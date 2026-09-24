@@ -1,37 +1,60 @@
 # Dracak-VTT
 
-Editor pravidel a databáze pro Dračí hlídku (DRH), s přihlášením a rolemi
-(admin / PJ / hráč). Vedle toho poběží mapa (přenesená z [Torch](https://github.com/Alairik/Torch)).
+Editor pravidel a databáze pro Dračí hlídku (DRH — domácí rozšíření nad
+core pravidly DrD), s přihlášením a rolemi (admin / PJ / hráč). Vedle
+toho poběží mapa (přenesená z [Torch](https://github.com/Alairik/Torch)).
+
+Stack: čisté **PHP + MySQL/MariaDB**, žádný build krok, žádná externí
+služba — nahraje se přes FTP na běžný hosting (WEDOS) a naimportuje přes
+phpMyAdmin. (Dřívější verze zkoušela Supabase/Postgres, zahozeno — reálný
+hosting je klasický sdílený PHP+MySQL, viz historie commitů.)
 
 ## Stav
 
-- ✅ Auth + role (admin/pj/hrac), skrývání záznamů (bestiář, PJ pravidla) přes RLS
-- ✅ Základní editor: navigace podle typů záznamů, rychlá šablona pro nový záznam
-- ⏳ Reálné schéma entit (kouzla, příšery, povolání, rasy…) — čeká na import
-  `drd-db-full-v1.sql` (13 tabulek, 1703 řádků: 41 povolání, 31 ras, 699 kouzel,
-  208 příšer). Zatím je `entities` obecná tabulka se `stats`/`scaling`/`variants`
-  jako JSONB, viz `supabase/migrations/0001_init_auth_roles.sql`.
+- ✅ Auth + role (admin/pj/hrac) přes PHP session + `password_hash`
+- ✅ Generický editor nad reálným schématem pravidel (`editor.php`) —
+  navigace podle typu záznamu, rychlá šablona (klíčová pole nahoře,
+  zbytek pod "Zobrazit všechna pole"), skrývání bestiáře a PJ poznámek
+  před hráči (na úrovni PHP kódu, ne jen UI — ověřeno testem)
+- ✅ Správa účtů (`admin.php`) — zakládání účtů, role, per-typ editační
+  práva pro roli hráč
+- ✅ Otestováno end-to-end na lokální MariaDB (import schématu + reálných
+  dat, login, viditelnost podle role, uložení/smazání záznamu, vynucení
+  práv i na úrovni POST requestu, ne jen skrytí tlačítka v UI)
+- ⏳ M:N vazby (obory magie u kouzla, efekty u schopnosti, zranitelnosti
+  příšer...) se zatím needitují přes UI — jen skalární pole tabulky.
+  Do doby, než přibude UI pro multi-select, se řeší přes phpMyAdmin.
 - ⏳ Mapa (zatím jen odkaz na Torch, `mapa.html`)
-- ⏳ Zakládání nových účtů (vyžaduje Supabase service-role klíč / Edge Function,
-  zatím se dělá přes Supabase dashboard → Authentication → Invite user)
+- ⏳ Tabulka `velikosti` (má PK `kod`, ne `id`) není v editoru zatím
+  zahrnutá — uprav přes phpMyAdmin, dokud generický editor nepočítá i
+  s jiným primárním klíčem než `id`
 
-## Spuštění
+## Data
 
-Žádný build krok — čistý statický web (HTML/CSS/JS), nahraje se na hosting
-tak jak je.
+`database/drd-db-full-v1.sql` — reálný obsah pravidel: 41 povolání,
+31 ras, 680 kouzel, 208 příšer, 342 schopností/dovedností, 219 vybavení,
+88 lektvarů a další. `docs/kontrolni-seznam-neuplnych-mist.md` eviduje
+283 míst v podkladu, která jsou poškozená/neúplná/nejasná — část bude
+časem potřeba doplnit z fotek knihy.
 
-1. Založ projekt na [supabase.com](https://supabase.com) (zdarma).
-2. V SQL editoru spusť `supabase/migrations/0001_init_auth_roles.sql`.
-3. Do `assets/js/config.js` doplň `SUPABASE_URL` a `SUPABASE_ANON_KEY`
-   (Project Settings → API — jde o veřejný anon klíč, ochranu dat řeší RLS
-   v migraci, ne tajnost klíče).
-4. Pozvi první účet přes Supabase dashboard a v tabulce `profiles` mu ručně
-   nastav `role = 'admin'`, než bude hotová admin obrazovka pro zakládání účtů.
+## Spuštění na WEDOSu
+
+1. V administraci WEDOSu založ MySQL databázi a uživatele k ní.
+2. V phpMyAdminu naimportuj postupně: `database/drd-db-schema-v1.sql`
+   (nebo rovnou `drd-db-full-v1.sql`, obsahuje schéma i data), pak
+   `database/0002_ucty_a_role.sql`.
+3. Zkopíruj `config.example.php` na `config.php` a doplň přihlašovací
+   údaje k databázi (`config.php` je v `.gitignore`, nikdy ho necommituj).
+4. Nahraj celý projekt přes FTP na hosting.
+5. Otevři `setup-admin.php` v prohlížeči a založ první admin účet. Pak
+   ten soubor z hostingu smaž (funguje jen jednou, dokud je tabulka
+   `ucty` prázdná, ale stejně nemá smysl ho tam nechávat).
+6. Přihlas se přes `index.php` → `editor.php`.
 
 ## Role
 
-- **admin** — spravuje účty a role (`admin.html`), edituje vše
+- **admin** — spravuje účty a role (`admin.php`), edituje vše
 - **pj** — vidí a edituje vše včetně bestiáře a PJ pravidel
-- **hrac** — nevidí záznamy označené jako skryté (bestiář, PJ pravidla ve
-  výchozím stavu); smí zakládat/editovat jen typy záznamů, které mu admin/PJ
-  povolí (`profiles.editable_types`)
+- **hrac** — v navigaci ani přímým URL nevidí bestiář/PJ poznámky ani
+  systémové číselníky; smí zakládat/editovat jen typy záznamů, které mu
+  admin povolí v `admin.php` (uložené v `ucet_opravneni`)
