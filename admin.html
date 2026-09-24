@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dračák VTT — správa účtů</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="editor-shell">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <strong id="user-name">…</strong>
+      <div class="role-badge">admin</div>
+    </div>
+    <a class="nav-item" href="editor.html">← Zpět do editoru</a>
+    <div class="sidebar-footer">
+      <button class="btn-secondary" id="logout-btn" style="width:100%;">Odhlásit se</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="main-header">
+      <h2>Správa účtů</h2>
+    </div>
+
+    <div class="note" style="margin-bottom:20px; max-width:640px;">
+      Nové účty (nové e-maily) se zatím zakládají přes Supabase dashboard
+      (Authentication → Users → Invite user) — anonymní klíč, který appka
+      používá, nemá právo účty vytvářet. Po přijetí pozvánky se tady dá
+      nastavit role a co smí uživatel sám editovat.
+    </div>
+
+    <div id="users-list" class="entity-list"></div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/auth.js"></script>
+<script>
+const ROLE_OPTIONS = ['hrac', 'pj', 'admin'];
+let editableTypesList = [];
+
+async function loadUsers() {
+  const { data: profiles, error } = await window.dracakClient
+    .from('profiles')
+    .select('id, display_name, role, editable_types')
+    .order('display_name');
+  if (error) {
+    document.getElementById('users-list').innerHTML = `<div class="note">Chyba: ${error.message}</div>`;
+    return;
+  }
+
+  const { data: types } = await window.dracakClient.from('entity_types').select('slug, name');
+  editableTypesList = types || [];
+
+  document.getElementById('users-list').innerHTML = profiles.map(p => `
+    <div class="entity-row" style="align-items:flex-start;">
+      <div style="flex:1;">
+        <strong>${p.display_name}</strong>
+        <div class="meta" style="margin-top:8px;">
+          Role:
+          <select data-user="${p.id}" class="role-select" style="width:auto; display:inline-block; margin-left:6px;">
+            ${ROLE_OPTIONS.map(r => `<option value="${r}" ${r === p.role ? 'selected' : ''}>${r}</option>`).join('')}
+          </select>
+        </div>
+        <div class="meta" style="margin-top:8px;">
+          Smí sám editovat (jen pro roli hráč):
+          <div style="margin-top:4px;">
+            ${editableTypesList.map(t => `
+              <label style="display:inline-flex; align-items:center; gap:4px; margin-right:12px; font-size:0.8rem;">
+                <input type="checkbox" style="width:auto;" data-user="${p.id}" data-type="${t.slug}"
+                  class="type-checkbox" ${p.editable_types.includes(t.slug) ? 'checked' : ''}>
+                ${t.name}
+              </label>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+      <button class="btn-secondary save-btn" data-user="${p.id}">Uložit</button>
+    </div>
+  `).join('');
+
+  document.querySelectorAll('.save-btn').forEach(btn => {
+    btn.addEventListener('click', () => saveUser(btn.dataset.user));
+  });
+}
+
+async function saveUser(userId) {
+  const role = document.querySelector(`.role-select[data-user="${userId}"]`).value;
+  const editable_types = Array.from(
+    document.querySelectorAll(`.type-checkbox[data-user="${userId}"]:checked`)
+  ).map(el => el.dataset.type);
+
+  const { error } = await window.dracakClient
+    .from('profiles')
+    .update({ role, editable_types })
+    .eq('id', userId);
+
+  if (error) alert('Nepodařilo se uložit: ' + error.message);
+  else alert('Uloženo.');
+}
+
+document.getElementById('logout-btn').addEventListener('click', async () => {
+  await dracakSignOut();
+  window.location.href = 'index.html';
+});
+
+(async () => {
+  const auth = await dracakRequireAuth();
+  if (!auth) return;
+  if (!auth.profile || auth.profile.role !== 'admin') {
+    document.querySelector('.main').innerHTML = '<div class="empty-state">Tahle stránka je jen pro administrátory.</div>';
+    return;
+  }
+  document.getElementById('user-name').textContent = auth.profile.display_name;
+  await loadUsers();
+})();
+</script>
+</body>
+</html>

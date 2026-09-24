@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dračák VTT — editor pravidel</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="editor-shell">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <strong id="user-name">…</strong>
+      <div class="role-badge" id="user-role">načítám…</div>
+    </div>
+    <nav id="nav-list"></nav>
+    <div class="sidebar-footer">
+      <a class="nav-item" href="mapa.html">🗺️ Mapa světa</a>
+      <a class="nav-item" id="admin-link" href="admin.html" style="display:none">⚙️ Správa účtů</a>
+      <button class="btn-secondary" id="logout-btn" style="width:100%; margin-top:10px;">Odhlásit se</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="main-header">
+      <h2 id="type-title">Vyber typ záznamu</h2>
+      <button class="btn-primary" id="add-btn" style="display:none; margin-top:0; width:auto;">+ Nový záznam</button>
+    </div>
+
+    <div id="entity-form-wrap" style="display:none; margin-bottom:20px;" class="card" style="max-width:none;">
+      <h3 style="margin-top:0;">Nový záznam — rychlá šablona</h3>
+      <form id="entity-form">
+        <label>Název</label>
+        <input name="title" required>
+        <label>Úroveň (nepovinné)</label>
+        <input name="level" type="number">
+        <label>Popis</label>
+        <textarea name="description"></textarea>
+        <label>Efekt v boji (nepovinné)</label>
+        <textarea name="combat_effect"></textarea>
+        <label>
+          <input type="checkbox" name="hidden_from_players" style="width:auto; display:inline-block;">
+          Skrýt před hráči
+        </label>
+        <div style="display:flex; gap:10px; margin-top:16px;">
+          <button class="btn-primary" type="submit" style="margin-top:0;">Uložit</button>
+          <button class="btn-secondary" type="button" id="cancel-form">Zrušit</button>
+        </div>
+      </form>
+    </div>
+
+    <div id="entity-list" class="entity-list"></div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/auth.js"></script>
+<script>
+let currentProfile = null;
+let currentType = null;
+let entityTypes = [];
+
+function canEditType(profile, typeSlug) {
+  if (!profile) return false;
+  if (profile.role === 'admin' || profile.role === 'pj') return true;
+  return (profile.editable_types || []).includes(typeSlug);
+}
+
+async function loadTypes() {
+  const { data, error } = await window.dracakClient
+    .from('entity_types')
+    .select('*')
+    .order('sort_order');
+  if (error) {
+    document.getElementById('nav-list').innerHTML = `<div class="note">Chyba načítání typů: ${error.message}</div>`;
+    return;
+  }
+  entityTypes = data.filter(t => currentProfile.role !== 'hrac' || !t.hidden_by_default);
+
+  const nav = document.getElementById('nav-list');
+  nav.innerHTML = entityTypes.map(t => `
+    <div class="nav-item" data-slug="${t.slug}">
+      <span>${t.name}</span>
+    </div>
+  `).join('');
+
+  nav.querySelectorAll('.nav-item').forEach(el => {
+    el.addEventListener('click', () => selectType(el.dataset.slug));
+  });
+
+  if (entityTypes.length) selectType(entityTypes[0].slug);
+}
+
+async function selectType(slug) {
+  currentType = slug;
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.slug === slug);
+  });
+  const type = entityTypes.find(t => t.slug === slug);
+  document.getElementById('type-title').textContent = type ? type.name : slug;
+
+  const addBtn = document.getElementById('add-btn');
+  addBtn.style.display = canEditType(currentProfile, slug) ? 'inline-block' : 'none';
+
+  hideForm();
+  await loadEntities(slug);
+}
+
+async function loadEntities(slug) {
+  const list = document.getElementById('entity-list');
+  list.innerHTML = '<div class="note">Načítám…</div>';
+  const { data, error } = await window.dracakClient
+    .from('entities')
+    .select('*')
+    .eq('type_slug', slug)
+    .order('title');
+
+  if (error) {
+    list.innerHTML = `<div class="note">Chyba: ${error.message}</div>`;
+    return;
+  }
+  if (!data.length) {
+    list.innerHTML = '<div class="empty-state">Zatím tu nic není. Buď první.</div>';
+    return;
+  }
+  list.innerHTML = data.map(e => `
+    <div class="entity-row">
+      <div>
+        <strong>${e.title}</strong>${e.level ? ` <span class="meta">Lv. ${e.level}</span>` : ''}
+        <div class="meta">${(e.description || '').slice(0, 120)}</div>
+      </div>
+      ${e.hidden_from_players ? '<span class="badge hidden">skryté</span>' : ''}
+    </div>
+  `).join('');
+}
+
+function hideForm() {
+  document.getElementById('entity-form-wrap').style.display = 'none';
+  document.getElementById('entity-form').reset();
+}
+
+document.getElementById('add-btn').addEventListener('click', () => {
+  document.getElementById('entity-form-wrap').style.display = 'block';
+});
+document.getElementById('cancel-form').addEventListener('click', hideForm);
+
+document.getElementById('entity-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const payload = {
+    type_slug: currentType,
+    title: fd.get('title'),
+    level: fd.get('level') ? Number(fd.get('level')) : null,
+    description: fd.get('description') || null,
+    combat_effect: fd.get('combat_effect') || null,
+    hidden_from_players: fd.get('hidden_from_players') === 'on',
+    created_by: currentProfile.id,
+  };
+  const { error } = await window.dracakClient.from('entities').insert(payload);
+  if (error) {
+    alert('Nepodařilo se uložit: ' + error.message);
+    return;
+  }
+  hideForm();
+  await loadEntities(currentType);
+});
+
+document.getElementById('logout-btn').addEventListener('click', async () => {
+  await dracakSignOut();
+  window.location.href = 'index.html';
+});
+
+(async () => {
+  const auth = await dracakRequireAuth();
+  if (!auth) return;
+  currentProfile = auth.profile;
+
+  if (!currentProfile) {
+    document.querySelector('.main').innerHTML = `
+      <div class="empty-state">
+        Tvůj účet ještě nemá profil s rolí. Ozvi se administrátorovi, ať ti ho založí
+        (tabulka <code>profiles</code>).
+      </div>`;
+    return;
+  }
+
+  document.getElementById('user-name').textContent = currentProfile.display_name;
+  document.getElementById('user-role').textContent = currentProfile.role;
+  if (currentProfile.role === 'admin') {
+    document.getElementById('admin-link').style.display = 'block';
+  }
+
+  await loadTypes();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dračák VTT — přihlášení</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="centered">
+  <div class="card">
+    <h1>Dračák VTT</h1>
+    <form id="login-form">
+      <label for="email">E-mail</label>
+      <input id="email" type="email" required autocomplete="username">
+      <label for="password">Heslo</label>
+      <input id="password" type="password" required autocomplete="current-password">
+      <button class="btn-primary" type="submit">Přihlásit se</button>
+      <div class="error" id="login-error"></div>
+    </form>
+    <p class="note">
+      Účty zakládá administrátor. Pokud nemáš přístup, ozvi se PJ.
+    </p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/auth.js"></script>
+<script>
+(async () => {
+  const existing = await dracakGetSession();
+  if (existing) window.location.href = 'editor.html';
+})();
+
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errorEl = document.getElementById('login-error');
+  errorEl.textContent = '';
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  try {
+    if (!window.dracakClient) {
+      errorEl.textContent = 'Supabase zatím není nakonfigurované (assets/js/config.js).';
+      return;
+    }
+    await dracakSignIn(email, password);
+    window.location.href = 'editor.html';
+  } catch (err) {
+    errorEl.textContent = 'Přihlášení se nezdařilo: ' + err.message;
+  }
+});
+</script>
+</body>
+</html>
