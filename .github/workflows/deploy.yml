@@ -29,3 +29,6 @@ jobs:
             .github/**
             **/*.md
             node_modules/**
+            database/**
+            docs/**
+            setup-admin.php
