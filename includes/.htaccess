@@ -1,0 +1,12 @@
+# Zakazuje přímý HTTP přístup do téhle složky. Platí jen tady (Apache
+# .htaccess se dědí jen do podadresářů), nezasahuje do kořenového
+# .htaccess ani do jiných projektů na hostingu. Appka soubory odsud
+# includuje interně přes PHP, ne přes HTTP, takže to nic nerozbije.
+
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>
