@@ -14,6 +14,27 @@ jobs:
         with:
           fetch-depth: 2
 
+      - name: Generate config.php
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASS: ${{ secrets.DB_PASS }}
+        run: |
+          php -r '
+          $config = [
+              "db_host" => getenv("DB_HOST"),
+              "db_name" => getenv("DB_NAME"),
+              "db_user" => getenv("DB_USER"),
+              "db_pass" => getenv("DB_PASS"),
+          ];
+          $php = "<?php\n"
+              . "// Vygenerováno GitHub Actions při deployi z repozitářových secrets.\n"
+              . "// Needituj ručně na serveru — příští deploy to přepíše. Necommituj do gitu.\n"
+              . "return " . var_export($config, true) . ";\n";
+          file_put_contents("config.php", $php);
+          '
+
       - name: FTP Deploy
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
