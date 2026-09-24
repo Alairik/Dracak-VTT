@@ -43,7 +43,6 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftps
           server-dir: ./
-          dry-run: true
           exclude: |
             **/.git*
             **/.git*/**
