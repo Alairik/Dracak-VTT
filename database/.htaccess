@@ -1,0 +1,13 @@
+# Zakazuje přímý HTTP přístup do téhle složky a podsložek. Platí jen tady
+# (Apache .htaccess se dědí jen do podadresářů tohoto adresáře) — nijak
+# neovlivňuje kořenový .htaccess ani jiné projekty na hostingu.
+# Appka čte data přes MySQL, ne přes webserver, takže tenhle blok nic
+# nerozbije.
+
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>
