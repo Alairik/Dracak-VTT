@@ -56,81 +56,81 @@ foreach ($pdo->query('SELECT ucet_id, tabulka FROM ucet_opravneni')->fetchAll() 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dračák VTT — správa účtů</title>
-<link rel="stylesheet" href="assets/css/style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/organic.css">
 </head>
 <body>
-<div class="editor-shell">
-  <aside class="sidebar">
-    <div class="sidebar-header">
-      <strong><?= htmlspecialchars($user['jmeno']) ?></strong>
-      <div class="role-badge">admin</div>
-    </div>
-    <a class="nav-item" href="dashboard.php">🏠 Dashboard</a>
-    <a class="nav-item" href="editor.php">← Zpět do editoru</a>
-    <div class="sidebar-footer">
-      <form method="post" action="logout.php"><button class="btn-secondary" style="width:100%;">Odhlásit se</button></form>
+<button class="menu-btn" id="menuBtn" type="button" aria-label="Otevřít navigaci">☰</button>
+<div class="backdrop" id="backdrop"></div>
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">Dračák VTT</div>
+    <div class="sidebar-user"><?= htmlspecialchars($user['jmeno']) ?><span class="role-badge">admin</span></div>
+    <a class="mock-item" href="dashboard.php">🏠 Dashboard</a>
+    <a class="mock-item active" href="admin.php">Správa účtů</a>
+    <a class="mock-item" href="editor.php">← Zpět do editoru</a>
+    <div class="sidebar-bottom">
+      <form method="post" action="logout.php"><button class="btn btn-ghost" style="width:100%;">Odhlásit se</button></form>
     </div>
   </aside>
 
   <main class="main">
-    <div class="main-header"><h2>Správa účtů</h2></div>
-    <?php if ($error): ?><div class="error" style="margin-bottom:16px;"><?= htmlspecialchars($error) ?></div><?php endif; ?>
+    <h1 class="page-title">Správa účtů</h1>
+    <?php if ($error): ?><p class="error"><?= htmlspecialchars($error) ?></p><?php endif; ?>
 
-    <div class="card" style="max-width:480px; margin-bottom:24px;">
-      <h3 style="margin-top:0;">Nový účet</h3>
+    <div class="card elev-sm" style="max-width:480px; margin:16px 0 24px;">
+      <h3 style="font-size:16px;margin-bottom:12px;">Nový účet</h3>
       <form method="post">
         <input type="hidden" name="akce" value="vytvorit">
-        <label>E-mail</label>
-        <input type="email" name="email" required>
-        <label>Jméno</label>
-        <input type="text" name="jmeno" required>
-        <label>Heslo (min. 8 znaků)</label>
-        <input type="password" name="heslo" required minlength="8">
-        <label>Role</label>
-        <select name="role">
-          <option value="hrac">hráč</option>
-          <option value="pj">PJ</option>
-          <option value="admin">admin</option>
-        </select>
-        <button class="btn-primary" type="submit">Založit účet</button>
+        <div class="field"><label>E-mail</label><input type="email" name="email" required></div>
+        <div class="field"><label>Jméno</label><input type="text" name="jmeno" required></div>
+        <div class="field"><label>Heslo (min. 8 znaků)</label><input type="password" name="heslo" required minlength="8"></div>
+        <div class="field"><label>Role</label>
+          <select name="role">
+            <option value="hrac">hráč</option>
+            <option value="pj">PJ</option>
+            <option value="admin">admin</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" type="submit">Založit účet</button>
       </form>
     </div>
 
-    <div class="entity-list">
+    <div class="records-grid" style="grid-template-columns:1fr;">
       <?php foreach ($users as $u): ?>
-        <div class="entity-row" style="align-items:flex-start;">
+        <div class="card elev-sm" style="display:flex;justify-content:space-between;gap:16px;align-items:flex-start;">
           <form method="post" style="flex:1;">
             <input type="hidden" name="akce" value="ulozit">
             <input type="hidden" name="id" value="<?= (int)$u['id'] ?>">
-            <strong><?= htmlspecialchars($u['jmeno']) ?></strong>
-            <span class="meta"><?= htmlspecialchars($u['email']) ?></span>
-            <div style="margin-top:8px;">
-              Role:
-              <select name="role" style="width:auto; display:inline-block;">
+            <div class="rec-title" style="font-size:16px;"><?= htmlspecialchars($u['jmeno']) ?></div>
+            <div class="note"><?= htmlspecialchars($u['email']) ?></div>
+            <div class="field" style="margin-top:10px;max-width:200px;">
+              <label>Role</label>
+              <select name="role">
                 <?php foreach (['hrac' => 'hráč', 'pj' => 'PJ', 'admin' => 'admin'] as $val => $label): ?>
                   <option value="<?= $val ?>" <?= $u['role'] === $val ? 'selected' : '' ?>><?= $label ?></option>
                 <?php endforeach; ?>
               </select>
             </div>
-            <div class="meta" style="margin-top:8px;">
-              Smí sám editovat (jen pro roli hráč):
-              <div style="margin-top:4px;">
-                <?php foreach ($editableTables as $key => $cfg): ?>
-                  <label style="display:inline-flex; align-items:center; gap:4px; margin-right:12px; font-size:0.8rem;">
-                    <input type="checkbox" style="width:auto;" name="tabulky[]" value="<?= $key ?>"
-                      <?= in_array($key, $permsByUser[$u['id']] ?? [], true) ? 'checked' : '' ?>>
-                    <?= htmlspecialchars($cfg['label']) ?>
-                  </label>
-                <?php endforeach; ?>
-              </div>
+            <div class="note" style="margin-top:10px;">Smí sám editovat (jen pro roli hráč):</div>
+            <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;">
+              <?php foreach ($editableTables as $key => $cfg): ?>
+                <label class="tag" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+                  <input type="checkbox" style="width:auto;" name="tabulky[]" value="<?= $key ?>"
+                    <?= in_array($key, $permsByUser[$u['id']] ?? [], true) ? 'checked' : '' ?>>
+                  <?= htmlspecialchars($cfg['label']) ?>
+                </label>
+              <?php endforeach; ?>
             </div>
-            <button class="btn-secondary" type="submit" style="margin-top:10px;">Uložit</button>
+            <button class="btn btn-secondary" type="submit" style="margin-top:12px;font-size:12px;padding:6px 12px;">Uložit</button>
           </form>
           <?php if ((int)$u['id'] !== (int)$user['id']): ?>
             <form method="post" onsubmit="return confirm('Smazat účet <?= htmlspecialchars($u['email']) ?>?');">
               <input type="hidden" name="akce" value="smazat">
               <input type="hidden" name="id" value="<?= (int)$u['id'] ?>">
-              <button class="btn-secondary">Smazat</button>
+              <button class="btn btn-ghost" type="submit">Smazat</button>
             </form>
           <?php endif; ?>
         </div>
@@ -138,5 +138,13 @@ foreach ($pdo->query('SELECT ucet_id, tabulka FROM ucet_opravneni')->fetchAll() 
     </div>
   </main>
 </div>
+<script>
+(function(){
+  var menuBtn = document.getElementById('menuBtn'), sidebar = document.getElementById('sidebar'), backdrop = document.getElementById('backdrop');
+  function closeNav(){ sidebar.classList.remove('open'); backdrop.classList.remove('show'); }
+  if (menuBtn) menuBtn.addEventListener('click', function(){ sidebar.classList.toggle('open'); backdrop.classList.toggle('show'); });
+  if (backdrop) backdrop.addEventListener('click', closeNav);
+})();
+</script>
 </body>
 </html>

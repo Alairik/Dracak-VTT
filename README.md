@@ -17,18 +17,23 @@ hosting je klasický sdílený PHP+MySQL, viz historie commitů.)
   s rolí `pj`/`admin` — na serveru (viz `content/`), ne jen schované v JS.
   `index.php` na ni odkazuje, `editor.php` má odkaz zpátky.
 - ✅ Auth + role (admin/pj/hrac) přes PHP session + `password_hash`
-- ✅ Generický editor nad reálným schématem pravidel (`editor.php`) —
-  navigace podle typu záznamu, rychlá šablona (klíčová pole nahoře,
-  zbytek pod "Zobrazit všechna pole"), skrývání bestiáře a PJ poznámek
-  před hráči (na úrovni PHP kódu, ne jen UI — ověřeno testem)
+- ✅ Editor pravidel (`editor.php`) redesignovaný podle
+  `docs/zadani-redesign-ui.md` + design handoffu (Organic design systém,
+  Playfair Display): hledání entit + "naposledy otevřené" v sidebaru,
+  server-side hledání a filtry (rozsahové i select, per entitu), karty
+  záznamů ve stylu knihy pravidel, M:N vztahy editovatelné jako tag box
+  přímo na formuláři (rasové schopnosti, obory magie, zranitelnosti...),
+  kompaktní zápis kostek ("2k6+2" místo rozházených polí), vlastní
+  jednodušší UI pro číselníky, maticový pohled na `velikost_modifikatory`.
+  Skrývání bestiáře/PJ poznámek před hráči zůstává na úrovni PHP kódu.
+- ✅ Row-level vlastnictví záznamů — hráč s table-level oprávněním smí
+  upravovat jen svoje vlastní záznamy (`created_by`), ne cizí/systémové;
+  vynuceno i na POST requestu, ne jen skrytím tlačítka (`dracak_can_edit_row()`).
 - ✅ Správa účtů (`admin.php`) — zakládání účtů, role, per-typ editační
   práva pro roli hráč
 - ✅ Otestováno end-to-end na lokální MariaDB (import schématu + reálných
-  dat, login, viditelnost podle role, uložení/smazání záznamu, vynucení
-  práv i na úrovni POST requestu, ne jen skrytí tlačítka v UI)
-- ⏳ M:N vazby (obory magie u kouzla, efekty u schopnosti, zranitelnosti
-  příšer...) se zatím needitují přes UI — jen skalární pole tabulky.
-  Do doby, než přibude UI pro multi-select, se řeší přes phpMyAdmin.
+  dat, login, viditelnost podle role, uložení/smazání záznamu, M:N vazby,
+  vynucení práv i na úrovni POST requestu, ne jen skrytí tlačítka v UI)
 - ⏳ Mapa (zatím jen odkaz na Torch, `mapa.html`)
 - ⏳ Tabulka `velikosti` (má PK `kod`, ne `id`) není v editoru zatím
   zahrnutá — uprav přes phpMyAdmin, dokud generický editor nepočítá i

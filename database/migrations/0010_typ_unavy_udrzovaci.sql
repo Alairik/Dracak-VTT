@@ -1,0 +1,21 @@
+-- Oprava datového modelu typ_unavy u kouzel (viz konverzace — ověřeno
+-- proti přepsanému textu pravidel v content/pravidla-hrac.html):
+--
+-- vyčerpávající/nevyčerpávající je reálná a používaná osa (52× nevycerpavajici
+-- v drd-db-full-v1.sql) a odpovídá stínové/reálné únavě z pravidel
+-- ("vyčerpávající kouzlo... Jedná se o únavu stínovou" / "nevyčerpávající
+-- kouzla... nejedná se o stínovou únavu") — zůstává beze změny.
+--
+-- 'udrzovaci' a 'zaostreni_vule' v původním ENUM nejsou skutečné hodnoty
+-- typu únavy (žádný z ~2900 řádků kouzel je nepoužívá — jsou jen
+-- v definici sloupce). Podle textu je "udržovací magie" nezávislá
+-- vlastnost navíc (kouzlo může být nevyčerpávající PŘI SESLÁNÍ a ještě
+-- k tomu vyžadovat udržovací magenergii, dokud běží), ne alternativa
+-- k vyčerpávající/nevyčerpávající — proto samostatný sloupec, ne další
+-- hodnota ve stejném enumu. "Zaostření vůle" je v textu popsané jako
+-- činnost kouzelníka (jako meditace), ne vlastnost kouzla — v appce se
+-- od teď u typu únavy kouzla vůbec nenabízí (entities.php).
+--
+-- Sloupec typ_unavy samotný se neupravuje (žádný DROP/MODIFY) — appka
+-- teď jen nenabízí ty dvě nepoužívané hodnoty v UI.
+ALTER TABLE kouzla ADD COLUMN udrzovaci BOOLEAN NOT NULL DEFAULT FALSE AFTER typ_unavy;

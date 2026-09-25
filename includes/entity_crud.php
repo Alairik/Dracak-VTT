@@ -40,10 +40,28 @@ function dracak_entity_fields(string $table, array $config): array
     return dracak_auto_fields($table);
 }
 
-function dracak_entity_list(string $table, array $config): array
+// $filters = ['search' => string, 'where' => [sql fragmenty s ? placeholdery], 'params' => [...]]
+// Volající (editor.php) sestaví $filters jen z hodnot ověřených proti
+// $config['fields']/definici filtru — nikdy přímo z $_GET do SQL.
+function dracak_entity_list(string $table, array $config, array $filters = []): array
 {
     $orderBy = $config['order_by'] ?? 'id';
-    return dracak_db()->query("SELECT * FROM `$table` ORDER BY `$orderBy`")->fetchAll();
+    $sql = "SELECT * FROM `$table`";
+    $where = $filters['where'] ?? [];
+    if ($where) {
+        $sql .= ' WHERE ' . implode(' AND ', $where);
+    }
+    $sql .= " ORDER BY `$orderBy`";
+    $stmt = dracak_db()->prepare($sql);
+    $stmt->execute($filters['params'] ?? []);
+    return $stmt->fetchAll();
+}
+
+// Distinct hodnoty sloupce pro select-filtr (jen když pole nemá pevné 'options').
+function dracak_distinct_values(string $table, string $column): array
+{
+    $stmt = dracak_db()->query("SELECT DISTINCT `$column` AS v FROM `$table` WHERE `$column` IS NOT NULL AND `$column` != '' ORDER BY `$column`");
+    return array_column($stmt->fetchAll(), 'v');
 }
 
 function dracak_entity_get(string $table, int $id): ?array
@@ -62,10 +80,19 @@ function dracak_fk_options(string $refTable, string $refLabel): array
 // Uloží entitu (insert když $id je null, jinak update). Vrací nové/stávající id.
 // $input = $_POST. Sloupce se berou jen z definice polí (whitelist) - nikdy
 // se neinterpoluje klíč z requestu přímo do SQL.
-function dracak_entity_save(string $table, array $fields, ?int $id, array $input): int
+// $config a $currentUserId volitelné: když $config['row_owned'] a jde o
+// insert, nastaví se created_by na aktuálního uživatele (viz auth.php
+// dracak_can_edit_row() — hráč pak smí upravovat jen svoje vlastní řádky).
+function dracak_entity_save(string $table, array $fields, ?int $id, array $input, ?array $config = null, ?int $currentUserId = null): int
 {
     $data = [];
     foreach ($fields as $f) {
+        // Core kostky sloupce (pocet_kostek/typ_kostky/pevny_bonus) se v
+        // UI needitují jednotlivě — nahrazuje je syntetické pole
+        // 'kostky_zapis' zpracované zvlášť níž, viz dracak_kostky_zapis_parse().
+        if (!empty($f['kostky_core'])) {
+            continue;
+        }
         $name = $f['name'];
         if ($f['type'] === 'checkbox') {
             $data[$name] = isset($input[$name]) ? 1 : 0;
@@ -83,20 +110,115 @@ function dracak_entity_save(string $table, array $fields, ?int $id, array $input
         $data[$name] = $value;
     }
 
+    if (array_filter($fields, fn($f) => !empty($f['kostky_core']))) {
+        $data = array_merge($data, dracak_kostky_zapis_parse((string)($input['kostky_zapis'] ?? '')));
+    }
+
     $pdo = dracak_db();
     if ($id === null) {
+        if (!empty($config['row_owned']) && $currentUserId !== null) {
+            $data['created_by'] = $currentUserId;
+        }
         $cols = array_keys($data);
         $placeholders = array_fill(0, count($cols), '?');
         $sql = "INSERT INTO `$table` (" . implode(',', array_map(fn($c) => "`$c`", $cols)) . ')'
             . ' VALUES (' . implode(',', $placeholders) . ')';
         $pdo->prepare($sql)->execute(array_values($data));
-        return (int)$pdo->lastInsertId();
+        $newId = (int)$pdo->lastInsertId();
+        dracak_relations_save($table, $newId, $config['relations'] ?? [], $input);
+        return $newId;
     }
 
     $set = implode(',', array_map(fn($c) => "`$c` = ?", array_keys($data)));
     $sql = "UPDATE `$table` SET $set WHERE id = ?";
     $pdo->prepare($sql)->execute([...array_values($data), $id]);
+    dracak_relations_save($table, $id, $config['relations'] ?? [], $input);
     return $id;
+}
+
+// Zápis "2k6+2" / "1k6" / "" -> sloupce pocet_kostek/typ_kostky/pevny_bonus.
+// Neplatný/prázdný zápis = všechny tři na NULL (žádná kostka u záznamu).
+function dracak_kostky_zapis_parse(string $zapis): array
+{
+    $zapis = trim($zapis);
+    if ($zapis === '' || !preg_match('/^(\d+)\s*(k\d+)\s*([+-]\s*\d+)?$/i', $zapis, $m)) {
+        return ['pocet_kostek' => null, 'typ_kostky' => null, 'pevny_bonus' => null];
+    }
+    return [
+        'pocet_kostek' => (int)$m[1],
+        'typ_kostky' => strtolower($m[2]),
+        'pevny_bonus' => isset($m[3]) ? (int)str_replace(' ', '', $m[3]) : null,
+    ];
+}
+
+// Opak dracak_kostky_zapis_parse() — sloupce -> "2k6+2" pro edit formulář.
+function dracak_kostky_zapis_format(array $row): string
+{
+    if (empty($row['pocet_kostek']) || empty($row['typ_kostky'])) {
+        return '';
+    }
+    $text = $row['pocet_kostek'] . $row['typ_kostky'];
+    if (!empty($row['pevny_bonus'])) {
+        $bonus = (int)$row['pevny_bonus'];
+        $text .= $bonus >= 0 ? "+$bonus" : (string)$bonus;
+    }
+    return $text;
+}
+
+// Přepíše M:N vztahy záznamu podle definice v entities.php ('relations').
+// $input = $_POST, klíče 'rel_{join_table}' (pole ID) a volitelně
+// 'rel_{join_table}_extra' (pole ID => extra hodnota). Vždy smaže staré
+// vazby a zapíše nové (jednoduché, bezpečné proti duplicitám i mazání).
+function dracak_relations_save(string $table, int $id, array $relations, array $input): void
+{
+    if (!$relations) {
+        return;
+    }
+    $pdo = dracak_db();
+    foreach ($relations as $rel) {
+        $join = $rel['join_table'];
+        $ownFk = $rel['own_fk'];
+        $otherFk = $rel['other_fk'];
+        $pdo->prepare("DELETE FROM `$join` WHERE `$ownFk` = ?")->execute([$id]);
+
+        $ids = array_map('intval', (array)($input['rel_' . $join] ?? []));
+        $extra = (array)($input['rel_' . $join . '_extra'] ?? []);
+        if (!$ids) {
+            continue;
+        }
+        $hasExtra = !empty($rel['extra_column']);
+        $sql = $hasExtra
+            ? "INSERT INTO `$join` (`$ownFk`, `$otherFk`, `{$rel['extra_column']}`) VALUES (?, ?, ?)"
+            : "INSERT INTO `$join` (`$ownFk`, `$otherFk`) VALUES (?, ?)";
+        $ins = $pdo->prepare($sql);
+        foreach (array_unique($ids) as $otherId) {
+            if ($hasExtra) {
+                $val = trim((string)($extra[$otherId] ?? ''));
+                $ins->execute([$id, $otherId, $val !== '' ? $val : null]);
+            } else {
+                $ins->execute([$id, $otherId]);
+            }
+        }
+    }
+}
+
+// Aktuálně přiřazené položky vztahu (s labelem + extra hodnotou), pro
+// vykreslení tagů v edit formuláři.
+function dracak_relation_current(string $join, string $ownFk, string $otherFk, string $otherTable, string $otherLabel, int $id, ?string $extraColumn = null): array
+{
+    $extraSql = $extraColumn ? ", j.`$extraColumn` AS extra" : '';
+    $sql = "SELECT o.id, o.`$otherLabel` AS label$extraSql FROM `$join` j
+            JOIN `$otherTable` o ON o.id = j.`$otherFk`
+            WHERE j.`$ownFk` = ? ORDER BY o.`$otherLabel`";
+    $stmt = dracak_db()->prepare($sql);
+    $stmt->execute([$id]);
+    return $stmt->fetchAll();
+}
+
+// Všechny možné položky druhé strany vztahu (pro "+ přidat" dropdown).
+function dracak_relation_options(string $otherTable, string $otherLabel): array
+{
+    return dracak_db()->query("SELECT id, `$otherLabel` AS label FROM `$otherTable` ORDER BY `$otherLabel`")->fetchAll();
 }
 
 function dracak_entity_delete(string $table, int $id): void

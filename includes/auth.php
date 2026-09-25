@@ -91,3 +91,23 @@ function dracak_can_edit(array $user, string $table): bool
     }
     return in_array($table, dracak_editable_tables($user), true);
 }
+
+// Row-level vlastnictví (viz docs/zadani-redesign-ui.md, rozhodnutí #5 a
+// migrace database/migrations/0009_row_ownership.sql). admin/pj beze
+// změny edituje vše; hráč smí i s table-level oprávněním upravovat jen
+// svoje vlastní záznamy (created_by === jeho id). Tabulky bez row_owned
+// (číselníky, bestiář...) se řídí jen dracak_can_edit() jako dřív.
+function dracak_can_edit_row(array $user, string $table, array $config, ?array $row): bool
+{
+    if (!dracak_can_edit($user, $table)) {
+        return false;
+    }
+    if (empty($config['row_owned']) || in_array($user['role'], ['admin', 'pj'], true)) {
+        return true;
+    }
+    // Nový záznam (row === null): hráč ho zakládá, vlastníkem bude on sám.
+    if ($row === null) {
+        return true;
+    }
+    return isset($row['created_by']) && (int)$row['created_by'] === (int)$user['id'];
+}
