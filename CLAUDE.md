@@ -35,6 +35,20 @@
   kde třetí selže, první dva zůstanou v DB natrvalo i po chybě — to je
   limit enginu, ne chyba skriptu. Drž migrace pokud možno malé a
   soustředěné na jednu věc.
+- **DB účet, kterým `migrate.php` běží (`w...`), má na Wedosu natvrdo jen
+  DML (SELECT/INSERT/UPDATE/DELETE) — nikdy CREATE ani ALTER.** To není
+  nastavitelné, GRANT selže i pod admin účtem (`a...`), Wedos to
+  zákazníkovi nedovolí vůbec. Proto:
+  - Tabulka `migrace_log` musí zůstat založená ručně přes phpMyAdmin
+    pod **admin** účtem. Pokud by někdy zmizela (nová DB, obnova ze
+    zálohy…), `migrate.php` na ní spadne — sám si ji založit nemůže.
+  - Jakákoli migrace obsahující CREATE/ALTER musí být po pushi **ručně**
+    spuštěná přes phpMyAdmin (admin účet) a zapsaná do `migrace_log` —
+    `migrate.php` pod web účtem takový příkaz nikdy neprovede. Migrace
+    obsahující jen INSERT/UPDATE/DELETE proběhnou automaticky v pořádku.
+  - `migrate.php` má fallback na `CREATE TABLE IF NOT EXISTS migrace_log`
+    (zkusí ho, při zamítnutí ověří dostupnost tabulky přes SELECT) — to
+    řeší jen to, že tabulka už existuje, ne založení nové.
 - **`scripts/` smí na serveru obsahovat JEN `migrate.php`.** Nic jiného
   se tam nepřidává, aniž by se zároveň upravil `exclude` v `deploy.yml`
   — momentálně se `scripts/` nijak nevylučuje (spoléhá se na to, že tam
