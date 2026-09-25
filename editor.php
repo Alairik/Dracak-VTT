@@ -200,7 +200,7 @@ if ($nastroj === null) {
 <div class="backdrop" id="backdrop"></div>
 <div class="shell">
   <aside class="sidebar" id="sidebar">
-    <div class="brand">Dračák VTT</div>
+    <a class="brand" href="dashboard.php" style="text-decoration:none;color:inherit;">🏠 Dračák VTT</a>
     <div class="sidebar-user">
       <?= htmlspecialchars($user['jmeno']) ?><span class="role-badge"><?= htmlspecialchars($user['role']) ?></span>
     </div>

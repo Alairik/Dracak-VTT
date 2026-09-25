@@ -42,7 +42,7 @@ $headingsJson = json_encode($headings, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG);
 <div class="app variant-hb">
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-head">
-      <p class="sidebar-title">Pravidla DrD + domácí pravidla</p>
+      <p class="sidebar-title"><a href="<?= $user ? 'dashboard.php' : 'index.php' ?>" style="text-decoration:none;color:inherit;">🏠 Pravidla DrD + domácí pravidla</a></p>
       <p class="sidebar-sub">PPZ + PPP + PPE &middot; verze 1.6 + homebrew</p>
 
       <div class="auth-box">

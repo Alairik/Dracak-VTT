@@ -66,7 +66,7 @@ foreach ($pdo->query('SELECT ucet_id, tabulka FROM ucet_opravneni')->fetchAll() 
 <div class="backdrop" id="backdrop"></div>
 <div class="shell">
   <aside class="sidebar" id="sidebar">
-    <div class="brand">Dračák VTT</div>
+    <a class="brand" href="dashboard.php" style="text-decoration:none;color:inherit;">🏠 Dračák VTT</a>
     <div class="sidebar-user"><?= htmlspecialchars($user['jmeno']) ?><span class="role-badge">admin</span></div>
     <a class="mock-item" href="dashboard.php">🏠 Dashboard</a>
     <a class="mock-item active" href="admin.php">Správa účtů</a>
