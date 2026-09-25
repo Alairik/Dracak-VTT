@@ -89,10 +89,11 @@ return [
         'hidden_from_players' => false,
         'row_owned' => true,
         'order_by' => 'nazev',
-        'summary_fields' => ['druh' => 'Druh', 'uroven_od' => 'Od Lv.'],
+        'summary_fields' => ['druh' => 'Druh', 'vlastnost_id' => 'Vlastnost', 'uroven_od' => 'Od Lv.'],
         'fields' => [
             ['name' => 'nazev', 'label' => 'Název', 'type' => 'text', 'required' => true, 'quick' => true],
             ['name' => 'druh', 'label' => 'Druh', 'type' => 'select', 'options' => ['schopnost', 'dovednost'], 'quick' => true, 'filter' => 'select'],
+            ['name' => 'vlastnost_id', 'label' => 'Klíčová vlastnost', 'type' => 'select_fk', 'ref_table' => 'vlastnosti', 'ref_label' => 'nazev', 'quick' => true, 'filter' => 'select_fk'],
             ['name' => 'uroven_od', 'label' => 'Od úrovně', 'type' => 'number', 'quick' => true, 'filter' => 'range'],
             ...dracak_kostky_pole(),
             ['name' => 'popis', 'label' => 'Popis', 'type' => 'textarea', 'quick' => true],

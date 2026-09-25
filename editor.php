@@ -125,7 +125,7 @@ if ($nastroj === null) {
                 $filterValues[$name] = ['min' => $min, 'max' => $max];
                 if ($min !== '' && is_numeric($min)) { $where[] = "`$name` >= ?"; $params[] = $min; }
                 if ($max !== '' && is_numeric($max)) { $where[] = "`$name` <= ?"; $params[] = $max; }
-            } elseif ($f['filter'] === 'select') {
+            } elseif ($f['filter'] === 'select' || $f['filter'] === 'select_fk') {
                 $val = trim((string)($_GET[$name] ?? ''));
                 $filterValues[$name] = $val;
                 if ($val !== '') { $where[] = "`$name` = ?"; $params[] = $val; }
@@ -173,8 +173,11 @@ if ($nastroj === null) {
     $filterSelectOptions = [];
     if ($editRow === null && !$isCiselnik) {
         foreach ($fields as $f) {
-            if (($f['filter'] ?? null) !== 'select') continue;
-            $filterSelectOptions[$f['name']] = $f['options'] ?: dracak_distinct_values($table, $f['name']);
+            if (($f['filter'] ?? null) === 'select') {
+                $filterSelectOptions[$f['name']] = $f['options'] ?: dracak_distinct_values($table, $f['name']);
+            } elseif (($f['filter'] ?? null) === 'select_fk') {
+                $filterSelectOptions[$f['name']] = dracak_fk_options($f['ref_table'], $f['ref_label']);
+            }
         }
         if (in_array('kouzla_mana_dosah_povolani', $config['special_filters'] ?? [], true)) {
             $filterSelectOptions['__povolani'] = dracak_db()->query(
@@ -448,6 +451,15 @@ if ($nastroj === null) {
             <?php endforeach; ?>
           </select>
         </div>
+      <?php elseif ($f['filter'] === 'select_fk'): ?>
+        <div><div class="filter-lbl"><?= htmlspecialchars($f['label']) ?></div>
+          <select class="input filter-select" name="<?= $name ?>" onchange="this.form.submit()">
+            <option value="">vše</option>
+            <?php foreach ($filterSelectOptions[$name] ?? [] as $opt): ?>
+              <option value="<?= (int)$opt['id'] ?>" <?= (string)($filterValues[$name] ?? '') === (string)$opt['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string)$opt['label']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
       <?php endif; endforeach;
       if (in_array('kouzla_mana_dosah_povolani', $config['special_filters'] ?? [], true)): ?>
         <div><div class="filter-lbl">Mana (magů)</div>
@@ -484,8 +496,20 @@ if ($nastroj === null) {
         <?php foreach ($rows as $row):
             $titleField = $config['fields'][0]['name'] ?? array_key_first($row);
             $gridFields = [];
+            static $fkLabelCache = [];
             foreach ($config['summary_fields'] ?? [] as $field => $label) {
-                if (!empty($row[$field])) $gridFields[] = ['k' => $label, 'v' => $row[$field]];
+                if (empty($row[$field])) continue;
+                $fieldDef = null;
+                foreach ($fields as $fd) { if ($fd['name'] === $field) { $fieldDef = $fd; break; } }
+                if ($fieldDef && $fieldDef['type'] === 'select_fk') {
+                    $cacheKey = $fieldDef['ref_table'] . '.' . $fieldDef['ref_label'];
+                    if (!isset($fkLabelCache[$cacheKey])) {
+                        $fkLabelCache[$cacheKey] = array_column(dracak_fk_options($fieldDef['ref_table'], $fieldDef['ref_label']), 'label', 'id');
+                    }
+                    $gridFields[] = ['k' => $label, 'v' => $fkLabelCache[$cacheKey][(int)$row[$field]] ?? $row[$field]];
+                } else {
+                    $gridFields[] = ['k' => $label, 'v' => $row[$field]];
+                }
             }
             $kostky = dracak_kostky_zapis_format($row);
             if ($kostky) $gridFields[] = ['k' => 'Kostky', 'v' => $kostky];
