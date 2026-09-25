@@ -14,6 +14,14 @@ jobs:
         with:
           fetch-depth: 2
 
+      - name: Run pending DB migrations
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASS: ${{ secrets.DB_PASS }}
+        run: php scripts/run_migrations.php
+
       - name: Generate config.php
         env:
           DB_HOST: ${{ secrets.DB_HOST }}
@@ -51,4 +59,5 @@ jobs:
             node_modules/**
             database/**
             docs/**
+            scripts/**
             setup-admin.php
