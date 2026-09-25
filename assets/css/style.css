@@ -209,3 +209,55 @@ button {
   color: var(--accent);
   white-space: nowrap;
 }
+
+/* --- Dashboard --- */
+.dashboard {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 32px 24px 60px;
+}
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 28px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.dashboard-header h1 { margin: 0 0 4px; font-size: 1.5rem; }
+.dashboard-header .role-badge { margin-top: 0; }
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+.tile {
+  display: block;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  text-decoration: none;
+  color: var(--text);
+  transition: border-color .15s ease;
+}
+.tile:hover { border-color: var(--accent); }
+.tile-icon { font-size: 1.6rem; }
+.tile-title { font-size: 1.05rem; font-weight: 600; margin: 10px 0 4px; color: var(--text); }
+.tile-desc { font-size: 0.83rem; color: var(--text-dim); }
+.tile.tile-soon {
+  cursor: default;
+  opacity: 0.55;
+}
+.tile.tile-soon:hover { border-color: var(--border); }
+.tile-soon-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1px 8px;
+  margin-top: 8px;
+}

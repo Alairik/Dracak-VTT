@@ -4,7 +4,7 @@ require_once __DIR__ . '/includes/auth.php';
 
 dracak_session_start();
 if (dracak_current_user()) {
-    header('Location: editor.php');
+    header('Location: dashboard.php');
     exit;
 }
 
@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email'] ?? '');
     $password = (string)($_POST['password'] ?? '');
     if (dracak_login($email, $password)) {
-        header('Location: editor.php');
+        header('Location: dashboard.php');
         exit;
     }
     $error = 'Nesprávný e-mail nebo heslo.';

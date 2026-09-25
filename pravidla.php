@@ -51,7 +51,7 @@ $headingsJson = json_encode($headings, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG);
             <span class="auth-name">Přihlášen: <strong><?= htmlspecialchars($user['jmeno'] ?: $user['email']) ?></strong> (<?= htmlspecialchars($user['role']) ?>)</span>
           </div>
           <div class="auth-actions">
-            <a class="auth-db" href="editor.php">Otevřít databázi →</a>
+            <a class="auth-db" href="dashboard.php">Dashboard →</a>
             <a href="logout.php">Odhlásit se</a>
           </div>
         <?php else: ?>
