@@ -54,8 +54,20 @@ $config = require $configPath;
 $expectedToken = $config['migrate_token'] ?? '';
 $providedToken = $_SERVER['HTTP_X_MIGRATE_TOKEN'] ?? $_GET['token'] ?? '';
 
-if ($expectedToken === '' || $providedToken === '' || !hash_equals($expectedToken, $providedToken)) {
-    migrate_fail(403, 'Neplatný nebo chybějící token.');
+// config.php vzniká z getenv() v deploy.yml — chybějící/prázdný GitHub
+// Secret se zapíše jako bool false, ne jako "". hash_equals() se
+// striktními typy na boolu spadne s TypeError (neošetřená = prázdné
+// tělo + 500, bez vysvětlení) — is_string() to napřed odchytí a vrátí
+// čitelnou chybu místo pádu.
+if (
+    !is_string($expectedToken) || $expectedToken === ''
+    || !is_string($providedToken) || $providedToken === ''
+    || !hash_equals($expectedToken, $providedToken)
+) {
+    $reason = !is_string($expectedToken) || $expectedToken === ''
+        ? ' (config.php nemá migrate_token — zkontroluj GitHub Secret MIGRATE_TOKEN)'
+        : '';
+    migrate_fail(403, 'Neplatný nebo chybějící token.' . $reason);
 }
 
 // Zakázané vzory — soubor obsahující cokoliv z tohohle se vůbec
