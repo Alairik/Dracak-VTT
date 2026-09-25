@@ -24,7 +24,7 @@ ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 header('Content-Type: text/plain; charset=utf-8');
 
-function migrate_fail(int $httpCode, string $message): never
+function migrate_fail(int $httpCode, string $message): void
 {
     http_response_code($httpCode);
     echo $message . "\n";
@@ -39,7 +39,7 @@ function migrate_split_sql(string $sql): array
 {
     $lines = array_filter(
         explode("\n", $sql),
-        fn($line) => !str_starts_with(trim($line), '--')
+        fn($line) => strpos(trim($line), '--') !== 0
     );
     $clean = implode("\n", $lines);
     return array_values(array_filter(array_map('trim', explode(';', $clean))));
@@ -78,6 +78,8 @@ $pdo->exec(
         spusteno_v TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
 );
+
+echo 'PHP ' . PHP_VERSION . "\n";
 
 $applied = array_flip($pdo->query('SELECT soubor FROM migrace_log')->fetchAll(PDO::FETCH_COLUMN));
 
