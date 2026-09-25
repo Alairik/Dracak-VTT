@@ -37,11 +37,12 @@ return [
         'order_by' => 'nazev',
         // Řádek štítků v seznamu, ve stylu "SPECIFIKACE KOUZEL" z pravidel
         // (Mana/Dosah/Rozsah/Trvání pohromadě, ne zahrabané v odstavci).
-        'summary_fields' => ['uroven_kouzla' => 'Lv.', 'cena_magenergie' => 'Mana', 'dosah' => 'Dosah', 'rozsah' => 'Rozsah', 'doba_trvani' => 'Trvání'],
+        'summary_fields' => ['uroven_kouzla' => 'Lv.', 'cena_magenergie' => 'Mana', 'cena_dalsi_seslani' => '+ mana/další', 'dosah' => 'Dosah', 'rozsah' => 'Rozsah', 'doba_trvani' => 'Trvání'],
         'fields' => [
             ['name' => 'nazev', 'label' => 'Název', 'type' => 'text', 'required' => true, 'quick' => true],
             ['name' => 'uroven_kouzla', 'label' => 'Úroveň kouzla', 'type' => 'number', 'quick' => true],
-            ['name' => 'cena_magenergie', 'label' => 'Cena magenergie', 'type' => 'text', 'quick' => true],
+            ['name' => 'cena_magenergie', 'label' => 'Cena magenergie (první/jediné seslání)', 'type' => 'text', 'quick' => true],
+            ['name' => 'cena_dalsi_seslani', 'label' => 'Cena za každé další seslání (jen u vícenásobných, pokud se liší)', 'type' => 'text', 'quick' => true],
             ...dracak_kostky_pole(),
             ['name' => 'popis', 'label' => 'Popis / efekt', 'type' => 'textarea', 'quick' => true],
             ['name' => 'seznam_kouzel_id', 'label' => 'Seznam kouzel', 'type' => 'select_fk', 'ref_table' => 'seznamy_kouzel', 'ref_label' => 'nazev'],
