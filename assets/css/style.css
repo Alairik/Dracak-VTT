@@ -194,3 +194,18 @@ button {
   color: var(--text-dim);
 }
 .badge.hidden { background: rgba(179,70,44,0.2); color: var(--danger); }
+
+.stat-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0;
+}
+.stat-badge {
+  font-size: 0.75rem;
+  padding: 2px 9px;
+  border-radius: 5px;
+  background: rgba(201,138,60,0.12);
+  color: var(--accent);
+  white-space: nowrap;
+}

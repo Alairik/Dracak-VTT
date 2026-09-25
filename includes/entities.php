@@ -22,6 +22,7 @@ function dracak_kostky_pole(): array
         ['name' => 'typ_kostky', 'label' => 'Typ kostky', 'type' => 'select', 'options' => $typyKostek, 'quick' => true],
         ['name' => 'pevny_bonus', 'label' => 'Pevný bonus (např. +2 u "2k6+2")', 'type' => 'number', 'quick' => true],
         ['name' => 'vicenasobne', 'label' => 'Lze provést/seslat vícekrát (škáluje počet kostek, např. modré blesky)', 'type' => 'checkbox', 'quick' => true],
+        ['name' => 'max_pouziti', 'label' => 'Max. počet použití (prázdné = bez limitu, např. "3x denně")', 'type' => 'text', 'quick' => true],
     ];
 }
 
@@ -34,6 +35,9 @@ return [
         'group' => 'obsah',
         'hidden_from_players' => false,
         'order_by' => 'nazev',
+        // Řádek štítků v seznamu, ve stylu "SPECIFIKACE KOUZEL" z pravidel
+        // (Mana/Dosah/Rozsah/Trvání pohromadě, ne zahrabané v odstavci).
+        'summary_fields' => ['uroven_kouzla' => 'Lv.', 'cena_magenergie' => 'Mana', 'dosah' => 'Dosah', 'rozsah' => 'Rozsah', 'doba_trvani' => 'Trvání'],
         'fields' => [
             ['name' => 'nazev', 'label' => 'Název', 'type' => 'text', 'required' => true, 'quick' => true],
             ['name' => 'uroven_kouzla', 'label' => 'Úroveň kouzla', 'type' => 'number', 'quick' => true],
@@ -41,7 +45,8 @@ return [
             ...dracak_kostky_pole(),
             ['name' => 'popis', 'label' => 'Popis / efekt', 'type' => 'textarea', 'quick' => true],
             ['name' => 'seznam_kouzel_id', 'label' => 'Seznam kouzel', 'type' => 'select_fk', 'ref_table' => 'seznamy_kouzel', 'ref_label' => 'nazev'],
-            ['name' => 'dosah', 'label' => 'Dosah', 'type' => 'text'],
+            ['name' => 'dosah', 'label' => 'Dosah (vzdálenost)', 'type' => 'text'],
+            ['name' => 'rozsah', 'label' => 'Rozsah (počet cílů / oblast)', 'type' => 'text'],
             ['name' => 'doba_seslani', 'label' => 'Doba seslání', 'type' => 'text'],
             ['name' => 'doba_trvani', 'label' => 'Doba trvání', 'type' => 'text'],
             ['name' => 'typ_unavy', 'label' => 'Typ únavy', 'type' => 'select', 'options' => ['vycerpavajici', 'nevycerpavajici', 'udrzovaci', 'zaostreni_vule']],
@@ -54,6 +59,7 @@ return [
         'group' => 'obsah',
         'hidden_from_players' => false,
         'order_by' => 'nazev',
+        'summary_fields' => ['druh' => 'Druh', 'uroven_od' => 'Od Lv.'],
         'fields' => [
             ['name' => 'nazev', 'label' => 'Název', 'type' => 'text', 'required' => true, 'quick' => true],
             ['name' => 'druh', 'label' => 'Druh', 'type' => 'select', 'options' => ['schopnost', 'dovednost'], 'quick' => true],
@@ -71,6 +77,7 @@ return [
         'group' => 'obsah',
         'hidden_from_players' => false,
         'order_by' => 'nazev',
+        'summary_fields' => ['typ' => 'Typ', 'uc' => 'ÚČ', 'utocnost' => 'Útočnost', 'oc' => 'OČ'],
         'fields' => [
             ['name' => 'nazev', 'label' => 'Název', 'type' => 'text', 'required' => true, 'quick' => true],
             ['name' => 'typ', 'label' => 'Typ', 'type' => 'select', 'options' => ['zbran', 'zbroj', 'surovina', 'artefakt'], 'quick' => true],
@@ -90,6 +97,7 @@ return [
         'group' => 'obsah',
         'hidden_from_players' => false,
         'order_by' => 'nazev',
+        'summary_fields' => ['cena' => 'Cena'],
         'fields' => [
             ['name' => 'nazev', 'label' => 'Název', 'type' => 'text', 'required' => true, 'quick' => true],
             ...dracak_kostky_pole(),
@@ -106,6 +114,7 @@ return [
         'group' => 'obsah',
         'hidden_from_players' => false,
         'order_by' => 'nazev',
+        'summary_fields' => ['typ' => 'Typ', 'pocet_akci' => 'Počet akcí'],
         'fields' => [
             ['name' => 'nazev', 'label' => 'Název', 'type' => 'text', 'required' => true, 'quick' => true],
             ['name' => 'typ', 'label' => 'Typ', 'type' => 'select', 'options' => ['utocna', 'obranna', 'kombinovana'], 'quick' => true],
@@ -186,6 +195,7 @@ return [
         'group' => 'bestiar',
         'hidden_from_players' => true,
         'order_by' => 'nazev',
+        'summary_fields' => ['velikost' => 'Velikost', 'zivotaschopnost' => 'Živ.', 'uc' => 'ÚČ', 'oc' => 'OČ'],
         'fields' => [
             ['name' => 'nazev', 'label' => 'Název', 'type' => 'text', 'required' => true, 'quick' => true],
             ['name' => 'zivotaschopnost', 'label' => 'Životaschopnost', 'type' => 'text', 'quick' => true],

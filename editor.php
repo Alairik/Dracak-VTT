@@ -167,12 +167,27 @@ function dracak_group_label(string $g): string
         <div class="entity-list">
           <?php foreach ($rows as $row):
               $titleField = $config['fields'][0]['name'] ?? array_key_first($row);
+              $badges = [];
+              foreach ($config['summary_fields'] ?? [] as $field => $badgeLabel) {
+                  if (!empty($row[$field])) {
+                      $badges[] = $badgeLabel . ': ' . $row[$field];
+                  }
+              }
+              $kostky = dracak_format_kostky($row);
+              if ($kostky) {
+                  $badges[] = 'Kostky: ' . $kostky;
+              }
           ?>
             <div class="entity-row">
               <div>
                 <strong><?= htmlspecialchars((string)($row['nazev'] ?? $row[$titleField] ?? $row['id'])) ?></strong>
+                <?php if ($badges): ?>
+                  <div class="stat-badges">
+                    <?php foreach ($badges as $b): ?><span class="stat-badge"><?= htmlspecialchars($b) ?></span><?php endforeach; ?>
+                  </div>
+                <?php endif; ?>
                 <?php if (!empty($row['popis'])): ?>
-                  <div class="meta"><?= htmlspecialchars(mb_substr((string)$row['popis'], 0, 120)) ?></div>
+                  <div class="meta"><?= htmlspecialchars(mb_substr((string)$row['popis'], 0, 160)) ?></div>
                 <?php endif; ?>
               </div>
               <?php if ($canEdit): ?>

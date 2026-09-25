@@ -104,3 +104,22 @@ function dracak_entity_delete(string $table, int $id): void
     $stmt = dracak_db()->prepare("DELETE FROM `$table` WHERE id = ?");
     $stmt->execute([$id]);
 }
+
+// Poskládá "2k6+2" / "1k6 (lze seslat vícekrát, max 3x denně)" ze sloupců
+// zavedených dracak_kostky_pole() — aby se to v seznamu neukazovalo jako
+// tři/čtyři rozházená syrová pole, ale jako jeden čitelný zápis.
+function dracak_format_kostky(array $row): ?string
+{
+    if (empty($row['pocet_kostek']) || empty($row['typ_kostky'])) {
+        return null;
+    }
+    $text = $row['pocet_kostek'] . $row['typ_kostky'];
+    if (!empty($row['pevny_bonus'])) {
+        $bonus = (int)$row['pevny_bonus'];
+        $text .= $bonus >= 0 ? "+$bonus" : (string)$bonus;
+    }
+    if (!empty($row['vicenasobne'])) {
+        $text .= ' (lze víckrát' . (!empty($row['max_pouziti']) ? ', max ' . $row['max_pouziti'] : '') . ')';
+    }
+    return $text;
+}
