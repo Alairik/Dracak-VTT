@@ -660,3 +660,19 @@ p.hb-src em{color:inherit;font-style:normal;}
 .auth-error{color:var(--accent);font-size:.8rem;}
 .auth-hint{color:var(--ink-faint);font-size:.74rem;margin:4px 0 0;}
 
+/* ---------- tužka: odkaz na editaci v DB ---------- */
+.edit-pencil{
+  display:inline-block;
+  margin-left:.5em;
+  font-size:.65em;
+  text-decoration:none;
+  color:var(--ink-faint);
+  opacity:.55;
+  vertical-align:middle;
+  border:1px solid var(--border);
+  border-radius:5px;
+  padding:1px 5px;
+  line-height:1.4;
+}
+.edit-pencil:hover{opacity:1;color:var(--accent);border-color:var(--accent);}
+

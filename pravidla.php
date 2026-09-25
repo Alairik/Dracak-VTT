@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/includes/entity_crud.php';
 
 dracak_session_start();
 
@@ -27,6 +28,43 @@ if (!$canSeePjBestiar) {
     });
 }
 $headingsJson = json_encode($headings, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG);
+
+// Tužka-odkaz z textu pravidel rovnou do editace DB záznamu — jen pro
+// nadpisy, co jsme spárovali s konkrétním řádkem (content/edit-links.json,
+// vygenerováno jednorázově porovnáním nadpisů s DB), a jen když uživatel
+// smí ten konkrétní záznam editovat (stejné pravidlo jako editor.php:
+// dracak_can_edit_row — table-level právo + u row_owned tabulek i
+// vlastnictví). Nikdy neposílat prohlížeči odkaz na záznam, který
+// uživatel nesmí editovat, i kdyby ho jen skryl JS.
+$editLinks = [];
+if ($user !== null) {
+    $allLinks = json_decode((string)file_get_contents(__DIR__ . '/content/edit-links.json'), true) ?: [];
+    $allEntities = require __DIR__ . '/includes/entities.php';
+    $byTable = [];
+    foreach ($allLinks as $hid => $link) {
+        $byTable[$link['table']][$hid] = (int)$link['id'];
+    }
+    foreach ($byTable as $table => $hidToId) {
+        $config = $allEntities[$table] ?? null;
+        if ($config === null || !dracak_can_edit($user, $table)) continue;
+        $rowOwned = !empty($config['row_owned']) && $user['role'] === 'hrac';
+        $ownedIds = [];
+        if ($rowOwned) {
+            $ids = array_values(array_unique($hidToId));
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $stmt = dracak_db()->prepare("SELECT id, created_by FROM `$table` WHERE id IN ($placeholders)");
+            $stmt->execute($ids);
+            foreach ($stmt->fetchAll() as $r) {
+                if ((int)$r['created_by'] === (int)$user['id']) $ownedIds[(int)$r['id']] = true;
+            }
+        }
+        foreach ($hidToId as $hid => $id) {
+            if ($rowOwned && !isset($ownedIds[$id])) continue;
+            $editLinks[$hid] = ['table' => $table, 'id' => $id];
+        }
+    }
+}
+$editLinksJson = json_encode($editLinks, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG);
 ?>
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Pravidla DrD + domácí pravidla</title>
@@ -131,7 +169,25 @@ if ($canSeePjBestiar) {
 
 <script>
 window.__HEADINGS__ = <?= $headingsJson ?>;
+window.__EDIT_LINKS__ = <?= $editLinksJson ?>;
 </script>
 <script src="assets/pravidla/pravidla.js"></script>
+<script>
+(function(){
+  var links = window.__EDIT_LINKS__ || {};
+  Object.keys(links).forEach(function(hid){
+    var el = document.getElementById(hid);
+    if (!el) return;
+    var link = links[hid];
+    var a = document.createElement('a');
+    a.className = 'edit-pencil';
+    a.href = 'editor.php?tabulka=' + encodeURIComponent(link.table) + '&akce=edit&id=' + link.id;
+    a.title = 'Upravit v databázi';
+    a.setAttribute('aria-label', 'Upravit v databázi');
+    a.textContent = '✎';
+    el.appendChild(a);
+  });
+})();
+</script>
 
 </body></html>
