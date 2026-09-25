@@ -93,6 +93,7 @@ function dracak_group_label(string $g): string
       <?php endforeach; ?>
     <?php endforeach; ?>
     <div class="sidebar-footer">
+      <a class="nav-item" href="pravidla.php">📖 Pravidla</a>
       <a class="nav-item" href="mapa.html">🗺️ Mapa světa</a>
       <?php if ($user['role'] === 'admin'): ?>
         <a class="nav-item" href="admin.php">⚙️ Správa účtů</a>

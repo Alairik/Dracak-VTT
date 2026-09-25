@@ -40,6 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <?php if ($error): ?><div class="error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
     </form>
     <p class="note">Účty zakládá administrátor. Pokud nemáš přístup, ozvi se PJ.</p>
+    <p class="note"><a href="pravidla.php">Přečíst si pravidla DrD + domácí pravidla →</a></p>
   </div>
 </div>
 </body>

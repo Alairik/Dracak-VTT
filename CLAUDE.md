@@ -41,3 +41,9 @@
   nic jiného není), takže by se cokoliv dalšího nahrálo na veřejný web.
 - **`setup-admin.php` se nikdy nedeployuje** (viz `exclude` v `deploy.yml`)
   — má přístup k DB a zakládá admin účty, nepatří na veřejný web.
+- **`content/` drží fragmenty rulebooku pro `pravidla.php`** (`pravidla-hrac.html`,
+  `pravidla-pj.html`, `pravidla-bestiar.html`, `toc-*.html`, `headings.json`) —
+  má `.htaccess Require all denied` jako `includes/`, protože `pravidla.php`
+  je čte interně přes `readfile()`/`file_get_contents()` podle role
+  (`pj`/`bestiar` fragmenty jen pro `pj`/`admin`). Nikdy sem nepřidávej nic,
+  co by šlo natvrdo poslat prohlížeči bez ohledu na roli.

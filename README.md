@@ -11,6 +11,11 @@ hosting je klasický sdílený PHP+MySQL, viz historie commitů.)
 
 ## Stav
 
+- ✅ `pravidla.php` — čitelný rulebook (Hráč/PJ/Bestiář) s vestavěným
+  přihlášením přímo v postranním panelu. Hráčská část je veřejná bez
+  přihlášení; PJ pravidla a bestiář se pošlou prohlížeči jen účtům
+  s rolí `pj`/`admin` — na serveru (viz `content/`), ne jen schované v JS.
+  `index.php` na ni odkazuje, `editor.php` má odkaz zpátky.
 - ✅ Auth + role (admin/pj/hrac) přes PHP session + `password_hash`
 - ✅ Generický editor nad reálným schématem pravidel (`editor.php`) —
   navigace podle typu záznamu, rychlá šablona (klíčová pole nahoře,
