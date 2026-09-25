@@ -10,6 +10,21 @@ declare(strict_types=1);
 // v1 editoru NEEDITUJÍ přes UI — na to je zatím potřeba phpMyAdmin.
 // Skalární pole (vlastní sloupce tabulky) editovat jdou.
 
+// Sdílená 4 pole pro entity, co dávají zranění/léčení kostkou (kouzlo,
+// schopnost, lektvar, finta) — řeší "2k6+2" i "modré blesky: lze seslat
+// vícekrát, každé seslání přidá dalších 1k6". Sloupce zavádí migrace
+// database/0003_kostky_a_bonusy.sql.
+function dracak_kostky_pole(): array
+{
+    $typyKostek = ['k3', 'k4', 'k6', 'k8', 'k10', 'k12', 'k20', 'k100'];
+    return [
+        ['name' => 'pocet_kostek', 'label' => 'Počet kostek', 'type' => 'number', 'quick' => true],
+        ['name' => 'typ_kostky', 'label' => 'Typ kostky', 'type' => 'select', 'options' => $typyKostek, 'quick' => true],
+        ['name' => 'pevny_bonus', 'label' => 'Pevný bonus (např. +2 u "2k6+2")', 'type' => 'number', 'quick' => true],
+        ['name' => 'vicenasobne', 'label' => 'Lze provést/seslat vícekrát (škáluje počet kostek, např. modré blesky)', 'type' => 'checkbox', 'quick' => true],
+    ];
+}
+
 return [
 
     // --- OBSAH: kouzlo/příšera/dovednost/lektvar/vybavení, editovatelné hráčem dle práv ---
@@ -23,6 +38,7 @@ return [
             ['name' => 'nazev', 'label' => 'Název', 'type' => 'text', 'required' => true, 'quick' => true],
             ['name' => 'uroven_kouzla', 'label' => 'Úroveň kouzla', 'type' => 'number', 'quick' => true],
             ['name' => 'cena_magenergie', 'label' => 'Cena magenergie', 'type' => 'text', 'quick' => true],
+            ...dracak_kostky_pole(),
             ['name' => 'popis', 'label' => 'Popis / efekt', 'type' => 'textarea', 'quick' => true],
             ['name' => 'seznam_kouzel_id', 'label' => 'Seznam kouzel', 'type' => 'select_fk', 'ref_table' => 'seznamy_kouzel', 'ref_label' => 'nazev'],
             ['name' => 'dosah', 'label' => 'Dosah', 'type' => 'text'],
@@ -42,8 +58,9 @@ return [
             ['name' => 'nazev', 'label' => 'Název', 'type' => 'text', 'required' => true, 'quick' => true],
             ['name' => 'druh', 'label' => 'Druh', 'type' => 'select', 'options' => ['schopnost', 'dovednost'], 'quick' => true],
             ['name' => 'uroven_od', 'label' => 'Od úrovně', 'type' => 'number', 'quick' => true],
+            ...dracak_kostky_pole(),
             ['name' => 'popis', 'label' => 'Popis', 'type' => 'textarea', 'quick' => true],
-            ['name' => 'mechanika', 'label' => 'Mechanika (kostka/bonus/cíl)', 'type' => 'text'],
+            ['name' => 'mechanika', 'label' => 'Mechanika (poznámka navíc, cíl efektu...)', 'type' => 'text'],
             ['name' => 'vyzaduje_id', 'label' => 'Vyžaduje (prerekvizita)', 'type' => 'select_fk', 'ref_table' => 'zvlastni_schopnosti', 'ref_label' => 'nazev'],
             ['name' => 'past_id', 'label' => 'Past (záchranný hod)', 'type' => 'select_fk', 'ref_table' => 'pasti', 'ref_label' => 'vlastnosti'],
         ],
@@ -75,6 +92,7 @@ return [
         'order_by' => 'nazev',
         'fields' => [
             ['name' => 'nazev', 'label' => 'Název', 'type' => 'text', 'required' => true, 'quick' => true],
+            ...dracak_kostky_pole(),
             ['name' => 'popis', 'label' => 'Popis / efekt', 'type' => 'textarea', 'quick' => true],
             ['name' => 'cena', 'label' => 'Cena', 'type' => 'number', 'quick' => true],
             ['name' => 'doba_pripravy', 'label' => 'Doba přípravy', 'type' => 'text'],
@@ -91,6 +109,7 @@ return [
         'fields' => [
             ['name' => 'nazev', 'label' => 'Název', 'type' => 'text', 'required' => true, 'quick' => true],
             ['name' => 'typ', 'label' => 'Typ', 'type' => 'select', 'options' => ['utocna', 'obranna', 'kombinovana'], 'quick' => true],
+            ...dracak_kostky_pole(),
             ['name' => 'poznamky', 'label' => 'Poznámky', 'type' => 'textarea', 'quick' => true],
             ['name' => 'bonus_iniciativa', 'label' => 'Bonus k iniciativě', 'type' => 'number'],
             ['name' => 'pocet_akci', 'label' => 'Počet akcí', 'type' => 'number'],
