@@ -20,6 +20,7 @@ jobs:
           DB_NAME: ${{ secrets.DB_NAME }}
           DB_USER: ${{ secrets.DB_USER }}
           DB_PASS: ${{ secrets.DB_PASS }}
+          MIGRATE_TOKEN: ${{ secrets.MIGRATE_TOKEN }}
         run: |
           php -r '
           $config = [
@@ -27,6 +28,7 @@ jobs:
               "db_name" => getenv("DB_NAME"),
               "db_user" => getenv("DB_USER"),
               "db_pass" => getenv("DB_PASS"),
+              "migrate_token" => getenv("MIGRATE_TOKEN"),
           ];
           $php = "<?php\n"
               . "// Vygenerováno GitHub Actions při deployi z repozitářových secrets.\n"
@@ -49,6 +51,20 @@ jobs:
             .github/**
             **/*.md
             node_modules/**
-            database/**
+            database/drd-db-schema-v1.sql
+            database/drd-db-full-v1.sql
+            database/0002_ucty_a_role.sql
             docs/**
             setup-admin.php
+
+      - name: Run pending DB migrations
+        run: |
+          response=$(curl -sS -w "\n%{http_code}" -X POST "https://vtt.zvelebil.online/scripts/migrate.php" \
+            -H "X-Migrate-Token: ${{ secrets.MIGRATE_TOKEN }}")
+          http_code=$(echo "$response" | tail -1)
+          body=$(echo "$response" | sed '$d')
+          echo "$body"
+          if [ "$http_code" -ge 400 ]; then
+            echo "::error::migrate.php vrátil HTTP $http_code"
+            exit 1
+          fi

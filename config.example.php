@@ -7,4 +7,7 @@ return [
     'db_name' => '',
     'db_user' => '',
     'db_pass' => '',
+    // Sdílený tajný token pro scripts/migrate.php — musí sedět s GitHub
+    // Secret MIGRATE_TOKEN. Lokálně nepotřebuješ, jen na serveru.
+    'migrate_token' => '',
 ];
