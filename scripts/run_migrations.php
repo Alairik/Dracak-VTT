@@ -26,6 +26,14 @@ if ($mysqli === false) {
     fwrite(STDERR, 'Připojení k DB selhalo: ' . mysqli_connect_error() . "\n");
     exit(1);
 }
+// Bez tohohle běží spojení na charsetu, co si server usmyslí (často
+// latin1) — pak UPDATE/WHERE porovnávající českou diakritiku (třeba
+// "WHERE nazev = 'Trpaslík'") tiše nenajde nic, žádná chyba, jen 0
+// změněných řádků. Objevilo se to přesně takhle při testu migrace 0007.
+if (!$mysqli->set_charset('utf8mb4')) {
+    fwrite(STDERR, 'Nepodařilo se nastavit utf8mb4: ' . $mysqli->error . "\n");
+    exit(1);
+}
 
 if (!$mysqli->query(
     'CREATE TABLE IF NOT EXISTS schema_migrations (
