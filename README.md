@@ -24,12 +24,6 @@ hosting je klasický sdílený PHP+MySQL, viz historie commitů.)
 - ⏳ M:N vazby (obory magie u kouzla, efekty u schopnosti, zranitelnosti
   příšer...) se zatím needitují přes UI — jen skalární pole tabulky.
   Do doby, než přibude UI pro multi-select, se řeší přes phpMyAdmin.
-- ✅ Automatické DB migrace — `database/migrations/*.sql` se při každém
-  deployi aplikují samy (`scripts/run_migrations.php`, krok "Run pending
-  DB migrations" v `deploy.yml`), sledované v tabulce `schema_migrations`
-  na produkci, takže se nic nespustí dvakrát. Vyžaduje mít na hostingu
-  zapnutý vzdálený přístup k MySQL (jinak GitHub Actions runner
-  nepřipojí) a secrets `DB_HOST`/`DB_NAME`/`DB_USER`/`DB_PASS`.
 - ⏳ Mapa (zatím jen odkaz na Torch, `mapa.html`)
 - ⏳ Tabulka `velikosti` (má PK `kod`, ne `id`) není v editoru zatím
   zahrnutá — uprav přes phpMyAdmin, dokud generický editor nepočítá i
@@ -45,30 +39,30 @@ hosting je klasický sdílený PHP+MySQL, viz historie commitů.)
 
 ## Spuštění na WEDOSu
 
-1. V administraci WEDOSu založ MySQL databázi a uživatele k ní, a zapni
-   vzdálený přístup k MySQL (nutné pro automatický deploy a migrace přes
-   GitHub Actions).
-2. V phpMyAdminu naimportuj postupně (jen jednou, ručně — tyhle dva
-   soubory automatický runner nikdy nespouští): `database/drd-db-schema-v1.sql`
+1. V administraci WEDOSu založ MySQL databázi a uživatele k ní. (WEDOS
+   na tomhle tarifu nenabízí vzdálený přístup k MySQL zvenčí — GitHub
+   Actions se k databázi nikdy nedostane, migrace se proto pouští jen
+   ručně přes phpMyAdmin, viz níže.)
+2. V phpMyAdminu naimportuj postupně: `database/drd-db-schema-v1.sql`
    (nebo rovnou `drd-db-full-v1.sql`, obsahuje schéma i data), pak
-   `database/0002_ucty_a_role.sql`.
+   všechny soubory z `database/migrations/` v číselném pořadí.
 3. V GitHub repu (Settings → Secrets and variables → Actions) nastav
    `FTP_SERVER`/`FTP_USERNAME`/`FTP_PASSWORD` a `DB_HOST`/`DB_NAME`/
-   `DB_USER`/`DB_PASS`. Push na `main` pak sám nahraje soubory na FTP,
-   vygeneruje `config.php` na serveru a aplikuje nové soubory z
-   `database/migrations/*.sql`.
+   `DB_USER`/`DB_PASS`. Push na `main` pak sám nahraje soubory na FTP a
+   vygeneruje `config.php` na serveru.
 4. Otevři `setup-admin.php` (nahraj ho na hosting ručně přes FTP —
-   `scripts/**` a `setup-admin.php` se z bezpečnostních důvodů
-   nedeployují automaticky) a založ první admin účet. Pak ho zase smaž.
+   `setup-admin.php` se z bezpečnostních důvodů nedeployuje automaticky)
+   a založ první admin účet. Pak ho zase smaž.
 5. Přihlas se přes `index.php` → `editor.php`.
 
 ## Přidání nové DB migrace
 
 Nový soubor `database/migrations/NNNN_popis.sql` (číslo o 1 vyšší než
-poslední) se při dalším pushi na `main` sám aplikuje na produkci — nic
-ručně spouštět nemusíš. Runner (`scripts/run_migrations.php`) si drží
-seznam už aplikovaných souborů v tabulce `schema_migrations`, takže je
-bezpečné ho pouštět při každém deployi.
+poslední) — a pak ho ručně spustit v phpMyAdminu na produkci. Automatické
+spouštění migrací se zkoušelo (`scripts/run_migrations.php`), ale WEDOS
+na tomhle tarifu vzdálený přístup k MySQL nenabízí vůbec, takže se
+GitHub Actions k databázi nikdy nepřipojí — odstraněno, ať deploy
+zbytečně nečeká na timeout.
 
 ## Role
 

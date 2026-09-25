@@ -14,20 +14,6 @@ jobs:
         with:
           fetch-depth: 2
 
-      # continue-on-error: pokud WEDOS zrovna nemá zapnutý vzdálený přístup
-      # k MySQL (nebo je síť dole), tenhle krok spadne na timeoutu — ale
-      # nesmí kvůli tomu zůstat celý deploy (FTP Deploy níže) nenasazený.
-      # Failure kroku se pořád ukáže v Actions jako varování, jen
-      # neblokuje.
-      - name: Run pending DB migrations
-        continue-on-error: true
-        env:
-          DB_HOST: ${{ secrets.DB_HOST }}
-          DB_NAME: ${{ secrets.DB_NAME }}
-          DB_USER: ${{ secrets.DB_USER }}
-          DB_PASS: ${{ secrets.DB_PASS }}
-        run: php scripts/run_migrations.php
-
       - name: Generate config.php
         env:
           DB_HOST: ${{ secrets.DB_HOST }}
@@ -65,5 +51,4 @@ jobs:
             node_modules/**
             database/**
             docs/**
-            scripts/**
             setup-admin.php
