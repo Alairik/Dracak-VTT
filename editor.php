@@ -377,6 +377,31 @@ if ($nastroj === null) {
         </div>
       <?php endforeach; ?>
 
+      <?php if (!empty($config['vysledky_testu'])):
+          $tiers = dracak_schopnost_vysledky_load((int)($editRow['id'] ?? 0));
+      ?>
+        <h3 class="rel-label">Efekt podle výsledku testu (pasti)</h3>
+        <p class="note" style="margin:-4px 0 10px;">Co se stane při každém ze 4 stupňů výsledku. Když se efekt liší v boji a mimo boj, zaškrtni "liší se" a vyplň obě pole zvlášť místo obecného.</p>
+        <?php foreach ($tiers as $t):
+            $hasSplit = $t['boj'] !== '' || $t['mimo_boj'] !== '';
+        ?>
+          <div class="card" style="padding:12px 14px;margin-bottom:10px;background:var(--color-neutral-100);border:none;">
+            <div style="font-weight:600;font-size:13px;margin-bottom:6px;"><?= htmlspecialchars($t['nazev']) ?></div>
+            <label style="font-weight:400;font-size:11.5px;display:flex;align-items:center;gap:5px;margin-bottom:6px;">
+              <input type="checkbox" class="vt-split-toggle" data-tier="<?= $t['id'] ?>" <?= $hasSplit ? 'checked' : '' ?> onchange="dracakToggleVtSplit(this)">
+              Liší se v boji / mimo boj
+            </label>
+            <div class="field vt-obecny" data-tier="<?= $t['id'] ?>" style="<?= $hasSplit ? 'display:none;' : '' ?>margin-bottom:0;">
+              <textarea name="vysledek[<?= $t['id'] ?>][obecny]" rows="2" placeholder="Obecný efekt"><?= htmlspecialchars($hasSplit ? '' : $t['obecny']) ?></textarea>
+            </div>
+            <div class="vt-split" data-tier="<?= $t['id'] ?>" style="<?= $hasSplit ? '' : 'display:none;' ?>display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <div class="field" style="margin-bottom:0;"><label style="font-weight:400;font-size:11px;">V boji</label><textarea name="vysledek[<?= $t['id'] ?>][boj]" rows="2"><?= htmlspecialchars($t['boj']) ?></textarea></div>
+              <div class="field" style="margin-bottom:0;"><label style="font-weight:400;font-size:11px;">Mimo boj</label><textarea name="vysledek[<?= $t['id'] ?>][mimo_boj]" rows="2"><?= htmlspecialchars($t['mimo_boj']) ?></textarea></div>
+            </div>
+          </div>
+        <?php endforeach; ?>
+      <?php endif; ?>
+
       <div style="display:flex;gap:10px;margin-top:20px;">
         <button class="btn btn-primary" type="submit">Uložit</button>
         <a class="btn btn-ghost" href="editor.php?tabulka=<?= urlencode($table) ?>">Zrušit</a>
@@ -619,6 +644,13 @@ function dracakBump(btn, delta){
   var valEl = stepper.querySelector('.chip-val'), input = pill.querySelector('.chip-extra');
   var v = parseInt(input.value, 10) + delta;
   input.value = v; valEl.textContent = (v >= 0 ? '+' : '') + v;
+}
+function dracakToggleVtSplit(cb){
+  var tier = cb.getAttribute('data-tier');
+  var obecny = document.querySelector('.vt-obecny[data-tier="' + tier + '"]');
+  var split = document.querySelector('.vt-split[data-tier="' + tier + '"]');
+  if (cb.checked) { obecny.style.display = 'none'; split.style.display = 'grid'; }
+  else { obecny.style.display = ''; split.style.display = 'none'; }
 }
 </script>
 </body>

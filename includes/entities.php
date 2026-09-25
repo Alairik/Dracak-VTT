@@ -88,6 +88,7 @@ return [
         'group' => 'obsah',
         'hidden_from_players' => false,
         'row_owned' => true,
+        'vysledky_testu' => true,
         'order_by' => 'nazev',
         'summary_fields' => ['druh' => 'Druh', 'vlastnost_id' => 'Vlastnost', 'uroven_od' => 'Od Lv.'],
         'fields' => [

@@ -126,6 +126,7 @@ function dracak_entity_save(string $table, array $fields, ?int $id, array $input
         $pdo->prepare($sql)->execute(array_values($data));
         $newId = (int)$pdo->lastInsertId();
         dracak_relations_save($table, $newId, $config['relations'] ?? [], $input);
+        if (!empty($config['vysledky_testu'])) dracak_schopnost_vysledky_save($newId, $input);
         return $newId;
     }
 
@@ -133,7 +134,50 @@ function dracak_entity_save(string $table, array $fields, ?int $id, array $input
     $sql = "UPDATE `$table` SET $set WHERE id = ?";
     $pdo->prepare($sql)->execute([...array_values($data), $id]);
     dracak_relations_save($table, $id, $config['relations'] ?? [], $input);
+    if (!empty($config['vysledky_testu'])) dracak_schopnost_vysledky_save($id, $input);
     return $id;
+}
+
+// Efekty dovednosti podle 4 stupňů výsledku testu (viz migrace 0014/0015)
+// — načte pro edit formulář, seskupené podle vysledek_testu_id a kontextu.
+function dracak_schopnost_vysledky_load(int $schopnostId): array
+{
+    $stmt = dracak_db()->prepare(
+        'SELECT vt.id AS vysledek_testu_id, vt.kod, vt.nazev, vt.poradi, sv.kontext, sv.efekt_text
+         FROM vysledky_testu vt
+         LEFT JOIN schopnost_vysledky sv ON sv.vysledek_testu_id = vt.id AND sv.schopnost_id = ?
+         ORDER BY vt.poradi'
+    );
+    $stmt->execute([$schopnostId]);
+    $tiers = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $tid = (int)$row['vysledek_testu_id'];
+        if (!isset($tiers[$tid])) {
+            $tiers[$tid] = ['id' => $tid, 'kod' => $row['kod'], 'nazev' => $row['nazev'], 'obecny' => '', 'boj' => '', 'mimo_boj' => ''];
+        }
+        if ($row['kontext'] !== null) {
+            $tiers[$tid][$row['kontext']] = $row['efekt_text'];
+        }
+    }
+    return array_values($tiers);
+}
+
+// Uloží z $_POST (klíč 'vysledek' => [tier_id => [kontext => text]]) —
+// smaže staré a zapíše jen neprázdné, stejný "replace-all" vzor jako
+// dracak_relations_save().
+function dracak_schopnost_vysledky_save(int $schopnostId, array $input): void
+{
+    $pdo = dracak_db();
+    $pdo->prepare('DELETE FROM schopnost_vysledky WHERE schopnost_id = ?')->execute([$schopnostId]);
+    $data = (array)($input['vysledek'] ?? []);
+    $ins = $pdo->prepare('INSERT INTO schopnost_vysledky (schopnost_id, vysledek_testu_id, kontext, efekt_text) VALUES (?, ?, ?, ?)');
+    foreach ($data as $tierId => $byContext) {
+        foreach ((array)$byContext as $kontext => $text) {
+            $text = trim((string)$text);
+            if ($text === '' || !in_array($kontext, ['obecny', 'boj', 'mimo_boj'], true)) continue;
+            $ins->execute([$schopnostId, (int)$tierId, $kontext, $text]);
+        }
+    }
 }
 
 // Zápis "2k6+2" / "1k6" / "" -> sloupce pocet_kostek/typ_kostky/pevny_bonus.
