@@ -82,10 +82,33 @@ function dracak_entity_get(string $table, int $id): ?array
 // nevytvořen), link se tiše přeskočí — nikdy neukazovat tužku/kartu na
 // neexistující řádek.
 //
-// Podmínka: `nazev` musí být v tabulce jedinečný. Pro kouzla a
-// zvlastni_schopnosti to neplatí (stejný název používá víc povolání) — ty
-// proto zůstávají zatím na starém zápisu {"table":...,"id":...} a řeší se
-// zvlášť (potřebují druhý rozlišovací klíč, ne jen název).
+// U kouzel a zvláštních schopností `nazev` sám o sobě nestačí — stejný
+// název používá víc povolání (desítky kouzel, dvě dovednosti: Stopování,
+// Tichý pohyb). Link proto u nich smí nést i "povolani" (název povolání,
+// nebo chybí/null pro řádek bez napojení na žádné povolání) — použije se
+// JEN když je nazev v tabulce nejednoznačný, jinak se ignoruje.
+function dracak_build_nazev_index(string $table): array
+{
+    if ($table === 'kouzla') {
+        $sql = "SELECT k.id, k.nazev, p.nazev AS povolani FROM kouzla k
+                LEFT JOIN seznamy_kouzel sk ON sk.id = k.seznam_kouzel_id
+                LEFT JOIN povolani p ON p.id = sk.povolani_id
+                WHERE k.nazev != ''";
+    } elseif ($table === 'zvlastni_schopnosti') {
+        $sql = "SELECT z.id, z.nazev,
+                (SELECT p.nazev FROM schopnost_povolani sp JOIN povolani p ON p.id = sp.povolani_id
+                 WHERE sp.schopnost_id = z.id ORDER BY p.id LIMIT 1) AS povolani
+                FROM zvlastni_schopnosti z";
+    } else {
+        $sql = "SELECT id, nazev, NULL AS povolani FROM `$table`";
+    }
+    $index = [];
+    foreach (dracak_db()->query($sql) as $r) {
+        $index[$r['nazev']][] = ['id' => (int)$r['id'], 'povolani' => $r['povolani']];
+    }
+    return $index;
+}
+
 function dracak_resolve_content_link(array $link, array &$nazevIndexCache): ?int
 {
     if (isset($link['id'])) {
@@ -96,13 +119,21 @@ function dracak_resolve_content_link(array $link, array &$nazevIndexCache): ?int
     }
     $table = $link['table'];
     if (!isset($nazevIndexCache[$table])) {
-        $index = [];
-        foreach (dracak_db()->query("SELECT id, nazev FROM `$table`") as $r) {
-            $index[$r['nazev']] = (int)$r['id'];
-        }
-        $nazevIndexCache[$table] = $index;
+        $nazevIndexCache[$table] = dracak_build_nazev_index($table);
     }
-    return $nazevIndexCache[$table][$link['nazev']] ?? null;
+    $candidates = $nazevIndexCache[$table][$link['nazev']] ?? [];
+    if (count($candidates) === 1) {
+        return $candidates[0]['id'];
+    }
+    if (count($candidates) > 1) {
+        $wantPovolani = $link['povolani'] ?? null;
+        foreach ($candidates as $c) {
+            if ($c['povolani'] === $wantPovolani) {
+                return $c['id'];
+            }
+        }
+    }
+    return null;
 }
 
 function dracak_fk_options(string $refTable, string $refLabel): array
