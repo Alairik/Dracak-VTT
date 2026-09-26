@@ -131,7 +131,7 @@ $protectedContentIdsJson = json_encode($protectedContentIds, JSON_UNESCAPED_UNIC
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/pravidla/pravidla.css">
+<link rel="stylesheet" href="assets/pravidla/pravidla.css?v=<?= filemtime(__DIR__ . '/assets/pravidla/pravidla.css') ?>">
 </head><body>
 
 <button class="menu-btn" id="menuBtn" type="button" aria-label="Otevřít navigaci">☰</button>
@@ -233,7 +233,7 @@ window.__EDIT_LINKS__ = <?= $editLinksJson ?>;
 window.__LIVE_CARDS__ = <?= $liveCardsJson ?>;
 window.__PROTECTED_CONTENT_IDS__ = <?= $protectedContentIdsJson ?>;
 </script>
-<script src="assets/pravidla/pravidla.js"></script>
+<script src="assets/pravidla/pravidla.js?v=<?= filemtime(__DIR__ . '/assets/pravidla/pravidla.js') ?>"></script>
 <script>
 (function(){
   // Živé karty: nahradí zmrzlý statický text u napojeného nadpisu aktuálním
