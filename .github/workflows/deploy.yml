@@ -54,6 +54,7 @@ jobs:
             database/drd-db-schema-v1.sql
             database/drd-db-full-v1.sql
             database/0002_ucty_a_role.sql
+            database/RUCNE-*.sql
             docs/**
             setup-admin.php
 
