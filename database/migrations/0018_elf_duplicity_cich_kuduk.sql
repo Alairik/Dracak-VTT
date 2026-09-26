@@ -8,18 +8,31 @@
 -- Potvrzeno v konverzaci — smazat oboje, nechat jen id 4.
 --
 -- Obě duplicity měly navíc mylně napojenou rasovou schopnost "Čich".
--- Podle pravidel (viz content/pravidla-hrac.html, h9/h112) je Čich
--- schopnost Hobita, ne Elfa — a stejně tak to má i seed
--- (`WHERE r.nazev = 'Hobit' AND s.nazev = 'Čich'`). Samostatný řádek
--- "Hobit" už v rasy není (nahrazen Kudůkem — "rasa vzniklá splynutím
--- trpaslíků a hobitů"), takže Čich patří k Kudůkovi (id 3).
+--
+-- DODATEČNÁ OPRAVA (viz 0019): tenhle soubor se nikdy úspěšně nespustil
+-- na produkci (celá dávka se zasekla dřív, na 0009 kvůli ALTER právům).
+-- Při čistém otestování proti nepoškozené DB ze seedu se ukázalo, že
+-- domněnka "Hobit v rasy chybí, nahradil ho Kudůk" byla založená na mé
+-- LOKÁLNÍ testovací DB, která je sama neúplná/poškozená (podobně jako
+-- těch 50 prázdných kouzel, co jsme řešili dřív) — seed
+-- (drd-db-full-v1.sql) zakládá Hobita jako úplně první rasu a rovnou mu
+-- dává Čich, přesně jak mají pravidla (h9/h112). Níže je tedy guard:
+-- Čich se přesune na Kudůka, JEN pokud Hobit (nebo cokoli jiného) Čich
+-- už nemá — na skutečné (nepoškozené) produkci by tahle podmínka měla
+-- vždy selhat a řádek se nevloží vůbec, protože Hobit už Čich mít bude.
 --
 -- ON DELETE CASCADE na rasa_schopnosti/rasa_bonusy_vlastnosti/rasa_jazyky/
--- rasa_povolani smaže napojená data u id 1 a 34 automaticky.
+-- rasa_povolani smaže napojená data u id 1 a 34 automaticky (pokud tam
+-- vůbec jsou — DELETE má guard na nazev='Elf', takže na nepoškozené DB,
+-- kde id 1/34 nejsou Elf, se nic nesmaže).
 --
 -- Čisté DELETE/INSERT (DML) — mělo by se nasadit samo přes migrate.php.
 
 DELETE FROM rasy WHERE id IN (1, 34) AND nazev = 'Elf';
 
 INSERT IGNORE INTO rasa_schopnosti (rasa_id, schopnost_id)
-SELECT 3, id FROM zvlastni_schopnosti WHERE nazev = 'Čich';
+SELECT r.id, s.id FROM rasy r, zvlastni_schopnosti s
+WHERE r.nazev = 'Kudůk' AND s.nazev = 'Čich'
+AND NOT EXISTS (
+    SELECT 1 FROM rasa_schopnosti rs2 WHERE rs2.schopnost_id = s.id
+);

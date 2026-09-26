@@ -56,10 +56,17 @@ register_shutdown_function(function (): void {
  }
 });
 
-// Rozdělí soubor na jednotlivé příkazy. Není to obecný SQL parser —
-// spoléhá na to, že naše migrace nemají středník uvnitř řetězcového
-// literálu (ověřeno u všech dosavadních souborů). Řádky s "--"
-// komentářem se zahodí celé.
+// Rozdělí soubor na jednotlivé příkazy. Řádky s "--" komentářem se
+// zahodí celé, zbytek se prochází znak po znaku a sleduje se, jestli
+// jsme uvnitř řetězcového literálu — středník uvnitř řetězce (běžné u
+// narativního textu z pravidel, viz např. 0016/0017: "...nezíská žádné
+// další životy; naopak...") se nesmí počítat jako konec příkazu.
+// Rozpozná obě obvyklá zapsání uvozovky uvnitř řetězce: zdvojenou ('')
+// i zpětným lomítkem (\') — ale spoléhá se čistě na dvojici uvozovek/
+// lomítko v textu, ne na skutečný SQL_MODE serveru. Pořád to není
+// obecný SQL parser (neřeší např. dvojité uvozovky, komentáře /* */
+// uvnitř řádku ani vícebajtové sekvence, které by náhodou obsahovaly
+// byte 0x27) — jen tolik, kolik naše migrace reálně potřebují.
 function migrate_split_sql(string $sql): array
  {
   $lines = array_filter(
@@ -67,7 +74,47 @@ function migrate_split_sql(string $sql): array
    fn($line) => strpos(trim($line), '--') !== 0
    );
   $clean = implode("\n", $lines);
-  return array_values(array_filter(array_map('trim', explode(';', $clean))));
+
+  $statements = [];
+  $current = '';
+  $len = strlen($clean);
+  $inString = false;
+  $backslashes = 0;
+  for ($i = 0; $i < $len; $i++) {
+   $ch = $clean[$i];
+   if ($ch === '\\') {
+    $backslashes++;
+    $current .= $ch;
+    continue;
+   }
+   if ($ch === "'") {
+    $escaped = $inString && ($backslashes % 2) === 1;
+    $backslashes = 0;
+    if ($escaped) {
+     $current .= $ch;
+     continue;
+    }
+    if ($inString && ($i + 1) < $len && $clean[$i + 1] === "'") {
+     $current .= "''";
+     $i++;
+     continue;
+    }
+    $inString = !$inString;
+    $current .= $ch;
+    continue;
+   }
+   $backslashes = 0;
+   if ($ch === ';' && !$inString) {
+    $trimmed = trim($current);
+    if ($trimmed !== '') $statements[] = $trimmed;
+    $current = '';
+    continue;
+   }
+   $current .= $ch;
+  }
+  $trimmed = trim($current);
+  if ($trimmed !== '') $statements[] = $trimmed;
+  return $statements;
  }
 
 $configPath = __DIR__ . '/../config.php';

@@ -149,7 +149,7 @@ Záznam městské hlídky Grestu
 
 Výpověď zvoníka Lamberta
 
-Archív hlídky, odd. c16/989/7' WHERE id = 30 AND nazev = 'Naro\'shai';
+Archív hlídky, odd. c16/989/7' WHERE id = 30 AND nazev = 'Naro''shai';
 UPDATE rasy SET popis = 'Skaven
 
 Rattus humanus
