@@ -11,33 +11,35 @@ $isAdmin = $user['role'] === 'admin';
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dračák VTT — dashboard</title>
-<link rel="stylesheet" href="assets/css/style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/organic.css">
 </head>
 <body>
-<div class="dashboard">
-  <div class="dashboard-header">
+<div class="dash-shell">
+  <div class="dash-header">
     <div>
-      <h1>Dračák VTT</h1>
-      <span>Přihlášen: <strong><?= htmlspecialchars($user['jmeno']) ?></strong></span>
-      <div class="role-badge"><?= htmlspecialchars($user['role']) ?></div>
+      <div class="dash-brand">🐉 Dračák VTT</div>
+      <div class="dash-user">Přihlášen: <strong><?= htmlspecialchars($user['jmeno']) ?></strong><span class="role-badge"><?= htmlspecialchars($user['role']) ?></span></div>
     </div>
-    <form method="post" action="logout.php"><button class="btn-secondary">Odhlásit se</button></form>
+    <form method="post" action="logout.php"><button class="btn btn-secondary" type="submit">Odhlásit se</button></form>
   </div>
 
-  <div class="dashboard-grid">
-    <a class="tile tile-soon" aria-disabled="true">
+  <div class="tile-grid">
+    <span class="tile tile-soon" aria-disabled="true">
       <div class="tile-icon">🧙</div>
       <div class="tile-title">Postavy</div>
       <div class="tile-desc">Výběr a správa vlastních postav.</div>
       <span class="tile-soon-badge">Připravujeme</span>
-    </a>
+    </span>
 
-    <a class="tile tile-soon" aria-disabled="true">
+    <span class="tile tile-soon" aria-disabled="true">
       <div class="tile-icon">🗺️</div>
       <div class="tile-title">Dobrodružství</div>
       <div class="tile-desc">Výběr aktivní kampaně/dobrodružství.</div>
       <span class="tile-soon-badge">Připravujeme</span>
-    </a>
+    </span>
 
     <a class="tile" href="pravidla.php">
       <div class="tile-icon">📖</div>
