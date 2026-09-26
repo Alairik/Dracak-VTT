@@ -289,3 +289,69 @@ function dracak_format_kostky(array $row): ?string
     }
     return $text;
 }
+
+// Vykreslí "živou kartu" ze skutečných DB dat pro pravidla.php — nahrazuje
+// zmrzlý statický text u napojeného nadpisu (viz content/edit-links.json)
+// aktuálním obsahem DB. Používá stejné třídy jako artefakt pravidel
+// (statline/chip/chip-k/chip-v), aby to vizuálně sedělo se zbytkem knihy.
+// $config = definice z entities.php pro danou tabulku.
+function dracak_render_pravidla_card(string $table, int $id, array $config): ?string
+{
+    $row = dracak_entity_get($table, $id);
+    if ($row === null) return null;
+    $fields = dracak_entity_fields($table, $config);
+    $fieldsByName = [];
+    foreach ($fields as $f) $fieldsByName[$f['name']] = $f;
+
+    $chips = [];
+    foreach ($config['summary_fields'] ?? [] as $fieldName => $label) {
+        if (empty($row[$fieldName])) continue;
+        $value = $row[$fieldName];
+        $fd = $fieldsByName[$fieldName] ?? null;
+        if ($fd && $fd['type'] === 'select_fk') {
+            $opt = dracak_fk_options($fd['ref_table'], $fd['ref_label']);
+            $value = array_column($opt, 'label', 'id')[(int)$value] ?? $value;
+        }
+        $chips[] = '<span class="chip"><span class="chip-k">' . htmlspecialchars($label) . ':</span><span class="chip-v"> ' . htmlspecialchars((string)$value) . '</span></span>';
+    }
+    $kostky = dracak_kostky_zapis_format($row);
+    if ($kostky) {
+        $chips[] = '<span class="chip"><span class="chip-k">kostky:</span><span class="chip-v"> ' . htmlspecialchars($kostky) . '</span></span>';
+    }
+
+    $html = '';
+    if ($chips) {
+        $html .= '<p class="statline">' . implode('', $chips) . '</p>';
+    }
+    $popisField = $fieldsByName['popis'] ?? $fieldsByName['obsah'] ?? $fieldsByName['poznamky'] ?? null;
+    if ($popisField && !empty($row[$popisField['name']])) {
+        $html .= '<p>' . nl2br(htmlspecialchars((string)$row[$popisField['name']])) . '</p>';
+    }
+    foreach ($config['relations'] ?? [] as $rel) {
+        $items = dracak_relation_current($rel['join_table'], $rel['own_fk'], $rel['other_fk'], $rel['other_table'], $rel['other_label'], $id, $rel['extra_column'] ?? null);
+        if (!$items) continue;
+        $labels = array_map(function ($it) use ($rel) {
+            $label = $it['label'];
+            if (!empty($rel['extra_column']) && $it['extra'] !== null && $it['extra'] !== '') {
+                $label .= ' (' . $it['extra'] . ')';
+            }
+            return htmlspecialchars((string)$label);
+        }, $items);
+        $html .= '<p class="cb cb-note"><em>' . htmlspecialchars($rel['label']) . ':</em> ' . implode(', ', $labels) . '</p>';
+    }
+    if (!empty($config['vysledky_testu'])) {
+        $tiers = dracak_schopnost_vysledky_load($id);
+        $rows = [];
+        foreach ($tiers as $t) {
+            $parts = [];
+            if ($t['obecny'] !== '') $parts[] = $t['obecny'];
+            if ($t['boj'] !== '') $parts[] = 'V boji: ' . $t['boj'];
+            if ($t['mimo_boj'] !== '') $parts[] = 'Mimo boj: ' . $t['mimo_boj'];
+            if ($parts) $rows[] = '<tr><td>' . htmlspecialchars($t['nazev']) . '</td><td>' . htmlspecialchars(implode(' ', $parts)) . '</td></tr>';
+        }
+        if ($rows) {
+            $html .= '<div class="table-wrap"><table class="stat-table"><tbody>' . implode('', $rows) . '</tbody></table></div>';
+        }
+    }
+    return $html !== '' ? $html : null;
+}

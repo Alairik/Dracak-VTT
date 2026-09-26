@@ -36,14 +36,35 @@ $headingsJson = json_encode($headings, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG);
 // dracak_can_edit_row — table-level právo + u row_owned tabulek i
 // vlastnictví). Nikdy neposílat prohlížeči odkaz na záznam, který
 // uživatel nesmí editovat, i kdyby ho jen skryl JS.
+$allLinks = json_decode((string)file_get_contents(__DIR__ . '/content/edit-links.json'), true) ?: [];
+$allEntities = require __DIR__ . '/includes/entities.php';
+$byTable = [];
+foreach ($allLinks as $hid => $link) {
+    $byTable[$link['table']][$hid] = (int)$link['id'];
+}
+
+// Živé karty: nahrazují zmrzlý statický text u napojeného nadpisu aktuálním
+// obsahem DB (viz dracak_render_pravidla_card) — pro každého čtenáře, co na
+// tu sekci knihy vůbec dosáhne (viditelnost sekcí hlídá už výběr content/*
+// souborů výš, ne tohle). Uprav v editoru -> hned se to projeví tady.
+$liveCards = [];
+foreach ($byTable as $table => $hidToId) {
+    $config = $allEntities[$table] ?? null;
+    if ($config === null) continue;
+    foreach ($hidToId as $hid => $id) {
+        $html = dracak_render_pravidla_card($table, $id, $config);
+        if ($html !== null) $liveCards[$hid] = $html;
+    }
+}
+$liveCardsJson = json_encode($liveCards, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG);
+
+// Tužka-odkaz z textu pravidel rovnou do editace DB záznamu — jen když
+// uživatel smí ten konkrétní záznam editovat (stejné pravidlo jako
+// editor.php: dracak_can_edit_row — table-level právo + u row_owned tabulek
+// i vlastnictví). Nikdy neposílat prohlížeči odkaz na záznam, který
+// uživatel nesmí editovat, i kdyby ho jen skryl JS.
 $editLinks = [];
 if ($user !== null) {
-    $allLinks = json_decode((string)file_get_contents(__DIR__ . '/content/edit-links.json'), true) ?: [];
-    $allEntities = require __DIR__ . '/includes/entities.php';
-    $byTable = [];
-    foreach ($allLinks as $hid => $link) {
-        $byTable[$link['table']][$hid] = (int)$link['id'];
-    }
     foreach ($byTable as $table => $hidToId) {
         $config = $allEntities[$table] ?? null;
         if ($config === null || !dracak_can_edit($user, $table)) continue;
@@ -170,10 +191,29 @@ if ($canSeePjBestiar) {
 <script>
 window.__HEADINGS__ = <?= $headingsJson ?>;
 window.__EDIT_LINKS__ = <?= $editLinksJson ?>;
+window.__LIVE_CARDS__ = <?= $liveCardsJson ?>;
 </script>
 <script src="assets/pravidla/pravidla.js"></script>
 <script>
 (function(){
+  // Živé karty: nahradí zmrzlý statický text u napojeného nadpisu aktuálním
+  // obsahem z DB (viz dracak_render_pravidla_card v entity_crud.php) — než
+  // se přidá tužka, ať jde na přehledný nadpis nad aktuálním obsahem, ne
+  // nad starým textem, co za chvíli zmizí.
+  var cards = window.__LIVE_CARDS__ || {};
+  Object.keys(cards).forEach(function(hid){
+    var heading = document.getElementById(hid);
+    if (!heading) return;
+    var toRemove = [];
+    document.querySelectorAll('[data-sec="' + hid + '"]').forEach(function(el){
+      var wrap = el.closest('.table-wrap');
+      var target = wrap || el;
+      if (toRemove.indexOf(target) === -1) toRemove.push(target);
+    });
+    toRemove.forEach(function(el){ el.remove(); });
+    heading.insertAdjacentHTML('afterend', cards[hid]);
+  });
+
   var links = window.__EDIT_LINKS__ || {};
   Object.keys(links).forEach(function(hid){
     var el = document.getElementById(hid);
