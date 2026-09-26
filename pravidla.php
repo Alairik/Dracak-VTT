@@ -37,10 +37,29 @@ $headingsJson = json_encode($headings, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG);
 // vlastnictví). Nikdy neposílat prohlížeči odkaz na záznam, který
 // uživatel nesmí editovat, i kdyby ho jen skryl JS.
 $allLinks = json_decode((string)file_get_contents(__DIR__ . '/content/edit-links.json'), true) ?: [];
+// content-links.json: stejná myšlenka jako edit-links.json, ale nadpis
+// nestačí jako kotva — použije se, když je víc položek (lektvary, později
+// předměty/finty) vypsáno v jedné knižní pasáži/tabulce pod SPOLEČNÝM
+// nadpisem, každá se svým vlastním jmenovaným odstavcem/řádkem tabulky
+// (id="bNNNN" v pravidla-hrac.html). Klíče obou souborů se nikdy
+// nepřekrývají (h... vs b...), takže se dají sloučit do jednoho pole a
+// projít stejnou logikou práv (viz pravidla.js — liší se jen tím, na jaký
+// typ elementu se tužka připojuje).
+$contentLinks = json_decode((string)file_get_contents(__DIR__ . '/content/content-links.json'), true) ?: [];
 $allEntities = require __DIR__ . '/includes/entities.php';
 $byTable = [];
 foreach ($allLinks as $hid => $link) {
     $byTable[$link['table']][$hid] = (int)$link['id'];
+}
+// $byTableAll = $byTable + content-links, jen pro prokliky (viz níže) — živé
+// karty (dál) běží jen nad $byTable (celé nadpisy), protože content-links
+// kotví na jeden odstavec/řádek uvnitř nadpisu se spoustou dalších položek
+// (např. h275 = 26+ lektvarů pod jedním nadpisem) — nahradit tam jen text
+// jedné položky bez rozbití zbytku sekce by chtělo jiný render, ne
+// dracak_render_pravidla_card (ten maže/nahrazuje podle celého data-sec).
+$byTableAll = $byTable;
+foreach ($contentLinks as $cid => $link) {
+    $byTableAll[$link['table']][$cid] = (int)$link['id'];
 }
 
 // Živé karty: nahrazují zmrzlý statický text u napojeného nadpisu aktuálním
@@ -65,7 +84,7 @@ $liveCardsJson = json_encode($liveCards, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG);
 // uživatel nesmí editovat, i kdyby ho jen skryl JS.
 $editLinks = [];
 if ($user !== null) {
-    foreach ($byTable as $table => $hidToId) {
+    foreach ($byTableAll as $table => $hidToId) {
         $config = $allEntities[$table] ?? null;
         if ($config === null || !dracak_can_edit($user, $table)) continue;
         $rowOwned = !empty($config['row_owned']) && $user['role'] === 'hrac';
@@ -86,6 +105,19 @@ if ($user !== null) {
     }
 }
 $editLinksJson = json_encode($editLinks, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG);
+
+// Ochrana obsahu s vlastním content-linkem před smazáním živou kartou
+// nadřazeného nadpisu. Příklad: h275 ("Lučba") je napojený na schopnost
+// Alchymisty a má vlastní živou kartu — ale pod týmž nadpisem (stejné
+// data-sec="h275") je vyjmenováno 26+ jednotlivých lektvarů, každý se
+// svým vlastním content-linkem (id="bNNNN"). Bez týhle ochrany by JS
+// live-card smazal úplně všechno s data-sec="h275" (viz níže) včetně
+// těch jednotlivých položek, na které content-links.json míří — a
+// zbyla by jen karta schopnosti Lučba. Musí to vidět úplně každý
+// čtenář (i bez práva editovat), protože jde o to, co se vůbec
+// vykreslí, ne o to, kdo smí kliknout na tužku.
+$protectedContentIds = array_values(array_keys($contentLinks));
+$protectedContentIdsJson = json_encode($protectedContentIds, JSON_UNESCAPED_UNICODE);
 ?>
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Pravidla DrD + domácí pravidla</title>
@@ -192,6 +224,7 @@ if ($canSeePjBestiar) {
 window.__HEADINGS__ = <?= $headingsJson ?>;
 window.__EDIT_LINKS__ = <?= $editLinksJson ?>;
 window.__LIVE_CARDS__ = <?= $liveCardsJson ?>;
+window.__PROTECTED_CONTENT_IDS__ = <?= $protectedContentIdsJson ?>;
 </script>
 <script src="assets/pravidla/pravidla.js"></script>
 <script>
@@ -201,6 +234,14 @@ window.__LIVE_CARDS__ = <?= $liveCardsJson ?>;
   // se přidá tužka, ať jde na přehledný nadpis nad aktuálním obsahem, ne
   // nad starým textem, co za chvíli zmizí.
   var cards = window.__LIVE_CARDS__ || {};
+  var protectedIds = window.__PROTECTED_CONTENT_IDS__ || [];
+  function containsProtected(el){
+    if (protectedIds.indexOf(el.id) !== -1) return true;
+    for (var i = 0; i < protectedIds.length; i++) {
+      if (el.querySelector('#' + CSS.escape(protectedIds[i]))) return true;
+    }
+    return false;
+  }
   Object.keys(cards).forEach(function(hid){
     var heading = document.getElementById(hid);
     if (!heading) return;
@@ -208,6 +249,12 @@ window.__LIVE_CARDS__ = <?= $liveCardsJson ?>;
     document.querySelectorAll('[data-sec="' + hid + '"]').forEach(function(el){
       var wrap = el.closest('.table-wrap');
       var target = wrap || el;
+      // Nadpis (typicky h275) může mít vlastní živou kartu, ale zároveň pod
+      // sebou vyjmenovávat spoustu samostatných položek (lektvary, později
+      // předměty), z nichž každá má svůj vlastní content-link (id="bNNNN",
+      // viz content-links.json). Ty se živou kartou nadřazeného nadpisu
+      // smazat nesmí, jinak by z celé sekce zbyla jen ta jedna karta.
+      if (containsProtected(target)) return;
       if (toRemove.indexOf(target) === -1) toRemove.push(target);
     });
     toRemove.forEach(function(el){ el.remove(); });
@@ -225,6 +272,16 @@ window.__LIVE_CARDS__ = <?= $liveCardsJson ?>;
     a.title = 'Upravit v databázi';
     a.setAttribute('aria-label', 'Upravit v databázi');
     a.textContent = '✎';
+    // content-links.json kotví na jednotlivý řádek tabulky (id="bNNNN" na
+    // <tr>, viz h2056/h2085 v pravidla-hrac.html), ne na nadpis — <a> jako
+    // přímé dítě <tr> by prohlížeč z tabulky vyhodil. Tužka proto jde do
+    // posledního <td> toho řádku; jinde (nadpisy, jednotlivé <p> u h275)
+    // se připojuje přímo k elementu jako dřív.
+    if (el.tagName === 'TR') {
+      var lastTd = el.querySelector('td:last-child');
+      (lastTd || el).appendChild(a);
+      return;
+    }
     el.appendChild(a);
   });
 })();
