@@ -72,6 +72,39 @@ function dracak_entity_get(string $table, int $id): ?array
     return $row ?: null;
 }
 
+// Napojení pravidel na DB (content/edit-links.json, content/content-links.json)
+// nesmí ukládat natvrdo číselné id — auto_increment se mezi prostředími (moje
+// testovací DB vs. produkce) liší podle toho, co se kde kdy vložilo/smazalo,
+// takže stejné id v jiném prostředí klidně míří na úplně jiný řádek, nebo na
+// žádný. Proto tyhle soubory ukládají {"table":"rasy","nazev":"Hobit"} — a
+// teprve tady, při každém requestu, se název přeloží na aktuální id v tomhle
+// konkrétním prostředí. Když název v tabulce vůbec není (řádek smazán, ještě
+// nevytvořen), link se tiše přeskočí — nikdy neukazovat tužku/kartu na
+// neexistující řádek.
+//
+// Podmínka: `nazev` musí být v tabulce jedinečný. Pro kouzla a
+// zvlastni_schopnosti to neplatí (stejný název používá víc povolání) — ty
+// proto zůstávají zatím na starém zápisu {"table":...,"id":...} a řeší se
+// zvlášť (potřebují druhý rozlišovací klíč, ne jen název).
+function dracak_resolve_content_link(array $link, array &$nazevIndexCache): ?int
+{
+    if (isset($link['id'])) {
+        return (int)$link['id'];
+    }
+    if (!isset($link['nazev'])) {
+        return null;
+    }
+    $table = $link['table'];
+    if (!isset($nazevIndexCache[$table])) {
+        $index = [];
+        foreach (dracak_db()->query("SELECT id, nazev FROM `$table`") as $r) {
+            $index[$r['nazev']] = (int)$r['id'];
+        }
+        $nazevIndexCache[$table] = $index;
+    }
+    return $nazevIndexCache[$table][$link['nazev']] ?? null;
+}
+
 function dracak_fk_options(string $refTable, string $refLabel): array
 {
     return dracak_db()->query("SELECT id, `$refLabel` AS label FROM `$refTable` ORDER BY `$refLabel`")->fetchAll();

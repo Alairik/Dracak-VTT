@@ -47,9 +47,15 @@ $allLinks = json_decode((string)file_get_contents(__DIR__ . '/content/edit-links
 // typ elementu se tužka připojuje).
 $contentLinks = json_decode((string)file_get_contents(__DIR__ . '/content/content-links.json'), true) ?: [];
 $allEntities = require __DIR__ . '/includes/entities.php';
+// Odkazy se ukládají přes název, ne přes id (viz dracak_resolve_content_link
+// v entity_crud.php — id se mezi prostředími liší podle auto_increment).
+// $nazevIndexCache se plní líně, jednou za tabulku, a sdílí se mezi
+// edit-links i content-links.
+$nazevIndexCache = [];
 $byTable = [];
 foreach ($allLinks as $hid => $link) {
-    $byTable[$link['table']][$hid] = (int)$link['id'];
+    $id = dracak_resolve_content_link($link, $nazevIndexCache);
+    if ($id !== null) $byTable[$link['table']][$hid] = $id;
 }
 // $byTableAll = $byTable + content-links, jen pro prokliky (viz níže) — živé
 // karty (dál) běží jen nad $byTable (celé nadpisy), protože content-links
@@ -59,7 +65,8 @@ foreach ($allLinks as $hid => $link) {
 // dracak_render_pravidla_card (ten maže/nahrazuje podle celého data-sec).
 $byTableAll = $byTable;
 foreach ($contentLinks as $cid => $link) {
-    $byTableAll[$link['table']][$cid] = (int)$link['id'];
+    $id = dracak_resolve_content_link($link, $nazevIndexCache);
+    if ($id !== null) $byTableAll[$link['table']][$cid] = $id;
 }
 
 // Živé karty: nahrazují zmrzlý statický text u napojeného nadpisu aktuálním
