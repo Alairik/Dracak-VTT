@@ -61,3 +61,20 @@
   je čte interně přes `readfile()`/`file_get_contents()` podle role
   (`pj`/`bestiar` fragmenty jen pro `pj`/`admin`). Nikdy sem nepřidávej nic,
   co by šlo natvrdo poslat prohlížeči bez ohledu na roli.
+- **Proč DB vůbec existuje, mimo pravidel:** VTT nad ní poběží a bude z ní
+  tahat reálná data přímo do hry — ne jen zobrazovat text k přečtení.
+  Z toho plyne, co znamenají strukturovaná pole jako `kostky`
+  (pocet_kostek/typ_kostky/pevny_bonus) a vazby na `efekty`
+  (`kouzlo_efekty`, `lektvar_efekty`, `schopnost_efekty`): nejsou to
+  hezčí popisky, ale mechanický hák, který má engine za hry **skutečně
+  spustit** — hodit kostkou, strhnout životy, nasadit debuff s trváním
+  — místo aby si PJ musel přečíst `popis` a vyhodnotit to ručně. Platí
+  stejně pro kouzla, lektvary i zvláštní schopnosti/dovednosti (ne jen
+  kouzla). Efekt/kostky proto patří jen tam, kde má záznam jasný
+  mechanický dopad (poškození, léčení, standardní stavový efekt typu
+  Spánek/Ochromení, který `efekty` už eviduje jako obecný,
+  znovupoužitelný typ) — ne u čistě naratívních/flexibilních věcí bez
+  jasné mechaniky (typ "získej dočasně nějakou schopnost zvířete").
+  Než se cokoliv z tohohle plošně doplňuje na desítky/stovky záznamů,
+  radši se zeptat, protože špatně navržený efekt je hůř opravitelný
+  než žádný.
