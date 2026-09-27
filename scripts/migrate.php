@@ -146,21 +146,118 @@ function migrate_je_create_table_if_not_exists(string $stmt, ?string &$tabulka):
   return false;
  }
 
+// Stejný princip jako výš, pro "ALTER TABLE ... ADD/MODIFY" — pokryje
+// jen vzory, co CLAUDE.md u migrací povoluje (ALTER ADD, plus MODIFY
+// COLUMN ... ENUM(...) jako rozšíření výčtu, což je taky čistě
+// přídavné, nic nemaže). Cokoliv jiného (např. MODIFY měnící typ na
+// něco, co by mohlo zahodit data) tenhle fallback záměrně NEPOZNÁ a
+// nechá to spadnout normálně — radši hlasitá chyba než tiché
+// přeskočení něčeho, co jsme neověřili.
+function migrate_alter_uz_hotovo(PDO $pdo, string $stmt, ?string &$popis): bool
+ {
+  if (!preg_match('/^ALTER\s+TABLE\s+`?(\w+)`?\s+(.*)$/is', trim($stmt), $m)) {
+   return false;
+  }
+  $tabulka = $m[1];
+  $zbytek = trim($m[2]);
+
+  // ADD [COLUMN] jméno ...
+  if (preg_match('/^ADD\s+(?:COLUMN\s+)?`?(\w+)`?/i', $zbytek, $mm)) {
+   $sloupec = $mm[1];
+   $q = $pdo->prepare(
+    'SELECT COUNT(*) FROM information_schema.COLUMNS'
+    . ' WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+    );
+   $q->execute([$tabulka, $sloupec]);
+   if ((int)$q->fetchColumn() > 0) {
+    $popis = "sloupec $tabulka.$sloupec už existuje";
+    return true;
+   }
+   return false;
+  }
+
+  // ADD [CONSTRAINT jméno] [UNIQUE] (KEY|INDEX) jméno ...
+  if (preg_match('/^ADD\s+(?:CONSTRAINT\s+`?\w+`?\s+)?(?:UNIQUE\s+)?(?:KEY|INDEX)\s+`?(\w+)`?/i', $zbytek, $mm)) {
+   $jmeno = $mm[1];
+   $q = $pdo->prepare(
+    'SELECT COUNT(*) FROM information_schema.STATISTICS'
+    . ' WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?'
+    );
+   $q->execute([$tabulka, $jmeno]);
+   if ((int)$q->fetchColumn() > 0) {
+    $popis = "index $tabulka.$jmeno už existuje";
+    return true;
+   }
+   return false;
+  }
+
+  // ADD CONSTRAINT jméno FOREIGN KEY ...
+  if (preg_match('/^ADD\s+CONSTRAINT\s+`?(\w+)`?\s+FOREIGN\s+KEY/i', $zbytek, $mm)) {
+   $jmeno = $mm[1];
+   $q = $pdo->prepare(
+    'SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS'
+    . ' WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND CONSTRAINT_NAME = ?'
+    );
+   $q->execute([$tabulka, $jmeno]);
+   if ((int)$q->fetchColumn() > 0) {
+    $popis = "cizí klíč $tabulka.$jmeno už existuje";
+    return true;
+   }
+   return false;
+  }
+
+  // MODIFY [COLUMN] jméno ... ENUM('a','b',...) — jen rozšiřování
+  // výčtu se dá bezpečně ověřit: pokud tam všechny požadované hodnoty
+  // už jsou, je to hotovo (netestujeme, jestli tam náhodou nechybí
+  // starší hodnota, kterou by ALTER odebíral — to by nebyl přídavný
+  // ALTER a do migrace by nepatřil vůbec).
+  if (preg_match('/^MODIFY\s+(?:COLUMN\s+)?`?(\w+)`?.*?ENUM\s*\((.*?)\)/is', $zbytek, $mm)) {
+   $sloupec = $mm[1];
+   preg_match_all("/'((?:[^'\\\\]|\\\\.)*)'/", $mm[2], $mmValues);
+   $pozadovane = $mmValues[1];
+   if (!$pozadovane) {
+    return false;
+   }
+   $q = $pdo->prepare(
+    'SELECT COLUMN_TYPE FROM information_schema.COLUMNS'
+    . ' WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+    );
+   $q->execute([$tabulka, $sloupec]);
+   $aktualniTyp = $q->fetchColumn();
+   if ($aktualniTyp === false) {
+    return false;
+   }
+   preg_match_all("/'((?:[^'\\\\]|\\\\.)*)'/", (string)$aktualniTyp, $aktualniValues);
+   $aktualni = $aktualniValues[1];
+   $chybi = array_diff($pozadovane, $aktualni);
+   if (!$chybi) {
+    $popis = "$tabulka.$sloupec už má všechny požadované hodnoty výčtu";
+    return true;
+   }
+   return false;
+  }
+
+  return false;
+ }
+
 function migrate_exec_statement(PDO $pdo, string $stmt): string
  {
   try {
    $pdo->exec($stmt);
    return '';
   } catch (PDOException $e) {
-   if (!migrate_je_create_table_if_not_exists($stmt, $tabulka)) {
-    throw $e;
+   if (migrate_je_create_table_if_not_exists($stmt, $tabulka)) {
+    try {
+     $pdo->query('SELECT 1 FROM `' . $tabulka . '` LIMIT 1');
+    } catch (PDOException $eSelect) {
+     throw $e;
+    }
+    return "  (CREATE TABLE $tabulka přeskočeno — tenhle účet nemá CREATE, ale tabulka už existuje a je použitelná.)\n";
    }
-   try {
-    $pdo->query('SELECT 1 FROM `' . $tabulka . '` LIMIT 1');
-   } catch (PDOException $eSelect) {
-    throw $e;
+   if (migrate_alter_uz_hotovo($pdo, $stmt, $popis)) {
+    return "  (ALTER přeskočen — tenhle účet nemá ALTER, ale $popis.)\n";
    }
-   return "  (CREATE TABLE $tabulka přeskočeno — tenhle účet nemá CREATE, ale tabulka už existuje a je použitelná.)\n";
+   throw $e;
   }
  }
 
