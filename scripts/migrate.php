@@ -117,6 +117,42 @@ function migrate_split_sql(string $sql): array
   return $statements;
  }
 
+// Stejný princip jako fallback pro migrace_log níž, jen obecně pro
+// libovolnou migraci: "CREATE TABLE IF NOT EXISTS" pod web účtem
+// (DML-only) spadne na oprávnění (1142) i když tabulka už existuje —
+// IF NOT EXISTS potlačí jen chybu "already exists", ne kontrolu
+// oprávnění. Když se to stane, ověříme přes SELECT, jestli je tabulka
+// použitelná (typicky proto, že ji admin mezitím ručně založil přes
+// phpMyAdmin) — pokud ano, bereme to jako "už hotovo" a jedeme dál na
+// zbytek souboru (typicky INSERTy), místo abychom po nasazení museli
+// každou takovou migraci ještě ručně zapisovat do migrace_log zvlášť.
+function migrate_je_create_table_if_not_exists(string $stmt, ?string &$tabulka): bool
+ {
+  if (preg_match('/^CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+`?(\w+)`?/i', trim($stmt), $m)) {
+   $tabulka = $m[1];
+   return true;
+  }
+  return false;
+ }
+
+function migrate_exec_statement(PDO $pdo, string $stmt): string
+ {
+  try {
+   $pdo->exec($stmt);
+   return '';
+  } catch (PDOException $e) {
+   if (!migrate_je_create_table_if_not_exists($stmt, $tabulka)) {
+    throw $e;
+   }
+   try {
+    $pdo->query('SELECT 1 FROM `' . $tabulka . '` LIMIT 1');
+   } catch (PDOException $eSelect) {
+    throw $e;
+   }
+   return "  (CREATE TABLE $tabulka přeskočeno — tenhle účet nemá CREATE, ale tabulka už existuje a je použitelná.)\n";
+  }
+ }
+
 $configPath = __DIR__ . '/../config.php';
 if (!file_exists($configPath)) {
  migrate_fail(500, 'Chybí config.php.');
@@ -236,7 +272,8 @@ echo "Spouštím $filename ...\n";
  $pdo->beginTransaction();
  try {
   foreach (migrate_split_sql($sql) as $stmt) {
-   $pdo->exec($stmt);
+   $note = migrate_exec_statement($pdo, $stmt);
+   if ($note !== '') echo $note;
   }
   $ins = $pdo->prepare('INSERT INTO migrace_log (soubor) VALUES (?)');
   $ins->execute([$filename]);
