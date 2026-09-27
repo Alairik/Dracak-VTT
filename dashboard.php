@@ -27,19 +27,11 @@ $isAdmin = $user['role'] === 'admin';
   </div>
 
   <div class="tile-grid">
-    <span class="tile tile-soon" aria-disabled="true">
-      <div class="tile-icon">🧙</div>
-      <div class="tile-title">Postavy</div>
-      <div class="tile-desc">Výběr a správa vlastních postav.</div>
-      <span class="tile-soon-badge">Připravujeme</span>
-    </span>
-
-    <span class="tile tile-soon" aria-disabled="true">
+    <a class="tile" href="vtt/svety.php">
       <div class="tile-icon">🗺️</div>
-      <div class="tile-title">Dobrodružství</div>
-      <div class="tile-desc">Výběr aktivní kampaně/dobrodružství.</div>
-      <span class="tile-soon-badge">Připravujeme</span>
-    </span>
+      <div class="tile-title">Světy</div>
+      <div class="tile-desc">Výběr aktivní kampaně, mapy a postavy ve hře.</div>
+    </a>
 
     <a class="tile" href="pravidla.php">
       <div class="tile-icon">📖</div>
