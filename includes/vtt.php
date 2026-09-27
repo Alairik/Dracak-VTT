@@ -113,7 +113,7 @@ function dracak_vtt_hod_kostkou(int $pocet, int $typ, int $bonus): array
     return ['hody' => $hody, 'bonus' => $bonus, 'celkem' => array_sum($hody) + $bonus];
 }
 
-// Společná hlavička/patička pro vtt/*.php stránky — ať se neopakuje na
+// Společná hlavička/patička pro hra/*.php stránky — ať se neopakuje na
 // třech místech to samé <head> a horní lišta co dashboard.php.
 function dracak_vtt_page_start(string $title, array $user): void
 {

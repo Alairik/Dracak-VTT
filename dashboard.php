@@ -27,7 +27,7 @@ $isAdmin = $user['role'] === 'admin';
   </div>
 
   <div class="tile-grid">
-    <a class="tile" href="vtt/svety.php">
+    <a class="tile" href="hra/svety.php">
       <div class="tile-icon">🗺️</div>
       <div class="tile-title">Světy</div>
       <div class="tile-desc">Výběr aktivní kampaně, mapy a postavy ve hře.</div>
