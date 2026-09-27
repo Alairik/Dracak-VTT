@@ -81,11 +81,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $rasaId = !empty($_POST['rasa_id']) ? (int)$_POST['rasa_id'] : null;
         $povolaniId = !empty($_POST['povolani_id']) ? (int)$_POST['povolani_id'] : null;
         $maxHp = max(0, (int)($_POST['max_hp'] ?? 0));
+
+        // Hráč zakládá vždycky sám sobě — neřeší se, co pošle v POSTu.
+        // PJ/admin může založit rovnou pro kohokoliv u stolu (vlastnik_ucet_id
+        // v POSTu), jinak taky sám sobě.
+        $vlastnikId = $user['id'];
+        if ($isPjOrAdmin && !empty($_POST['vlastnik_ucet_id'])) {
+            $stmt = dracak_db()->prepare('SELECT 1 FROM svet_hraci WHERE svet_id = ? AND ucet_id = ?');
+            $stmt->execute([$svetId, (int)$_POST['vlastnik_ucet_id']]);
+            if ($stmt->fetchColumn()) {
+                $vlastnikId = (int)$_POST['vlastnik_ucet_id'];
+            }
+        }
+
         $stmt = dracak_db()->prepare(
             'INSERT INTO postavy (svet_id, vlastnik_ucet_id, nazev, rasa_id, povolani_id, uroven, aktualni_hp, max_hp)
              VALUES (?, ?, ?, ?, ?, 1, ?, ?)'
         );
-        $stmt->execute([$svetId, $user['id'], $nazev, $rasaId, $povolaniId, $maxHp, $maxHp]);
+        $stmt->execute([$svetId, $vlastnikId, $nazev, $rasaId, $povolaniId, $maxHp, $maxHp]);
+        header("Location: svet.php?id=$svetId");
+        exit;
+    }
+
+    if ($akce === 'prevest_postavu') {
+        if (!$isPjOrAdmin) { http_response_code(403); die('Jen PJ/admin přiřazuje postavu jinému hráči.'); }
+        $postavaId = (int)($_POST['postava_id'] ?? 0);
+        $novyVlastnikId = (int)($_POST['novy_vlastnik_id'] ?? 0);
+        $stmt = dracak_db()->prepare('SELECT 1 FROM svet_hraci WHERE svet_id = ? AND ucet_id = ?');
+        $stmt->execute([$svetId, $novyVlastnikId]);
+        if ($stmt->fetchColumn()) {
+            $stmt = dracak_db()->prepare('UPDATE postavy SET vlastnik_ucet_id = ? WHERE id = ? AND svet_id = ?');
+            $stmt->execute([$novyVlastnikId, $postavaId, $svetId]);
+        }
         header("Location: svet.php?id=$svetId");
         exit;
     }
@@ -119,10 +146,10 @@ if ($isPjOrAdmin) {
     $volniHraci = $stmt->fetchAll();
 
     $stmt = dracak_db()->prepare(
-        'SELECT u.jmeno FROM svet_hraci sh JOIN ucty u ON u.id = sh.ucet_id WHERE sh.svet_id = ? ORDER BY u.jmeno'
+        'SELECT u.id, u.jmeno FROM svet_hraci sh JOIN ucty u ON u.id = sh.ucet_id WHERE sh.svet_id = ? ORDER BY u.jmeno'
     );
     $stmt->execute([$svetId]);
-    $hraciVeSvete = array_column($stmt->fetchAll(), 'jmeno');
+    $hraciVeSvete = $stmt->fetchAll();
 }
 
 dracak_vtt_page_start($svet['nazev'], $user);
@@ -167,7 +194,7 @@ dracak_vtt_page_start($svet['nazev'], $user);
     <?php if ($isPjOrAdmin): ?>
     <h2 class="page-title" style="font-size:20px;margin-top:28px;">Hráči u stolu</h2>
     <div class="card elev-sm">
-      <p><?= $hraciVeSvete ? htmlspecialchars(implode(', ', $hraciVeSvete)) : 'Zatím žádný hráč nepřidán.' ?></p>
+      <p><?= $hraciVeSvete ? htmlspecialchars(implode(', ', array_column($hraciVeSvete, 'jmeno'))) : 'Zatím žádný hráč nepřidán.' ?></p>
       <?php if ($volniHraci): ?>
       <form method="post" style="display:flex;gap:10px;margin-top:10px;">
         <input type="hidden" name="akce" value="pridat_hrace">
@@ -228,6 +255,18 @@ dracak_vtt_page_start($svet['nazev'], $user);
               <div class="k">Rasa/Povolání:</div><div><?= htmlspecialchars(($p['rasa_nazev'] ?? '—') . ' / ' . ($p['povolani_nazev'] ?? '—')) ?></div>
               <div class="k">Život:</div><div><?= (int)$p['aktualni_hp'] ?> / <?= (int)$p['max_hp'] ?></div>
             </div>
+            <?php if ($isPjOrAdmin && count($hraciVeSvete) > 1): ?>
+              <form method="post" style="display:flex;gap:6px;margin-top:8px;">
+                <input type="hidden" name="akce" value="prevest_postavu">
+                <input type="hidden" name="postava_id" value="<?= (int)$p['id'] ?>">
+                <select class="input" name="novy_vlastnik_id" style="flex:1;font-size:12px;">
+                  <?php foreach ($hraciVeSvete as $h): ?>
+                    <option value="<?= (int)$h['id'] ?>" <?= (int)$h['id'] === (int)$p['vlastnik_ucet_id'] ? 'selected' : '' ?>><?= htmlspecialchars($h['jmeno']) ?></option>
+                  <?php endforeach; ?>
+                </select>
+                <button class="btn btn-ghost" type="submit" style="font-size:12px;">Přiřadit</button>
+              </form>
+            <?php endif; ?>
           </div>
         <?php endforeach; ?>
       </div>
@@ -237,6 +276,16 @@ dracak_vtt_page_start($svet['nazev'], $user);
       <div class="field"><label for="p_nazev">Jméno postavy *</label>
         <input class="input" type="text" id="p_nazev" name="nazev" required>
       </div>
+      <?php if ($isPjOrAdmin && $hraciVeSvete): ?>
+      <div class="field"><label for="vlastnik_ucet_id">Založit pro hráče</label>
+        <select id="vlastnik_ucet_id" name="vlastnik_ucet_id">
+          <option value="">Sebe (<?= htmlspecialchars($user['jmeno']) ?>)</option>
+          <?php foreach ($hraciVeSvete as $h): ?>
+            <option value="<?= (int)$h['id'] ?>"><?= htmlspecialchars($h['jmeno']) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <?php endif; ?>
       <div class="field"><label for="rasa_id">Rasa</label>
         <select id="rasa_id" name="rasa_id"><option value="">—</option>
           <?php foreach ($rasyOptions as $r): ?><option value="<?= (int)$r['id'] ?>"><?= htmlspecialchars($r['nazev']) ?></option><?php endforeach; ?>
