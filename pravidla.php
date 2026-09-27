@@ -307,7 +307,7 @@ window.__CURRENT_USER_ID__ = <?= $user !== null ? (int)$user['id'] : 'null' ?>;
     heading.insertAdjacentHTML('afterend', cards[hid]);
   });
 
-  // ---------- pravidla_texty: univerzální přepis KAŽDÉHO kusu textu ----------
+  // ---------- pravidla_texty: přepis a editace PO SEKCÍCH (oprava issue #1) ----------
   // Na rozdíl od $liveCards/$editLinks výš (jen nadpisy/odstavce ručně
   // spárované s konkrétním DB záznamem přes edit-links.json/
   // content-links.json), tohle se váže PŘÍMO na libovolné id="hNNNN"/
@@ -317,23 +317,134 @@ window.__CURRENT_USER_ID__ = <?= $user !== null ? (int)$user['id'] : 'null' ?>;
   // smazala (nahradila DB záznamem), tu už není, takže se na něj žádný
   // přepis ani tužka nepřidá (jeho syrový text se stejně nezobrazuje).
   //
-  // Jeden querySelectorAll dokumentem (bookIdEls), sdílený mezi
-  // nahrazením textu TADY a přidáním tužek DÁL DOLE (po tužkách
-  // napojených DB záznamů) — ne opakované dotazování DOM v cyklu přes
-  // tisíce nadpisů/odstavců, to je přesně ten O(n×m) vzor, co se
-  // opravil v předchozím commitu (f5f61a4) a nesmí se sem vrátit.
+  // PŮVODNĚ (commit 3fce388) dostal tužku úplně KAŽDÝ jednotlivý
+  // <p>/<li>/<tr> (id="bNNNN") — pod jedním nadpisem klidně 24+
+  // samostatných tužek (viz issue #1: "Myslel jsem, že to bude na
+  // odstavce, po logických nadpisech. Ne že řádek dostane tužku.").
+  // Oprava: editovatelná JEDNOTKA je teď celá SEKCE — nadpis (hN) +
+  // všechny jeho přímé sourozence (odstavce, celé <ul>/<ol> seznamy) až
+  // po další nadpis (dracakSectionSiblings, čistě strukturální — projde
+  // DOM sourozenci, žádná závislost na data-sec, takže funguje stejně
+  // spolehlivě i PO uložení, kdy sanitizace atributy smaže). kniha_id
+  // sekce je pořád jen "hN" (nadpisu), "bN" se od teď pro pravidla_texty
+  // nově NEPOUŽÍVÁ — viz dracak_pravidla_texty_map() v entity_crud.php.
+  //
+  // Sloučení je ale BEZPEČNÉ jen tam, kde by nešlo nic rozbít:
+  //  - sekce s vlastní živou kartou (cards[hid]) — tělo pod nadpisem už
+  //    není statický text knihy, ale vykreslený DB záznam, pravidla_texty
+  //    se ho netýká (nadpis samotný zůstává editovatelný zvlášť, jako dřív).
+  //  - sekce s tabulkou (<table>/.table-wrap) — needitujeme přes WYSIWYG
+  //    (sanitizace by tabulku rozbila, td/tr nejsou na allow-listu), tj.
+  //    beze změny oproti stavu PŘED touhle opravou.
+  //  - sekce, kde je aspoň jeden <p>/<li>/<tr> napojený přes
+  //    content-links.json (protectedSet) — TOHLE je systém napojení DB
+  //    entit na knihu (viz entity_crud.php dracak_resolve_content_link),
+  //    sloučení do jednoho HTML by smazalo jednotlivá id="bNNNN", na
+  //    která se content-links.json odkazuje ("který přesně odstavec
+  //    patří kterému kouzlu/lektvaru") — NESMÍ se sloučit, zůstává stará
+  //    jemná editace po jednotlivých blocích (viz fallback smyčka níž).
+  // Ve všech třech případech se prostě nepoužije sloučená sekce a chová
+  // se to přesně jako dřív (tužka na jednotlivém prvku) — entity-linking
+  // systém (content-links.json/edit-links.json) tahle oprava vůbec
+  // nemění, běží dál nezávisle nad stejným HTML.
   var textOverrides = window.__TEXT_OVERRIDES__ || {};
   var textEditEnabled = !!window.__TEXT_EDIT_ENABLED__;
   var textEditUnrestricted = !!window.__TEXT_EDIT_UNRESTRICTED__;
   var currentUserId = window.__CURRENT_USER_ID__;
   var knihaIdRe = /^[hb][1-9][0-9]{0,9}$/;
+  var headingIdRe = /^h[1-9][0-9]{0,9}$/;
+  var headingTagRe = /^H[2-6]$/;
   var bookIdEls = (Object.keys(textOverrides).length || textEditEnabled)
     ? document.querySelectorAll('[id]')
     : [];
+
+  // Strukturální (ne data-sec) výčet "těla" sekce — přímí sourozenci
+  // nadpisu až po další nadpis. Nezávislé na data-sec/id atributech, což
+  // je schválně: po prvním uložení sekce sanitizace VŠECHNY atributy
+  // (kromě href u <a>) smaže, takže nový obsah žádné id="bN"/data-sec
+  // nemá — kdyby seskupení viselo na data-sec, druhá editace ve stejné
+  // session by už nic nenašla. Sourozenecký průchod funguje pořád
+  // stejně, ať je obsah "syrový" ze statického HTML, nebo už jednou
+  // uložený z editoru.
+  function dracakSectionSiblings(headingEl) {
+    var out = [];
+    var node = headingEl.nextElementSibling;
+    while (node && !(node.id && headingIdRe.test(node.id))) {
+      out.push(node);
+      node = node.nextElementSibling;
+    }
+    return out;
+  }
+
+  function dracakSectionHasTableOrProtected(siblings) {
+    for (var i = 0; i < siblings.length; i++) {
+      var el = siblings[i];
+      if (el.tagName === 'TABLE' || (el.classList && el.classList.contains('table-wrap'))) return true;
+      if (protectedSet[el.id]) return true;
+      if (el.querySelectorAll) {
+        var innerIds = el.querySelectorAll('[id]');
+        for (var j = 0; j < innerIds.length; j++) {
+          if (protectedSet[innerIds[j].id]) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  // Groupabilita nadpisu je stálá vlastnost obsahu knihy (živá karta /
+  // tabulka / content-link se editací neobjeví ani nezmizí) — cachujeme,
+  // ať se u velkých tabulek nepočítá znovu pro každý jednotlivý <tr>
+  // (viz fallback smyčka níž).
+  var groupableCache = {};
+  function dracakIsGroupableHeading(hid) {
+    if (hid in groupableCache) return groupableCache[hid];
+    var result = false;
+    if (!cards[hid]) {
+      var h = document.getElementById(hid);
+      if (h && headingTagRe.test(h.tagName)) {
+        result = !dracakSectionHasTableOrProtected(dracakSectionSiblings(h));
+      }
+    }
+    groupableCache[hid] = result;
+    return result;
+  }
+
+  // Nahradí tělo sekce (aktuální sourozenci nadpisu) uloženým HTML.
+  // Pokud uložený obsah začíná nadpisovým tagem (uživatel v editoru
+  // přejmenoval i titulek), použije se jen jeho VNITŘEK pro
+  // headingEl.innerHTML — headingEl samotný (tag + id="hN") se nikdy
+  // nezahazuje/nenahrazuje, aby zůstal funkční jako TOC/vyhledávání/
+  // edit-links kotva (getElementById(hid) musí pořád vracet skutečný
+  // nadpis, ne nějaký nově naparsovaný uzel bez id — sanitizace by mu id
+  // stejně smazala).
+  function dracakApplySection(headingEl, obsah) {
+    dracakSectionSiblings(headingEl).forEach(function(n){
+      if (n.parentNode) n.parentNode.removeChild(n);
+    });
+    var tmp = document.createElement('div');
+    tmp.innerHTML = obsah;
+    var first = tmp.firstElementChild;
+    if (first && headingTagRe.test(first.tagName)) {
+      headingEl.innerHTML = first.innerHTML;
+      tmp.removeChild(first);
+    }
+    var ref = headingEl;
+    while (tmp.firstChild) {
+      var node = tmp.firstChild;
+      ref.parentNode.insertBefore(node, ref.nextSibling);
+      ref = node;
+    }
+  }
+
   Array.prototype.forEach.call(bookIdEls, function(el){
     if (!knihaIdRe.test(el.id)) return;
     var ov = textOverrides[el.id];
-    if (ov && typeof ov.obsah === 'string') el.innerHTML = ov.obsah;
+    if (!ov || typeof ov.obsah !== 'string') return;
+    if (headingIdRe.test(el.id) && headingTagRe.test(el.tagName) && dracakIsGroupableHeading(el.id)) {
+      dracakApplySection(el, ov.obsah);
+    } else {
+      el.innerHTML = ov.obsah;
+    }
   });
 
   // ---------- lehký WYSIWYG modal pro editaci textu (jeden, sdílený) ----------
@@ -420,9 +531,17 @@ window.__CURRENT_USER_ID__ = <?= $user !== null ? (int)$user['id'] : 'null' ?>;
             msg.textContent = (data && data.error) || 'Uložení selhalo.';
             return;
           }
-          current.el.innerHTML = data.obsah;
           textOverrides[current.knihaId] = {obsah: data.obsah, created_by: currentUserId};
-          dracakAttachTextPencil(current.el);
+          if (current.mode === 'section') {
+            // dracakApplySection nahradí i headingEl.innerHTML (pokud
+            // uživatel přejmenoval titulek) — smaže tím i tužku, co v
+            // headingEl předtím byla, proto se znovu připojuje až POTÉ.
+            dracakApplySection(current.headingEl, data.obsah);
+            dracakAttachSectionPencil(current.headingEl);
+          } else {
+            current.el.innerHTML = data.obsah;
+            dracakAttachTextPencil(current.el);
+          }
           close();
         })
         .catch(function(){
@@ -432,10 +551,25 @@ window.__CURRENT_USER_ID__ = <?= $user !== null ? (int)$user['id'] : 'null' ?>;
         });
     });
 
+    // Tužky (edit-pencil, ať už pravidla_texty, nebo edit-links.json
+    // entitní odkaz) se připojují jako DĚTI editovaného elementu (viz
+    // dracakAttachTextPencil/dracakAttachSectionPencil/edit-links smyčka
+    // výš) — takže el.innerHTML/outerHTML v době otevření editoru
+    // obsahuje i JE. Bez vyčištění by se "✎" odkaz natrvalo zapsal do
+    // uloženého textu (a při každé další editaci by přibýval další).
+    // Klon, ne přímá manipulace originálu — needitujeme živý DOM, jen si
+    // z něj bereme čistou kopii obsahu pro editor.
+    function dracakCleanClone(el){
+      var clone = el.cloneNode(true);
+      Array.prototype.forEach.call(clone.querySelectorAll('.edit-pencil'), function(p){ p.remove(); });
+      return clone;
+    }
+
     textModal = {open: function(el, knihaId){
       msg.textContent = '';
       msg.style.color = '';
       var editRoot;
+      var clean = dracakCleanClone(el);
       // TR/LI se needitují jako holý fragment (rozbité <td>/odrážky mimo
       // kontext) — zabalí se do skutečné <table>/<ul>, ať editor vypadá
       // a chová se stejně jako zbytek knihy. Ukládá se ale zpátky jen
@@ -445,7 +579,7 @@ window.__CURRENT_USER_ID__ = <?= $user !== null ? (int)$user['id'] : 'null' ?>;
         var table = document.createElement('table');
         var tbody = document.createElement('tbody');
         var tr = document.createElement('tr');
-        tr.innerHTML = el.innerHTML;
+        tr.innerHTML = clean.innerHTML;
         tbody.appendChild(tr);
         table.appendChild(tbody);
         body.innerHTML = '';
@@ -454,16 +588,34 @@ window.__CURRENT_USER_ID__ = <?= $user !== null ? (int)$user['id'] : 'null' ?>;
       } else if (el.tagName === 'LI') {
         var ul = document.createElement('ul');
         var li = document.createElement('li');
-        li.innerHTML = el.innerHTML;
+        li.innerHTML = clean.innerHTML;
         ul.appendChild(li);
         body.innerHTML = '';
         body.appendChild(ul);
         editRoot = li;
       } else {
-        body.innerHTML = el.innerHTML;
+        body.innerHTML = clean.innerHTML;
         editRoot = body;
       }
-      current = {el: el, knihaId: knihaId, extract: function(){ return editRoot.innerHTML; }};
+      current = {mode: 'single', el: el, knihaId: knihaId, extract: function(){ return editRoot.innerHTML; }};
+      overlay.hidden = false;
+      body.focus();
+    }, openSection: function(headingEl, siblings, knihaId){
+      // Sloučená editace CELÉ sekce (oprava issue #1): editor dostane
+      // nadpis + všechny jeho odstavce/seznamy najednou, jako jeden
+      // souvislý kus HTML (headingEl + sourozenci, OČIŠTĚNÝ od tužek —
+      // viz dracakCleanClone) — žádné umělé zabalování jako u TR/LI výš,
+      // tyhle tagy (h2..h6/p/ul/ol) jsou samy o sobě validní přímo v
+      // contenteditable divu. Uloží se zpátky přesně to, co editor
+      // vrátí (body.innerHTML) — dracak_sanitize_html() na serveru
+      // prožene VŠECHNY tagy uvnitř (ne jen inline formátování jako dřív
+      // u jednoho odstavce), viz rozšířený allow-list v entity_crud.php.
+      msg.textContent = '';
+      msg.style.color = '';
+      var html = dracakCleanClone(headingEl).outerHTML;
+      for (var i = 0; i < siblings.length; i++) html += dracakCleanClone(siblings[i]).outerHTML;
+      body.innerHTML = html;
+      current = {mode: 'section', headingEl: headingEl, knihaId: knihaId, extract: function(){ return body.innerHTML; }};
       overlay.hidden = false;
       body.focus();
     }};
@@ -472,6 +624,13 @@ window.__CURRENT_USER_ID__ = <?= $user !== null ? (int)$user['id'] : 'null' ?>;
 
   function dracakOpenTextEditor(el){
     ensureTextModal().open(el, el.id);
+  }
+
+  function dracakOpenSectionEditor(headingEl){
+    // Sourozenci se čtou znovu TEĎ (ne z dřívějšího cache průchodu) —
+    // po předchozím uložení v týž session už mohou být jiní (viz
+    // dracakSectionSiblings výš, proto je čistě strukturální).
+    ensureTextModal().openSection(headingEl, dracakSectionSiblings(headingEl), headingEl.id);
   }
 
   // Přidá tužku "upravit text" na element — sdíleno mezi počátečním
@@ -492,6 +651,21 @@ window.__CURRENT_USER_ID__ = <?= $user !== null ? (int)$user['id'] : 'null' ?>;
       return;
     }
     el.appendChild(a);
+  }
+
+  // Tužka "upravit text sekce" — JEDNA na celý nadpis + jeho tělo (viz
+  // dracakSectionSiblings/dracakApplySection výš), místo jedné na každý
+  // odstavec zvlášť. Připojuje se na headingEl přímo, stejně jako dřív
+  // tužka jen na titulek — jen teď otevírá celou sekci najednou.
+  function dracakAttachSectionPencil(headingEl){
+    var a = document.createElement('a');
+    a.className = 'edit-pencil text-edit-pencil';
+    a.href = '#';
+    a.title = 'Upravit text sekce';
+    a.setAttribute('aria-label', 'Upravit text sekce');
+    a.textContent = '✎';
+    a.addEventListener('click', function(ev){ ev.preventDefault(); dracakOpenSectionEditor(headingEl); });
+    headingEl.appendChild(a);
   }
 
   var links = window.__EDIT_LINKS__ || {};
@@ -524,11 +698,32 @@ window.__CURRENT_USER_ID__ = <?= $user !== null ? (int)$user['id'] : 'null' ?>;
   // stejné pravidlo jako dracak_can_edit_row() v auth.php). Nezávislé
   // na $links výš — objeví se i na čistě naratívním textu, co žádný
   // edit-links.json/content-links.json vůbec nezná.
+  //
+  // Granularita (oprava issue #1): nadpis, jehož sekce je sloučitelná
+  // (dracakIsGroupableHeading — viz vysvětlení výš), dostane JEDNU tužku
+  // pro celou sekci (dracakAttachSectionPencil); jeho jednotlivé
+  // odstavce/řádky žádnou vlastní tužku nedostanou (pokrývá je tužka
+  // sekce). Nadpis, jehož sekce sloučitelná NENÍ (živá karta / tabulka /
+  // content-link napojení), i jeho odstavce/řádky dostanou tužku po
+  // staru, po jednotlivých blocích — přesně stav PŘED touhle opravou,
+  // schválně beze změny, viz komentář u dracakSectionHasTableOrProtected.
   if (textEditEnabled) {
     Array.prototype.forEach.call(bookIdEls, function(el){
       if (!knihaIdRe.test(el.id)) return;
       var ov = textOverrides[el.id];
       if (ov && !textEditUnrestricted && ov.created_by !== currentUserId) return;
+      if (headingIdRe.test(el.id) && headingTagRe.test(el.tagName)) {
+        if (dracakIsGroupableHeading(el.id)) {
+          dracakAttachSectionPencil(el);
+        } else {
+          dracakAttachTextPencil(el);
+        }
+        return;
+      }
+      // Odstavec/řádek (bN): vlastní tužku dostane jen když jeho sekce
+      // NENÍ sloučitelná — jinak ho pokrývá tužka sekce nad ním.
+      var sec = el.getAttribute('data-sec');
+      if (sec && headingIdRe.test(sec) && dracakIsGroupableHeading(sec)) return;
       dracakAttachTextPencil(el);
     });
   }

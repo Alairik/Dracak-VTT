@@ -379,7 +379,14 @@ function dracak_entity_find_by(string $table, string $column, string $value): ?a
 //     zapomenout).
 function dracak_sanitize_html(string $html): string
 {
-    $allowedTags = ['b', 'strong', 'i', 'em', 'u', 'ul', 'ol', 'li', 'p', 'br', 'h3', 'h4', 'a'];
+    // h2/h5/h6 a blockquote/hr přidány kvůli opravě issue #1 (pravidla_texty
+    // teď ukládá CELOU sekci pod nadpisem — nadpis samotný (kniha zná h2..h6,
+    // ne jen h3/h4) i obyčejné oddělovače/citace, co se v textu pravidel
+    // reálně vyskytují — viz content/pravidla-*.html). Zatím jediný
+    // spotřebitel týhle funkce je pravidla_texty (žádná jiná entita v
+    // entities.php nemá 'sanitize_html' => true), takže rozšíření je
+    // bezpečné a nemá dopad jinam.
+    $allowedTags = ['b', 'strong', 'i', 'em', 'u', 'ul', 'ol', 'li', 'p', 'br', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'blockquote', 'hr'];
     // Tagy, u kterých se zahazuje i celý obsah uvnitř — ne jen rozbalí.
     $dropWithContent = ['script', 'style', 'iframe', 'object', 'embed', 'svg', 'math', 'noscript', 'template', 'form', 'button', 'input', 'select', 'textarea', 'link', 'meta'];
 
@@ -477,6 +484,19 @@ function dracak_sanitize_href(string $href): ?string
 
 // ---------- pravidla_texty (viz entities.php + migrace 0037) ----------
 
+// Granularita (oprava issue #1, 2026-09-27): kniha_id se od teď ukládá
+// jen jako 'hNNNN' (celá sekce = nadpis + jeho odstavce/seznamy až po
+// další nadpis, viz pravidla.php inline skript — dracakSectionSiblings/
+// dracakApplySection), ne jako 'bNNNN' na jednotlivý odstavec/řádek —
+// tabulka i tenhle dotaz zůstávají beze změny (kniha_id je pořád jen
+// VARCHAR(20) UNIQUE, žádná migrace schématu nebyla potřeba). Případný
+// starý 'bNNNN' řádek (feature běžela necelý den před touhle opravou,
+// na produkci realisticky 0 řádků) se NEMAŽE ani nepřevádí — zůstává v
+// DB jako osiřelý, neškodný záznam (žádná tužka na jednotlivý odstavec
+// už na něj nevede, takže se nedá dál editovat, ale pokud by nějaký
+// list/tr element s tím id ještě existoval, jeho už uložený přepis se
+// pořád zobrazí — bezpečné, nedestruktivní).
+//
 // Všechny existující přepisy textu knihy JEDNÍM dotazem — líné
 // vytváření řádků znamená typicky desítky/stovky záznamů, ne tisíce, i
 // když je celá kniha (napříč hráč/pj/bestiář) řádově tisíce nadpisů a
