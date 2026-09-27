@@ -69,3 +69,24 @@ jobs:
             echo "::error::migrate.php vrátil HTTP $http_code"
             exit 1
           fi
+
+      - name: Post-deploy smoke test
+        run: |
+          # Nezalogovaný request na tyhle stránky vždycky skončí na
+          # dracak_require_login() dřív, než se stihne cokoli jiného —
+          # takže 404/5xx tady může znamenat jen "soubor na serveru
+          # fakticky chybí/spadl", ne "entita nenalezena" (to je jiná
+          # větev kódu, co se sem vůbec nedostane). Řeší nespolehlivost
+          # FTP přenosu na tomhle hostingu, co se v praxi ukázala: FTP
+          # deploy krok výš hlásil úspěch, ale soubor na produkci
+          # reálně chyběl.
+          fail=0
+          for path in dashboard.php editor.php pravidla.php vtt/svety.php vtt/svet.php vtt/mapa.php vtt/mapa_obrazek.php; do
+            code=$(curl -sS -o /dev/null -w "%{http_code}" "https://vtt.zvelebil.online/$path")
+            echo "$path -> HTTP $code"
+            if [ "$code" = "404" ] || [ "$code" -ge 500 ]; then
+              echo "::error::$path vrátil HTTP $code — soubor pravděpodobně chybí nebo spadl na serveru"
+              fail=1
+            fi
+          done
+          exit $fail
