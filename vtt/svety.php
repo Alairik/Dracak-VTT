@@ -73,3 +73,4 @@ dracak_vtt_page_start('Světy', $user);
     <?php endif; ?>
   </main>
 <?php dracak_vtt_page_end(); ?>
+
