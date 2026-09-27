@@ -45,6 +45,36 @@ function dracak_vtt_can_move_token(array $user, array $token): bool
     return $vlastnik !== false && (int)$vlastnik === (int)$user['id'];
 }
 
+function dracak_vtt_entity_row(string $typEntity, int $entitaId): ?array
+{
+    $table = $typEntity === 'nestvura_instance' ? 'nestvura_instance' : 'postavy';
+    $stmt = dracak_db()->prepare("SELECT * FROM $table WHERE id = ?");
+    $stmt->execute([$entitaId]);
+    $row = $stmt->fetch();
+    return $row ?: null;
+}
+
+// pj/admin upraví život komukoliv, hráč jen svojí vlastní postavě —
+// instance nestvůry je vždy v gesci PJ.
+function dracak_vtt_can_edit_hp(array $user, string $typEntity, array $entity): bool
+{
+    if (in_array($user['role'], ['admin', 'pj'], true)) {
+        return true;
+    }
+    return $typEntity === 'postava' && (int)($entity['vlastnik_ucet_id'] ?? 0) === (int)$user['id'];
+}
+
+// Vytáhne první číslo z volného textu jako "20", "20-25", "viz text" —
+// zdrojová data bestiáře jsou často nečistá (viz
+// docs/kontrolni-seznam-neuplnych-mist.md), radši 0 než pád na chybě.
+function dracak_vtt_prvni_cislo(?string $text): int
+{
+    if ($text !== null && preg_match('/(\d+)/', $text, $m)) {
+        return (int)$m[1];
+    }
+    return 0;
+}
+
 // Zápis události do logu — vždy stejný tvar, ať se na to nezapomíná
 // u jednotlivých endpointů (viz docs/vtt-datovy-model-navrh-v1.md).
 function dracak_vtt_log_event(int $svetId, ?int $mapaId, string $typ, array $payload, int $ucetId): int
