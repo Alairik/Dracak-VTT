@@ -242,6 +242,34 @@ return [
         ],
     ],
 
+    // Volný text knihy pravidel — přepisy jednotlivých nadpisů/odstavců
+    // (id="hNNNN"/"bNNNN" v content/pravidla-*.html), editovatelné přes
+    // tužku u KAŽDÉHO kusu textu v pravidla.php (viz migrace
+    // database/migrations/0037_pravidla_texty.sql). Řádek existuje jen
+    // pro texty, co už někdo přepsal (líné vytváření) — 'kniha_id' je
+    // přímá stabilní vazba na knihu, žádné name-matching jako u
+    // kouzel/schopností. Pole 'obsah' nese HTML z lehkého WYSIWYG
+    // editoru a MUSÍ projít dracak_sanitize_html() při každém uložení
+    // (viz 'sanitize_html' => true níž a dracak_entity_save() v
+    // entity_crud.php) — jde o obsah, co se pak posílá přímo do
+    // prohlížeče dalších čtenářů knihy, takže to není volitelné.
+    // Editace primárně přes pravidla-text-save.php (vlastní WYSIWYG
+    // modal v pravidla.php), ale záznam je i normální entita v tomhle
+    // registru, takže funguje i přes generický editor.php a dědí
+    // stejnou row_owned logiku (dracak_can_edit_row) jako kouzla apod.
+    'pravidla_texty' => [
+        'label' => 'Text pravidel (přepsané odstavce/nadpisy)',
+        'group' => 'obsah',
+        'hidden_from_players' => false,
+        'row_owned' => true,
+        'order_by' => 'upraveno_v',
+        'summary_fields' => ['kniha_id' => 'ID v knize'],
+        'fields' => [
+            ['name' => 'kniha_id', 'label' => 'ID v knize (hNNNN = nadpis, bNNNN = odstavec/řádek)', 'type' => 'text', 'required' => true, 'quick' => true],
+            ['name' => 'obsah', 'label' => 'Obsah (HTML — sanitizuje se při uložení)', 'type' => 'textarea', 'required' => false, 'quick' => true, 'sanitize_html' => true],
+        ],
+    ],
+
     'pasti' => [
         'label' => 'Pasti (záchranné hody)',
         'group' => 'obsah',

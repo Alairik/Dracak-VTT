@@ -163,6 +163,14 @@ function dracak_entity_save(string $table, array $fields, ?int $id, array $input
             continue;
         }
         $value = trim((string)($input[$name] ?? ''));
+        // HTML uložené uživatelem (viz entities.php 'pravidla_texty') jde
+        // přímo do prohlížeče DALŠÍCH čtenářů — sanitizace tady, na
+        // JEDINÉM místě, kterým prochází každý zápis bez ohledu na to,
+        // jestli přišel z editor.php nebo z pravidla-text-save.php.
+        // Allow-list, ne blacklist — viz dracak_sanitize_html() níž.
+        if (!empty($f['sanitize_html']) && $value !== '') {
+            $value = dracak_sanitize_html($value);
+        }
         if ($value === '' && $f['type'] === 'select_fk') {
             $data[$name] = null;
             continue;
@@ -333,6 +341,170 @@ function dracak_entity_delete(string $table, int $id): void
 {
     $stmt = dracak_db()->prepare("DELETE FROM `$table` WHERE id = ?");
     $stmt->execute([$id]);
+}
+
+// Najde jeden řádek podle libovolného sloupce (ne jen 'id') — používá
+// pravidla-text-save.php pro lookup podle kniha_id (UNIQUE, ale není
+// primární klíč). $table a $column vždy z pevného, natvrdo psaného
+// volání v kódu (nikdy přímo z requestu) — stejná whitelist konvence
+// jako zbytek souboru.
+function dracak_entity_find_by(string $table, string $column, string $value): ?array
+{
+    $stmt = dracak_db()->prepare("SELECT * FROM `$table` WHERE `$column` = ? LIMIT 1");
+    $stmt->execute([$value]);
+    $row = $stmt->fetch();
+    return $row ?: null;
+}
+
+// ---------- HTML sanitizace (allow-list) pro uživatelem uložený obsah ----------
+//
+// Použito u polí s 'sanitize_html' => true v entities.php (viz
+// 'pravidla_texty') — obsah z lehkého WYSIWYG editoru v pravidla.php se
+// ukládá jako HTML a pak se posílá přímo do prohlížeče DALŠÍCH čtenářů
+// knihy. Bez server-side sanitizace nezávislé na klientovi je to přímá
+// cesta k uloženému XSS (útočník si klientský JS validaci prostě obejde
+// přímým HTTP requestem na uložení). Allow-list, NE blacklist:
+//   - Povolené tagy (jen tyhle projdou beze změny): b, strong, i, em, u,
+//     ul, ol, li, p, br, h3, h4, a.
+//   - Nebezpečné tagy (script/style/iframe/...) se zahodí i s celým
+//     obsahem uvnitř — ne jen rozbalí, protože ten obsah (JS kód, CSS
+//     s exfiltrací přes url()...) sám o sobě nemá být na stránce vůbec.
+//   - Cokoliv jiného (div/span/img/...) se rozbalí — element zmizí, ale
+//     jeho bezpečný (už sanitizovaný) obsah/text zůstane.
+//   - Atributy: žádné se nezachovávají, JEDINÁ výjimka je href u <a>, a
+//     i ten jen po kontrole schématu (dracak_sanitize_href) — zakázané
+//     jsou zejména javascript:/data:/vbscript: odkazy a on* atributy
+//     mizí úplně u všech tagů (žádný allow-list atributů = žádné onclick
+//     apod., nikdy se nekontroluje jmenovitě, protože by šlo něco
+//     zapomenout).
+function dracak_sanitize_html(string $html): string
+{
+    $allowedTags = ['b', 'strong', 'i', 'em', 'u', 'ul', 'ol', 'li', 'p', 'br', 'h3', 'h4', 'a'];
+    // Tagy, u kterých se zahazuje i celý obsah uvnitř — ne jen rozbalí.
+    $dropWithContent = ['script', 'style', 'iframe', 'object', 'embed', 'svg', 'math', 'noscript', 'template', 'form', 'button', 'input', 'select', 'textarea', 'link', 'meta'];
+
+    $html = trim($html);
+    if ($html === '') {
+        return '';
+    }
+
+    $doc = new DOMDocument();
+    libxml_use_internal_errors(true);
+    // Trik s XML deklarací kódování na začátku vstupu: bez něj
+    // DOMDocument::loadHTML() čte vstup jako Latin-1 a poškodí diakritiku
+    // (běžný PHP gotcha). Pozor, NIKDY nepsat tu XML deklaraci doslovně
+    // do komentáře nad tímhle řádkem — obsahuje sekvenci ukončující PHP
+    // tag, ta by komentář (i celý zbytek souboru za ním) potichu
+    // proměnila v prostý HTML výstup.
+    $doc->loadHTML('<' . '?xml encoding="utf-8" ?' . '><html><body>' . $html . '</body></html>', LIBXML_NOERROR | LIBXML_NOWARNING);
+    libxml_clear_errors();
+
+    $body = $doc->getElementsByTagName('body')->item(0);
+    if ($body === null) {
+        return '';
+    }
+    dracak_sanitize_node($body, $allowedTags, $dropWithContent);
+
+    $out = '';
+    foreach (iterator_to_array($body->childNodes) as $child) {
+        $out .= $doc->saveHTML($child);
+    }
+    return trim($out);
+}
+
+// Rekurzivně projde uzel a vyčistí jeho DĚTI podle allow-listu. Rekurze
+// běží PŘED rozhodnutím o rodičovském tagu, takže i obsah rozbaleného
+// (nepovoleného, ale neškodného) tagu je v době rozbalení už čistý.
+function dracak_sanitize_node(DOMNode $node, array $allowedTags, array $dropWithContent): void
+{
+    foreach (iterator_to_array($node->childNodes) as $child) {
+        if ($child instanceof DOMText) {
+            continue;
+        }
+        if (!($child instanceof DOMElement)) {
+            // Komentáře (<!-- -->), CDATA, processing instructions apod. — nikdy neprojdou.
+            $node->removeChild($child);
+            continue;
+        }
+        $tag = strtolower($child->tagName);
+        if (in_array($tag, $dropWithContent, true)) {
+            $node->removeChild($child);
+            continue;
+        }
+        dracak_sanitize_node($child, $allowedTags, $dropWithContent);
+
+        // href se čte PŘED smazáním atributů a znovu nastaví (po kontrole
+        // schématu) jen u <a> — všechny ostatní atributy u všech tagů
+        // (class/style/on*/id/...) se zahazují bez výjimky.
+        $href = $tag === 'a' ? $child->getAttribute('href') : null;
+        foreach (iterator_to_array($child->attributes) as $attr) {
+            $child->removeAttribute($attr->name);
+        }
+        if ($tag === 'a') {
+            $safeHref = dracak_sanitize_href((string)$href);
+            if ($safeHref !== null) {
+                $child->setAttribute('href', $safeHref);
+            }
+        }
+
+        if (!in_array($tag, $allowedTags, true)) {
+            while ($child->firstChild) {
+                $node->insertBefore($child->firstChild, $child);
+            }
+            $node->removeChild($child);
+        }
+    }
+}
+
+// Povolí jen http/https/mailto a odkazy bez schématu (kotvy "#h123",
+// relativní cesty) — nikdy javascript:/data:/vbscript:. Řídicí znaky
+// (mezery/tab/nový řádek) se před kontrolou odstraní, protože je
+// prohlížeč uvnitř schématu ignoruje (klasický obchvat "java\tscript:").
+function dracak_sanitize_href(string $href): ?string
+{
+    $href = trim($href);
+    if ($href === '') {
+        return null;
+    }
+    $stripped = (string)preg_replace('/[\x00-\x20]+/', '', $href);
+    if (preg_match('~^([a-z][a-z0-9+.\-]*):~i', $stripped, $m)) {
+        if (!in_array(strtolower($m[1]), ['http', 'https', 'mailto'], true)) {
+            return null;
+        }
+    }
+    return $href;
+}
+
+// ---------- pravidla_texty (viz entities.php + migrace 0037) ----------
+
+// Všechny existující přepisy textu knihy JEDNÍM dotazem — líné
+// vytváření řádků znamená typicky desítky/stovky záznamů, ne tisíce, i
+// když je celá kniha (napříč hráč/pj/bestiář) řádově tisíce nadpisů a
+// odstavců. pravidla.php tohle volá při KAŽDÉM načtení stránky, takže
+// try/catch: dokud admin ručně nespustí CREATE TABLE migraci 0037 přes
+// phpMyAdmin (web DB účet nemá na Wedosu CREATE práva, viz CLAUDE.md),
+// tabulka na produkci chvíli nemusí existovat vůbec — v tom okně nesmí
+// spadnout celá stránka pravidel pro všechny návštěvníky, jen se
+// text-override tiše zachová jako "zatím nic přepsáno není".
+function dracak_pravidla_texty_map(): array
+{
+    try {
+        $rows = dracak_db()->query('SELECT kniha_id, obsah, created_by FROM pravidla_texty')->fetchAll();
+    } catch (PDOException $e) {
+        error_log('[dracak-vtt] pravidla_texty nedostupná (nejspíš ještě nezaložená migrace 0037): ' . $e->getMessage());
+        return [];
+    }
+    $map = [];
+    foreach ($rows as $r) {
+        if ($r['obsah'] === null || $r['obsah'] === '') {
+            continue;
+        }
+        $map[$r['kniha_id']] = [
+            'obsah' => $r['obsah'],
+            'created_by' => $r['created_by'] !== null ? (int)$r['created_by'] : null,
+        ];
+    }
+    return $map;
 }
 
 // Poskládá "2k6+2" / "1k6 (lze seslat vícekrát, max 3x denně)" ze sloupců

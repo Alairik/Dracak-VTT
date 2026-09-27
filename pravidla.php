@@ -125,6 +125,25 @@ $editLinksJson = json_encode($editLinks, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG);
 // vykreslí, ne o to, kdo smí kliknout na tužku.
 $protectedContentIds = array_values(array_keys($contentLinks));
 $protectedContentIdsJson = json_encode($protectedContentIds, JSON_UNESCAPED_UNICODE);
+
+// Univerzální přepis KAŽDÉHO kusu textu knihy (viz includes/entities.php
+// 'pravidla_texty' a migrace database/migrations/0037_pravidla_texty.sql)
+// — na rozdíl od $editLinks/$liveCards výš, co znají jen nadpisy/odstavce
+// ručně spárované s konkrétním DB záznamem přes edit-links.json/
+// content-links.json, tenhle systém se váže PŘÍMO na id="hNNNN"/"bNNNN"
+// v HTML knihy. Server pošle jen mapu existujících přepisů (líné
+// vytváření, typicky desítky/stovky řádků) — JS dohledá, kam pencil
+// patří, jedním průchodem DOM (viz inline skript níž), ne tady v PHP
+// (tady bychom museli znát VŠECHNA id v knize, ne jen napojená).
+$pravidlaTexty = dracak_pravidla_texty_map();
+$textOverridesJson = json_encode($pravidlaTexty, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG);
+// Table-level právo (stejná dracak_can_edit() jako u kouzel/schopností —
+// admin/pj vždy, hráč jen s explicitním grantem v ucet_opravneni přes
+// admin.php). $textEditUnrestricted navíc říká JS, že řádkové
+// vlastnictví (created_by) se nekontroluje — admin/pj smí přepsat i
+// cizí záznam, přesně jako dracak_can_edit_row() v auth.php.
+$textEditEnabled = $user !== null && dracak_can_edit($user, 'pravidla_texty');
+$textEditUnrestricted = $user !== null && in_array($user['role'], ['admin', 'pj'], true);
 ?>
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Pravidla DrD + domácí pravidla</title>
@@ -232,6 +251,10 @@ window.__HEADINGS__ = <?= $headingsJson ?>;
 window.__EDIT_LINKS__ = <?= $editLinksJson ?>;
 window.__LIVE_CARDS__ = <?= $liveCardsJson ?>;
 window.__PROTECTED_CONTENT_IDS__ = <?= $protectedContentIdsJson ?>;
+window.__TEXT_OVERRIDES__ = <?= $textOverridesJson ?>;
+window.__TEXT_EDIT_ENABLED__ = <?= $textEditEnabled ? 'true' : 'false' ?>;
+window.__TEXT_EDIT_UNRESTRICTED__ = <?= $textEditUnrestricted ? 'true' : 'false' ?>;
+window.__CURRENT_USER_ID__ = <?= $user !== null ? (int)$user['id'] : 'null' ?>;
 </script>
 <script src="assets/pravidla/pravidla.js?v=<?= filemtime(__DIR__ . '/assets/pravidla/pravidla.js') ?>"></script>
 <script>
@@ -284,6 +307,193 @@ window.__PROTECTED_CONTENT_IDS__ = <?= $protectedContentIdsJson ?>;
     heading.insertAdjacentHTML('afterend', cards[hid]);
   });
 
+  // ---------- pravidla_texty: univerzální přepis KAŽDÉHO kusu textu ----------
+  // Na rozdíl od $liveCards/$editLinks výš (jen nadpisy/odstavce ručně
+  // spárované s konkrétním DB záznamem přes edit-links.json/
+  // content-links.json), tohle se váže PŘÍMO na libovolné id="hNNNN"/
+  // "bNNNN" v knize — viz includes/entities.php 'pravidla_texty' a
+  // migrace database/migrations/0037_pravidla_texty.sql. Musí běžet AŽ
+  // PO odstranění sekcí živými kartami výš — element, co živá karta
+  // smazala (nahradila DB záznamem), tu už není, takže se na něj žádný
+  // přepis ani tužka nepřidá (jeho syrový text se stejně nezobrazuje).
+  //
+  // Jeden querySelectorAll dokumentem (bookIdEls), sdílený mezi
+  // nahrazením textu TADY a přidáním tužek DÁL DOLE (po tužkách
+  // napojených DB záznamů) — ne opakované dotazování DOM v cyklu přes
+  // tisíce nadpisů/odstavců, to je přesně ten O(n×m) vzor, co se
+  // opravil v předchozím commitu (f5f61a4) a nesmí se sem vrátit.
+  var textOverrides = window.__TEXT_OVERRIDES__ || {};
+  var textEditEnabled = !!window.__TEXT_EDIT_ENABLED__;
+  var textEditUnrestricted = !!window.__TEXT_EDIT_UNRESTRICTED__;
+  var currentUserId = window.__CURRENT_USER_ID__;
+  var knihaIdRe = /^[hb][1-9][0-9]{0,9}$/;
+  var bookIdEls = (Object.keys(textOverrides).length || textEditEnabled)
+    ? document.querySelectorAll('[id]')
+    : [];
+  Array.prototype.forEach.call(bookIdEls, function(el){
+    if (!knihaIdRe.test(el.id)) return;
+    var ov = textOverrides[el.id];
+    if (ov && typeof ov.obsah === 'string') el.innerHTML = ov.obsah;
+  });
+
+  // ---------- lehký WYSIWYG modal pro editaci textu (jeden, sdílený) ----------
+  var textModal = null;
+  function ensureTextModal(){
+    if (textModal) return textModal;
+    var overlay = document.createElement('div');
+    overlay.className = 'text-edit-overlay';
+    overlay.hidden = true;
+    overlay.innerHTML =
+      '<div class="text-edit-modal" role="dialog" aria-modal="true" aria-label="Úprava textu pravidel">' +
+        '<div class="text-edit-head"><h2>Úprava textu</h2><button type="button" class="text-edit-close" aria-label="Zavřít">×</button></div>' +
+        '<div class="text-edit-toolbar">' +
+          '<button type="button" data-cmd="bold" title="Tučně"><b>B</b></button>' +
+          '<button type="button" data-cmd="italic" title="Kurzíva"><i>I</i></button>' +
+          '<button type="button" data-cmd="formatBlock" data-val="H3" title="Nadpis 3">H3</button>' +
+          '<button type="button" data-cmd="formatBlock" data-val="H4" title="Nadpis 4">H4</button>' +
+          '<button type="button" data-cmd="formatBlock" data-val="P" title="Odstavec">¶</button>' +
+          '<button type="button" data-cmd="insertUnorderedList" title="Odrážky">• Seznam</button>' +
+          '<button type="button" data-cmd="insertOrderedList" title="Číslovaný seznam">1. Seznam</button>' +
+          '<button type="button" data-cmd="createLink" title="Odkaz">Odkaz</button>' +
+          '<button type="button" data-cmd="unlink" title="Zrušit odkaz">Zrušit odkaz</button>' +
+          '<button type="button" data-cmd="removeFormat" title="Vyčistit formátování">Vyčistit</button>' +
+        '</div>' +
+        '<div class="text-edit-body" contenteditable="true"></div>' +
+        '<div class="text-edit-foot"><span class="text-edit-msg"></span><div class="text-edit-actions">' +
+          '<button type="button" class="text-edit-cancel">Zrušit</button>' +
+          '<button type="button" class="text-edit-save">Uložit</button>' +
+        '</div></div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+
+    var body = overlay.querySelector('.text-edit-body');
+    var msg = overlay.querySelector('.text-edit-msg');
+    var saveBtn = overlay.querySelector('.text-edit-save');
+    var current = null;
+
+    function close(){
+      overlay.hidden = true;
+      body.innerHTML = '';
+      msg.textContent = '';
+      msg.style.color = '';
+      current = null;
+    }
+    overlay.querySelector('.text-edit-close').addEventListener('click', close);
+    overlay.querySelector('.text-edit-cancel').addEventListener('click', close);
+    overlay.addEventListener('click', function(ev){ if (ev.target === overlay) close(); });
+    document.addEventListener('keydown', function(ev){
+      if (ev.key === 'Escape' && !overlay.hidden) close();
+    });
+
+    Array.prototype.forEach.call(overlay.querySelectorAll('.text-edit-toolbar button'), function(btn){
+      btn.addEventListener('click', function(){
+        body.focus();
+        var cmd = btn.getAttribute('data-cmd');
+        if (cmd === 'createLink') {
+          var url = window.prompt('Adresa odkazu (https://…):', 'https://');
+          if (!url) return;
+          document.execCommand('createLink', false, url);
+          return;
+        }
+        document.execCommand(cmd, false, btn.getAttribute('data-val') || undefined);
+      });
+    });
+
+    saveBtn.addEventListener('click', function(){
+      if (!current) return;
+      saveBtn.disabled = true;
+      msg.style.color = '';
+      msg.textContent = 'Ukládám…';
+      var fd = new URLSearchParams();
+      fd.set('kniha_id', current.knihaId);
+      fd.set('obsah', current.extract());
+      fetch('pravidla-text-save.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'},
+        body: fd.toString(),
+        credentials: 'same-origin'
+      }).then(function(r){ return r.json().catch(function(){ return null; }); })
+        .then(function(data){
+          saveBtn.disabled = false;
+          if (!data || data.ok !== true) {
+            msg.style.color = 'var(--accent)';
+            msg.textContent = (data && data.error) || 'Uložení selhalo.';
+            return;
+          }
+          current.el.innerHTML = data.obsah;
+          textOverrides[current.knihaId] = {obsah: data.obsah, created_by: currentUserId};
+          dracakAttachTextPencil(current.el);
+          close();
+        })
+        .catch(function(){
+          saveBtn.disabled = false;
+          msg.style.color = 'var(--accent)';
+          msg.textContent = 'Uložení selhalo (síť).';
+        });
+    });
+
+    textModal = {open: function(el, knihaId){
+      msg.textContent = '';
+      msg.style.color = '';
+      var editRoot;
+      // TR/LI se needitují jako holý fragment (rozbité <td>/odrážky mimo
+      // kontext) — zabalí se do skutečné <table>/<ul>, ať editor vypadá
+      // a chová se stejně jako zbytek knihy. Ukládá se ale zpátky jen
+      // vnitřek (editRoot.innerHTML), ne obal — stejná jednotka jako
+      // kniha_id (celý obsah <tr>/<li>/<p>/<hX>), viz pravidla-text-save.php.
+      if (el.tagName === 'TR') {
+        var table = document.createElement('table');
+        var tbody = document.createElement('tbody');
+        var tr = document.createElement('tr');
+        tr.innerHTML = el.innerHTML;
+        tbody.appendChild(tr);
+        table.appendChild(tbody);
+        body.innerHTML = '';
+        body.appendChild(table);
+        editRoot = tr;
+      } else if (el.tagName === 'LI') {
+        var ul = document.createElement('ul');
+        var li = document.createElement('li');
+        li.innerHTML = el.innerHTML;
+        ul.appendChild(li);
+        body.innerHTML = '';
+        body.appendChild(ul);
+        editRoot = li;
+      } else {
+        body.innerHTML = el.innerHTML;
+        editRoot = body;
+      }
+      current = {el: el, knihaId: knihaId, extract: function(){ return editRoot.innerHTML; }};
+      overlay.hidden = false;
+      body.focus();
+    }};
+    return textModal;
+  }
+
+  function dracakOpenTextEditor(el){
+    ensureTextModal().open(el, el.id);
+  }
+
+  // Přidá tužku "upravit text" na element — sdíleno mezi počátečním
+  // vykreslením stránky a znovupřipojením po úspěšném uložení (uložení
+  // přepíše el.innerHTML novým obsahem, čímž smaže i tuhle tužku, co
+  // uvnitř elementu předtím byla).
+  function dracakAttachTextPencil(el){
+    var a = document.createElement('a');
+    a.className = 'edit-pencil text-edit-pencil';
+    a.href = '#';
+    a.title = 'Upravit text';
+    a.setAttribute('aria-label', 'Upravit text');
+    a.textContent = '✎';
+    a.addEventListener('click', function(ev){ ev.preventDefault(); dracakOpenTextEditor(el); });
+    if (el.tagName === 'TR') {
+      var lastTd = el.querySelector('td:last-child');
+      (lastTd || el).appendChild(a);
+      return;
+    }
+    el.appendChild(a);
+  }
+
   var links = window.__EDIT_LINKS__ || {};
   Object.keys(links).forEach(function(hid){
     var el = document.getElementById(hid);
@@ -307,6 +517,21 @@ window.__PROTECTED_CONTENT_IDS__ = <?= $protectedContentIdsJson ?>;
     }
     el.appendChild(a);
   });
+
+  // Univerzální tužka "upravit text" — u KAŽDÉHO id="hNNNN"/"bNNNN" v
+  // knize, na který má aktuální uživatel právo (dracak_can_edit() na
+  // 'pravidla_texty' + řádkové vlastnictví u existujících přepisů,
+  // stejné pravidlo jako dracak_can_edit_row() v auth.php). Nezávislé
+  // na $links výš — objeví se i na čistě naratívním textu, co žádný
+  // edit-links.json/content-links.json vůbec nezná.
+  if (textEditEnabled) {
+    Array.prototype.forEach.call(bookIdEls, function(el){
+      if (!knihaIdRe.test(el.id)) return;
+      var ov = textOverrides[el.id];
+      if (ov && !textEditUnrestricted && ov.created_by !== currentUserId) return;
+      dracakAttachTextPencil(el);
+    });
+  }
 })();
 </script>
 
