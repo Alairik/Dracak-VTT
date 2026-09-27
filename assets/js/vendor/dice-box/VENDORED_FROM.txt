@@ -1,0 +1,16 @@
+Zdroj: npm balíček @3d-dice/dice-box, verze 1.1.4
+https://www.npmjs.com/package/@3d-dice/dice-box
+Licence: MIT (viz LICENSE v tomto adresáři)
+
+Staženo přes `npm pack @3d-dice/dice-box` a ručně ořezáno o:
+- soubory se zdrojovými mapami (*.js.map) — jen pro ladění, za běhu se nepoužijí
+- nezminifikované duplicity (Dice.js, world.*.js, dice-box.es.js) — použité
+  jsou výhradně .min.js varianty, ty nezminifikované jsou zdroj/vývojová verze
+
+Zachovaná struktura (dist/*.min.js + dist/assets/) musí zůstat přesně takhle
+vedle sebe — moduly na sebe odkazují relativními cestami
+(`import("./world.offscreen.min.js")` apod.) a `assetPath` v konfiguraci musí
+mířit na podadresář `assets/` (obsahuje `themes/default/` a `ammo/`).
+
+Aktualizace na novější verzi: `npm pack @3d-dice/dice-box@<verze>`, rozbalit,
+zopakovat stejný výběr souborů.
