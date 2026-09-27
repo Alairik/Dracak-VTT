@@ -66,9 +66,13 @@
 
 *{box-sizing:border-box;}
 html,body{height:auto;}
-@media (prefers-reduced-motion: no-preference){
-  html{scroll-behavior:smooth;}
-}
+/* Žádné html{scroll-behavior:smooth} — kniha pravidel je jeden dokument
+   přes milion pixelů vysoký (tisíce nadpisů v jednom #content), takže by
+   každý klik v navigaci vizuálně "jel" několik sekund odshora přes celý
+   mezilehlý obsah místo okamžitého skoku na cíl (nahlášený bug: "pokaždé
+   to jede odshora"). Tlačítko "Nahoru" (topBtn) si smooth scroll řeší
+   samo přes JS scrollTo({behavior:'smooth'}) na krátkou vzdálenost — tam
+   je smooth žádoucí a neškodí.*/
 body{
   margin:0;
   background:var(--bg);

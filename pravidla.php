@@ -242,10 +242,26 @@ window.__PROTECTED_CONTENT_IDS__ = <?= $protectedContentIdsJson ?>;
   // nad starým textem, co za chvíli zmizí.
   var cards = window.__LIVE_CARDS__ || {};
   var protectedIds = window.__PROTECTED_CONTENT_IDS__ || [];
+  var protectedSet = {};
+  for (var pI = 0; pI < protectedIds.length; pI++) protectedSet[protectedIds[pI]] = true;
+  // Výkon: dřív se pro KAŽDÝ z ~1200 napojených nadpisů volalo
+  // document.querySelectorAll('[data-sec="..."]') nad celým (desítky tisíc
+  // uzlů velkým) dokumentem — O(nadpisy × velikost dokumentu), naměřeno
+  // ~8s blokování hlavního vlákna hned při načtení stránky (přesně to, na
+  // co si uživatel stěžoval jako na "zaseknutí"). Místo toho projedeme
+  // dokument JEDNOU, roztřídíme podle data-sec do mapy a dál už jen
+  // čteme z ní — O(velikost dokumentu + nadpisy).
+  var secIndex = {};
+  Array.prototype.forEach.call(document.querySelectorAll('[data-sec]'), function(el){
+    var key = el.getAttribute('data-sec');
+    (secIndex[key] || (secIndex[key] = [])).push(el);
+  });
   function containsProtected(el){
-    if (protectedIds.indexOf(el.id) !== -1) return true;
-    for (var i = 0; i < protectedIds.length; i++) {
-      if (el.querySelector('#' + CSS.escape(protectedIds[i]))) return true;
+    if (protectedSet[el.id]) return true;
+    if (!protectedIds.length) return false;
+    var found = el.querySelectorAll('[id]');
+    for (var i = 0; i < found.length; i++) {
+      if (protectedSet[found[i].id]) return true;
     }
     return false;
   }
@@ -253,7 +269,7 @@ window.__PROTECTED_CONTENT_IDS__ = <?= $protectedContentIdsJson ?>;
     var heading = document.getElementById(hid);
     if (!heading) return;
     var toRemove = [];
-    document.querySelectorAll('[data-sec="' + hid + '"]').forEach(function(el){
+    (secIndex[hid] || []).forEach(function(el){
       var wrap = el.closest('.table-wrap');
       var target = wrap || el;
       // Nadpis (typicky h275) může mít vlastní živou kartu, ale zároveň pod
