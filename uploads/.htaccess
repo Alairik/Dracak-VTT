@@ -1,0 +1,12 @@
+# Zakazuje přímý HTTP přístup do téhle složky — stejný důvod jako u
+# content/.htaccess: nahrané mapy se čtou jen přes vtt/mapa_obrazek.php
+# (kontrola přístupu ke světu), nikdy ne přímou statickou URL, jinak by
+# šlo obejít, že hráč do daného světa vůbec nepatří.
+
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>
