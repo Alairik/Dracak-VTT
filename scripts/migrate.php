@@ -24,6 +24,17 @@ ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 header('Content-Type: text/plain; charset=utf-8');
 
+// KRITICKÉ: bez bufferu tenhle skript loguje "tichý úspěch". Jakmile PHP
+// jednou pošle klientovi byte těla (první echo o kus níž — "Přeskakuji
+// ..."/"Spouštím ..."), HTTP hlavičky jsou nevratně odeslané s výchozím
+// 200 — pozdější http_response_code(500) v migrate_fail() (nebo v
+// register_shutdown_function níž) na tom už nic nezmění, jen tiše
+// neuspěje. deploy.yml pak vidí HTTP 200 a označí krok za zelený, i když
+// log těla jasně říká "Chyba v ...soubor.sql". ob_start() tady drží celé
+// tělo v bufferu, dokud skript neskončí — teprve pak PHP hlavičky pošle,
+// takže http_response_code() zůstane platný po celou dobu běhu.
+ob_start();
+
 function migrate_fail(int $httpCode, string $message): void
  {
   http_response_code($httpCode);
