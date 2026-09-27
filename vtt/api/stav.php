@@ -41,3 +41,4 @@ echo json_encode([
     'tokeny' => $tokeny,
     'posledni_udalost_id' => $posledniId,
 ], JSON_UNESCAPED_UNICODE);
+

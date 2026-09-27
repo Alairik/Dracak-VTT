@@ -30,3 +30,4 @@ foreach ($udalosti as &$u) {
 unset($u);
 
 echo json_encode(['udalosti' => $udalosti], JSON_UNESCAPED_UNICODE);
+

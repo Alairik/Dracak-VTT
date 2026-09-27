@@ -55,3 +55,4 @@ foreach ($entityPairs as $pair) {
 }
 
 echo json_encode(['ok' => true, 'expirovalo' => $expirovalo]);
+

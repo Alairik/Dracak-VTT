@@ -50,3 +50,4 @@ try {
 }
 
 echo json_encode(['ok' => true, 'udalost_id' => $eventId]);
+

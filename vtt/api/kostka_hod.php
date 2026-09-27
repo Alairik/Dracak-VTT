@@ -43,3 +43,4 @@ echo json_encode([
     'celkem' => $vysledek['celkem'],
     'hodil' => $user['jmeno'],
 ], JSON_UNESCAPED_UNICODE);
+

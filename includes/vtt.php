@@ -149,3 +149,4 @@ function dracak_vtt_page_end(): void
 </html>
     <?php
 }
+

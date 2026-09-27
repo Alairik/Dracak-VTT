@@ -54,3 +54,4 @@ $eventId = dracak_vtt_log_event((int)$mapa['svet_id'], $mapaId, 'efekt_aplikovan
 ], (int)$user['id']);
 
 echo json_encode(['ok' => true, 'udalost_id' => $eventId]);
+

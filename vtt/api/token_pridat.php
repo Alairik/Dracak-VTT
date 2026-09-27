@@ -82,3 +82,4 @@ $eventId = dracak_vtt_log_event((int)$mapa['svet_id'], $mapaId, 'token_pridan', 
 ], (int)$user['id']);
 
 echo json_encode(['ok' => true, 'token_id' => $tokenId, 'udalost_id' => $eventId, 'nazev' => $nazev]);
+

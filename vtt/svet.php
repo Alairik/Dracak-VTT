@@ -254,3 +254,4 @@ dracak_vtt_page_start($svet['nazev'], $user);
     </form>
   </main>
 <?php dracak_vtt_page_end(); ?>
+

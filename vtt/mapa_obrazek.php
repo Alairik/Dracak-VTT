@@ -35,3 +35,4 @@ $mime = match (true) {
 header('Content-Type: ' . $mime);
 header('Cache-Control: private, max-age=3600');
 readfile($cesta);
+
