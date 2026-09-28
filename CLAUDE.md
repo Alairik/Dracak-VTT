@@ -78,3 +78,9 @@
   Než se cokoliv z tohohle plošně doplňuje na desítky/stovky záznamů,
   radši se zeptat, protože špatně navržený efekt je hůř opravitelný
   než žádný.
+- **Nejistota v herní mechanice (výpočty, vzorce, co přesně dělá
+  iniciativa/finta/atribut) se neřeší odhadem.** Skutečný text pravidel
+  je v `content/pravidla-hrac.html`, `pravidla-pj.html`,
+  `pravidla-bestiar.html` — tam je zdroj pravdy, ne intuice podle jiných
+  systémů (D&D apod.). Než se cokoliv počítá nebo staví, nejdřív si
+  najít odpovídající pasáž v těchhle souborech.
