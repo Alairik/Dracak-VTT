@@ -75,122 +75,167 @@ if ($isPjOrAdmin) {
 }
 
 $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti WHERE svet_id = ' . $svetId)->fetchColumn() ?: 0);
-
-dracak_vtt_page_start($mapa['nazev'], $user);
 ?>
-  <main class="main" style="padding:24px;">
-    <p class="crumb"><a href="svet.php?id=<?= $svetId ?>">← <?= htmlspecialchars($svet['nazev']) ?></a></p>
-    <h1 class="page-title"><?= htmlspecialchars($mapa['nazev']) ?> <span style="font-size:13px;font-weight:400;color:var(--color-neutral-500);">(<?= $mapa['typ_mapy'] === 'svet' ? 'světová mapa' : 'zóna' ?>)</span></h1>
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dračák VTT — <?= htmlspecialchars($mapa['nazev']) ?></title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/organic.css?v=<?= filemtime(__DIR__ . '/../assets/css/organic.css') ?>">
+<style>
+  html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#161412; }
+  #viewport { position:fixed; inset:0; overflow:auto; }
+  #mapWrap { position:relative; display:inline-block; }
+  #emptyState { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; color:#ddd; text-align:center; padding:24px; }
 
-    <?php if (!$mapa['obrazek_cesta']): ?>
-      <div class="empty-state">Tahle mapa ještě nemá nahraný obrázek — přidej ho na stránce světa.</div>
-    <?php else: ?>
-      <div style="display:flex;gap:16px;margin-top:14px;flex-wrap:wrap;align-items:flex-start;">
-        <div id="mapScroll" style="overflow:auto;max-width:100%;border:1px solid var(--color-neutral-300);border-radius:8px;">
-          <div id="mapWrap" style="position:relative;display:inline-block;">
-            <img id="mapImg" src="mapa_obrazek.php?id=<?= $mapaId ?>" style="display:block;max-width:none;">
-            <?php foreach ($tokeny as $t):
-                $entKey = $t['typ_entity'] . ':' . $t['entita_id'];
-                $efektyText = implode(', ', $aktivniEfektyByEntity[$entKey] ?? []);
-            ?>
-              <div class="vtt-token" data-id="<?= (int)$t['id'] ?>" data-owned="<?= $t['owned'] ? 1 : 0 ?>"
-                   data-typ-entity="<?= htmlspecialchars($t['typ_entity']) ?>" data-entita-id="<?= (int)$t['entita_id'] ?>"
-                   title="<?= htmlspecialchars((string)$t['label']) ?>"
-                   style="position:absolute;left:<?= (int)$t['x'] ?>px;top:<?= (int)$t['y'] ?>px;width:40px;text-align:center;cursor:<?= $t['owned'] ? 'grab' : 'default' ?>;user-select:none;z-index:<?= (int)$t['z_poradi'] ?>;">
-                <div style="width:40px;height:40px;border-radius:50%;background:<?= $t['typ_entity'] === 'postava' ? 'var(--color-accent-600, #7a3b2e)' : '#4a2b2b' ?>;
-                            color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;box-shadow:0 2px 6px rgba(0,0,0,.4);">
-                  <?= htmlspecialchars(mb_substr((string)$t['label'], 0, 2)) ?>
-                </div>
-                <div class="vtt-hp" data-token-id="<?= (int)$t['id'] ?>" style="font-size:10px;background:rgba(0,0,0,.6);color:#fff;border-radius:4px;margin-top:2px;padding:1px 3px;">
-                  <?= $t['hp'] !== null ? (int)$t['hp'] . '/' . (int)$t['max_hp'] : '—' ?>
-                </div>
-                <?php if ($efektyText): ?>
-                  <div style="font-size:9px;background:rgba(0,0,0,.5);color:#fdd;border-radius:4px;margin-top:1px;padding:1px 3px;"><?= htmlspecialchars($efektyText) ?></div>
-                <?php endif; ?>
-              </div>
-            <?php endforeach; ?>
+  .topbar { position:fixed; top:14px; left:50%; transform:translateX(-50%); z-index:200;
+            background:rgba(24,22,20,.88); color:#fff; border-radius:999px; padding:8px 18px;
+            display:flex; align-items:center; gap:10px; font-size:14px; backdrop-filter:blur(4px); }
+  .topbar a { color:#e8c9a8; text-decoration:none; font-weight:600; }
+  .topbar .typ { font-size:11px; opacity:.65; }
+
+  .toolbar { position:fixed; left:16px; top:50%; transform:translateY(-50%); z-index:200;
+             display:flex; flex-direction:column; gap:8px; background:rgba(24,22,20,.88);
+             padding:8px; border-radius:14px; backdrop-filter:blur(4px); }
+  .tbtn { width:46px; height:46px; border-radius:10px; border:none; background:transparent; color:#eee;
+          font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+          transition:background .12s; }
+  .tbtn:hover { background:rgba(255,255,255,.12); }
+  .tbtn.active { background:var(--color-accent-600, #7a3b2e); }
+  .tbtn.armed { background:#3a6b4a; }
+
+  .popover { position:fixed; left:74px; z-index:210; background:rgba(24,22,20,.95); color:#eee;
+             border-radius:12px; padding:14px; width:280px; box-shadow:0 8px 24px rgba(0,0,0,.5);
+             display:none; }
+  .popover.open { display:block; }
+  .popover h3 { margin:0 0 8px; font-size:13px; color:#e8c9a8; }
+  .popover label { font-size:11px; font-weight:600; display:block; margin:8px 0 3px; }
+  .popover select, .popover input { width:100%; box-sizing:border-box; }
+  .popover .note { font-size:11px; color:#bbb; margin-top:8px; }
+  .popover .close-x { position:absolute; top:8px; right:10px; cursor:pointer; color:#999; background:none; border:none; font-size:14px; }
+
+  .panel { position:fixed; right:0; top:0; bottom:0; width:300px; z-index:200; background:rgba(20,18,16,.95);
+           color:#eee; padding:16px; box-sizing:border-box; transform:translateX(100%); transition:transform .15s;
+           overflow-y:auto; }
+  .panel.open { transform:translateX(0); }
+  .panel h3 { margin:0 0 10px; font-size:14px; color:#e8c9a8; }
+  .panel .close-x { position:absolute; top:12px; right:14px; cursor:pointer; color:#999; background:none; border:none; font-size:16px; }
+  .panel-hp-row { display:flex; gap:6px; margin:8px 0; }
+  .panel-hp-row button { flex:1; }
+  .panel select, .panel input { width:100%; box-sizing:border-box; margin-bottom:6px; }
+
+  #logList { font-size:12.5px; display:flex; flex-direction:column-reverse; gap:5px; }
+
+  .vtt-token { position:absolute; width:40px; text-align:center; user-select:none; }
+  .vtt-token .puck { width:40px; height:40px; border-radius:50%; color:#fff; display:flex; align-items:center;
+                      justify-content:center; font-size:11px; font-weight:600; box-shadow:0 2px 6px rgba(0,0,0,.5); }
+  .vtt-token .hp { font-size:10px; background:rgba(0,0,0,.65); color:#fff; border-radius:4px; margin-top:2px; padding:1px 3px; }
+  .vtt-token .fx { font-size:9px; background:rgba(0,0,0,.55); color:#fdd; border-radius:4px; margin-top:1px; padding:1px 3px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="svet.php?id=<?= $svetId ?>">← <?= htmlspecialchars($svet['nazev']) ?></a>
+  <span><?= htmlspecialchars($mapa['nazev']) ?></span>
+  <span class="typ">(<?= $mapa['typ_mapy'] === 'svet' ? 'světová mapa' : 'zóna' ?>)</span>
+</div>
+
+<?php if (!$mapa['obrazek_cesta']): ?>
+  <div id="emptyState">Tahle mapa ještě nemá nahraný obrázek — přidej ho na stránce světa.</div>
+<?php else: ?>
+
+  <div id="viewport">
+    <div id="mapWrap">
+      <img id="mapImg" src="mapa_obrazek.php?id=<?= $mapaId ?>" style="display:block;max-width:none;">
+      <?php foreach ($tokeny as $t):
+          $entKey = $t['typ_entity'] . ':' . $t['entita_id'];
+          $efektyText = implode(', ', $aktivniEfektyByEntity[$entKey] ?? []);
+      ?>
+        <div class="vtt-token" data-id="<?= (int)$t['id'] ?>" data-owned="<?= $t['owned'] ? 1 : 0 ?>"
+             data-typ-entity="<?= htmlspecialchars($t['typ_entity']) ?>" data-entita-id="<?= (int)$t['entita_id'] ?>"
+             data-label="<?= htmlspecialchars((string)$t['label']) ?>"
+             title="<?= htmlspecialchars((string)$t['label']) ?>"
+             style="left:<?= (int)$t['x'] ?>px;top:<?= (int)$t['y'] ?>px;cursor:<?= $t['owned'] ? 'grab' : 'default' ?>;z-index:<?= (int)$t['z_poradi'] ?>;">
+          <div class="puck" style="background:<?= $t['typ_entity'] === 'postava' ? 'var(--color-accent-600, #7a3b2e)' : '#4a2b2b' ?>;">
+            <?= htmlspecialchars(mb_substr((string)$t['label'], 0, 2)) ?>
           </div>
+          <div class="hp" data-token-id="<?= (int)$t['id'] ?>"><?= $t['hp'] !== null ? (int)$t['hp'] . '/' . (int)$t['max_hp'] : '—' ?></div>
+          <?php if ($efektyText): ?><div class="fx"><?= htmlspecialchars($efektyText) ?></div><?php endif; ?>
         </div>
+      <?php endforeach; ?>
+    </div>
+  </div>
 
-        <div style="min-width:260px;flex:1;">
-          <div class="card elev-sm">
-            <h3 class="rel-label">Přidat token</h3>
-            <?php if ($volnePostavy): ?>
-              <label style="font-size:12px;font-weight:600;">Postava</label>
-              <select class="input" id="novaPostavaSelect">
-                <option value="">—</option>
-                <?php foreach ($volnePostavy as $p): ?>
-                  <option value="<?= (int)$p['id'] ?>"><?= htmlspecialchars($p['nazev']) ?></option>
-                <?php endforeach; ?>
-              </select>
-            <?php endif; ?>
-            <?php if ($isPjOrAdmin && $nestvuryKatalog): ?>
-              <label style="font-size:12px;font-weight:600;margin-top:8px;display:block;">Nestvůra (bestiář)</label>
-              <select class="input" id="novaNestvuraSelect">
-                <option value="">—</option>
-                <?php foreach ($nestvuryKatalog as $n): ?>
-                  <option value="<?= (int)$n['id'] ?>"><?= htmlspecialchars($n['nazev']) ?></option>
-                <?php endforeach; ?>
-              </select>
-            <?php endif; ?>
-            <p class="note" style="margin-top:6px;">Vyber v jednom z výběrů a klikni na mapu, kam to položit.</p>
-          </div>
-
-          <div class="card elev-sm" style="margin-top:12px;">
-            <h3 class="rel-label">Spravovat token</h3>
-            <select class="input" id="spravovatSelect">
-              <option value="">— vyber token —</option>
-              <?php foreach ($tokeny as $t): if (!$t['owned'] && !$isPjOrAdmin) continue; ?>
-                <option value="<?= htmlspecialchars($t['typ_entity']) ?>:<?= (int)$t['entita_id'] ?>:<?= (int)$t['id'] ?>">
-                  <?= htmlspecialchars((string)$t['label']) ?> (<?= $t['typ_entity'] === 'postava' ? 'postava' : 'nestvůra' ?>)
-                </option>
-              <?php endforeach; ?>
-            </select>
-            <div style="display:flex;gap:6px;margin-top:8px;align-items:center;">
-              <span style="font-size:12px;">Život:</span>
-              <button class="btn btn-ghost" type="button" data-delta="-5">−5</button>
-              <button class="btn btn-ghost" type="button" data-delta="-1">−1</button>
-              <button class="btn btn-ghost" type="button" data-delta="1">+1</button>
-              <button class="btn btn-ghost" type="button" data-delta="5">+5</button>
-            </div>
-            <?php if ($isPjOrAdmin && $efektyKatalog): ?>
-              <label style="font-size:12px;font-weight:600;margin-top:10px;display:block;">Aplikovat efekt</label>
-              <select class="input" id="efektSelect">
-                <?php foreach ($efektyKatalog as $e): ?>
-                  <option value="<?= (int)$e['id'] ?>"><?= htmlspecialchars($e['nazev']) ?> (<?= htmlspecialchars($e['typ']) ?>)</option>
-                <?php endforeach; ?>
-              </select>
-              <div style="display:flex;gap:6px;margin-top:6px;">
-                <input class="input" type="number" id="efektKola" placeholder="kol (prázdné = trvalé)" style="flex:1;">
-                <button class="btn btn-secondary" type="button" id="efektBtn">Aplikovat</button>
-              </div>
-            <?php endif; ?>
-            <button class="btn btn-ghost" type="button" id="smazatTokenBtn" style="margin-top:10px;">Smazat token</button>
-          </div>
-
-          <?php if ($isPjOrAdmin): ?>
-          <div class="card elev-sm" style="margin-top:12px;">
-            <button class="btn btn-primary" type="button" id="koloKonecBtn" style="width:100%;">Konec kola (odpočítat trvání efektů)</button>
-          </div>
-          <?php endif; ?>
-
-          <div class="card elev-sm" style="margin-top:12px;">
-            <h3 class="rel-label">Hodit kostkou</h3>
-            <div style="display:flex;gap:8px;">
-              <input class="input" type="text" id="kostkyNotace" placeholder="2k6+2" style="flex:1;">
-              <button class="btn btn-primary" id="hoditBtn" type="button">Hodit</button>
-            </div>
-            <div id="diceBoxContainer" style="position:fixed;inset:0;pointer-events:none;z-index:9999;"></div>
-          </div>
-
-          <div class="card elev-sm" style="margin-top:12px;max-height:320px;overflow:auto;">
-            <h3 class="rel-label">Log</h3>
-            <div id="udalostiLog" style="font-size:12.5px;display:flex;flex-direction:column-reverse;gap:4px;"></div>
-          </div>
-        </div>
-      </div>
+  <div class="toolbar">
+    <?php if ($volnePostavy || ($isPjOrAdmin && $nestvuryKatalog)): ?>
+      <button class="tbtn" type="button" id="tb-pridat" title="Přidat token">➕</button>
     <?php endif; ?>
-  </main>
+    <button class="tbtn" type="button" id="tb-kostky" title="Hodit kostkou">🎲</button>
+    <button class="tbtn" type="button" id="tb-log" title="Log">📜</button>
+    <?php if ($isPjOrAdmin): ?>
+      <button class="tbtn" type="button" id="tb-kolo" title="Konec kola (odpočítat trvání efektů)">⏭️</button>
+    <?php endif; ?>
+  </div>
+
+  <div class="popover" id="popover-pridat">
+    <button class="close-x" data-close-popover>✕</button>
+    <h3>Přidat token</h3>
+    <?php if ($volnePostavy): ?>
+      <label for="novaPostavaSelect">Postava</label>
+      <select class="input" id="novaPostavaSelect">
+        <option value="">—</option>
+        <?php foreach ($volnePostavy as $p): ?><option value="<?= (int)$p['id'] ?>"><?= htmlspecialchars($p['nazev']) ?></option><?php endforeach; ?>
+      </select>
+    <?php endif; ?>
+    <?php if ($isPjOrAdmin && $nestvuryKatalog): ?>
+      <label for="nestvuraHledat">Nestvůra (bestiář)</label>
+      <input class="input" type="text" id="nestvuraHledat" placeholder="hledat…">
+      <select class="input" id="novaNestvuraSelect" size="6">
+        <?php foreach ($nestvuryKatalog as $n): ?><option value="<?= (int)$n['id'] ?>"><?= htmlspecialchars($n['nazev']) ?></option><?php endforeach; ?>
+      </select>
+    <?php endif; ?>
+    <p class="note">Vyber a klikni na mapu, kam to položit.</p>
+  </div>
+
+  <div class="popover" id="popover-kostky">
+    <button class="close-x" data-close-popover>✕</button>
+    <h3>Hodit kostkou</h3>
+    <input class="input" type="text" id="kostkyNotace" placeholder="2k6+2">
+    <button class="btn btn-primary" id="hoditBtn" type="button" style="width:100%;margin-top:8px;">Hodit</button>
+  </div>
+
+  <div class="panel" id="panel-log">
+    <button class="close-x" data-close-panel>✕</button>
+    <h3>Log</h3>
+    <div id="logList"></div>
+  </div>
+
+  <div class="panel" id="panel-spravovat">
+    <button class="close-x" data-close-panel>✕</button>
+    <h3 id="spravovatNazev">—</h3>
+    <div class="panel-hp-row">
+      <button class="btn btn-ghost" type="button" data-delta="-5">−5</button>
+      <button class="btn btn-ghost" type="button" data-delta="-1">−1</button>
+      <button class="btn btn-ghost" type="button" data-delta="1">+1</button>
+      <button class="btn btn-ghost" type="button" data-delta="5">+5</button>
+    </div>
+    <?php if ($isPjOrAdmin && $efektyKatalog): ?>
+      <label style="font-size:11px;font-weight:600;">Aplikovat efekt</label>
+      <select id="efektSelect">
+        <?php foreach ($efektyKatalog as $e): ?><option value="<?= (int)$e['id'] ?>"><?= htmlspecialchars($e['nazev']) ?> (<?= htmlspecialchars($e['typ']) ?>)</option><?php endforeach; ?>
+      </select>
+      <input type="number" id="efektKola" placeholder="kol (prázdné = trvalé)">
+      <button class="btn btn-secondary" type="button" id="efektBtn" style="width:100%;">Aplikovat efekt</button>
+    <?php endif; ?>
+    <button class="btn btn-ghost" type="button" id="smazatTokenBtn" style="width:100%;margin-top:14px;">Smazat token</button>
+  </div>
+
+  <div id="diceBoxContainer" style="position:fixed;inset:0;pointer-events:none;z-index:9999;"></div>
 
 <script type="module">
 const SVET_ID = <?= $svetId ?>;
@@ -198,32 +243,81 @@ const MAPA_ID = <?= $mapaId ?>;
 let posledniUdalostId = <?= $posledniUdalostId ?>;
 
 const mapWrap = document.getElementById('mapWrap');
-const log = document.getElementById('udalostiLog');
+const viewport = document.getElementById('viewport');
+const logList = document.getElementById('logList');
 
 function logLine(text) {
-  if (!log) return;
+  if (!logList) return;
   const div = document.createElement('div');
   div.textContent = text;
-  log.appendChild(div);
+  logList.appendChild(div);
 }
 
 function postJson(url, body) {
   return fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)}).then(r => r.json());
 }
 
-// --- Drag tokenů ---
-let dragEl = null, dragOffsetX = 0, dragOffsetY = 0;
+// --- Popovery a panely ---
+function closeAllPopovers() { document.querySelectorAll('.popover.open').forEach(p => p.classList.remove('open')); document.querySelectorAll('.tbtn.active').forEach(b => b.classList.remove('active')); }
+function togglePopover(id, btn) {
+  const wasOpen = document.getElementById(id).classList.contains('open');
+  closeAllPopovers();
+  if (!wasOpen) {
+    const pop = document.getElementById(id);
+    pop.style.top = btn.getBoundingClientRect().top + 'px';
+    pop.classList.add('open');
+    btn.classList.add('active');
+  }
+}
+document.querySelectorAll('[data-close-popover]').forEach(b => b.addEventListener('click', closeAllPopovers));
+document.querySelectorAll('[data-close-panel]').forEach(b => b.addEventListener('click', (e) => e.target.closest('.panel').classList.remove('open')));
+
+const tbPridat = document.getElementById('tb-pridat');
+if (tbPridat) tbPridat.addEventListener('click', () => togglePopover('popover-pridat', tbPridat));
+const tbKostky = document.getElementById('tb-kostky');
+if (tbKostky) tbKostky.addEventListener('click', () => togglePopover('popover-kostky', tbKostky));
+const tbLog = document.getElementById('tb-log');
+if (tbLog) tbLog.addEventListener('click', () => document.getElementById('panel-log').classList.toggle('open'));
+
+const nestvuraHledat = document.getElementById('nestvuraHledat');
+if (nestvuraHledat) {
+  nestvuraHledat.addEventListener('input', () => {
+    const q = nestvuraHledat.value.trim().toLowerCase();
+    document.querySelectorAll('#novaNestvuraSelect option').forEach(opt => {
+      opt.style.display = (!q || opt.textContent.toLowerCase().includes(q)) ? '' : 'none';
+    });
+  });
+}
+
+// --- Drag i klik na token (klik = otevřít panel Spravovat, drag = přesun) ---
+let dragEl = null, dragOffsetX = 0, dragOffsetY = 0, dragMoved = false, dragStartClientX = 0, dragStartClientY = 0;
+const spravovatPanel = document.getElementById('panel-spravovat');
+let spravovanyToken = null;
+
+function otevritSpravovat(el) {
+  spravovanyToken = {typEntity: el.dataset.typEntity, entitaId: parseInt(el.dataset.entitaId, 10), tokenId: parseInt(el.dataset.id, 10)};
+  document.getElementById('spravovatNazev').textContent = el.dataset.label;
+  spravovatPanel.classList.add('open');
+}
+
 if (mapWrap) {
   mapWrap.addEventListener('mousedown', (e) => {
     const el = e.target.closest('.vtt-token');
     if (!el || el.dataset.owned !== '1') return;
     dragEl = el;
+    dragMoved = false;
+    dragStartClientX = e.clientX;
+    dragStartClientY = e.clientY;
     const rect = el.getBoundingClientRect();
     dragOffsetX = e.clientX - rect.left;
     dragOffsetY = e.clientY - rect.top;
   });
   window.addEventListener('mousemove', (e) => {
     if (!dragEl) return;
+    if (!dragMoved && (Math.abs(e.clientX - dragStartClientX) > 5 || Math.abs(e.clientY - dragStartClientY) > 5)) {
+      dragMoved = true;
+    }
+    if (!dragMoved) return;
     const wrapRect = mapWrap.getBoundingClientRect();
     const x = e.clientX - wrapRect.left - dragOffsetX;
     const y = e.clientY - wrapRect.top - dragOffsetY;
@@ -234,8 +328,12 @@ if (mapWrap) {
     if (!dragEl) return;
     const el = dragEl;
     dragEl = null;
-    postJson('api/token_presun.php', {token_id: parseInt(el.dataset.id, 10), x: parseInt(el.style.left, 10), y: parseInt(el.style.top, 10)})
-      .then(d => { if (d.error) logLine('Chyba přesunu: ' + d.error); });
+    if (dragMoved) {
+      postJson('api/token_presun.php', {token_id: parseInt(el.dataset.id, 10), x: parseInt(el.style.left, 10), y: parseInt(el.style.top, 10)})
+        .then(d => { if (d.error) logLine('Chyba přesunu: ' + d.error); });
+    } else {
+      otevritSpravovat(el);
+    }
   });
 
   mapWrap.addEventListener('click', (e) => {
@@ -255,21 +353,14 @@ if (mapWrap) {
   });
 }
 
-// --- Správa tokenu: život, efekt, smazání ---
-const spravovatSelect = document.getElementById('spravovatSelect');
-function vybranyToken() {
-  if (!spravovatSelect || !spravovatSelect.value) return null;
-  const [typEntity, entitaId, tokenId] = spravovatSelect.value.split(':');
-  return {typEntity, entitaId: parseInt(entitaId, 10), tokenId: parseInt(tokenId, 10)};
-}
-document.querySelectorAll('[data-delta]').forEach(btn => {
+// --- Panel Spravovat: život, efekt, smazání ---
+document.querySelectorAll('#panel-spravovat [data-delta]').forEach(btn => {
   btn.addEventListener('click', () => {
-    const sel = vybranyToken();
-    if (!sel) { logLine('Nejdřív vyber token ve "Spravovat token".'); return; }
-    postJson('api/hp_uprava.php', {mapa_id: MAPA_ID, typ_entity: sel.typEntity, entita_id: sel.entitaId, delta: parseInt(btn.dataset.delta, 10)})
+    if (!spravovanyToken) return;
+    postJson('api/hp_uprava.php', {mapa_id: MAPA_ID, typ_entity: spravovanyToken.typEntity, entita_id: spravovanyToken.entitaId, delta: parseInt(btn.dataset.delta, 10)})
       .then(d => {
         if (d.error) { logLine('Chyba: ' + d.error); return; }
-        const hpEl = document.querySelector('.vtt-hp[data-token-id="' + sel.tokenId + '"]');
+        const hpEl = document.querySelector('.hp[data-token-id="' + spravovanyToken.tokenId + '"]');
         if (hpEl) hpEl.textContent = d.nove_hp + (d.max_hp !== undefined ? '/' + d.max_hp : '');
         posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
       });
@@ -278,27 +369,25 @@ document.querySelectorAll('[data-delta]').forEach(btn => {
 const efektBtn = document.getElementById('efektBtn');
 if (efektBtn) {
   efektBtn.addEventListener('click', () => {
-    const sel = vybranyToken();
-    if (!sel) { logLine('Nejdřív vyber token ve "Spravovat token".'); return; }
+    if (!spravovanyToken) return;
     const efektId = parseInt(document.getElementById('efektSelect').value, 10);
     const kola = document.getElementById('efektKola').value;
-    postJson('api/efekt_pridat.php', {mapa_id: MAPA_ID, typ_entity: sel.typEntity, entita_id: sel.entitaId, efekt_id: efektId, zbyva_kol: kola})
+    postJson('api/efekt_pridat.php', {mapa_id: MAPA_ID, typ_entity: spravovanyToken.typEntity, entita_id: spravovanyToken.entitaId, efekt_id: efektId, zbyva_kol: kola})
       .then(d => { if (d.error) { logLine('Chyba: ' + d.error); return; } location.reload(); });
   });
 }
 const smazatBtn = document.getElementById('smazatTokenBtn');
 if (smazatBtn) {
   smazatBtn.addEventListener('click', () => {
-    const sel = vybranyToken();
-    if (!sel) { logLine('Nejdřív vyber token ve "Spravovat token".'); return; }
+    if (!spravovanyToken) return;
     if (!confirm('Opravdu smazat token?')) return;
-    postJson('api/token_smazat.php', {token_id: sel.tokenId})
+    postJson('api/token_smazat.php', {token_id: spravovanyToken.tokenId})
       .then(d => { if (d.error) { logLine('Chyba: ' + d.error); return; } location.reload(); });
   });
 }
-const koloKonecBtn = document.getElementById('koloKonecBtn');
-if (koloKonecBtn) {
-  koloKonecBtn.addEventListener('click', () => {
+const koloBtn = document.getElementById('tb-kolo');
+if (koloBtn) {
+  koloBtn.addEventListener('click', () => {
     postJson('api/kolo_konec.php', {mapa_id: MAPA_ID})
       .then(d => { if (d.error) { logLine('Chyba: ' + d.error); return; } location.reload(); });
   });
@@ -337,7 +426,7 @@ function applyEvent(u) {
   } else if (u.typ === 'hp_zmena') {
     const el = mapWrap && mapWrap.querySelector('.vtt-token[data-typ-entity="' + u.payload.typ_entity + '"][data-entita-id="' + u.payload.entita_id + '"]');
     if (el) {
-      const hpEl = el.querySelector('.vtt-hp');
+      const hpEl = el.querySelector('.hp');
       if (hpEl) hpEl.textContent = u.payload.nove_hp + (u.payload.max_hp ? '/' + u.payload.max_hp : '');
     }
   } else if (['token_pridan', 'token_smazan', 'efekt_aplikovan', 'efekt_konci'].includes(u.typ)) {
@@ -359,5 +448,6 @@ function poll() {
 }
 setInterval(poll, 1500);
 </script>
-<?php dracak_vtt_page_end(); ?>
-
+<?php endif; ?>
+</body>
+</html>
