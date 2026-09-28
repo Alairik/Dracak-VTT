@@ -107,6 +107,7 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
   .tbtn:hover { background:rgba(255,255,255,.12); }
   .tbtn.active { background:var(--color-accent-600, #7a3b2e); }
   .tbtn.armed { background:#3a6b4a; }
+  .tbtn svg, .close-x svg { display:block; }
 
   .popover { position:fixed; left:74px; z-index:210; background:rgba(24,22,20,.95); color:#eee;
              border-radius:12px; padding:14px; width:280px; box-shadow:0 8px 24px rgba(0,0,0,.5);
@@ -116,14 +117,14 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
   .popover label { font-size:11px; font-weight:600; display:block; margin:8px 0 3px; }
   .popover select, .popover input { width:100%; box-sizing:border-box; }
   .popover .note { font-size:11px; color:#bbb; margin-top:8px; }
-  .popover .close-x { position:absolute; top:8px; right:10px; cursor:pointer; color:#999; background:none; border:none; font-size:14px; }
+  .popover .close-x { position:absolute; top:8px; right:10px; cursor:pointer; color:#999; background:none; border:none; }
 
   .panel { position:fixed; right:0; top:0; bottom:0; width:300px; z-index:200; background:rgba(20,18,16,.95);
            color:#eee; padding:16px; box-sizing:border-box; transform:translateX(100%); transition:transform .15s;
            overflow-y:auto; }
   .panel.open { transform:translateX(0); }
   .panel h3 { margin:0 0 10px; font-size:14px; color:#e8c9a8; }
-  .panel .close-x { position:absolute; top:12px; right:14px; cursor:pointer; color:#999; background:none; border:none; font-size:16px; }
+  .panel .close-x { position:absolute; top:12px; right:14px; cursor:pointer; color:#999; background:none; border:none; }
   .panel-hp-row { display:flex; gap:6px; margin:8px 0; }
   .panel-hp-row button { flex:1; }
   .panel select, .panel input { width:100%; box-sizing:border-box; margin-bottom:6px; }
@@ -135,6 +136,17 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
                       justify-content:center; font-size:11px; font-weight:600; box-shadow:0 2px 6px rgba(0,0,0,.5); }
   .vtt-token .hp { font-size:10px; background:rgba(0,0,0,.65); color:#fff; border-radius:4px; margin-top:2px; padding:1px 3px; }
   .vtt-token .fx { font-size:9px; background:rgba(0,0,0,.55); color:#fdd; border-radius:4px; margin-top:1px; padding:1px 3px; }
+
+  .vtt-ping { position:absolute; transform:translate(-50%,-50%); pointer-events:none; z-index:150;
+              display:flex; flex-direction:column; align-items:center; }
+  .ping-dot { width:22px; height:22px; border-radius:50%; border:3px solid #ffb347; box-sizing:border-box;
+              animation:pingPulse 1s ease-out infinite; }
+  .ping-label { margin-top:4px; font-size:11px; background:rgba(0,0,0,.7); color:#fff; padding:1px 6px;
+                border-radius:4px; white-space:nowrap; }
+  @keyframes pingPulse {
+    0% { box-shadow:0 0 0 0 rgba(255,179,71,.6); }
+    100% { box-shadow:0 0 0 16px rgba(255,179,71,0); }
+  }
 </style>
 </head>
 <body>
@@ -152,6 +164,7 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
   <div id="viewport">
     <div id="mapWrap">
       <img id="mapImg" src="mapa_obrazek.php?id=<?= $mapaId ?>" style="display:block;max-width:none;">
+      <svg id="rulerSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:140;"></svg>
       <?php foreach ($tokeny as $t):
           $entKey = $t['typ_entity'] . ':' . $t['entita_id'];
           $efektyText = implode(', ', $aktivniEfektyByEntity[$entKey] ?? []);
@@ -173,17 +186,20 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
 
   <div class="toolbar">
     <?php if ($volnePostavy || ($isPjOrAdmin && $nestvuryKatalog)): ?>
-      <button class="tbtn" type="button" id="tb-pridat" title="Přidat token">➕</button>
+      <button class="tbtn" type="button" id="tb-pridat" title="Přidat token"><?php dracak_icon('user-round-plus'); ?></button>
     <?php endif; ?>
-    <button class="tbtn" type="button" id="tb-kostky" title="Hodit kostkou">🎲</button>
-    <button class="tbtn" type="button" id="tb-log" title="Log">📜</button>
+    <button class="tbtn armed" type="button" id="tb-move" title="Vybrat / přesunout"><?php dracak_icon('move'); ?></button>
+    <button class="tbtn" type="button" id="tb-ruler" title="Měřit vzdálenost"><?php dracak_icon('ruler'); ?></button>
+    <button class="tbtn" type="button" id="tb-ping" title="Ukázat na mapu ostatním"><?php dracak_icon('crosshair'); ?></button>
+    <button class="tbtn" type="button" id="tb-kostky" title="Hodit kostkou"><?php dracak_icon('dices'); ?></button>
+    <button class="tbtn" type="button" id="tb-log" title="Log"><?php dracak_icon('scroll-text'); ?></button>
     <?php if ($isPjOrAdmin): ?>
-      <button class="tbtn" type="button" id="tb-kolo" title="Konec kola (odpočítat trvání efektů)">⏭️</button>
+      <button class="tbtn" type="button" id="tb-kolo" title="Konec kola (odpočítat trvání efektů)"><?php dracak_icon('skip-forward'); ?></button>
     <?php endif; ?>
   </div>
 
   <div class="popover" id="popover-pridat">
-    <button class="close-x" data-close-popover>✕</button>
+    <button class="close-x" data-close-popover><?php dracak_icon('x', 14); ?></button>
     <h3>Přidat token</h3>
     <?php if ($volnePostavy): ?>
       <label for="novaPostavaSelect">Postava</label>
@@ -203,20 +219,20 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
   </div>
 
   <div class="popover" id="popover-kostky">
-    <button class="close-x" data-close-popover>✕</button>
+    <button class="close-x" data-close-popover><?php dracak_icon('x', 14); ?></button>
     <h3>Hodit kostkou</h3>
     <input class="input" type="text" id="kostkyNotace" placeholder="2k6+2">
     <button class="btn btn-primary" id="hoditBtn" type="button" style="width:100%;margin-top:8px;">Hodit</button>
   </div>
 
   <div class="panel" id="panel-log">
-    <button class="close-x" data-close-panel>✕</button>
+    <button class="close-x" data-close-panel><?php dracak_icon('x', 16); ?></button>
     <h3>Log</h3>
     <div id="logList"></div>
   </div>
 
   <div class="panel" id="panel-spravovat">
-    <button class="close-x" data-close-panel>✕</button>
+    <button class="close-x" data-close-panel><?php dracak_icon('x', 16); ?></button>
     <h3 id="spravovatNazev">—</h3>
     <div class="panel-hp-row">
       <button class="btn btn-ghost" type="button" data-delta="-5">−5</button>
@@ -240,11 +256,13 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
 <script type="module">
 const SVET_ID = <?= $svetId ?>;
 const MAPA_ID = <?= $mapaId ?>;
+const GRID_PX = <?= (int)($mapa['grid_velikost_px'] ?? 0) ?>;
 let posledniUdalostId = <?= $posledniUdalostId ?>;
 
 const mapWrap = document.getElementById('mapWrap');
 const viewport = document.getElementById('viewport');
 const logList = document.getElementById('logList');
+const rulerSvg = document.getElementById('rulerSvg');
 
 function logLine(text) {
   if (!logList) return;
@@ -279,6 +297,67 @@ if (tbKostky) tbKostky.addEventListener('click', () => togglePopover('popover-ko
 const tbLog = document.getElementById('tb-log');
 if (tbLog) tbLog.addEventListener('click', () => document.getElementById('panel-log').classList.toggle('open'));
 
+// --- Nástroje toolbaru: select/move (výchozí), ruler (měření), ping ---
+let currentTool = 'select';
+const toolButtons = {
+  select: document.getElementById('tb-move'),
+  ruler: document.getElementById('tb-ruler'),
+  ping: document.getElementById('tb-ping'),
+};
+function setTool(tool) {
+  currentTool = tool;
+  for (const [t, btn] of Object.entries(toolButtons)) {
+    if (btn) btn.classList.toggle('armed', t === tool);
+  }
+  rulerStart = null;
+  if (rulerSvg) rulerSvg.innerHTML = '';
+}
+if (toolButtons.select) toolButtons.select.addEventListener('click', () => setTool('select'));
+if (toolButtons.ruler) toolButtons.ruler.addEventListener('click', () => setTool(currentTool === 'ruler' ? 'select' : 'ruler'));
+if (toolButtons.ping) toolButtons.ping.addEventListener('click', () => setTool(currentTool === 'ping' ? 'select' : 'ping'));
+
+// --- Ruler: čistě klientská pomůcka, nic se neukládá ani nesynchronizuje ---
+let rulerStart = null, rulerClearTimer = null;
+function rulerPoint(e) {
+  const r = mapWrap.getBoundingClientRect();
+  return {x: e.clientX - r.left, y: e.clientY - r.top};
+}
+function drawRuler(a, b) {
+  if (!rulerSvg) return;
+  clearTimeout(rulerClearTimer);
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const distPx = Math.sqrt(dx * dx + dy * dy);
+  const label = GRID_PX > 0 ? (distPx / GRID_PX).toFixed(1) + ' polí' : Math.round(distPx) + ' px';
+  rulerSvg.innerHTML =
+    '<line x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '" stroke="#ffb347" stroke-width="2" stroke-dasharray="6 4"/>' +
+    '<circle cx="' + a.x + '" cy="' + a.y + '" r="4" fill="#ffb347"/>' +
+    '<circle cx="' + b.x + '" cy="' + b.y + '" r="4" fill="#ffb347"/>' +
+    '<text x="' + (a.x + b.x) / 2 + '" y="' + ((a.y + b.y) / 2 - 8) + '" fill="#fff" font-size="13" ' +
+    'text-anchor="middle" paint-order="stroke" stroke="#000" stroke-width="3">' + label + '</text>';
+}
+function clearRulerSoon() {
+  rulerClearTimer = setTimeout(() => { if (rulerSvg) rulerSvg.innerHTML = ''; }, 2500);
+}
+
+// --- Ping: efemérní ukazovátko, viditelné i ostatním přes polling ---
+function zobrazPing(x, y, jmeno) {
+  const el = document.createElement('div');
+  el.className = 'vtt-ping';
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  const dot = document.createElement('div');
+  dot.className = 'ping-dot';
+  el.appendChild(dot);
+  if (jmeno) {
+    const label = document.createElement('div');
+    label.className = 'ping-label';
+    label.textContent = jmeno;
+    el.appendChild(label);
+  }
+  mapWrap.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
 const nestvuraHledat = document.getElementById('nestvuraHledat');
 if (nestvuraHledat) {
   nestvuraHledat.addEventListener('input', () => {
@@ -302,6 +381,13 @@ function otevritSpravovat(el) {
 
 if (mapWrap) {
   mapWrap.addEventListener('mousedown', (e) => {
+    if (currentTool === 'ruler') {
+      if (e.target.closest('.vtt-token')) return;
+      rulerStart = rulerPoint(e);
+      drawRuler(rulerStart, rulerStart);
+      return;
+    }
+    if (currentTool !== 'select') return;
     const el = e.target.closest('.vtt-token');
     if (!el || el.dataset.owned !== '1') return;
     dragEl = el;
@@ -313,6 +399,11 @@ if (mapWrap) {
     dragOffsetY = e.clientY - rect.top;
   });
   window.addEventListener('mousemove', (e) => {
+    if (currentTool === 'ruler') {
+      if (!rulerStart) return;
+      drawRuler(rulerStart, rulerPoint(e));
+      return;
+    }
     if (!dragEl) return;
     if (!dragMoved && (Math.abs(e.clientX - dragStartClientX) > 5 || Math.abs(e.clientY - dragStartClientY) > 5)) {
       dragMoved = true;
@@ -325,6 +416,10 @@ if (mapWrap) {
     dragEl.style.top = y + 'px';
   });
   window.addEventListener('mouseup', () => {
+    if (currentTool === 'ruler') {
+      if (rulerStart) { rulerStart = null; clearRulerSoon(); }
+      return;
+    }
     if (!dragEl) return;
     const el = dragEl;
     dragEl = null;
@@ -337,6 +432,19 @@ if (mapWrap) {
   });
 
   mapWrap.addEventListener('click', (e) => {
+    if (currentTool === 'ping') {
+      if (e.target.closest('.vtt-token')) return;
+      const p = rulerPoint(e);
+      const x = Math.round(p.x), y = Math.round(p.y);
+      postJson('api/ping.php', {svet_id: SVET_ID, mapa_id: MAPA_ID, x, y})
+        .then(d => {
+          if (d.error) { logLine('Chyba: ' + d.error); return; }
+          posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
+          zobrazPing(x, y, d.jmeno || '');
+        });
+      return;
+    }
+    if (currentTool !== 'select') return;
     if (e.target.closest('.vtt-token')) return;
     const wrapRect = mapWrap.getBoundingClientRect();
     const x = Math.round(e.clientX - wrapRect.left - 20);
@@ -429,6 +537,8 @@ function applyEvent(u) {
       const hpEl = el.querySelector('.hp');
       if (hpEl) hpEl.textContent = u.payload.nove_hp + (u.payload.max_hp ? '/' + u.payload.max_hp : '');
     }
+  } else if (u.typ === 'ping') {
+    if (u.mapa_id == MAPA_ID) zobrazPing(u.payload.x, u.payload.y, u.payload.jmeno || '');
   } else if (['token_pridan', 'token_smazan', 'efekt_aplikovan', 'efekt_konci'].includes(u.typ)) {
     location.reload();
   }

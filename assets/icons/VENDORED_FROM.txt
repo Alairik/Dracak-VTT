@@ -1,0 +1,11 @@
+Zdroj: npm balíček lucide-static, verze 1.48.0
+https://www.npmjs.com/package/lucide-static
+Licence: ISC (viz LICENSE v tomto adresáři)
+
+Staženo přes `npm pack lucide-static` a vybráno jen těch pár ikon, co
+appka reálně používá — balíček samotný má přes 5800 souborů (~50 MB),
+nedává smysl vendorovat celý.
+
+Aktualizace/přidání další ikony: `npm pack lucide-static`, rozbalit,
+zkopírovat konkrétní `icons/<jmeno>.svg` sem beze změny (jsou to čisté
+stroke="currentColor" SVG, barva se dědí z CSS na obalujícím elementu).

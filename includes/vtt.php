@@ -150,3 +150,20 @@ function dracak_vtt_page_end(): void
     <?php
 }
 
+// Vypíše vendorovanou Lucide ikonu (assets/icons/<name>.svg) inline, ne
+// přes <img src>, protože ikony jsou stroke="currentColor" a barvu tak
+// dědí z CSS obalujícího tlačítka (hover/active stav zdarma).
+function dracak_icon(string $name, int $size = 20): void
+{
+    static $cache = [];
+    if (!array_key_exists($name, $cache)) {
+        $path = __DIR__ . '/../assets/icons/' . basename($name) . '.svg';
+        $cache[$name] = is_file($path) ? (string)file_get_contents($path) : '';
+    }
+    if ($cache[$name] === '') {
+        return;
+    }
+    $svg = preg_replace('/(width|height)="24"/', '$1="' . $size . '"', $cache[$name]);
+    echo $svg;
+}
+
