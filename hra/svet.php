@@ -81,6 +81,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $rasaId = !empty($_POST['rasa_id']) ? (int)$_POST['rasa_id'] : null;
         $povolaniId = !empty($_POST['povolani_id']) ? (int)$_POST['povolani_id'] : null;
         $maxHp = max(0, (int)($_POST['max_hp'] ?? 0));
+        // Atributy jsou "stupeň" podle pravidel (h104), ne bonus — viz
+        // migrace 0040. Nepovinné, starší/rychle založené postavy je
+        // mohou mít NULL.
+        $atributy = [];
+        foreach (['sila', 'obratnost', 'odolnost', 'inteligence', 'charisma'] as $atr) {
+            $atributy[$atr] = !empty($_POST[$atr]) ? max(1, (int)$_POST[$atr]) : null;
+        }
 
         // Hráč zakládá vždycky sám sobě — neřeší se, co pošle v POSTu.
         // PJ/admin může založit rovnou pro kohokoliv u stolu (vlastnik_ucet_id
@@ -95,10 +102,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $stmt = dracak_db()->prepare(
-            'INSERT INTO postavy (svet_id, vlastnik_ucet_id, nazev, rasa_id, povolani_id, uroven, aktualni_hp, max_hp)
-             VALUES (?, ?, ?, ?, ?, 1, ?, ?)'
+            'INSERT INTO postavy (svet_id, vlastnik_ucet_id, nazev, rasa_id, povolani_id, uroven, sila, obratnost, odolnost, inteligence, charisma, aktualni_hp, max_hp)
+             VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)'
         );
-        $stmt->execute([$svetId, $vlastnikId, $nazev, $rasaId, $povolaniId, $maxHp, $maxHp]);
+        $stmt->execute([
+            $svetId, $vlastnikId, $nazev, $rasaId, $povolaniId,
+            $atributy['sila'], $atributy['obratnost'], $atributy['odolnost'], $atributy['inteligence'], $atributy['charisma'],
+            $maxHp, $maxHp,
+        ]);
         header("Location: svet.php?id=$svetId");
         exit;
     }
@@ -254,6 +265,11 @@ dracak_vtt_page_start($svet['nazev'], $user);
               <div class="k">Hráč:</div><div><?= htmlspecialchars($p['vlastnik_jmeno']) ?></div>
               <div class="k">Rasa/Povolání:</div><div><?= htmlspecialchars(($p['rasa_nazev'] ?? '—') . ' / ' . ($p['povolani_nazev'] ?? '—')) ?></div>
               <div class="k">Život:</div><div><?= (int)$p['aktualni_hp'] ?> / <?= (int)$p['max_hp'] ?></div>
+              <?php if ($p['sila'] !== null): ?>
+              <div class="k">Atributy:</div><div style="font-size:12.5px;">
+                S <?= (int)$p['sila'] ?> · Obr <?= (int)$p['obratnost'] ?> · Odl <?= (int)$p['odolnost'] ?> · Int <?= (int)$p['inteligence'] ?> · Cha <?= (int)$p['charisma'] ?>
+              </div>
+              <?php endif; ?>
             </div>
             <?php if ($isPjOrAdmin && count($hraciVeSvete) > 1): ?>
               <form method="post" style="display:flex;gap:6px;margin-top:8px;">
@@ -299,7 +315,20 @@ dracak_vtt_page_start($svet['nazev'], $user);
       <div class="field"><label for="max_hp">Max. život</label>
         <input class="input" type="number" id="max_hp" name="max_hp" min="0" value="10">
       </div>
-      <button class="btn btn-primary" type="submit">Založit postavu</button>
+      <h3 class="rel-label">Atributy (stupeň, nepovinné)</h3>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;">
+        <div class="field"><label for="sila">Síla</label>
+          <input class="input" type="number" id="sila" name="sila" min="1" max="30"></div>
+        <div class="field"><label for="obratnost">Obratnost</label>
+          <input class="input" type="number" id="obratnost" name="obratnost" min="1" max="30"></div>
+        <div class="field"><label for="odolnost">Odolnost</label>
+          <input class="input" type="number" id="odolnost" name="odolnost" min="1" max="30"></div>
+        <div class="field"><label for="inteligence">Inteligence</label>
+          <input class="input" type="number" id="inteligence" name="inteligence" min="1" max="30"></div>
+        <div class="field"><label for="charisma">Charisma</label>
+          <input class="input" type="number" id="charisma" name="charisma" min="1" max="30"></div>
+      </div>
+      <button class="btn btn-primary" type="submit" style="margin-top:10px;">Založit postavu</button>
     </form>
   </main>
 <?php dracak_vtt_page_end(); ?>
