@@ -57,6 +57,30 @@ if ($tokeny) {
     }
 }
 
+require_once __DIR__ . '/../includes/vtt_predmety.php';
+
+// Inventář (predmety/lektvary/kouzla) pro každou entitu, co má na téhle mapě
+// token — stejný vzor jako $aktivniEfektyByEntity o pár řádků výš. Funguje
+// jednotně pro postavu i nestvura_instance (dracak_vtt_inventar() normalizuje
+// nestvura_instance_vybava do stejného tvaru).
+$inventarByEntity = [];
+if ($tokeny) {
+    foreach (array_unique(array_map(fn($t) => $t['typ_entity'] . ':' . $t['entita_id'], $tokeny)) as $klic) {
+        [$te, $ei] = explode(':', $klic);
+        $inventarByEntity[$klic] = dracak_vtt_inventar($te, (int)$ei);
+    }
+}
+
+// Cíle pro "Předat kořist" — všechny postavy ve světě (ne jen ty s tokenem
+// na téhle mapě). Jen PJ/admin je smí použít; loot.php to stejně vynucuje
+// server-side, tohle je jen pro UI.
+$svetPostavyKorist = [];
+if ($isPjOrAdmin) {
+    $stmt = dracak_db()->prepare('SELECT id, nazev FROM postavy WHERE svet_id = ? ORDER BY nazev');
+    $stmt->execute([$svetId]);
+    $svetPostavyKorist = $stmt->fetchAll();
+}
+
 $stmt = dracak_db()->prepare(
     'SELECT p.id, p.nazev FROM postavy p
      WHERE p.svet_id = ? AND p.id NOT IN (SELECT entita_id FROM tokeny WHERE mapa_id = ? AND typ_entity = "postava")
@@ -69,9 +93,11 @@ $volnePostavy = $stmt->fetchAll();
 
 $nestvuryKatalog = [];
 $efektyKatalog = [];
+$rychleEfekty = [];
 if ($isPjOrAdmin) {
     $nestvuryKatalog = dracak_db()->query('SELECT id, nazev FROM nestvury ORDER BY nazev')->fetchAll();
     $efektyKatalog = dracak_db()->query('SELECT id, nazev, typ FROM efekty ORDER BY nazev')->fetchAll();
+    $rychleEfekty = dracak_db()->query('SELECT id, nazev FROM efekty WHERE rychla_volba = 1 ORDER BY nazev')->fetchAll();
 }
 
 require_once __DIR__ . '/../includes/vtt_iniciativa.php';
@@ -140,6 +166,7 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
   .vtt-token { position:absolute; width:40px; text-align:center; user-select:none; }
   .vtt-token .puck { width:40px; height:40px; border-radius:50%; color:#fff; display:flex; align-items:center;
                       justify-content:center; font-size:11px; font-weight:600; box-shadow:0 2px 6px rgba(0,0,0,.5); }
+  .vtt-token.dead .puck { filter: grayscale(1); opacity: .55; }
   .vtt-token .hp { font-size:10px; background:rgba(0,0,0,.65); color:#fff; border-radius:4px; margin-top:2px; padding:1px 3px; }
   .vtt-token .fx { font-size:9px; background:rgba(0,0,0,.55); color:#fdd; border-radius:4px; margin-top:1px; padding:1px 3px; }
 
@@ -176,9 +203,11 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
           $entKey = $t['typ_entity'] . ':' . $t['entita_id'];
           $efektyText = implode(', ', $aktivniEfektyByEntity[$entKey] ?? []);
       ?>
-        <div class="vtt-token" data-id="<?= (int)$t['id'] ?>" data-owned="<?= $t['owned'] ? 1 : 0 ?>"
+        <div class="vtt-token<?= ($t['hp'] !== null && (int)$t['hp'] <= 0) ? ' dead' : '' ?>"
+             data-id="<?= (int)$t['id'] ?>" data-owned="<?= $t['owned'] ? 1 : 0 ?>"
              data-typ-entity="<?= htmlspecialchars($t['typ_entity']) ?>" data-entita-id="<?= (int)$t['entita_id'] ?>"
              data-label="<?= htmlspecialchars((string)$t['label']) ?>"
+             data-hp="<?= $t['hp'] !== null ? (int)$t['hp'] : '' ?>"
              title="<?= htmlspecialchars((string)$t['label']) ?>"
              style="left:<?= (int)$t['x'] ?>px;top:<?= (int)$t['y'] ?>px;cursor:<?= $t['owned'] ? 'grab' : 'default' ?>;z-index:<?= (int)$t['z_poradi'] ?>;">
           <div class="puck" style="background:<?= $t['typ_entity'] === 'postava' ? 'var(--color-accent-600, #7a3b2e)' : '#4a2b2b' ?>;">
@@ -269,6 +298,14 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
         <button class="btn btn-secondary" type="button" id="iniciativaHoditBtn" style="flex:1;">Hoď iniciativu</button>
       </div>
     </div>
+    <?php if ($isPjOrAdmin && $rychleEfekty): ?>
+      <label style="font-size:11px;font-weight:600;">Rychlé efekty</label>
+      <div id="rychleEfektyChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+        <?php foreach ($rychleEfekty as $e): ?>
+          <button type="button" class="btn btn-ghost chip-efekt" data-efekt-id="<?= (int)$e['id'] ?>" style="padding:4px 10px;font-size:12px;"><?= htmlspecialchars($e['nazev']) ?></button>
+        <?php endforeach; ?>
+      </div>
+    <?php endif; ?>
     <?php if ($isPjOrAdmin && $efektyKatalog): ?>
       <label style="font-size:11px;font-weight:600;">Aplikovat efekt</label>
       <select id="efektSelect">
@@ -277,6 +314,8 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
       <input type="number" id="efektKola" placeholder="kol (prázdné = trvalé)">
       <button class="btn btn-secondary" type="button" id="efektBtn" style="width:100%;">Aplikovat efekt</button>
     <?php endif; ?>
+    <div id="spravovatInventar" style="margin-top:14px;"></div>
+    <div id="spravovatKorist" style="margin-top:14px;"></div>
     <button class="btn btn-ghost" type="button" id="smazatTokenBtn" style="width:100%;margin-top:14px;">Smazat token</button>
   </div>
 
@@ -290,6 +329,9 @@ const GRID_TYPE = <?= json_encode($mapa['grid_typ'] ?? 'ctverec') ?>;
 const GRID_OFFSET_X = <?= (int)($mapa['grid_posun_x'] ?? 0) ?>;
 const GRID_OFFSET_Y = <?= (int)($mapa['grid_posun_y'] ?? 0) ?>;
 let posledniUdalostId = <?= $posledniUdalostId ?>;
+const INVENTAR = <?= json_encode($inventarByEntity, JSON_UNESCAPED_UNICODE) ?>;
+const SVET_POSTAVY = <?= json_encode($svetPostavyKorist, JSON_UNESCAPED_UNICODE) ?>;
+const IS_PJ_OR_ADMIN = <?= $isPjOrAdmin ? 'true' : 'false' ?>;
 
 const mapWrap = document.getElementById('mapWrap');
 const viewport = document.getElementById('viewport');
@@ -462,8 +504,15 @@ const spravovatPanel = document.getElementById('panel-spravovat');
 let spravovanyToken = null;
 
 function otevritSpravovat(el) {
-  spravovanyToken = {typEntity: el.dataset.typEntity, entitaId: parseInt(el.dataset.entitaId, 10), tokenId: parseInt(el.dataset.id, 10)};
+  spravovanyToken = {
+    typEntity: el.dataset.typEntity,
+    entitaId: parseInt(el.dataset.entitaId, 10),
+    tokenId: parseInt(el.dataset.id, 10),
+    hp: el.dataset.hp === '' ? null : parseInt(el.dataset.hp, 10),
+  };
   document.getElementById('spravovatNazev').textContent = el.dataset.label;
+  renderInventar();
+  renderKorist();
   spravovatPanel.classList.add('open');
 }
 
@@ -572,6 +621,111 @@ if (efektBtn) {
       .then(d => { if (d.error) { logLine('Chyba: ' + d.error); return; } location.reload(); });
   });
 }
+document.querySelectorAll('.chip-efekt').forEach(chip => {
+  chip.addEventListener('click', () => {
+    if (!spravovanyToken) return;
+    document.getElementById('efektSelect').value = chip.dataset.efektId;
+    document.getElementById('efektKola').value = '3';
+    document.getElementById('efektBtn').click();
+  });
+});
+
+// --- Inventář spravované entity: "Použít" na každé položce ---
+function klicEntity(typEntity, entitaId) { return typEntity + ':' + entitaId; }
+
+function renderInventar() {
+  const cont = document.getElementById('spravovatInventar');
+  if (!cont || !spravovanyToken) return;
+  const jeMrtvaNestvura = spravovanyToken.typEntity === 'nestvura_instance' && spravovanyToken.hp !== null && spravovanyToken.hp <= 0;
+  if (jeMrtvaNestvura) { cont.innerHTML = ''; return; }
+  const polozky = INVENTAR[klicEntity(spravovanyToken.typEntity, spravovanyToken.entitaId)] || [];
+  if (!polozky.length) { cont.innerHTML = ''; return; }
+  let html = '<h4 style="font-size:12px;color:#e8c9a8;margin:0 0 6px;">Inventář</h4>';
+  polozky.forEach((p, i) => {
+    const mnozstviText = p.typ_polozky === 'kouzlo' ? '' : (' ×' + p.mnozstvi);
+    html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:12.5px;">'
+      + '<span style="flex:1;">' + p.nazev + mnozstviText + '</span>'
+      + '<button class="btn btn-ghost" type="button" data-pouzit-index="' + i + '" style="font-size:11px;padding:3px 8px;">Použít</button>'
+      + '</div>';
+  });
+  cont.innerHTML = html;
+  cont.querySelectorAll('[data-pouzit-index]').forEach(btn => {
+    btn.addEventListener('click', () => pouzitPolozku(polozky[parseInt(btn.dataset.pouzitIndex, 10)]));
+  });
+}
+
+// Bez cíle = použito na sobě (typický "vypij lektvar"). Zadáním přesného
+// data-label jiného tokenu na mapě jde mířit i jinam — prostý prompt(),
+// ne picker, ať to zůstane malé.
+function vyberCil(vychoziLabel) {
+  const zadani = prompt('Cíl (prázdné = použít na "' + vychoziLabel + '"), napiš přesný název tokenu na mapě:', '');
+  if (zadani === null) return undefined;
+  if (zadani.trim() === '') return null;
+  const cilEl = Array.from(document.querySelectorAll('.vtt-token')).find(t => t.dataset.label === zadani.trim());
+  if (!cilEl) { alert('Token "' + zadani + '" na mapě nenašel.'); return undefined; }
+  return {typEntity: cilEl.dataset.typEntity, entitaId: parseInt(cilEl.dataset.entitaId, 10)};
+}
+
+function pouzitPolozku(p) {
+  if (!spravovanyToken) return;
+  const cil = vyberCil(document.getElementById('spravovatNazev').textContent);
+  if (cil === undefined) return;
+  const body = {
+    typ_entity: spravovanyToken.typEntity, entita_id: spravovanyToken.entitaId,
+    typ_polozky: p.typ_polozky, polozka_id: p.polozka_id, mapa_id: MAPA_ID,
+  };
+  if (cil) { body.cil_typ_entity = cil.typEntity; body.cil_entita_id = cil.entitaId; }
+  postJson('api/pouzij_predmet.php', body).then(d => {
+    if (d.error) { logLine('Chyba: ' + d.error); return; }
+    let zprava = document.getElementById('spravovatNazev').textContent + ' použil(a) ' + p.nazev;
+    if (d.kostka) zprava += ': [' + d.kostka.hody.join(', ') + ']' + (d.kostka.bonus ? (d.kostka.bonus > 0 ? '+' : '') + d.kostka.bonus : '') + ' = ' + d.kostka.celkem;
+    if (d.hp) zprava += ' (' + (d.hp.delta > 0 ? '+' : '') + d.hp.delta + ' život)';
+    logLine(zprava);
+    posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
+    location.reload();
+  });
+}
+
+// --- Kořist z mrtvé nestvůry: "Předat" na každé položce vybavy ---
+function renderKorist() {
+  const cont = document.getElementById('spravovatKorist');
+  if (!cont || !spravovanyToken) return;
+  const jeMrtvaNestvura = IS_PJ_OR_ADMIN && spravovanyToken.typEntity === 'nestvura_instance' && spravovanyToken.hp !== null && spravovanyToken.hp <= 0;
+  if (!jeMrtvaNestvura) { cont.innerHTML = ''; return; }
+  const polozky = INVENTAR[klicEntity('nestvura_instance', spravovanyToken.entitaId)] || [];
+  let html = '<h4 style="font-size:12px;color:#e8c9a8;margin:0 0 6px;">Kořist</h4>';
+  if (!polozky.length) {
+    html += '<p class="note" style="margin:0;">Nemá u sebe nic.</p>';
+  } else {
+    html += '<select id="koristCilSelect" class="input" style="margin-bottom:6px;">'
+      + SVET_POSTAVY.map(p => '<option value="' + p.id + '">' + p.nazev + '</option>').join('')
+      + '</select>';
+    polozky.forEach((p, i) => {
+      const mnozstviText = p.typ_polozky === 'kouzlo' ? '' : (' ×' + p.mnozstvi);
+      html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:12.5px;">'
+        + '<span style="flex:1;">' + p.nazev + mnozstviText + '</span>'
+        + '<button class="btn btn-ghost" type="button" data-predat-index="' + i + '" style="font-size:11px;padding:3px 8px;">Předat</button>'
+        + '</div>';
+    });
+  }
+  cont.innerHTML = html;
+  cont.querySelectorAll('[data-predat-index]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = polozky[parseInt(btn.dataset.predatIndex, 10)];
+      const cilId = parseInt(document.getElementById('koristCilSelect').value, 10);
+      postJson('api/loot.php', {
+        nestvura_instance_id: spravovanyToken.entitaId,
+        typ_polozky: p.typ_polozky, polozka_id: p.polozka_id,
+        cilova_postava_id: cilId,
+      }).then(d => {
+        if (d.error) { logLine('Chyba: ' + d.error); return; }
+        logLine('Předáno: ' + d.polozka_nazev + (d.mnozstvi > 1 ? ' ×' + d.mnozstvi : ''));
+        posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
+        location.reload();
+      });
+    });
+  });
+}
 const smazatBtn = document.getElementById('smazatTokenBtn');
 if (smazatBtn) {
   smazatBtn.addEventListener('click', () => {
@@ -643,7 +797,7 @@ function applyEvent(u) {
     }
   } else if (u.typ === 'ping') {
     if (u.mapa_id == MAPA_ID) zobrazPing(u.payload.x, u.payload.y, u.payload.jmeno || '');
-  } else if (['token_pridan', 'token_smazan', 'efekt_aplikovan', 'efekt_konci', 'iniciativa_hozena', 'kolo_nove', 'tah_zmena'].includes(u.typ)) {
+  } else if (['token_pridan', 'token_smazan', 'efekt_aplikovan', 'efekt_konci', 'iniciativa_hozena', 'kolo_nove', 'tah_zmena', 'predmet_pouzit', 'predmet_loot'].includes(u.typ)) {
     location.reload();
   }
 }

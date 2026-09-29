@@ -20,9 +20,14 @@
 --
 -- ALTER TABLE svet_udalosti na konci rozšiřuje ENUM `typ` o
 -- 'predmet_loot'/'predmet_pouzit' — čistě rozšíření výčtu, žádná
--- existující hodnota nemizí. Plný současný výčet (12 hodnot, ověřeno
--- `grep -n "MODIFY COLUMN typ" -A6 database/migrations/0039_vtt_ping.sql`)
--- končí 'hp_zmena','ping' — přesně to sem opsáno, nic se nezahazuje.
+-- existující hodnota nemizí. Tahle migrace vznikla paralelně s
+-- 0044_vtt_iniciativa.sql (izolovaný worktree, neviděl tamní 3 nové
+-- hodnoty) — při integraci (mimo tenhle soubor, ručně) opraveno na
+-- plný výčet PO 0044: 15 hodnot končících 'hp_zmena','ping',
+-- 'iniciativa_hozena','kolo_nove','tah_zmena', sem přidány jen
+-- 'predmet_loot'/'predmet_pouzit' navrch. Bez týhle opravy by tenhle
+-- ALTER tiše smazal tři hodnoty přidané 0044 — MODIFY COLUMN nahrazuje
+-- celý výčet, ne jen přidává.
 
 CREATE TABLE IF NOT EXISTS postava_predmety (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -75,5 +80,6 @@ ALTER TABLE svet_udalosti MODIFY COLUMN typ ENUM(
   'token_presun','token_pridan','token_smazan',
   'kostka_hod','efekt_aplikovan','efekt_konci',
   'chat','mapa_bod_pridan','mapa_bod_odhalen','aktivni_mapa_zmena',
-  'hp_zmena','ping','predmet_loot','predmet_pouzit'
+  'hp_zmena','ping','iniciativa_hozena','kolo_nove','tah_zmena',
+  'predmet_loot','predmet_pouzit'
 ) NOT NULL;
