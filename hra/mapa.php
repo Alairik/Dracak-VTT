@@ -74,6 +74,12 @@ if ($isPjOrAdmin) {
     $efektyKatalog = dracak_db()->query('SELECT id, nazev, typ FROM efekty ORDER BY nazev')->fetchAll();
 }
 
+require_once __DIR__ . '/../includes/vtt_iniciativa.php';
+$stmt = dracak_db()->prepare('SELECT * FROM kolo_stav WHERE mapa_id = ?');
+$stmt->execute([$mapaId]);
+$koloStav = $stmt->fetch() ?: null;
+$iniciativaPoradi = $koloStav ? dracak_vtt_iniciativa_poradi(dracak_db(), $mapaId) : [];
+
 $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti WHERE svet_id = ' . $svetId)->fetchColumn() ?: 0);
 ?>
 <!doctype html>
@@ -196,8 +202,23 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
     <button class="tbtn" type="button" id="tb-log" title="Log"><?php dracak_icon('scroll-text'); ?></button>
     <?php if ($isPjOrAdmin): ?>
       <button class="tbtn" type="button" id="tb-kolo" title="Konec kola (odpočítat trvání efektů)"><?php dracak_icon('skip-forward'); ?></button>
+      <button class="tbtn" type="button" id="tb-dalsi-tah" title="Další na tahu (iniciativa)"><?php dracak_icon('skip-forward'); ?></button>
     <?php endif; ?>
   </div>
+
+  <?php if ($koloStav): ?>
+  <div id="panelIniciativa" style="position:fixed;top:70px;right:16px;z-index:190;background:rgba(24,22,20,.92);color:#fff;border-radius:12px;padding:10px 14px;min-width:230px;font-size:13px;">
+    <div style="font-weight:600;margin-bottom:6px;">Kolo <?= (int)$koloStav['cislo_kola'] ?> — pořadí tahů</div>
+    <div id="iniciativaList">
+      <?php foreach ($iniciativaPoradi as $r): $jeAktivni = (int)$r['token_id'] === (int)($koloStav['aktivni_token_id'] ?? 0); ?>
+        <div data-token-id="<?= (int)$r['token_id'] ?>" style="display:flex;justify-content:space-between;gap:8px;padding:2px 0;<?= $jeAktivni ? 'color:#e8c9a8;font-weight:600;' : '' ?>">
+          <span><?= htmlspecialchars((string)($r['label'] ?? '?')) ?></span>
+          <span><?= (int)$r['hod'] ?><?= $r['modifikator'] >= 0 ? '+' . (int)$r['modifikator'] : (int)$r['modifikator'] ?>=<?= (int)$r['vysledek'] ?> · <?= (int)$r['akce_zbyvajici'] ?>/<?= (int)$r['akce_celkem'] ?> akcí</span>
+        </div>
+      <?php endforeach; ?>
+    </div>
+  </div>
+  <?php endif; ?>
 
   <div class="popover" id="popover-pridat">
     <button class="close-x" data-close-popover><?php dracak_icon('x', 14); ?></button>
@@ -240,6 +261,13 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
       <button class="btn btn-ghost" type="button" data-delta="-1">−1</button>
       <button class="btn btn-ghost" type="button" data-delta="1">+1</button>
       <button class="btn btn-ghost" type="button" data-delta="5">+5</button>
+    </div>
+    <div style="margin-top:10px;">
+      <label style="font-size:11px;font-weight:600;">Iniciativa — bonus/postih (dočasně ruční, tabulka str. 78 zatím chybí)</label>
+      <div style="display:flex;gap:6px;">
+        <input type="number" id="iniciativaModifikator" value="0" class="input" style="width:70px;">
+        <button class="btn btn-secondary" type="button" id="iniciativaHoditBtn" style="flex:1;">Hoď iniciativu</button>
+      </div>
     </div>
     <?php if ($isPjOrAdmin && $efektyKatalog): ?>
       <label style="font-size:11px;font-weight:600;">Aplikovat efekt</label>
@@ -560,6 +588,22 @@ if (koloBtn) {
       .then(d => { if (d.error) { logLine('Chyba: ' + d.error); return; } location.reload(); });
   });
 }
+const iniciativaHoditBtn = document.getElementById('iniciativaHoditBtn');
+if (iniciativaHoditBtn) {
+  iniciativaHoditBtn.addEventListener('click', () => {
+    if (!spravovanyToken) return;
+    const modifikator = parseInt(document.getElementById('iniciativaModifikator').value, 10) || 0;
+    postJson('api/iniciativa_hod.php', {mapa_id: MAPA_ID, token_id: spravovanyToken.tokenId, modifikator})
+      .then(d => { if (d.error) { logLine('Chyba: ' + d.error); return; } location.reload(); });
+  });
+}
+const tbDalsiTah = document.getElementById('tb-dalsi-tah');
+if (tbDalsiTah) {
+  tbDalsiTah.addEventListener('click', () => {
+    postJson('api/dalsi_tah.php', {mapa_id: MAPA_ID})
+      .then(d => { if (d.error) { logLine('Chyba: ' + d.error); return; } location.reload(); });
+  });
+}
 
 // --- Kostky (dice-box vizualizace + autoritativní server výsledek) ---
 let diceBox = null;
@@ -599,7 +643,7 @@ function applyEvent(u) {
     }
   } else if (u.typ === 'ping') {
     if (u.mapa_id == MAPA_ID) zobrazPing(u.payload.x, u.payload.y, u.payload.jmeno || '');
-  } else if (['token_pridan', 'token_smazan', 'efekt_aplikovan', 'efekt_konci'].includes(u.typ)) {
+  } else if (['token_pridan', 'token_smazan', 'efekt_aplikovan', 'efekt_konci', 'iniciativa_hozena', 'kolo_nove', 'tah_zmena'].includes(u.typ)) {
     location.reload();
   }
 }
