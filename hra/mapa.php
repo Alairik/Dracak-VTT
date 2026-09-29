@@ -164,6 +164,7 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
   <div id="viewport">
     <div id="mapWrap">
       <img id="mapImg" src="mapa_obrazek.php?id=<?= $mapaId ?>" style="display:block;max-width:none;">
+      <svg id="gridSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:0;"></svg>
       <svg id="rulerSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:140;"></svg>
       <?php foreach ($tokeny as $t):
           $entKey = $t['typ_entity'] . ':' . $t['entita_id'];
@@ -257,12 +258,71 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
 const SVET_ID = <?= $svetId ?>;
 const MAPA_ID = <?= $mapaId ?>;
 const GRID_PX = <?= (int)($mapa['grid_velikost_px'] ?? 0) ?>;
+const GRID_TYPE = <?= json_encode($mapa['grid_typ'] ?? 'ctverec') ?>;
+const GRID_OFFSET_X = <?= (int)($mapa['grid_posun_x'] ?? 0) ?>;
+const GRID_OFFSET_Y = <?= (int)($mapa['grid_posun_y'] ?? 0) ?>;
 let posledniUdalostId = <?= $posledniUdalostId ?>;
 
 const mapWrap = document.getElementById('mapWrap');
 const viewport = document.getElementById('viewport');
 const logList = document.getElementById('logList');
 const rulerSvg = document.getElementById('rulerSvg');
+const mapImgEl = document.getElementById('mapImg');
+
+// --- Grid overlay: čistě vizuální, neinteraktivní (pointer-events:none),
+// nad obrázkem a pod tokeny/rulerem. Čtverec = rovné čáry po GRID_PX.
+// Hex = "pointy-top" šestiúhelníky (vrchol nahoře/dole, řady vodorovně,
+// liché řady posunuté o půl šířky doprava — "odd-r offset" layout),
+// GRID_PX je hex "size" = poloměr od středu k vrcholu (circumradius).
+function renderGrid() {
+  const gridSvg = document.getElementById('gridSvg');
+  if (!gridSvg || !GRID_PX || GRID_PX <= 0) return;
+  const w = mapImgEl.naturalWidth || mapWrap.clientWidth;
+  const h = mapImgEl.naturalHeight || mapWrap.clientHeight;
+  if (!w || !h) return;
+
+  const stroke = 'rgba(255,255,255,0.35)';
+  const sw = 1;
+  let svg = '';
+
+  if (GRID_TYPE === 'hex') {
+    const size = GRID_PX;
+    const colStep = Math.sqrt(3) * size;
+    const rowStep = 1.5 * size;
+    const offX = ((GRID_OFFSET_X % colStep) + colStep) % colStep;
+    const offY = ((GRID_OFFSET_Y % rowStep) + rowStep) % rowStep;
+    const firstRow = -1, lastRow = Math.ceil((h - offY) / rowStep) + 1;
+    const firstCol = -1, lastCol = Math.ceil((w - offX) / colStep) + 1;
+    for (let row = firstRow; row <= lastRow; row++) {
+      const cy = offY + row * rowStep;
+      const rowShift = (Math.abs(row % 2) === 1) ? colStep / 2 : 0;
+      for (let col = firstCol; col <= lastCol; col++) {
+        const cx = offX + col * colStep + rowShift;
+        if (cx < -colStep || cx > w + colStep || cy < -rowStep * 1.5 || cy > h + rowStep * 1.5) continue;
+        let points = '';
+        for (let i = 0; i < 6; i++) {
+          const a = Math.PI / 180 * (60 * i - 30);
+          points += (i ? ' ' : '') + (cx + size * Math.cos(a)).toFixed(1) + ',' + (cy + size * Math.sin(a)).toFixed(1);
+        }
+        svg += '<polygon points="' + points + '" fill="none" stroke="' + stroke + '" stroke-width="' + sw + '"/>';
+      }
+    }
+  } else {
+    const offX = ((GRID_OFFSET_X % GRID_PX) + GRID_PX) % GRID_PX;
+    const offY = ((GRID_OFFSET_Y % GRID_PX) + GRID_PX) % GRID_PX;
+    for (let x = offX; x <= w; x += GRID_PX) {
+      svg += '<line x1="' + x.toFixed(1) + '" y1="0" x2="' + x.toFixed(1) + '" y2="' + h + '" stroke="' + stroke + '" stroke-width="' + sw + '"/>';
+    }
+    for (let y = offY; y <= h; y += GRID_PX) {
+      svg += '<line x1="0" y1="' + y.toFixed(1) + '" x2="' + w + '" y2="' + y.toFixed(1) + '" stroke="' + stroke + '" stroke-width="' + sw + '"/>';
+    }
+  }
+
+  gridSvg.setAttribute('width', w);
+  gridSvg.setAttribute('height', h);
+  gridSvg.innerHTML = svg;
+}
+if (mapImgEl.complete) renderGrid(); else mapImgEl.addEventListener('load', renderGrid);
 
 function logLine(text) {
   if (!logList) return;
