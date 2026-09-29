@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/../includes/vtt.php';
+require_once __DIR__ . '/../includes/vtt_predmety.php';
 
 $user = dracak_require_login();
 $isPjOrAdmin = in_array($user['role'], ['admin', 'pj'], true);
@@ -138,6 +139,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header("Location: svet.php?id=$svetId");
         exit;
     }
+
+    if ($akce === 'pridat_polozku') {
+        // PJ dá postavě startovní předmět/lektvar/kouzlo — v1 jednoduše
+        // podle ID z katalogu (viz editor.php?tabulka=... pro dohledání ID),
+        // ne přes plný výběrový katalog, ať je formulář malý (viz konverzace).
+        if (!$isPjOrAdmin) { http_response_code(403); die('Jen PJ/admin přidává položky postavě.'); }
+        $cilovaPostavaId = (int)($_POST['postava_id'] ?? 0);
+        $typPolozky = (string)($_POST['typ_polozky'] ?? '');
+        $polozkaId = (int)($_POST['polozka_id'] ?? 0);
+        $mnozstvi = max(1, (int)($_POST['mnozstvi'] ?? 1));
+
+        $cfg = dracak_vtt_polozka_config($typPolozky);
+        if (!$cfg) { http_response_code(422); die('Neplatný typ položky.'); }
+
+        $stmt = dracak_db()->prepare('SELECT 1 FROM postavy WHERE id = ? AND svet_id = ?');
+        $stmt->execute([$cilovaPostavaId, $svetId]);
+        if (!$stmt->fetchColumn()) { http_response_code(404); die('Postava nenalezena v tomhle světě.'); }
+
+        if (!dracak_vtt_polozka_katalog($typPolozky, $polozkaId)) {
+            http_response_code(404);
+            die('Položka s tímhle ID v katalogu neexistuje.');
+        }
+
+        if ($typPolozky === 'kouzlo') {
+            $ins = dracak_db()->prepare('INSERT IGNORE INTO postava_zna_kouzlo (postava_id, kouzlo_id) VALUES (?, ?)');
+            $ins->execute([$cilovaPostavaId, $polozkaId]);
+        } else {
+            $ins = dracak_db()->prepare(
+                "INSERT INTO {$cfg['inventar']} (postava_id, {$cfg['fk']}, mnozstvi) VALUES (?, ?, ?)
+                 ON DUPLICATE KEY UPDATE mnozstvi = mnozstvi + VALUES(mnozstvi)"
+            );
+            $ins->execute([$cilovaPostavaId, $polozkaId, $mnozstvi]);
+        }
+        header("Location: svet.php?id=$svetId");
+        exit;
+    }
 }
 
 $mapy = dracak_db()->prepare('SELECT * FROM mapy WHERE svet_id = ? ORDER BY typ_mapy DESC, nazev');
@@ -154,6 +191,14 @@ $postavy = dracak_db()->prepare(
 );
 $postavy->execute([$svetId]);
 $postavy = $postavy->fetchAll();
+
+// Inventář za postavu — jen krátký přehled do karty, ne plná správa (ta je
+// přes hra/api/pouzij_predmet.php na mapě). Zvlášť dotaz na postavu (max pár
+// desítek postav ve světě), ne JOIN přes 3 tabulky najednou.
+$inventarePostav = [];
+foreach ($postavy as $p) {
+    $inventarePostav[(int)$p['id']] = dracak_vtt_inventar('postava', (int)$p['id']);
+}
 
 $rasyOptions = dracak_db()->query('SELECT id, nazev FROM rasy ORDER BY nazev')->fetchAll();
 $povolaniOptions = dracak_db()->query('SELECT id, nazev FROM povolani ORDER BY nazev')->fetchAll();
@@ -304,6 +349,18 @@ dracak_vtt_page_start($svet['nazev'], $user);
               </div>
               <?php endif; ?>
             </div>
+            <?php $inv = $inventarePostav[(int)$p['id']] ?? []; if ($inv): ?>
+              <h4 class="rel-label" style="margin-top:10px;">Inventář</h4>
+              <ul style="margin:0;padding-left:18px;font-size:12.5px;">
+                <?php foreach ($inv as $i): ?>
+                  <li>
+                    <?= htmlspecialchars($i['nazev']) ?>
+                    <?php if ($i['typ_polozky'] !== 'kouzlo'): ?>× <?= (int)$i['mnozstvi'] ?><?php endif; ?>
+                    <span style="opacity:.6;">(<?= htmlspecialchars($i['typ_polozky']) ?>)</span>
+                  </li>
+                <?php endforeach; ?>
+              </ul>
+            <?php endif; ?>
             <?php if ($isPjOrAdmin && count($hraciVeSvete) > 1): ?>
               <form method="post" style="display:flex;gap:6px;margin-top:8px;">
                 <input type="hidden" name="akce" value="prevest_postavu">
@@ -363,6 +420,40 @@ dracak_vtt_page_start($svet['nazev'], $user);
       </div>
       <button class="btn btn-primary" type="submit" style="margin-top:10px;">Založit postavu</button>
     </form>
+
+    <?php if ($isPjOrAdmin && $postavy): ?>
+    <h2 class="page-title" style="font-size:20px;margin-top:28px;">Přidat položku postavě</h2>
+    <form method="post" class="card elev-sm" style="max-width:520px;margin-top:14px;">
+      <input type="hidden" name="akce" value="pridat_polozku">
+      <p class="note" style="margin-top:0;">
+        ID najdeš v katalogu (<a href="../editor.php?tabulka=predmety" target="_blank">předměty</a>,
+        <a href="../editor.php?tabulka=lektvary" target="_blank">lektvary</a>,
+        <a href="../editor.php?tabulka=kouzla" target="_blank">kouzla</a>) — u záznamu klikni na "Upravit", ID je v URL.
+      </p>
+      <div class="field"><label for="polozka_postava_id">Postava *</label>
+        <select class="input" id="polozka_postava_id" name="postava_id" required>
+          <?php foreach ($postavy as $p): ?>
+            <option value="<?= (int)$p['id'] ?>"><?= htmlspecialchars($p['nazev']) ?> (<?= htmlspecialchars($p['vlastnik_jmeno']) ?>)</option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div class="field"><label for="typ_polozky">Typ *</label>
+        <select class="input" id="typ_polozky" name="typ_polozky" required>
+          <option value="predmet">Předmět</option>
+          <option value="lektvar">Lektvar</option>
+          <option value="kouzlo">Kouzlo</option>
+        </select>
+      </div>
+      <div class="field"><label for="polozka_id">ID položky v katalogu *</label>
+        <input class="input" type="number" id="polozka_id" name="polozka_id" min="1" required>
+      </div>
+      <div class="field"><label for="polozka_mnozstvi">Množství</label>
+        <input class="input" type="number" id="polozka_mnozstvi" name="mnozstvi" min="1" value="1">
+        <p class="note" style="margin:4px 0 0;">U kouzla se ignoruje — znalost kouzla se nepočítá na kusy.</p>
+      </div>
+      <button class="btn btn-primary" type="submit">Přidat</button>
+    </form>
+    <?php endif; ?>
   </main>
 <?php dracak_vtt_page_end(); ?>
 
