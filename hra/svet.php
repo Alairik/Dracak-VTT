@@ -47,6 +47,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $typMapy = ($_POST['typ_mapy'] ?? 'zona') === 'svet' ? 'svet' : 'zona';
         if ($nazev === '') { http_response_code(422); die('Mapa musí mít název.'); }
 
+        // Grid je nepovinný — prázdná velikost = grid_velikost_px zůstává
+        // NULL a mapa.php ho nevykresluje (chování shodné se stavem před
+        // touhle funkcí). Typ/offset dávají smysl jen spolu s velikostí,
+        // ale ukládají se vždy (typ má DB DEFAULT 'ctverec', offsety 0).
+        $gridPx = trim((string)($_POST['grid_velikost_px'] ?? ''));
+        $gridVelikostPx = $gridPx !== '' ? max(1, (int)$gridPx) : null;
+        $gridTyp = ($_POST['grid_typ'] ?? 'ctverec') === 'hex' ? 'hex' : 'ctverec';
+        $gridPosunX = (int)($_POST['grid_posun_x'] ?? 0);
+        $gridPosunY = (int)($_POST['grid_posun_y'] ?? 0);
+
         $obrazekCesta = null;
         $sirka = null;
         $vyska = null;
@@ -68,9 +78,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $stmt = dracak_db()->prepare(
-            'INSERT INTO mapy (svet_id, nazev, typ_mapy, obrazek_cesta, sirka_px, vyska_px) VALUES (?, ?, ?, ?, ?, ?)'
+            'INSERT INTO mapy (svet_id, nazev, typ_mapy, obrazek_cesta, sirka_px, vyska_px, grid_velikost_px, grid_typ, grid_posun_x, grid_posun_y)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
-        $stmt->execute([$svetId, $nazev, $typMapy, $obrazekCesta, $sirka, $vyska]);
+        $stmt->execute([$svetId, $nazev, $typMapy, $obrazekCesta, $sirka, $vyska, $gridVelikostPx, $gridTyp, $gridPosunX, $gridPosunY]);
         header("Location: svet.php?id=$svetId");
         exit;
     }
@@ -228,7 +239,12 @@ dracak_vtt_page_start($svet['nazev'], $user);
         <?php foreach ($mapy as $m): ?>
           <div class="card elev-sm rec-card">
             <h3 class="rec-title"><a href="mapa.php?id=<?= (int)$m['id'] ?>" style="text-decoration:none;color:inherit;"><?= htmlspecialchars($m['nazev']) ?></a></h3>
-            <div class="rec-grid"><div class="k">Typ:</div><div><?= $m['typ_mapy'] === 'svet' ? 'světová' : 'zóna' ?></div></div>
+            <div class="rec-grid">
+              <div class="k">Typ:</div><div><?= $m['typ_mapy'] === 'svet' ? 'světová' : 'zóna' ?></div>
+              <?php if ($m['grid_velikost_px']): ?>
+              <div class="k">Grid:</div><div><?= $m['grid_typ'] === 'hex' ? 'hex' : 'čtverec' ?>, <?= (int)$m['grid_velikost_px'] ?> px</div>
+              <?php endif; ?>
+            </div>
             <div class="rec-actions"><a class="btn btn-secondary" href="mapa.php?id=<?= (int)$m['id'] ?>">Otevřít</a></div>
           </div>
         <?php endforeach; ?>
@@ -248,6 +264,23 @@ dracak_vtt_page_start($svet['nazev'], $user);
         </div>
         <div class="field"><label for="obrazek">Obrázek mapy (PNG/JPG/WEBP)</label>
           <input type="file" id="obrazek" name="obrazek" accept="image/png,image/jpeg,image/webp">
+        </div>
+        <h3 class="rel-label">Grid (nepovinné)</h3>
+        <p class="note" style="margin:-4px 0 10px;">Prázdná velikost = bez gridu, stejné jako dosud.</p>
+        <div class="field"><label for="grid_velikost_px">Velikost pole (px)</label>
+          <input class="input" type="number" id="grid_velikost_px" name="grid_velikost_px" min="1" step="1" placeholder="např. 70">
+        </div>
+        <div class="field"><label for="grid_typ">Typ gridu</label>
+          <select id="grid_typ" name="grid_typ">
+            <option value="ctverec">Čtverec</option>
+            <option value="hex">Hex</option>
+          </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div class="field"><label for="grid_posun_x">Posun X (px)</label>
+            <input class="input" type="number" id="grid_posun_x" name="grid_posun_x" step="1" value="0"></div>
+          <div class="field"><label for="grid_posun_y">Posun Y (px)</label>
+            <input class="input" type="number" id="grid_posun_y" name="grid_posun_y" step="1" value="0"></div>
         </div>
         <button class="btn btn-primary" type="submit">Přidat mapu</button>
       </form>
