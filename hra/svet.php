@@ -349,6 +349,9 @@ dracak_vtt_page_start($svet['nazev'], $user);
               </div>
               <?php endif; ?>
             </div>
+            <?php if ($isPjOrAdmin || (int)$p['vlastnik_ucet_id'] === (int)$user['id']): ?>
+              <div class="rec-actions"><a class="btn btn-secondary" href="postava.php?id=<?= (int)$p['id'] ?>">Upravit</a></div>
+            <?php endif; ?>
             <?php $inv = $inventarePostav[(int)$p['id']] ?? []; if ($inv): ?>
               <h4 class="rel-label" style="margin-top:10px;">Inventář</h4>
               <ul style="margin:0;padding-left:18px;font-size:12.5px;">
