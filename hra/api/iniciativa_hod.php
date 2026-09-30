@@ -8,12 +8,27 @@ $user = dracak_require_login();
 $data = json_decode((string)file_get_contents('php://input'), true) ?: [];
 $mapaId = (int)($data['mapa_id'] ?? 0);
 $tokenId = (int)($data['token_id'] ?? 0);
-$modifikator = (int)($data['modifikator'] ?? 0);
-// TINYINT sloupec (-128..127) — jen ochrana proti přetečení sloupce, NE
-// pravidlová hranice (ta chybí, viz includes/vtt_iniciativa.php nahoře).
-$modifikator = max(-100, min(100, $modifikator));
+$bonusIds = array_map('intval', is_array($data['bonus_ids'] ?? null) ? $data['bonus_ids'] : []);
+$jinyBonus = (int)($data['jiny_bonus'] ?? 0);
 
 $pdo = dracak_db();
+
+// Modifikátor = součet vybraných položek z Tabulky bonusů a postihů k
+// iniciativě (str. 78, database/migrations/0045_iniciativa_bonusy_tabulka.sql)
+// + volitelná ruční úprava pro cokoliv, co tabulka nepokrývá. Popisy se
+// vrací i do logu, ať je vidět PROČ vyšlo dané číslo, ne jen výsledné číslo.
+$vybraneBonusy = [];
+if ($bonusIds) {
+    $placeholders = implode(',', array_fill(0, count($bonusIds), '?'));
+    $stmt = $pdo->prepare("SELECT id, popis, bonus FROM iniciativa_bonusy WHERE id IN ($placeholders)");
+    $stmt->execute($bonusIds);
+    $vybraneBonusy = $stmt->fetchAll();
+}
+$modifikator = array_sum(array_column($vybraneBonusy, 'bonus')) + $jinyBonus;
+// TINYINT sloupec (-128..127) — jen ochrana proti přetečení sloupce, NE
+// pravidlová hranice (ta už je dána tabulkou bonusů výš).
+$modifikator = max(-100, min(100, $modifikator));
+
 $stmt = $pdo->prepare('SELECT t.*, m.svet_id FROM tokeny t JOIN mapy m ON m.id = t.mapa_id WHERE t.id = ? AND t.mapa_id = ?');
 $stmt->execute([$tokenId, $mapaId]);
 $token = $stmt->fetch();
@@ -60,6 +75,8 @@ try {
         'token_id' => $tokenId,
         'hod' => $hod,
         'modifikator' => $modifikator,
+        'bonusy' => array_column($vybraneBonusy, 'popis'),
+        'jiny_bonus' => $jinyBonus,
         'vysledek' => $vysledek,
         'akce_celkem' => $akce,
         'akce_zbyvajici' => $akce,
@@ -77,6 +94,7 @@ echo json_encode([
     'token_id' => $tokenId,
     'hod' => $hod,
     'modifikator' => $modifikator,
+    'bonusy' => array_column($vybraneBonusy, 'popis'),
     'vysledek' => $vysledek,
     'akce_celkem' => $akce,
     'akce_zbyvajici' => $akce,

@@ -105,6 +105,7 @@ $stmt = dracak_db()->prepare('SELECT * FROM kolo_stav WHERE mapa_id = ?');
 $stmt->execute([$mapaId]);
 $koloStav = $stmt->fetch() ?: null;
 $iniciativaPoradi = $koloStav ? dracak_vtt_iniciativa_poradi(dracak_db(), $mapaId) : [];
+$iniciativaBonusy = dracak_db()->query('SELECT id, popis, bonus FROM iniciativa_bonusy ORDER BY id')->fetchAll();
 
 $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti WHERE svet_id = ' . $svetId)->fetchColumn() ?: 0);
 ?>
@@ -292,9 +293,18 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
       <button class="btn btn-ghost" type="button" data-delta="5">+5</button>
     </div>
     <div style="margin-top:10px;">
-      <label style="font-size:11px;font-weight:600;">Iniciativa — bonus/postih (dočasně ruční, tabulka str. 78 zatím chybí)</label>
-      <div style="display:flex;gap:6px;">
-        <input type="number" id="iniciativaModifikator" value="0" class="input" style="width:70px;">
+      <label style="font-size:11px;font-weight:600;">Iniciativa — bonusy/postihy (zaškrtni, co platí)</label>
+      <div id="iniciativaBonusyList" style="max-height:120px;overflow-y:auto;font-size:12px;margin-bottom:6px;">
+        <?php foreach ($iniciativaBonusy as $b): ?>
+          <label style="display:flex;align-items:center;gap:6px;font-weight:400;margin-bottom:2px;">
+            <input type="checkbox" class="iniciativa-bonus-check" value="<?= (int)$b['id'] ?>">
+            <?= htmlspecialchars($b['popis']) ?> (<?= $b['bonus'] >= 0 ? '+' . (int)$b['bonus'] : (int)$b['bonus'] ?>)
+          </label>
+        <?php endforeach; ?>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <label style="font-size:11px;" for="iniciativaJinyBonus">jiný:</label>
+        <input type="number" id="iniciativaJinyBonus" value="0" class="input" style="width:60px;">
         <button class="btn btn-secondary" type="button" id="iniciativaHoditBtn" style="flex:1;">Hoď iniciativu</button>
       </div>
     </div>
@@ -746,8 +756,9 @@ const iniciativaHoditBtn = document.getElementById('iniciativaHoditBtn');
 if (iniciativaHoditBtn) {
   iniciativaHoditBtn.addEventListener('click', () => {
     if (!spravovanyToken) return;
-    const modifikator = parseInt(document.getElementById('iniciativaModifikator').value, 10) || 0;
-    postJson('api/iniciativa_hod.php', {mapa_id: MAPA_ID, token_id: spravovanyToken.tokenId, modifikator})
+    const bonusIds = Array.from(document.querySelectorAll('.iniciativa-bonus-check:checked')).map(c => parseInt(c.value, 10));
+    const jinyBonus = parseInt(document.getElementById('iniciativaJinyBonus').value, 10) || 0;
+    postJson('api/iniciativa_hod.php', {mapa_id: MAPA_ID, token_id: spravovanyToken.tokenId, bonus_ids: bonusIds, jiny_bonus: jinyBonus})
       .then(d => { if (d.error) { logLine('Chyba: ' + d.error); return; } location.reload(); });
   });
 }

@@ -75,6 +75,27 @@ function dracak_vtt_prvni_cislo(?string $text): int
     return 0;
 }
 
+// Vytáhne první ČÍSLO SE ZNAMÉNKEM z volného textu jako "(+2 + 6) = 8"
+// nebo "(−1 + 7) = 6" — nestvury.oc/uc jsou zápis vzorce, ne čisté číslo
+// (viz database/drd-db-full-v1.sql), první člen bývá bonus za
+// manévrovací schopnost/rychlost (blízký ekvivalent Obratnosti u
+// postav, byť to formálně není totéž — bestiář nemá vlastní atribut
+// Obratnost). Zdroj používá unicode mínus (−), ne ASCII pomlčku, proto
+// normalizace. Vrací null, když text žádné číslo neobsahuje (např.
+// "Obr + kvalita zbroje" u humanoidních šablon) — tam se hodnota musí
+// dopočítat jinak, radši null než tiše hádané 0.
+function dracak_vtt_prvni_cislo_se_znamenkem(?string $text): ?int
+{
+    if ($text === null) {
+        return null;
+    }
+    $normalizovano = str_replace(["\u{2212}", '–', '—'], '-', $text);
+    if (preg_match('/([+-]?\d+)/', $normalizovano, $m)) {
+        return (int)$m[1];
+    }
+    return null;
+}
+
 // Zápis události do logu — vždy stejný tvar, ať se na to nezapomíná
 // u jednotlivých endpointů (viz docs/vtt-datovy-model-navrh-v1.md).
 function dracak_vtt_log_event(int $svetId, ?int $mapaId, string $typ, array $payload, int $ucetId): int

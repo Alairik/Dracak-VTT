@@ -8,11 +8,10 @@ declare(strict_types=1);
 // je čistě pro rozšířený systém a tabulky kolo_stav/kolo_iniciativa
 // (database/migrations/0044_vtt_iniciativa.sql).
 //
-// Obecná Tabulka bonusů a postihů k iniciativě (str. 78) NENÍ v žádném
-// zdroji přepsaná — jen nečitelný obrázek v předloze, viz
-// docs/kontrolni-seznam-neuplnych-mist.md. Dokud se nenajde lepší sken,
-// modifikátor se zadává ručně (viz hra/api/iniciativa_hod.php) — tenhle
-// soubor NEHÁDÁ žádná čísla za tuhle chybějící tabulku.
+// Tabulka bonusů a postihů k iniciativě (str. 78) je teď v DB (migrace
+// 0045_iniciativa_bonusy_tabulka.sql) — přepsaná ze skutečné fotky
+// stránky, ne odhadnutá. hra/api/iniciativa_hod.php sčítá vybrané
+// položky z ní (checkboxy v UI) místo jednoho ručního čísla.
 require_once __DIR__ . '/vtt.php';
 
 // TABULKA INICIATIVY A AKCÍ, h1623, str. 77 — přepsáno doslova ze zdroje:
@@ -50,28 +49,59 @@ function dracak_vtt_can_roll_iniciativa(array $user, array $token): bool
     return dracak_vtt_can_move_token($user, $token);
 }
 
+// Bonus/postih za Obratnost postavy — přes opravy_za_atribut (migrace
+// 0007), stejný převod stupeň->bonus, co se používá všude jinde v
+// pravidlové DB. Nad rozsah tabulky (23+) pokračuje stejný krok "+1 za
+// každé 2 stupně" (floor((stupen-10)/2)), viz komentář u 0007.
+function dracak_vtt_obratnost_bonus(PDO $pdo, ?int $stupen): ?int
+{
+    if ($stupen === null) {
+        return null;
+    }
+    $stmt = $pdo->prepare('SELECT oprava FROM opravy_za_atribut WHERE ? BETWEEN stupen_od AND stupen_do');
+    $stmt->execute([$stupen]);
+    $oprava = $stmt->fetchColumn();
+    if ($oprava !== false) {
+        return (int)$oprava;
+    }
+    return (int)floor(($stupen - 10) / 2);
+}
+
 // Sestaví pořadí účastníků AKTUÁLNÍHO kola na mapě, sestupně podle
 // vysledek. Remíza: h1622 — "Pokud dvěma postavám padne na iniciativu
 // stejně, je dřív na řadě postava s větší obratností, nebo při stejné
-// obratnosti rozhodne PJ." Obratnost má jen postavy (postavy.obratnost,
-// migrace 0040) — nestvura_instance ji nemá, takže se při shodě
-// vysledek řadí až za postavy se stejným výsledkem (obratnost = -1,
-// nižší než jakákoliv reálná hodnota 1+). Finální remízu (dvě nestvůry,
-// nebo stejná obratnost) řeší stabilní řazení podle token_id — je to jen
-// ZOBRAZOVACÍ pořadí bez enforcementu (viz zadání), "rozhodne PJ" z
-// pravidel se tu nedá automatizovat, PJ pořadí vidí a řídí ho ručně přes
-// dalsi_tah.php.
+// obratnosti rozhodne PJ."
+//
+// Postava: bonus za Obratnost přes opravy_za_atribut (dracak_vtt_obratnost_bonus).
+// Nestvůra: bestiář nemá vlastní atribut Obratnost vůbec (potvrzeno
+// proti database/drd-db-full-v1.sql — u zvířat/nestvůr se OČ počítá z
+// manévrovací schopnosti a rychlosti/pohyblivosti, ne z Obratnosti; jen
+// humanoidní šablony jako "Obyvatelé" mají OČ = "Obr + kvalita zbroje").
+// Nejbližší dostupná náhrada je první číslo ve free-textu nestvury.oc
+// (typicky "(+2 + 6) = 8" — první člen bývá bonus za manévrovací
+// schopnost) přes dracak_vtt_prvni_cislo_se_znamenkem() — je to
+// APROXIMACE, ne totéž co Obratnost, ale lepší než nestvůru vždycky
+// automaticky prohrát remízu bez ohledu na její skutečné OČ. Když se z
+// oc nedá žádné číslo vytáhnout (např. humanoidní šablona s formulí
+// "Obr + kvalita zbroje" bez čísla), spadne na -999 — jasně nejnižší
+// prioritu, ne tiše hádanou nulu.
+//
+// Finální remízu (stejná i tahle náhradní hodnota) řeší stabilní řazení
+// podle token_id — je to jen ZOBRAZOVACÍ pořadí bez enforcementu (viz
+// zadání), "rozhodne PJ" z pravidel se tu nedá automatizovat, PJ pořadí
+// vidí a řídí ho ručně přes dalsi_tah.php.
 function dracak_vtt_iniciativa_poradi(PDO $pdo, int $mapaId): array
 {
     $stmt = $pdo->prepare(
         'SELECT ki.token_id, ki.hod, ki.modifikator, ki.vysledek, ki.akce_celkem, ki.akce_zbyvajici,
                 t.typ_entity, t.entita_id,
                 p.nazev AS postava_nazev, p.obratnost,
-                ni.nazev_instance
+                ni.nazev_instance, n.oc AS nestvura_oc
          FROM kolo_iniciativa ki
          JOIN tokeny t ON t.id = ki.token_id
          LEFT JOIN postavy p ON p.id = t.entita_id AND t.typ_entity = "postava"
          LEFT JOIN nestvura_instance ni ON ni.id = t.entita_id AND t.typ_entity = "nestvura_instance"
+         LEFT JOIN nestvury n ON n.id = ni.nestvura_id
          WHERE ki.mapa_id = ?'
     );
     $stmt->execute([$mapaId]);
@@ -84,12 +114,17 @@ function dracak_vtt_iniciativa_poradi(PDO $pdo, int $mapaId): array
         $r['akce_celkem'] = (int)$r['akce_celkem'];
         $r['akce_zbyvajici'] = (int)$r['akce_zbyvajici'];
         $r['label'] = $r['typ_entity'] === 'postava' ? $r['postava_nazev'] : $r['nazev_instance'];
-        $r['obratnost'] = $r['obratnost'] !== null ? (int)$r['obratnost'] : -1;
+        if ($r['typ_entity'] === 'postava') {
+            $bonus = dracak_vtt_obratnost_bonus($pdo, $r['obratnost'] !== null ? (int)$r['obratnost'] : null);
+        } else {
+            $bonus = dracak_vtt_prvni_cislo_se_znamenkem($r['nestvura_oc']);
+        }
+        $r['remiza_priorita'] = $bonus ?? -999;
     }
     unset($r);
     usort($radky, function (array $a, array $b): int {
         return $b['vysledek'] <=> $a['vysledek']
-            ?: $b['obratnost'] <=> $a['obratnost']
+            ?: $b['remiza_priorita'] <=> $a['remiza_priorita']
             ?: $a['token_id'] <=> $b['token_id'];
     });
     return $radky;
