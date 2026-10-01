@@ -38,6 +38,29 @@ foreach ($tokeny as &$t) {
 }
 unset($t);
 
+// Zdi (LoS/pohyb) — skrytá (viditelna_hracum=0) smí vidět jen PJ/admin,
+// stejný filtr jako u tokenů výš. udalosti.php stejnou podmínku vynucuje
+// i pro realtime polling, ať skrytá zeď neprosákne hráčům ani tudy.
+$stmt = dracak_db()->prepare(
+    'SELECT id, x1, y1, x2, y2, sirka_px, blokuje_pohyb, blokuje_vystrel, viditelna_hracum FROM zdi WHERE mapa_id = ?'
+);
+$stmt->execute([$mapaId]);
+$zdi = $stmt->fetchAll();
+if (!$isPjOrAdmin) {
+    $zdi = array_values(array_filter($zdi, fn($z) => (bool)$z['viditelna_hracum']));
+}
+foreach ($zdi as &$z) {
+    $z['x1'] = (float)$z['x1'];
+    $z['y1'] = (float)$z['y1'];
+    $z['x2'] = (float)$z['x2'];
+    $z['y2'] = (float)$z['y2'];
+    $z['sirka_px'] = (float)$z['sirka_px'];
+    $z['blokuje_pohyb'] = (bool)$z['blokuje_pohyb'];
+    $z['blokuje_vystrel'] = (bool)$z['blokuje_vystrel'];
+    $z['viditelna_hracum'] = (bool)$z['viditelna_hracum'];
+}
+unset($z);
+
 // Aktivní efekty pro všechny entity, co mají na téhle mapě token.
 $aktivniEfektyByEntity = [];
 if ($tokeny) {
@@ -199,6 +222,7 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
     <div id="mapWrap">
       <img id="mapImg" src="mapa_obrazek.php?id=<?= $mapaId ?>" style="display:block;max-width:none;">
       <svg id="gridSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:0;"></svg>
+      <svg id="zdiSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:5;"></svg>
       <svg id="rulerSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:140;"></svg>
       <?php foreach ($tokeny as $t):
           $entKey = $t['typ_entity'] . ':' . $t['entita_id'];
@@ -228,9 +252,13 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
     <button class="tbtn armed" type="button" id="tb-move" title="Vybrat / přesunout"><?php dracak_icon('move'); ?></button>
     <button class="tbtn" type="button" id="tb-ruler" title="Měřit vzdálenost"><?php dracak_icon('ruler'); ?></button>
     <button class="tbtn" type="button" id="tb-ping" title="Ukázat na mapu ostatním"><?php dracak_icon('crosshair'); ?></button>
+    <?php if ($isPjOrAdmin): ?>
+      <button class="tbtn" type="button" id="tb-zed" title="Kreslit zeď"><?php dracak_icon('brick-wall'); ?></button>
+    <?php endif; ?>
     <button class="tbtn" type="button" id="tb-kostky" title="Hodit kostkou"><?php dracak_icon('dices'); ?></button>
     <button class="tbtn" type="button" id="tb-log" title="Log"><?php dracak_icon('scroll-text'); ?></button>
     <?php if ($isPjOrAdmin): ?>
+      <button class="tbtn" type="button" id="tb-grid" title="Nastavení gridu"><?php dracak_icon('grid-2x2'); ?></button>
       <button class="tbtn" type="button" id="tb-kolo" title="Konec kola (odpočítat trvání efektů)"><?php dracak_icon('skip-forward'); ?></button>
       <button class="tbtn" type="button" id="tb-dalsi-tah" title="Další na tahu (iniciativa)"><?php dracak_icon('skip-forward'); ?></button>
     <?php endif; ?>
@@ -276,6 +304,52 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
     <input class="input" type="text" id="kostkyNotace" placeholder="2k6+2">
     <button class="btn btn-primary" id="hoditBtn" type="button" style="width:100%;margin-top:8px;">Hodit</button>
   </div>
+
+  <?php if ($isPjOrAdmin): ?>
+  <div class="popover" id="popover-zed">
+    <button class="close-x" data-close-popover><?php dracak_icon('x', 14); ?></button>
+    <h3>Zeď</h3>
+    <label for="zedSirka">Šířka (<span id="zedSirkaJednotka">px</span>)</label>
+    <input class="input" type="number" id="zedSirka" min="1" max="60" step="1" value="6">
+    <label style="display:flex;align-items:center;gap:6px;font-weight:400;">
+      <input type="checkbox" id="zedBlokujePohyb" checked> Blokuje pohyb
+    </label>
+    <label style="display:flex;align-items:center;gap:6px;font-weight:400;">
+      <input type="checkbox" id="zedBlokujeVystrel" checked> Blokuje výstřel/pohled
+    </label>
+    <label style="display:flex;align-items:center;gap:6px;font-weight:400;">
+      <input type="checkbox" id="zedViditelnaHracum" checked> Viditelná hráčům
+    </label>
+    <label style="display:flex;align-items:center;gap:6px;font-weight:400;">
+      <input type="checkbox" id="zedSnap" checked> Přichytávat ke gridu
+    </label>
+    <p class="note">Táhni po mapě a nakresli zeď. Klikni na existující zeď pro výběr a smazání.</p>
+    <button class="btn btn-ghost" type="button" id="zedSmazatBtn" style="width:100%;margin-top:8px;display:none;">Smazat vybranou zeď</button>
+  </div>
+
+  <div class="popover" id="popover-grid">
+    <button class="close-x" data-close-popover><?php dracak_icon('x', 14); ?></button>
+    <h3>Nastavení gridu</h3>
+    <label style="display:flex;align-items:center;gap:6px;font-weight:400;">
+      <input type="checkbox" id="gridZapnuty"> Grid zapnutý
+    </label>
+    <div id="gridNastaveniFields">
+      <label for="gridTypSelect">Typ</label>
+      <select class="input" id="gridTypSelect">
+        <option value="ctverec">Čtverec</option>
+        <option value="hex">Hex</option>
+      </select>
+      <label for="gridVelikostSlider">Velikost 1 sáhu (<span id="gridVelikostHodnota">70</span> px)</label>
+      <input type="range" id="gridVelikostSlider" min="20" max="200" step="1" value="70" style="width:100%;">
+      <label for="gridPosunXInput">Posun X</label>
+      <input class="input" type="number" id="gridPosunXInput" value="0">
+      <label for="gridPosunYInput">Posun Y</label>
+      <input class="input" type="number" id="gridPosunYInput" value="0">
+    </div>
+    <button class="btn btn-primary" type="button" id="gridUlozitBtn" style="width:100%;margin-top:10px;">Uložit</button>
+    <p class="note">Náhled na mapě se mění hned, uloží se až tlačítkem.</p>
+  </div>
+  <?php endif; ?>
 
   <div class="panel" id="panel-log">
     <button class="close-x" data-close-panel><?php dracak_icon('x', 16); ?></button>
@@ -334,10 +408,17 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
 <script type="module">
 const SVET_ID = <?= $svetId ?>;
 const MAPA_ID = <?= $mapaId ?>;
-const GRID_PX = <?= (int)($mapa['grid_velikost_px'] ?? 0) ?>;
-const GRID_TYPE = <?= json_encode($mapa['grid_typ'] ?? 'ctverec') ?>;
-const GRID_OFFSET_X = <?= (int)($mapa['grid_posun_x'] ?? 0) ?>;
-const GRID_OFFSET_Y = <?= (int)($mapa['grid_posun_y'] ?? 0) ?>;
+// Grid konsty jsou "let", ne "const" — grid panel (viz níž) je mění živě
+// při náhledu ještě před uložením, a po uložení/po eventu od jiného
+// klienta se přepíšou na novou trvalou hodnotu.
+let GRID_PX = <?= (int)($mapa['grid_velikost_px'] ?? 0) ?>;
+let GRID_TYPE = <?= json_encode($mapa['grid_typ'] ?? 'ctverec') ?>;
+let GRID_OFFSET_X = <?= (int)($mapa['grid_posun_x'] ?? 0) ?>;
+let GRID_OFFSET_Y = <?= (int)($mapa['grid_posun_y'] ?? 0) ?>;
+let gridSaved = {px: GRID_PX, typ: GRID_TYPE, offX: GRID_OFFSET_X, offY: GRID_OFFSET_Y};
+const ZDI_INITIAL = <?= json_encode(array_values($zdi), JSON_UNESCAPED_UNICODE) ?>;
+let zdiList = ZDI_INITIAL.slice();
+let zedVybranaId = null;
 let posledniUdalostId = <?= $posledniUdalostId ?>;
 const INVENTAR = <?= json_encode($inventarByEntity, JSON_UNESCAPED_UNICODE) ?>;
 const SVET_POSTAVY = <?= json_encode($svetPostavyKorist, JSON_UNESCAPED_UNICODE) ?>;
@@ -402,7 +483,144 @@ function renderGrid() {
   gridSvg.setAttribute('height', h);
   gridSvg.innerHTML = svg;
 }
-if (mapImgEl.complete) renderGrid(); else mapImgEl.addEventListener('load', renderGrid);
+// --- Zdi: vykreslení (barva podle blokuje_pohyb/blokuje_vystrel, skrytá
+// zeď jen v náhledu PJ jako přerušovaná a poloprůhledná — hráčům se sem
+// vůbec nedostane, viz filtr v mapa.php i udalosti.php). ---
+function renderZdi() {
+  const svg = document.getElementById('zdiSvg');
+  if (!svg) return;
+  const w = mapImgEl.naturalWidth || mapWrap.clientWidth;
+  const h = mapImgEl.naturalHeight || mapWrap.clientHeight;
+  if (!w || !h) return;
+  svg.setAttribute('width', w);
+  svg.setAttribute('height', h);
+  let html = '';
+  zdiList.forEach(z => {
+    let barva = '#a33b2e';
+    if (z.blokuje_pohyb && !z.blokuje_vystrel) barva = '#3b7a3b';
+    else if (!z.blokuje_pohyb && z.blokuje_vystrel) barva = '#3b5f8f';
+    const vybrana = z.id === zedVybranaId;
+    const sw = Math.max(2, z.sirka_px);
+    html += '<line x1="' + z.x1 + '" y1="' + z.y1 + '" x2="' + z.x2 + '" y2="' + z.y2 + '"'
+      + ' stroke="' + (vybrana ? '#ffd166' : barva) + '" stroke-width="' + sw + '" stroke-linecap="round"'
+      + ' opacity="' + (z.viditelna_hracum ? 1 : 0.55) + '"'
+      + (z.viditelna_hracum ? '' : ' stroke-dasharray="4 3"') + '/>';
+  });
+  svg.innerHTML = html;
+}
+
+// --- Magnetické body pro kreslení zdi: vrchol/střed hrany/střed buňky,
+// čtverec i hex (viz renderGrid() výš pro stejné "odd-r offset" hex rozložení). ---
+function squareSnapCandidates(px, py) {
+  const g = GRID_PX;
+  const offX = ((GRID_OFFSET_X % g) + g) % g;
+  const offY = ((GRID_OFFSET_Y % g) + g) % g;
+  const ci = Math.round((px - offX) / g);
+  const cj = Math.round((py - offY) / g);
+  const pts = [];
+  for (let di = -1; di <= 1; di++) {
+    for (let dj = -1; dj <= 1; dj++) {
+      const x0 = offX + (ci + di) * g, y0 = offY + (cj + dj) * g;
+      pts.push({x: x0, y: y0});
+      pts.push({x: x0 + g / 2, y: y0 + g / 2});
+      pts.push({x: x0 + g / 2, y: y0});
+      pts.push({x: x0, y: y0 + g / 2});
+    }
+  }
+  return pts;
+}
+function hexSnapCandidates(px, py) {
+  const size = GRID_PX;
+  const colStep = Math.sqrt(3) * size;
+  const rowStep = 1.5 * size;
+  const offX = ((GRID_OFFSET_X % colStep) + colStep) % colStep;
+  const offY = ((GRID_OFFSET_Y % rowStep) + rowStep) % rowStep;
+  const rowApprox = Math.round((py - offY) / rowStep);
+  const pts = [];
+  for (let row = rowApprox - 1; row <= rowApprox + 1; row++) {
+    const rowShift = (Math.abs(row % 2) === 1) ? colStep / 2 : 0;
+    const colApprox = Math.round((px - offX - rowShift) / colStep);
+    for (let col = colApprox - 1; col <= colApprox + 1; col++) {
+      const cx = offX + col * colStep + rowShift;
+      const cy = offY + row * rowStep;
+      pts.push({x: cx, y: cy});
+      const verts = [];
+      for (let i = 0; i < 6; i++) {
+        const a = Math.PI / 180 * (60 * i - 30);
+        verts.push({x: cx + size * Math.cos(a), y: cy + size * Math.sin(a)});
+      }
+      verts.forEach(v => pts.push(v));
+      for (let i = 0; i < 6; i++) {
+        const v1 = verts[i], v2 = verts[(i + 1) % 6];
+        pts.push({x: (v1.x + v2.x) / 2, y: (v1.y + v2.y) / 2});
+      }
+    }
+  }
+  return pts;
+}
+function snapPoint(px, py, enabled) {
+  if (!enabled || !GRID_PX || GRID_PX <= 0) return {x: px, y: py};
+  const candidates = GRID_TYPE === 'hex' ? hexSnapCandidates(px, py) : squareSnapCandidates(px, py);
+  const radius = GRID_PX * 0.25;
+  let best = null, bestDist = radius;
+  for (const c of candidates) {
+    const d = Math.hypot(c.x - px, c.y - py);
+    if (d < bestDist) { bestDist = d; best = c; }
+  }
+  return best || {x: px, y: py};
+}
+
+// --- Vzdálenost bodu od úsečky — pro výběr existující zdi klikem. ---
+function vzdalenostKUsecce(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const lenSq = dx * dx + dy * dy;
+  let t = lenSq > 0 ? ((px - x1) * dx + (py - y1) * dy) / lenSq : 0;
+  t = Math.max(0, Math.min(1, t));
+  const cx = x1 + t * dx, cy = y1 + t * dy;
+  return Math.hypot(px - cx, py - cy);
+}
+function najdiZedBlizkoBodu(px, py) {
+  let nejblizsi = null, nejmensiVzdalenost = Infinity;
+  zdiList.forEach(z => {
+    const prah = Math.max(6, z.sirka_px / 2 + 4);
+    const d = vzdalenostKUsecce(px, py, z.x1, z.y1, z.x2, z.y2);
+    if (d <= prah && d < nejmensiVzdalenost) { nejmensiVzdalenost = d; nejblizsi = z; }
+  });
+  return nejblizsi;
+}
+
+// 1 sáh = 1 buňka gridu (stejné jako ruler) — šířka zdi se zadává v
+// sáhách, když je grid aktivní, jinak jako syrové px (bez gridu nemáme
+// měřítko, viz drawRuler()).
+function zedSirkaPx() {
+  const input = document.getElementById('zedSirka');
+  if (!input) return 6;
+  const val = parseFloat(input.value) || 0;
+  return GRID_PX > 0 ? Math.max(1, val * GRID_PX) : Math.max(1, val);
+}
+function zedSnapEnabled() {
+  const chk = document.getElementById('zedSnap');
+  return !!(chk && chk.checked);
+}
+function aktualizovatZedJednotky() {
+  const input = document.getElementById('zedSirka');
+  const label = document.getElementById('zedSirkaJednotka');
+  if (!input) return;
+  if (GRID_PX > 0) {
+    input.min = '0.1'; input.max = '2'; input.step = '0.1'; input.value = '0.2';
+    if (label) label.textContent = 'sáhy';
+  } else {
+    input.min = '1'; input.max = '60'; input.step = '1'; input.value = '6';
+    if (label) label.textContent = 'px';
+  }
+}
+function drawZedPreview(a, b) {
+  if (!rulerSvg) return;
+  rulerSvg.innerHTML = '<line x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '"'
+    + ' stroke="#ffd166" stroke-width="' + Math.max(2, zedSirkaPx()) + '" stroke-linecap="round" opacity="0.6"/>';
+}
+
+if (mapImgEl.complete) { renderGrid(); renderZdi(); } else mapImgEl.addEventListener('load', () => { renderGrid(); renderZdi(); });
 
 function logLine(text) {
   if (!logList) return;
@@ -416,7 +634,11 @@ function postJson(url, body) {
 }
 
 // --- Popovery a panely ---
-function closeAllPopovers() { document.querySelectorAll('.popover.open').forEach(p => p.classList.remove('open')); document.querySelectorAll('.tbtn.active').forEach(b => b.classList.remove('active')); }
+function closeAllPopovers() {
+  zrusitZivyNahledGridu();
+  document.querySelectorAll('.popover.open').forEach(p => p.classList.remove('open'));
+  document.querySelectorAll('.tbtn.active').forEach(b => b.classList.remove('active'));
+}
 function togglePopover(id, btn) {
   const wasOpen = document.getElementById(id).classList.contains('open');
   closeAllPopovers();
@@ -437,12 +659,13 @@ if (tbKostky) tbKostky.addEventListener('click', () => togglePopover('popover-ko
 const tbLog = document.getElementById('tb-log');
 if (tbLog) tbLog.addEventListener('click', () => document.getElementById('panel-log').classList.toggle('open'));
 
-// --- Nástroje toolbaru: select/move (výchozí), ruler (měření), ping ---
+// --- Nástroje toolbaru: select/move (výchozí), ruler (měření), ping, zeď ---
 let currentTool = 'select';
 const toolButtons = {
   select: document.getElementById('tb-move'),
   ruler: document.getElementById('tb-ruler'),
   ping: document.getElementById('tb-ping'),
+  zed: document.getElementById('tb-zed'),
 };
 function setTool(tool) {
   currentTool = tool;
@@ -451,13 +674,94 @@ function setTool(tool) {
   }
   rulerStart = null;
   if (rulerSvg) rulerSvg.innerHTML = '';
+  zedDrawStart = null;
+  const popZed = document.getElementById('popover-zed');
+  if (popZed) {
+    if (tool === 'zed') {
+      popZed.style.top = toolButtons.zed.getBoundingClientRect().top + 'px';
+      popZed.classList.add('open');
+      toolButtons.zed.classList.add('active');
+      aktualizovatZedJednotky();
+    } else {
+      popZed.classList.remove('open');
+      toolButtons.zed.classList.remove('active');
+      zedVybranaId = null;
+      const btnSmazat = document.getElementById('zedSmazatBtn');
+      if (btnSmazat) btnSmazat.style.display = 'none';
+      renderZdi();
+    }
+  }
 }
 if (toolButtons.select) toolButtons.select.addEventListener('click', () => setTool('select'));
 if (toolButtons.ruler) toolButtons.ruler.addEventListener('click', () => setTool(currentTool === 'ruler' ? 'select' : 'ruler'));
 if (toolButtons.ping) toolButtons.ping.addEventListener('click', () => setTool(currentTool === 'ping' ? 'select' : 'ping'));
+if (toolButtons.zed) toolButtons.zed.addEventListener('click', () => setTool(currentTool === 'zed' ? 'select' : 'zed'));
+
+// --- Grid panel: živý náhled před uložením (viz zrusitZivyNahledGridu
+// volané z closeAllPopovers — zavření bez uložení náhled vrátí zpět). ---
+const gridZapnutyChk = document.getElementById('gridZapnuty');
+const gridTypSelect = document.getElementById('gridTypSelect');
+const gridVelikostSlider = document.getElementById('gridVelikostSlider');
+const gridVelikostHodnota = document.getElementById('gridVelikostHodnota');
+const gridPosunXInput = document.getElementById('gridPosunXInput');
+const gridPosunYInput = document.getElementById('gridPosunYInput');
+const gridNastaveniFields = document.getElementById('gridNastaveniFields');
+
+function zrusitZivyNahledGridu() {
+  if (!gridZapnutyChk) return;
+  GRID_PX = gridSaved.px; GRID_TYPE = gridSaved.typ; GRID_OFFSET_X = gridSaved.offX; GRID_OFFSET_Y = gridSaved.offY;
+  renderGrid();
+}
+function nacistGridFormular() {
+  if (!gridZapnutyChk) return;
+  gridZapnutyChk.checked = gridSaved.px > 0;
+  gridTypSelect.value = gridSaved.typ;
+  gridVelikostSlider.value = gridSaved.px > 0 ? gridSaved.px : 70;
+  gridVelikostHodnota.textContent = gridVelikostSlider.value;
+  gridPosunXInput.value = gridSaved.offX;
+  gridPosunYInput.value = gridSaved.offY;
+  gridNastaveniFields.style.display = gridZapnutyChk.checked ? '' : 'none';
+}
+function zivyNahledGridu() {
+  GRID_PX = gridZapnutyChk.checked ? parseInt(gridVelikostSlider.value, 10) : 0;
+  GRID_TYPE = gridTypSelect.value;
+  GRID_OFFSET_X = parseInt(gridPosunXInput.value, 10) || 0;
+  GRID_OFFSET_Y = parseInt(gridPosunYInput.value, 10) || 0;
+  renderGrid();
+}
+if (gridZapnutyChk) {
+  gridZapnutyChk.addEventListener('change', () => { gridNastaveniFields.style.display = gridZapnutyChk.checked ? '' : 'none'; zivyNahledGridu(); });
+  gridTypSelect.addEventListener('change', zivyNahledGridu);
+  gridVelikostSlider.addEventListener('input', () => { gridVelikostHodnota.textContent = gridVelikostSlider.value; zivyNahledGridu(); });
+  gridPosunXInput.addEventListener('input', zivyNahledGridu);
+  gridPosunYInput.addEventListener('input', zivyNahledGridu);
+}
+const tbGrid = document.getElementById('tb-grid');
+if (tbGrid) tbGrid.addEventListener('click', () => { nacistGridFormular(); togglePopover('popover-grid', tbGrid); });
+const gridUlozitBtn = document.getElementById('gridUlozitBtn');
+if (gridUlozitBtn) {
+  gridUlozitBtn.addEventListener('click', () => {
+    const novy = {
+      px: gridZapnutyChk.checked ? parseInt(gridVelikostSlider.value, 10) : 0,
+      typ: gridTypSelect.value,
+      offX: parseInt(gridPosunXInput.value, 10) || 0,
+      offY: parseInt(gridPosunYInput.value, 10) || 0,
+    };
+    postJson('api/mapa_grid_uprava.php', {mapa_id: MAPA_ID, grid_velikost_px: novy.px, grid_typ: novy.typ, grid_posun_x: novy.offX, grid_posun_y: novy.offY})
+      .then(d => {
+        if (d.error) { logLine('Chyba: ' + d.error); return; }
+        gridSaved = novy;
+        GRID_PX = novy.px; GRID_TYPE = novy.typ; GRID_OFFSET_X = novy.offX; GRID_OFFSET_Y = novy.offY;
+        aktualizovatZedJednotky();
+        closeAllPopovers();
+        logLine('Nastavení gridu uloženo.');
+      });
+  });
+}
 
 // --- Ruler: čistě klientská pomůcka, nic se neukládá ani nesynchronizuje ---
 let rulerStart = null, rulerClearTimer = null;
+let zedDrawStart = null;
 function rulerPoint(e) {
   const r = mapWrap.getBoundingClientRect();
   return {x: e.clientX - r.left, y: e.clientY - r.top};
@@ -537,6 +841,24 @@ if (mapWrap) {
       drawRuler(rulerStart, rulerStart);
       return;
     }
+    if (currentTool === 'zed') {
+      if (e.target.closest('.vtt-token')) return;
+      const p = rulerPoint(e);
+      const blizkaZed = najdiZedBlizkoBodu(p.x, p.y);
+      const btnSmazat = document.getElementById('zedSmazatBtn');
+      if (blizkaZed) {
+        zedVybranaId = blizkaZed.id;
+        if (btnSmazat) btnSmazat.style.display = 'block';
+        renderZdi();
+        return;
+      }
+      zedVybranaId = null;
+      if (btnSmazat) btnSmazat.style.display = 'none';
+      renderZdi();
+      zedDrawStart = snapPoint(p.x, p.y, zedSnapEnabled());
+      drawZedPreview(zedDrawStart, zedDrawStart);
+      return;
+    }
     if (currentTool !== 'select') return;
     const el = e.target.closest('.vtt-token');
     if (!el || el.dataset.owned !== '1') return;
@@ -554,6 +876,12 @@ if (mapWrap) {
       drawRuler(rulerStart, rulerPoint(e));
       return;
     }
+    if (currentTool === 'zed') {
+      if (!zedDrawStart) return;
+      const p = rulerPoint(e);
+      drawZedPreview(zedDrawStart, snapPoint(p.x, p.y, zedSnapEnabled()));
+      return;
+    }
     if (!dragEl) return;
     if (!dragMoved && (Math.abs(e.clientX - dragStartClientX) > 5 || Math.abs(e.clientY - dragStartClientY) > 5)) {
       dragMoved = true;
@@ -565,9 +893,36 @@ if (mapWrap) {
     dragEl.style.left = x + 'px';
     dragEl.style.top = y + 'px';
   });
-  window.addEventListener('mouseup', () => {
+  window.addEventListener('mouseup', (e) => {
     if (currentTool === 'ruler') {
       if (rulerStart) { rulerStart = null; clearRulerSoon(); }
+      return;
+    }
+    if (currentTool === 'zed') {
+      if (!zedDrawStart) return;
+      const start = zedDrawStart;
+      zedDrawStart = null;
+      const p = rulerPoint(e);
+      const end = snapPoint(p.x, p.y, zedSnapEnabled());
+      if (rulerSvg) rulerSvg.innerHTML = '';
+      const dist = Math.hypot(end.x - start.x, end.y - start.y);
+      if (dist < 3) return;
+      const sirkaPx = zedSirkaPx();
+      const blokujePohyb = document.getElementById('zedBlokujePohyb').checked;
+      const blokujeVystrel = document.getElementById('zedBlokujeVystrel').checked;
+      const viditelnaHracum = document.getElementById('zedViditelnaHracum').checked;
+      postJson('api/zed_pridat.php', {
+        mapa_id: MAPA_ID, x1: start.x, y1: start.y, x2: end.x, y2: end.y,
+        sirka_px: sirkaPx, blokuje_pohyb: blokujePohyb, blokuje_vystrel: blokujeVystrel, viditelna_hracum: viditelnaHracum,
+      }).then(d => {
+        if (d.error) { logLine('Chyba: ' + d.error); return; }
+        zdiList.push({
+          id: d.id, x1: start.x, y1: start.y, x2: end.x, y2: end.y, sirka_px: sirkaPx,
+          blokuje_pohyb: blokujePohyb, blokuje_vystrel: blokujeVystrel, viditelna_hracum: viditelnaHracum,
+        });
+        posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
+        renderZdi();
+      });
       return;
     }
     if (!dragEl) return;
@@ -748,6 +1103,19 @@ if (smazatBtn) {
       .then(d => { if (d.error) { logLine('Chyba: ' + d.error); return; } location.reload(); });
   });
 }
+const zedSmazatBtn = document.getElementById('zedSmazatBtn');
+if (zedSmazatBtn) {
+  zedSmazatBtn.addEventListener('click', () => {
+    if (zedVybranaId === null) return;
+    postJson('api/zed_smazat.php', {id: zedVybranaId}).then(d => {
+      if (d.error) { logLine('Chyba: ' + d.error); return; }
+      zdiList = zdiList.filter(z => z.id !== zedVybranaId);
+      zedVybranaId = null;
+      zedSmazatBtn.style.display = 'none';
+      renderZdi();
+    });
+  });
+}
 const koloBtn = document.getElementById('tb-kolo');
 if (koloBtn) {
   koloBtn.addEventListener('click', () => {
@@ -811,6 +1179,24 @@ function applyEvent(u) {
     }
   } else if (u.typ === 'ping') {
     if (u.mapa_id == MAPA_ID) zobrazPing(u.payload.x, u.payload.y, u.payload.jmeno || '');
+  } else if (u.typ === 'zed_pridana') {
+    if (u.mapa_id == MAPA_ID && !zdiList.some(z => z.id === u.payload.id)) {
+      zdiList.push(u.payload);
+      renderZdi();
+    }
+  } else if (u.typ === 'zed_smazana') {
+    if (u.mapa_id == MAPA_ID) {
+      zdiList = zdiList.filter(z => z.id !== u.payload.id);
+      if (zedVybranaId === u.payload.id) zedVybranaId = null;
+      renderZdi();
+    }
+  } else if (u.typ === 'mapa_grid_zmena') {
+    if (u.mapa_id == MAPA_ID) {
+      gridSaved = {px: u.payload.grid_velikost_px || 0, typ: u.payload.grid_typ, offX: u.payload.grid_posun_x, offY: u.payload.grid_posun_y};
+      GRID_PX = gridSaved.px; GRID_TYPE = gridSaved.typ; GRID_OFFSET_X = gridSaved.offX; GRID_OFFSET_Y = gridSaved.offY;
+      renderGrid();
+      aktualizovatZedJednotky();
+    }
   } else if (['token_pridan', 'token_smazan', 'efekt_aplikovan', 'efekt_konci', 'iniciativa_hozena', 'kolo_nove', 'tah_zmena', 'predmet_pouzit', 'predmet_loot'].includes(u.typ)) {
     location.reload();
   }
