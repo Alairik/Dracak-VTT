@@ -380,6 +380,12 @@ dracak_vtt_page_start($svet['nazev'], $user);
         <?php endforeach; ?>
       </div>
     <?php endif; ?>
+    <div class="card elev-sm" style="max-width:520px;margin-top:14px;">
+      <p style="margin:0 0 10px;">
+        <a class="btn btn-primary" href="postava_nova.php?id=<?= $svetId ?>">+ Nová postava (podle pravidel — rasa, povolání, hod na atributy)</a>
+      </p>
+      <p class="note" style="margin:0;">Krok za krokem nahodí atributy i život podle pravidel (h104), hod jde vždycky ručně přepsat. Formulář níž je rychlá/nouzová cesta beze hodu — hodí se třeba na bleskové založení NPC.</p>
+    </div>
     <form method="post" class="card elev-sm" style="max-width:520px;margin-top:14px;">
       <input type="hidden" name="akce" value="nova_postava">
       <div class="field"><label for="p_nazev">Jméno postavy *</label>
