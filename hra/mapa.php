@@ -261,6 +261,7 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
       <button class="tbtn" type="button" id="tb-grid" title="Nastavení gridu"><?php dracak_icon('grid-2x2'); ?></button>
       <button class="tbtn" type="button" id="tb-kolo" title="Konec kola (odpočítat trvání efektů)"><?php dracak_icon('skip-forward'); ?></button>
       <button class="tbtn" type="button" id="tb-dalsi-tah" title="Další na tahu (iniciativa)"><?php dracak_icon('skip-forward'); ?></button>
+      <button class="tbtn" type="button" id="tb-krok-zpet" title="Krok zpět (vrátit poslední akci)"><?php dracak_icon('undo-2'); ?></button>
     <?php endif; ?>
   </div>
 
@@ -1183,6 +1184,13 @@ if (tbDalsiTah) {
       .then(d => { if (d.error) { logLine('Chyba: ' + d.error); return; } location.reload(); });
   });
 }
+const tbKrokZpet = document.getElementById('tb-krok-zpet');
+if (tbKrokZpet) {
+  tbKrokZpet.addEventListener('click', () => {
+    postJson('api/krok_zpet.php', {mapa_id: MAPA_ID})
+      .then(d => { if (d.error) { logLine('Chyba: ' + d.error); return; } location.reload(); });
+  });
+}
 
 // --- Kostky (dice-box vizualizace + autoritativní server výsledek) ---
 let diceBox = null;
@@ -1240,7 +1248,7 @@ function applyEvent(u) {
       renderGrid();
       aktualizovatZedJednotky();
     }
-  } else if (['token_pridan', 'token_smazan', 'efekt_aplikovan', 'efekt_konci', 'iniciativa_hozena', 'kolo_nove', 'tah_zmena', 'predmet_pouzit', 'predmet_loot'].includes(u.typ)) {
+  } else if (['token_pridan', 'token_smazan', 'efekt_aplikovan', 'efekt_konci', 'iniciativa_hozena', 'kolo_nove', 'tah_zmena', 'predmet_pouzit', 'predmet_loot', 'krok_zpet'].includes(u.typ)) {
     location.reload();
   }
 }
