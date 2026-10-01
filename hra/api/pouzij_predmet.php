@@ -47,6 +47,24 @@ if (!dracak_vtt_can_edit_hp($user, $typEntity, $entity)) {
     echo json_encode(['error' => 'Tenhle předmět použít nesmíš.']);
     exit;
 }
+// Pořadí tahů (viz includes/vtt.php, dracak_vtt_je_na_tahu) — stejná
+// logika jako hra/api/token_presun.php. Entita (postava) nemá mapa_id
+// přímo (na rozdíl od nestvura_instance) a teoreticky může mít token na
+// víc mapách zároveň (DB to nijak nevynucuje) — radši projít VŠECHNY
+// jeho tokeny napříč mapami a zamítnout, pokud na KTERÉKOLI z nich
+// probíhá boj (kolo_stav), kde zrovna není na tahu, než se spoléhat na
+// mapa_id poslané klientem (to níž slouží jen pro log a kontrolu
+// dosahu, ne pro tenhle bezpečnostní check — klient by ho mohl
+// vynechat/zfalšovat a enforcement by tím obešel).
+$stmtEntityTokeny = $pdo->prepare('SELECT mapa_id, id FROM tokeny WHERE typ_entity = ? AND entita_id = ?');
+$stmtEntityTokeny->execute([$typEntity, $entitaId]);
+foreach ($stmtEntityTokeny->fetchAll() as $entityTokenRadek) {
+    if (!dracak_vtt_je_na_tahu($user, (int)$entityTokenRadek['mapa_id'], (int)$entityTokenRadek['id'])) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Teď nejsi na tahu — předmět/kouzlo teď použít nesmíš.']);
+        exit;
+    }
+}
 
 $cilEntity = dracak_vtt_entity_row($cilTypEntity, $cilEntitaId);
 if (!$cilEntity) {
@@ -87,6 +105,31 @@ if (!$katalog) {
     http_response_code(404);
     echo json_encode(['error' => 'Položka nenalezena v katalogu.']);
     exit;
+}
+
+// Kontrola dosahu — jen když je zadaný SKUTEČNÝ cíl (jiný token než
+// uživatel; "použij na sobě", tedy cíl == uživatel, dosah neomezuje
+// nikdy) A položka má parsovatelný číselný dosah v sáhách (viz
+// includes/vtt_predmety.php, dracak_vtt_polozka_dosah_sahy — lektvary a
+// neparsovatelné/slovní dosahy typu "dotek"/"doslech"/rozsahy se tu
+// mlčky přeskočí, viz komentář tam). Mapa se bere z mapa_id poslaného
+// klientem (mapa.php ho posílá vždy) — pro dosah to stačí (na rozdíl od
+// pořadí tahů výš to NENÍ bezpečnostní hranice, jen fyzikální
+// plausibilita; zfalšovaná mapa_id by nanejvýš obešla měření
+// vzdálenosti, ne povolení/zákaz akce samotné).
+$maSkutecnyCil = $cilTypEntity !== $typEntity || $cilEntitaId !== $entitaId;
+if ($maSkutecnyCil && $pozadovanaMapaId !== null) {
+    $dosahSahy = dracak_vtt_polozka_dosah_sahy($typPolozky, $katalog);
+    if ($dosahSahy !== null) {
+        $vzdalenostSahy = dracak_vtt_vzdalenost_tokenu_sahy($pdo, $pozadovanaMapaId, $typEntity, $entitaId, $cilTypEntity, $cilEntitaId);
+        if ($vzdalenostSahy !== null && $vzdalenostSahy > $dosahSahy + 0.01) {
+            http_response_code(422);
+            echo json_encode([
+                'error' => sprintf('Cíl je mimo dosah — %.1f sáhů daleko, %s má dosah %.1f sáhů.', $vzdalenostSahy, $katalog['nazev'], $dosahSahy),
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+    }
 }
 
 // Magenergie (content/pravidla-hrac.html h297/h179 a další — viz migrace

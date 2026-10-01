@@ -29,6 +29,15 @@ if (!dracak_vtt_can_move_token($user, $token)) {
     echo json_encode(['error' => 'Tímhle tokenem hýbat nesmíš.']);
     exit;
 }
+// Pořadí tahů (viz includes/vtt.php, dracak_vtt_je_na_tahu): probíhá-li
+// na téhle mapě boj (řádek v kolo_stav), smí token hýbat jen hráč,
+// jehož token je zrovna aktivni_token_id — pj/admin výjimka je uvnitř
+// helperu. Bez kolo_stav (boj neprobíhá) zůstává volný pohyb jako dřív.
+if (!dracak_vtt_je_na_tahu($user, (int)$token['mapa_id'], $tokenId)) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Teď nejsi na tahu — tímhle tokenem teď hýbat nesmíš.']);
+    exit;
+}
 
 $pdo->beginTransaction();
 try {

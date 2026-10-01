@@ -198,6 +198,7 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
   .vtt-token .puck { width:40px; height:40px; border-radius:50%; color:#fff; display:flex; align-items:center;
                       justify-content:center; font-size:11px; font-weight:600; box-shadow:0 2px 6px rgba(0,0,0,.5); }
   .vtt-token.dead .puck { filter: grayscale(1); opacity: .55; }
+  .vtt-token.not-turn .puck { opacity: .6; box-shadow:0 0 0 2px rgba(255,255,255,.25) inset; }
   .vtt-token .hp { font-size:10px; background:rgba(0,0,0,.65); color:#fff; border-radius:4px; margin-top:2px; padding:1px 3px; }
   .vtt-token .fx { font-size:9px; background:rgba(0,0,0,.55); color:#fdd; border-radius:4px; margin-top:1px; padding:1px 3px; }
 
@@ -234,16 +235,23 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
       <?php foreach ($tokeny as $t):
           $entKey = $t['typ_entity'] . ':' . $t['entita_id'];
           $efektyText = implode(', ', $aktivniEfektyByEntity[$entKey] ?? []);
+          // Pořadí tahů — čistě klientská indikace (server je autoritativní
+          // nezávisle na tomhle, viz hra/api/token_presun.php/pouzij_predmet.php
+          // a dracak_vtt_je_na_tahu v includes/vtt.php, stejná logika tady
+          // zopakovaná jen pro vykreslení). Bez kolo_stav (boj neprobíhá) je
+          // "na tahu" vždycky true — volno jako dnes.
+          $naTahu = $isPjOrAdmin || !$koloStav || (int)($koloStav['aktivni_token_id'] ?? 0) === (int)$t['id'];
       ?>
-        <div class="vtt-token<?= ($t['hp'] !== null && (int)$t['hp'] <= 0) ? ' dead' : '' ?>"
+        <div class="vtt-token<?= ($t['hp'] !== null && (int)$t['hp'] <= 0) ? ' dead' : '' ?><?= (!$naTahu && $t['owned']) ? ' not-turn' : '' ?>"
              data-id="<?= (int)$t['id'] ?>" data-owned="<?= $t['owned'] ? 1 : 0 ?>"
+             data-na-tahu="<?= $naTahu ? 1 : 0 ?>"
              data-typ-entity="<?= htmlspecialchars($t['typ_entity']) ?>" data-entita-id="<?= (int)$t['entita_id'] ?>"
              data-label="<?= htmlspecialchars((string)$t['label']) ?>"
              data-hp="<?= $t['hp'] !== null ? (int)$t['hp'] : '' ?>"
              data-magenergie="<?= $t['magenergie'] !== null ? (int)$t['magenergie'] : '' ?>"
              data-max-magenergie="<?= ($t['max_magenergie'] !== null && (int)$t['max_magenergie'] > 0) ? (int)$t['max_magenergie'] : '' ?>"
-             title="<?= htmlspecialchars((string)$t['label']) ?>"
-             style="left:<?= (int)$t['x'] ?>px;top:<?= (int)$t['y'] ?>px;cursor:<?= $t['owned'] ? 'grab' : 'default' ?>;z-index:<?= (int)$t['z_poradi'] ?>;">
+             title="<?= htmlspecialchars((string)$t['label']) . (!$naTahu && $t['owned'] ? ' (není na tahu)' : '') ?>"
+             style="left:<?= (int)$t['x'] ?>px;top:<?= (int)$t['y'] ?>px;cursor:<?= ($t['owned'] && $naTahu) ? 'grab' : ($t['owned'] ? 'not-allowed' : 'default') ?>;z-index:<?= (int)$t['z_poradi'] ?>;">
           <div class="puck" style="background:<?= $t['typ_entity'] === 'postava' ? 'var(--color-accent-600, #7a3b2e)' : '#4a2b2b' ?>;">
             <?= htmlspecialchars(mb_substr((string)$t['label'], 0, 2)) ?>
           </div>
@@ -929,7 +937,11 @@ if (mapWrap) {
     }
     if (currentTool !== 'select') return;
     const el = e.target.closest('.vtt-token');
-    if (!el || el.dataset.owned !== '1') return;
+    // data-na-tahu je jen klientská pomůcka (viz PHP výš, $naTahu) —
+    // server (hra/api/token_presun.php) je autoritativní nezávisle na
+    // týhle kontrole, tahle jen vizuálně zamezí drag, ať to hráč nezkouší
+    // nadarmo a nedostane zbytečnou chybu z backendu.
+    if (!el || el.dataset.owned !== '1' || el.dataset.naTahu === '0') return;
     dragEl = el;
     dragMoved = false;
     dragStartClientX = e.clientX;

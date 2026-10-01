@@ -45,6 +45,39 @@ function dracak_vtt_can_move_token(array $user, array $token): bool
     return $vlastnik !== false && (int)$vlastnik === (int)$user['id'];
 }
 
+// Vynucení pořadí tahů v boji (includes/vtt_iniciativa.php, kolo_stav/
+// kolo_iniciativa, content/pravidla-hrac.html h1619-h1625 "Rozšířený
+// soubojový systém"). pj/admin smí jednat kdykoliv za kohokoliv (stejná
+// výjimka jako dracak_vtt_can_move_token výš) — typicky nestvůry nebo
+// oprava stavu. Hráč smí jednat tokenem jen když je zrovna
+// kolo_stav.aktivni_token_id PRO DANOU MAPU. Když pro mapu kolo_stav
+// vůbec neexistuje (boj na ní neprobíhá), vrací true — dnešní volné
+// chování se neomezuje jen proto, že existuje boj JINDE/JINDE NA MAPĚ.
+//
+// Záměrně NEváže se na kolo_iniciativa.akce_zbyvajici (ubývání akcí) —
+// to číslo dnes neznamená "kolik API volání smí token ještě udělat",
+// ale kolikrát PJ ještě musí zavolat hra/api/dalsi_tah.php, než se
+// přesune na dalšího (viz tam: nově aktivní token má na začátku svého
+// tahu VŽDY plné akce_zbyvajici, až teprve DALŠÍ zavolání dalsi_tah.php
+// mu je sníží) — vázat pohyb/použití předmětu na tohle číslo by
+// vyžadovalo nový mechanismus (odečet při KAŽDÉ hráčské akci), který
+// dalsi_tah.php/kolo_konec.php dnes neimplementují a zadání týhle dávky
+// o něj nežádá. Enforcement je tak čistě "je tenhle token zrovna na
+// řadě", ne kolik mu zbývá akcí v rámci tahu.
+function dracak_vtt_je_na_tahu(array $user, int $mapaId, int $tokenId): bool
+{
+    if (in_array($user['role'], ['admin', 'pj'], true)) {
+        return true;
+    }
+    $stmt = dracak_db()->prepare('SELECT aktivni_token_id FROM kolo_stav WHERE mapa_id = ?');
+    $stmt->execute([$mapaId]);
+    $koloStav = $stmt->fetch();
+    if (!$koloStav) {
+        return true;
+    }
+    return (int)($koloStav['aktivni_token_id'] ?? 0) === $tokenId;
+}
+
 function dracak_vtt_entity_row(string $typEntity, int $entitaId): ?array
 {
     $table = $typEntity === 'nestvura_instance' ? 'nestvura_instance' : 'postavy';

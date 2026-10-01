@@ -159,6 +159,104 @@ function dracak_vtt_entity_svet_mapa(string $typEntity, array $entity): array
     return ['svet_id' => $svetId !== false ? (int)$svetId : 0, 'mapa_id' => (int)$entity['mapa_id']];
 }
 
+// Vytáhne číselný dosah v SÁZÍCH z volného textu kouzla.dosah/predmety.dosah
+// ("5 sáhů", "1 sáh", "1,5 sáhu", "0", "10") — ALE JEN když je CELÝ
+// (ořezaný) text přesně tenhle tvar: číslo (desetinná čárka i tečka —
+// reálná data v migraci 0006 píšou čárku, "1,5 sáhu") + volitelně
+// "sáh"/"sáhy"/"sáhů"/"sáhu", nic jiného.
+//
+// Ověřeno proti SKUTEČNÝM datům (SELECT DISTINCT dosah FROM kouzla, 699
+// řádků reálného obsahu z database/drd-db-full-v1.sql — testovací DB
+// dracak_test má jen pár fixture řádků, nereprezentativní): kromě čistých
+// čísel/sáhů tam je spousta NEPARSOVATELNÝCH tvarů — rozsahy ("1-30
+// sáhů", "60-600 sáhů", "17/34 sáhů"), vzorce se škálováním ("2 sáhy za
+// úroveň kouzelníka", "10 sáhů + 1 sáh za každou úroveň kouzelníka"),
+// jiné jednotky ("5 mil", "1 míle"), slovní dosahy ("dotek", "dotyk",
+// "doslech", "dohled", "poloměr Charizmatu") a popisné věty ("musí mít
+// vidět do očí", "viz níže"). Všechny tyhle NEPARSUJEME — vracíme null a
+// kontrola dosahu se v hra/api/pouzij_predmet.php pro ně mlčky
+// přeskočí (viz CLAUDE.md — "nehádat herní mechaniku", radši žádná
+// kontrola než špatně uhodnuté číslo). "0" je přitom validní a
+// smysluplné: h1612 v content/pravidla-hrac.html definuje "dosah... 0 =
+// jen na sebe", takže se parsuje jako 0 sáhů (cíl jiný než uživatel pak
+// logicky vždy spadne mimo dosah, přesně jak má).
+function dracak_vtt_parsuj_dosah_sahy(?string $text): ?float
+{
+    if ($text === null) {
+        return null;
+    }
+    $t = trim($text);
+    if ($t === '') {
+        return null;
+    }
+    if (!preg_match('/^(\d+(?:[.,]\d+)?)\s*(?:sáh[yůu]?)?$/u', $t, $m)) {
+        return null;
+    }
+    return (float)str_replace(',', '.', $m[1]);
+}
+
+// Dosah POLOŽKY v sáhách, nebo null (lektvar nemá sloupec dosah vůbec —
+// lektvary.dosah v DB neexistuje; nebo text není parsovatelný, viz výš).
+// Střelné/vrhací zbraně: dostrel_efektivni/dostrel_maximalni jsou v DB
+// už ČÍSELNÉ sloupce (SMALLINT, migrace 0006_zraneni_dosah_zbrani.sql),
+// žádné parsování textu netřeba — berou se jako tvrdá hranice dosahu
+// místo sloupce dosah (ten je podle schématu "dosah NA BLÍZKO", u
+// střelných/vrhacích zbraní se nepoužívá). dostrel_maximalni (nad
+// efektivní = postih -5 k útoku, viz komentář u sloupce) je přednější,
+// protože je to skutečná fyzická hranice, kam zbraň vůbec dostřelí;
+// postih za překročení efektivního dostřelu tahle kontrola neřeší (to
+// je otázka úspěšnosti zásahu, ne legality použití).
+//
+// POZOR: v produkční DB (database/drd-db-full-v1.sql) i v testovací
+// dracak_test jsou VŠECHNY řádky predmety.dosah/zraneni/
+// dostrel_efektivni/dostrel_maximalni dnes NULL — migrace 0006 sloupce
+// jen PŘIDALA, žádná další migrace je nenaplnila daty. Tahle funkce pro
+// predmety proto v praxi dnes vždy vrátí null (kontrola se přeskočí) —
+// až se zbraním dosah/dostřel doplní, začne fungovat bez další úpravy.
+function dracak_vtt_polozka_dosah_sahy(string $typPolozky, array $katalog): ?float
+{
+    if ($typPolozky === 'kouzlo') {
+        return dracak_vtt_parsuj_dosah_sahy($katalog['dosah'] ?? null);
+    }
+    if ($typPolozky === 'predmet') {
+        if (!empty($katalog['dostrel_maximalni'])) {
+            return (float)$katalog['dostrel_maximalni'];
+        }
+        if (!empty($katalog['dostrel_efektivni'])) {
+            return (float)$katalog['dostrel_efektivni'];
+        }
+        return dracak_vtt_parsuj_dosah_sahy($katalog['dosah'] ?? null);
+    }
+    return null;
+}
+
+// Vzdálenost dvou tokenů NA STEJNÉ MAPĚ v sáhách — stejný princip jako
+// drawRuler() v hra/mapa.php ("1 buňka gridu = 1 sáh", content/pravidla-
+// hrac.html h1621: "pro souboj platí, že jeden hex vždy odpovídá jednomu
+// sáhu"). Vrací null, když to nejde spočítat (ne chyba, jen "nelze
+// ověřit"): mapa bez nastaveného gridu (grid_velikost_px <= 0 — stejně
+// jako ruler bez gridu zůstává v syrových px, protože bez gridu není
+// měřítko px->sáh) nebo některá z entit na týhle mapě token nemá.
+function dracak_vtt_vzdalenost_tokenu_sahy(PDO $pdo, int $mapaId, string $typA, int $entitaA, string $typB, int $entitaB): ?float
+{
+    $stmt = $pdo->prepare('SELECT grid_velikost_px FROM mapy WHERE id = ?');
+    $stmt->execute([$mapaId]);
+    $gridPx = (int)$stmt->fetchColumn();
+    if ($gridPx <= 0) {
+        return null;
+    }
+    $stmt = $pdo->prepare('SELECT x, y FROM tokeny WHERE mapa_id = ? AND typ_entity = ? AND entita_id = ? LIMIT 1');
+    $stmt->execute([$mapaId, $typA, $entitaA]);
+    $tokenA = $stmt->fetch();
+    $stmt->execute([$mapaId, $typB, $entitaB]);
+    $tokenB = $stmt->fetch();
+    if (!$tokenA || !$tokenB) {
+        return null;
+    }
+    $distPx = hypot((int)$tokenB['x'] - (int)$tokenA['x'], (int)$tokenB['y'] - (int)$tokenA['y']);
+    return $distPx / $gridPx;
+}
+
 // Uloží novou hodnotu aktualni_hp entity se stejným ořezem 0..max_hp jako
 // hra/api/hp_uprava.php (max_hp = 0 znamená "neznámé", tam se neořezává
 // nahoru). Vrací [nove_hp, max_hp].
