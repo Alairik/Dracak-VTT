@@ -84,3 +84,11 @@
   `pravidla-bestiar.html` — tam je zdroj pravdy, ne intuice podle jiných
   systémů (D&D apod.). Než se cokoliv počítá nebo staví, nejdřív si
   najít odpovídající pasáž v těchhle souborech.
+- **"Homebrew" v komentářích `drd-db-full-v1.sql` (Stopař stínů, Panoš,
+  Střelec, Divoch, Šaman a další rozšířená povolání/rasy) neznamená
+  "nestandardní doplněk, který stojí bokem."** Je to jen odkaz na to, že
+  daný obsah je z „Pravidel pro pokročilé" místo základní příručky —
+  pořád má konkrétní citaci (h935, h1076…) a je to plnohodnotná součást
+  pravidel. Nikdy to neber jako důvod tohle povolání/rasu/mechaniku
+  vynechat, odložit na později nebo řešit jinak než core obsah — jediný
+  rozdíl je, kde v `content/pravidla-*.html` to hledat.
