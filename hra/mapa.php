@@ -570,6 +570,39 @@ function snapPoint(px, py, enabled) {
   return best || {x: px, y: py};
 }
 
+// --- Magnet pro tokeny: vždycky střed nejbližší buňky (ne volitelné
+// 3 body jako u zdi) — token patří do buňky, ne kamkoliv na ni. Bez
+// gridu žádný magnet není (stejný princip jako jinde — bez gridu
+// nemáme měřítko ani buňky, na co by se to chytalo). ---
+function gridCellCenter(px, py) {
+  if (!GRID_PX || GRID_PX <= 0) return {x: px, y: py};
+  if (GRID_TYPE === 'hex') {
+    const size = GRID_PX;
+    const colStep = Math.sqrt(3) * size;
+    const rowStep = 1.5 * size;
+    const offX = ((GRID_OFFSET_X % colStep) + colStep) % colStep;
+    const offY = ((GRID_OFFSET_Y % rowStep) + rowStep) % rowStep;
+    const rowApprox = Math.round((py - offY) / rowStep);
+    let best = null, bestDist = Infinity;
+    for (let row = rowApprox - 1; row <= rowApprox + 1; row++) {
+      const rowShift = (Math.abs(row % 2) === 1) ? colStep / 2 : 0;
+      const colApprox = Math.round((px - offX - rowShift) / colStep);
+      for (let col = colApprox - 1; col <= colApprox + 1; col++) {
+        const cx = offX + col * colStep + rowShift;
+        const cy = offY + row * rowStep;
+        const d = Math.hypot(cx - px, cy - py);
+        if (d < bestDist) { bestDist = d; best = {x: cx, y: cy}; }
+      }
+    }
+    return best;
+  }
+  const offX = ((GRID_OFFSET_X % GRID_PX) + GRID_PX) % GRID_PX;
+  const offY = ((GRID_OFFSET_Y % GRID_PX) + GRID_PX) % GRID_PX;
+  const i = Math.floor((px - offX) / GRID_PX);
+  const j = Math.floor((py - offY) / GRID_PX);
+  return {x: offX + i * GRID_PX + GRID_PX / 2, y: offY + j * GRID_PX + GRID_PX / 2};
+}
+
 // --- Vzdálenost bodu od úsečky — pro výběr existující zdi klikem. ---
 function vzdalenostKUsecce(px, py, x1, y1, x2, y2) {
   const dx = x2 - x1, dy = y2 - y1;
@@ -888,10 +921,19 @@ if (mapWrap) {
     }
     if (!dragMoved) return;
     const wrapRect = mapWrap.getBoundingClientRect();
-    const x = e.clientX - wrapRect.left - dragOffsetX;
-    const y = e.clientY - wrapRect.top - dragOffsetY;
-    dragEl.style.left = x + 'px';
-    dragEl.style.top = y + 'px';
+    if (GRID_PX > 0) {
+      // S gridem token vždycky sedí na střed buňky — grab point uvnitř
+      // pucku (dragOffsetX/Y) se tu záměrně ignoruje, token je diskrétní
+      // obyvatel buňky, ne volně tažený bod.
+      const c = gridCellCenter(e.clientX - wrapRect.left, e.clientY - wrapRect.top);
+      dragEl.style.left = Math.round(c.x - 20) + 'px';
+      dragEl.style.top = Math.round(c.y - 20) + 'px';
+    } else {
+      const x = e.clientX - wrapRect.left - dragOffsetX;
+      const y = e.clientY - wrapRect.top - dragOffsetY;
+      dragEl.style.left = x + 'px';
+      dragEl.style.top = y + 'px';
+    }
   });
   window.addEventListener('mouseup', (e) => {
     if (currentTool === 'ruler') {
@@ -952,8 +994,9 @@ if (mapWrap) {
     if (currentTool !== 'select') return;
     if (e.target.closest('.vtt-token')) return;
     const wrapRect = mapWrap.getBoundingClientRect();
-    const x = Math.round(e.clientX - wrapRect.left - 20);
-    const y = Math.round(e.clientY - wrapRect.top - 20);
+    const dropPoint = gridCellCenter(e.clientX - wrapRect.left, e.clientY - wrapRect.top);
+    const x = Math.round(dropPoint.x - 20);
+    const y = Math.round(dropPoint.y - 20);
     const postavaSel = document.getElementById('novaPostavaSelect');
     const nestvuraSel = document.getElementById('novaNestvuraSelect');
     if (postavaSel && postavaSel.value) {
