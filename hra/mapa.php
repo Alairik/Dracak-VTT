@@ -467,7 +467,10 @@ function drawRuler(a, b) {
   clearTimeout(rulerClearTimer);
   const dx = b.x - a.x, dy = b.y - a.y;
   const distPx = Math.sqrt(dx * dx + dy * dy);
-  const label = GRID_PX > 0 ? (distPx / GRID_PX).toFixed(1) + ' polí' : Math.round(distPx) + ' px';
+  // 1 buňka gridu = 1 sáh (content/pravidla-hrac.html, h1621: "pro souboj
+  // platí, že jeden hex vždy odpovídá jednomu sáhu") — bez gridu nemáme
+  // měřítko, takže zůstává nepřevedené px jako jediná poctivá možnost.
+  const label = GRID_PX > 0 ? (distPx / GRID_PX).toFixed(1) + ' sáhů' : Math.round(distPx) + ' px';
   rulerSvg.innerHTML =
     '<line x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '" stroke="#ffb347" stroke-width="2" stroke-dasharray="6 4"/>' +
     '<circle cx="' + a.x + '" cy="' + a.y + '" r="4" fill="#ffb347"/>' +
