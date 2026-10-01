@@ -30,6 +30,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // upravuje max. život při postupu na vyšší úroveň) — mimo tenhle
     // strop se nekontroluje nic (léčení/zranění v boji řeší mapa.php).
     $aktualniHp = min($maxHp, max(0, (int)($_POST['aktualni_hp'] ?? 0)));
+    // Magenergie (viz database/migrations/0050_vtt_postava_magenergie.sql)
+    // je na rozdíl od HP nepovinná — prázdné pole = NULL = tohle
+    // povolání magenergii nepoužívá (nebo se zatím nevyplnilo), stejná
+    // konvence jako nullable atributy níž.
+    $maxMagenergie = !empty($_POST['max_magenergie']) ? max(0, (int)$_POST['max_magenergie']) : null;
+    $aktualniMagenergie = $maxMagenergie !== null
+        ? min($maxMagenergie, max(0, (int)($_POST['aktualni_magenergie'] ?? 0)))
+        : null;
     $poznamky = trim((string)($_POST['poznamky'] ?? '')) ?: null;
     $atributy = [];
     foreach (['sila', 'obratnost', 'odolnost', 'inteligence', 'charisma'] as $atr) {
@@ -39,12 +47,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt = dracak_db()->prepare(
         'UPDATE postavy SET nazev = ?, rasa_id = ?, povolani_id = ?, uroven = ?,
          sila = ?, obratnost = ?, odolnost = ?, inteligence = ?, charisma = ?,
-         aktualni_hp = ?, max_hp = ?, poznamky = ? WHERE id = ?'
+         aktualni_hp = ?, max_hp = ?, aktualni_magenergie = ?, max_magenergie = ?, poznamky = ? WHERE id = ?'
     );
     $stmt->execute([
         $nazev, $rasaId, $povolaniId, $uroven,
         $atributy['sila'], $atributy['obratnost'], $atributy['odolnost'], $atributy['inteligence'], $atributy['charisma'],
-        $aktualniHp, $maxHp, $poznamky, $postavaId,
+        $aktualniHp, $maxHp, $aktualniMagenergie, $maxMagenergie, $poznamky, $postavaId,
     ]);
     header("Location: svet.php?id=$svetId");
     exit;
@@ -84,6 +92,12 @@ dracak_vtt_page_start($postava['nazev'], $user);
           <input class="input" type="number" id="aktualni_hp" name="aktualni_hp" min="0" value="<?= (int)$postava['aktualni_hp'] ?>"></div>
         <div class="field"><label for="max_hp">Max. život</label>
           <input class="input" type="number" id="max_hp" name="max_hp" min="0" value="<?= (int)$postava['max_hp'] ?>"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div class="field"><label for="aktualni_magenergie">Aktuální magenergie</label>
+          <input class="input" type="number" id="aktualni_magenergie" name="aktualni_magenergie" min="0" value="<?= htmlspecialchars((string)($postava['aktualni_magenergie'] ?? '')) ?>"></div>
+        <div class="field"><label for="max_magenergie">Max. magenergie (prázdné = povolání ji nepoužívá)</label>
+          <input class="input" type="number" id="max_magenergie" name="max_magenergie" min="0" value="<?= htmlspecialchars((string)($postava['max_magenergie'] ?? '')) ?>"></div>
       </div>
       <h3 class="rel-label">Atributy (stupeň)</h3>
       <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;">

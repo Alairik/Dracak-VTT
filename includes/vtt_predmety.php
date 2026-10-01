@@ -174,3 +174,50 @@ function dracak_vtt_aplikuj_hp_deltu(string $typEntity, array $entity, int $delt
     $upd->execute([$noveHp, (int)$entity['id']]);
     return [$noveHp, $maxHp];
 }
+
+// Magenergie (viz database/migrations/0050_vtt_postava_magenergie.sql)
+// existuje JEN na postavy, nestvury instance ji vůbec nemají ve
+// schématu — nestvury nemagenergii nemají (viz zadání). max_magenergie
+// NULL = povolání magenergii nepoužívá (nebo zatím nevyplněno), 0 se v
+// praxi nevyskytuje (PJ by nulu nezadal), ale pro jistotu se chová
+// stejně jako NULL — "žádná zásoba", žádná kontrola/odečet.
+function dracak_vtt_ma_magenergii(array $postava): bool
+{
+    return $postava['max_magenergie'] !== null && (int)$postava['max_magenergie'] > 0;
+}
+
+// Cena kouzla v magech. kouzla.cena_magenergie je volný text (VARCHAR,
+// viz drd-db-schema-v1.sql) — "5 magů", "3 magy první, 2 magy každý
+// další", "Životaschopnost × 2", "viz níže" apod., ne čisté číslo.
+// Migrace 0005_cena_dalsiho_seslani.sql ale stanovila, že sloupec
+// znamená "cenu prvního/jediného seslání" — pro jedno použití předmětu
+// (hra/api/pouzij_predmet.php) je to přesně to číslo, co chceme.
+// Použij proto stejnou konvenci jako dracak_vtt_prvni_cislo() jinde v
+// enginu (oc/uc u nestvur): vytáhni první číslo z textu. U kouzel bez
+// žádného čísla (vzorec závislý na vlastnostech cíle, odkaz na jiné
+// kouzlo/tabulku) vrací null — cenu nejde spolehlivě určit automaticky,
+// engine takovou spotřebu NEHÁDÁ (viz CLAUDE.md), jen ji nevynucuje a
+// nechá PJ doladit magenergii ručně přes ±tlačítko.
+function dracak_vtt_kouzlo_cena_magenergie(?string $cenaMagenergie): ?int
+{
+    if ($cenaMagenergie === null || trim($cenaMagenergie) === '') {
+        return null;
+    }
+    $cislo = dracak_vtt_prvni_cislo($cenaMagenergie);
+    return $cislo > 0 ? $cislo : null;
+}
+
+// Odečte cenu kouzla z postava.aktualni_magenergie, ořezáno na 0..max
+// (h297/h179: "nikdy nesmí klesnout pod nulu a nelze ji zvýšit nad
+// tabulkovou hodnotu"). Volá se jen když dracak_vtt_ma_magenergii() je
+// true a cena je známá — volající musí ověřit dostatek PŘED zavoláním
+// (viz dracak_vtt_kontrola_magenergie), tohle jen zapisuje výsledek.
+// Vrací [nova_magenergie, max_magenergie].
+function dracak_vtt_odecti_magenergii(array $postava, int $cena): array
+{
+    $max = (int)$postava['max_magenergie'];
+    $nova = max(0, min($max, (int)$postava['aktualni_magenergie'] - $cena));
+    $upd = dracak_db()->prepare('UPDATE postavy SET aktualni_magenergie = ? WHERE id = ?');
+    $upd->execute([$nova, (int)$postava['id']]);
+    return [$nova, $max];
+}

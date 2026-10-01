@@ -19,6 +19,7 @@ $svetId = (int)$svet['id'];
 $stmt = dracak_db()->prepare(
     'SELECT t.id, t.typ_entity, t.entita_id, t.x, t.y, t.z_poradi, t.viditelny_hracum,
             p.nazev AS postava_nazev, p.vlastnik_ucet_id, p.aktualni_hp AS postava_hp, p.max_hp AS postava_max_hp,
+            p.aktualni_magenergie AS postava_magenergie, p.max_magenergie AS postava_max_magenergie,
             ni.nazev_instance, ni.aktualni_hp AS nestvura_hp, ni.max_hp AS nestvura_max_hp
      FROM tokeny t
      LEFT JOIN postavy p ON p.id = t.entita_id AND t.typ_entity = "postava"
@@ -34,6 +35,12 @@ foreach ($tokeny as &$t) {
     $t['label'] = $t['typ_entity'] === 'postava' ? $t['postava_nazev'] : $t['nazev_instance'];
     $t['hp'] = $t['typ_entity'] === 'postava' ? $t['postava_hp'] : $t['nestvura_hp'];
     $t['max_hp'] = $t['typ_entity'] === 'postava' ? $t['postava_max_hp'] : $t['nestvura_max_hp'];
+    // Magenergie existuje jen na postavy (viz migrace
+    // 0050_vtt_postava_magenergie.sql) — nestvura_instance sloupec vůbec
+    // nemá, proto tu není druhá větev jako u HP. max_magenergie NULL/0 =
+    // povolání magenergii nepoužívá, panel-spravovat řádek pak schová.
+    $t['magenergie'] = $t['typ_entity'] === 'postava' ? $t['postava_magenergie'] : null;
+    $t['max_magenergie'] = $t['typ_entity'] === 'postava' ? $t['postava_max_magenergie'] : null;
     $t['owned'] = $isPjOrAdmin || ((int)($t['vlastnik_ucet_id'] ?? 0) === (int)$user['id']);
 }
 unset($t);
@@ -233,6 +240,8 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
              data-typ-entity="<?= htmlspecialchars($t['typ_entity']) ?>" data-entita-id="<?= (int)$t['entita_id'] ?>"
              data-label="<?= htmlspecialchars((string)$t['label']) ?>"
              data-hp="<?= $t['hp'] !== null ? (int)$t['hp'] : '' ?>"
+             data-magenergie="<?= $t['magenergie'] !== null ? (int)$t['magenergie'] : '' ?>"
+             data-max-magenergie="<?= ($t['max_magenergie'] !== null && (int)$t['max_magenergie'] > 0) ? (int)$t['max_magenergie'] : '' ?>"
              title="<?= htmlspecialchars((string)$t['label']) ?>"
              style="left:<?= (int)$t['x'] ?>px;top:<?= (int)$t['y'] ?>px;cursor:<?= $t['owned'] ? 'grab' : 'default' ?>;z-index:<?= (int)$t['z_poradi'] ?>;">
           <div class="puck" style="background:<?= $t['typ_entity'] === 'postava' ? 'var(--color-accent-600, #7a3b2e)' : '#4a2b2b' ?>;">
@@ -366,6 +375,20 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
       <button class="btn btn-ghost" type="button" data-delta="-1">−1</button>
       <button class="btn btn-ghost" type="button" data-delta="1">+1</button>
       <button class="btn btn-ghost" type="button" data-delta="5">+5</button>
+    </div>
+    <!-- Magenergie (content/pravidla-hrac.html h297 aj., viz migrace
+         0050_vtt_postava_magenergie.sql) — jen postavy s nastaveným
+         max_magenergie (povolání, co magenergii používá); schováno přes
+         otevritSpravovat() JS, ne přes PHP, protože panel je společný
+         pro všechny tokeny na mapě, ne per-token. -->
+    <div id="panelMagenergieRow" style="display:none;margin-top:10px;">
+      <label style="font-size:11px;font-weight:600;">Magenergie: <span id="spravovatMagenergieText">—</span></label>
+      <div class="panel-hp-row">
+        <button class="btn btn-ghost" type="button" data-mag-delta="-5">−5</button>
+        <button class="btn btn-ghost" type="button" data-mag-delta="-1">−1</button>
+        <button class="btn btn-ghost" type="button" data-mag-delta="1">+1</button>
+        <button class="btn btn-ghost" type="button" data-mag-delta="5">+5</button>
+      </div>
     </div>
     <div style="margin-top:10px;">
       <label style="font-size:11px;font-weight:600;">Iniciativa — bonusy/postihy (zaškrtni, co platí)</label>
@@ -860,8 +883,19 @@ function otevritSpravovat(el) {
     entitaId: parseInt(el.dataset.entitaId, 10),
     tokenId: parseInt(el.dataset.id, 10),
     hp: el.dataset.hp === '' ? null : parseInt(el.dataset.hp, 10),
+    magenergie: el.dataset.magenergie === '' ? null : parseInt(el.dataset.magenergie, 10),
+    maxMagenergie: el.dataset.maxMagenergie === '' ? null : parseInt(el.dataset.maxMagenergie, 10),
   };
   document.getElementById('spravovatNazev').textContent = el.dataset.label;
+  const magRow = document.getElementById('panelMagenergieRow');
+  if (magRow) {
+    if (spravovanyToken.maxMagenergie !== null) {
+      magRow.style.display = '';
+      document.getElementById('spravovatMagenergieText').textContent = (spravovanyToken.magenergie ?? 0) + '/' + spravovanyToken.maxMagenergie;
+    } else {
+      magRow.style.display = 'none';
+    }
+  }
   renderInventar();
   renderKorist();
   spravovatPanel.classList.add('open');
@@ -1023,6 +1057,19 @@ document.querySelectorAll('#panel-spravovat [data-delta]').forEach(btn => {
       });
   });
 });
+document.querySelectorAll('#panel-spravovat [data-mag-delta]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (!spravovanyToken || spravovanyToken.maxMagenergie === null) return;
+    postJson('api/magenergie_uprava.php', {mapa_id: MAPA_ID, entita_id: spravovanyToken.entitaId, delta: parseInt(btn.dataset.magDelta, 10)})
+      .then(d => {
+        if (d.error) { logLine('Chyba: ' + d.error); return; }
+        spravovanyToken.magenergie = d.nova_magenergie;
+        const txt = document.getElementById('spravovatMagenergieText');
+        if (txt) txt.textContent = d.nova_magenergie + '/' + d.max_magenergie;
+        posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
+      });
+  });
+});
 const efektBtn = document.getElementById('efektBtn');
 if (efektBtn) {
   efektBtn.addEventListener('click', () => {
@@ -1092,6 +1139,7 @@ function pouzitPolozku(p) {
     let zprava = document.getElementById('spravovatNazev').textContent + ' použil(a) ' + p.nazev;
     if (d.kostka) zprava += ': [' + d.kostka.hody.join(', ') + ']' + (d.kostka.bonus ? (d.kostka.bonus > 0 ? '+' : '') + d.kostka.bonus : '') + ' = ' + d.kostka.celkem;
     if (d.hp) zprava += ' (' + (d.hp.delta > 0 ? '+' : '') + d.hp.delta + ' život)';
+    if (d.magenergie) zprava += ' (-' + d.magenergie.cena + ' magenergie, zbývá ' + d.magenergie.nova_magenergie + '/' + d.magenergie.max_magenergie + ')';
     logLine(zprava);
     posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
     location.reload();
@@ -1227,6 +1275,14 @@ function applyEvent(u) {
     if (el) {
       const hpEl = el.querySelector('.hp');
       if (hpEl) hpEl.textContent = u.payload.nove_hp + (u.payload.max_hp ? '/' + u.payload.max_hp : '');
+    }
+  } else if (u.typ === 'magenergie_zmena') {
+    // Magenergie nemá na tokenu vlastní badge (jen v panel-spravovat),
+    // proto se tu aktualizuje jen otevřený panel, ne hledání elementu na mapě.
+    if (spravovanyToken && spravovanyToken.typEntity === 'postava' && spravovanyToken.entitaId === u.payload.entita_id) {
+      spravovanyToken.magenergie = u.payload.nova_magenergie;
+      const txt = document.getElementById('spravovatMagenergieText');
+      if (txt) txt.textContent = u.payload.nova_magenergie + '/' + u.payload.max_magenergie;
     }
   } else if (u.typ === 'ping') {
     if (u.mapa_id == MAPA_ID) zobrazPing(u.payload.x, u.payload.y, u.payload.jmeno || '');

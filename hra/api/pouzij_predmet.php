@@ -89,6 +89,25 @@ if (!$katalog) {
     exit;
 }
 
+// Magenergie (content/pravidla-hrac.html h297/h179 a další — viz migrace
+// 0050_vtt_postava_magenergie.sql): jen kouzlo, jen seslatel typu postava
+// s nastavenou zásobou (max_magenergie) — nestvury magenergii nemají a
+// povolání, co magenergii nepoužívá, má max_magenergie NULL. Cenu kouzla
+// nejde vždy spolehlivě rozparsovat z volného textu cena_magenergie
+// (vzorce typu "Životaschopnost × 2") — tam se nic nevynucuje, viz
+// dracak_vtt_kouzlo_cena_magenergie().
+$magenergieCena = null;
+if ($typPolozky === 'kouzlo' && $typEntity === 'postava' && dracak_vtt_ma_magenergii($entity)) {
+    $magenergieCena = dracak_vtt_kouzlo_cena_magenergie($katalog['cena_magenergie'] ?? null);
+    if ($magenergieCena !== null && (int)$entity['aktualni_magenergie'] < $magenergieCena) {
+        http_response_code(422);
+        echo json_encode([
+            'error' => "Nedostatek magenergie (máš {$entity['aktualni_magenergie']}, kouzlo stojí {$magenergieCena}).",
+        ]);
+        exit;
+    }
+}
+
 $pdo->beginTransaction();
 try {
     // Spotřeba: jen lektvar (vypitý kus mizí). Předmět (zbraň/zbroj/
@@ -150,6 +169,14 @@ try {
         }
     }
 
+    // Magenergie se strhává seslateli ($entity/$typEntity), ne cíli kouzla
+    // — platí ten, kdo kouzlo seslal, bez ohledu na to, na koho dopadá.
+    $magenergieVysledek = null;
+    if ($magenergieCena !== null) {
+        [$novaMagenergie, $maxMagenergie] = dracak_vtt_odecti_magenergii($entity, $magenergieCena);
+        $magenergieVysledek = ['cena' => $magenergieCena, 'nova_magenergie' => $novaMagenergie, 'max_magenergie' => $maxMagenergie];
+    }
+
     $logMapaId = $pozadovanaMapaId ?? $svetMapa['mapa_id'] ?? $cilSvetMapa['mapa_id'];
     $eventId = dracak_vtt_log_event($svetMapa['svet_id'], $logMapaId, 'predmet_pouzit', [
         'typ_entity' => $typEntity,
@@ -162,6 +189,7 @@ try {
         'kostka' => $kostka,
         'hp' => $hpVysledek,
         'efekty' => $aplikovaneEfekty,
+        'magenergie' => $magenergieVysledek,
         'pouzil' => $user['jmeno'],
     ], (int)$user['id']);
 
@@ -178,4 +206,5 @@ echo json_encode([
     'kostka' => $kostka,
     'hp' => $hpVysledek,
     'efekty' => $aplikovaneEfekty,
+    'magenergie' => $magenergieVysledek,
 ], JSON_UNESCAPED_UNICODE);
