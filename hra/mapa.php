@@ -972,7 +972,9 @@ function otevritSpravovat(el) {
 if (mapWrap) {
   mapWrap.addEventListener('mousedown', (e) => {
     if (currentTool === 'ruler') {
-      if (e.target.closest('.vtt-token')) return;
+      // Měřítko musí jít začít i kliknutím přímo na token (časté měření
+      // "dosáhne token A na token B") — ruler nijak nekoliduje s
+      // táhnutím tokenu, to běží jen v currentTool==='select' větvi níž.
       rulerStart = rulerPoint(e);
       drawRuler(rulerStart, rulerStart);
       return;
