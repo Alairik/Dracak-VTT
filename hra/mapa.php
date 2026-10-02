@@ -642,6 +642,18 @@ function gridCellCenter(px, py) {
   return {x: offX + i * GRID_PX + GRID_PX / 2, y: offY + j * GRID_PX + GRID_PX / 2};
 }
 
+// Px na 1 sáh. Čtverec: GRID_PX je přímo strana buňky = 1 sáh. Hex:
+// GRID_PX je "size" (circumradius, střed->vrchol, viz renderGrid()
+// výš), ale podle pravidel (content/pravidla-hrac.html h1621/b10798:
+// "jeden hex vždy odpovídá jednomu sáhu") je 1 sáh vzdálenost
+// STŘED-STŘED sousedních hexů, ne circumradius samotný — to je
+// colStep = √3 × size (shodné se vzdáleností všech 6 sousedů v
+// "odd-r" rozložení, viz hexSnapCandidates/renderGrid).
+function pxNaSah() {
+  if (!GRID_PX || GRID_PX <= 0) return 0;
+  return GRID_TYPE === 'hex' ? Math.sqrt(3) * GRID_PX : GRID_PX;
+}
+
 // --- Vzdálenost bodu od úsečky — pro výběr existující zdi klikem. ---
 function vzdalenostKUsecce(px, py, x1, y1, x2, y2) {
   const dx = x2 - x1, dy = y2 - y1;
@@ -668,7 +680,8 @@ function zedSirkaPx() {
   const input = document.getElementById('zedSirka');
   if (!input) return 6;
   const val = parseFloat(input.value) || 0;
-  return GRID_PX > 0 ? Math.max(1, val * GRID_PX) : Math.max(1, val);
+  const pxSah = pxNaSah();
+  return pxSah > 0 ? Math.max(1, val * pxSah) : Math.max(1, val);
 }
 function zedSnapEnabled() {
   const chk = document.getElementById('zedSnap');
@@ -814,12 +827,21 @@ function zrusitZivyNahledGridu() {
   GRID_PX = gridSaved.px; GRID_TYPE = gridSaved.typ; GRID_OFFSET_X = gridSaved.offX; GRID_OFFSET_Y = gridSaved.offY;
   renderGrid();
 }
+// Slider nastavuje GRID_PX (u hexu circumradius, viz pxNaSah() výš),
+// ne přímo "1 sáh v px" — u hexu proto popisek u slideru dopočítá
+// skutečnou velikost sáhu (√3×), ať PJ neměří grid podle čísla, co ve
+// skutečnosti znamená něco jiného.
+function aktualizovatGridVelikostHodnotu() {
+  const raw = parseInt(gridVelikostSlider.value, 10) || 0;
+  const sah = gridTypSelect.value === 'hex' ? Math.round(raw * Math.sqrt(3)) : raw;
+  gridVelikostHodnota.textContent = sah;
+}
 function nacistGridFormular() {
   if (!gridZapnutyChk) return;
   gridZapnutyChk.checked = gridSaved.px > 0;
   gridTypSelect.value = gridSaved.typ;
   gridVelikostSlider.value = gridSaved.px > 0 ? gridSaved.px : 70;
-  gridVelikostHodnota.textContent = gridVelikostSlider.value;
+  aktualizovatGridVelikostHodnotu();
   gridPosunXInput.value = gridSaved.offX;
   gridPosunYInput.value = gridSaved.offY;
   gridNastaveniFields.style.display = gridZapnutyChk.checked ? '' : 'none';
@@ -833,8 +855,8 @@ function zivyNahledGridu() {
 }
 if (gridZapnutyChk) {
   gridZapnutyChk.addEventListener('change', () => { gridNastaveniFields.style.display = gridZapnutyChk.checked ? '' : 'none'; zivyNahledGridu(); });
-  gridTypSelect.addEventListener('change', zivyNahledGridu);
-  gridVelikostSlider.addEventListener('input', () => { gridVelikostHodnota.textContent = gridVelikostSlider.value; zivyNahledGridu(); });
+  gridTypSelect.addEventListener('change', () => { aktualizovatGridVelikostHodnotu(); zivyNahledGridu(); });
+  gridVelikostSlider.addEventListener('input', () => { aktualizovatGridVelikostHodnotu(); zivyNahledGridu(); });
   gridPosunXInput.addEventListener('input', zivyNahledGridu);
   gridPosunYInput.addEventListener('input', zivyNahledGridu);
 }
@@ -873,10 +895,11 @@ function drawRuler(a, b) {
   clearTimeout(rulerClearTimer);
   const dx = b.x - a.x, dy = b.y - a.y;
   const distPx = Math.sqrt(dx * dx + dy * dy);
-  // 1 buňka gridu = 1 sáh (content/pravidla-hrac.html, h1621: "pro souboj
-  // platí, že jeden hex vždy odpovídá jednomu sáhu") — bez gridu nemáme
-  // měřítko, takže zůstává nepřevedené px jako jediná poctivá možnost.
-  const label = GRID_PX > 0 ? (distPx / GRID_PX).toFixed(1) + ' sáhů' : Math.round(distPx) + ' px';
+  // 1 sáh = pxNaSah() (čtverec: 1 buňka; hex: střed-střed sousedních
+  // hexů, viz h1621 "jeden hex vždy odpovídá jednomu sáhu") — bez gridu
+  // nemáme měřítko, takže zůstává nepřevedené px jako jediná poctivá možnost.
+  const pxSah = pxNaSah();
+  const label = pxSah > 0 ? (distPx / pxSah).toFixed(1) + ' sáhů' : Math.round(distPx) + ' px';
   rulerSvg.innerHTML =
     '<line x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '" stroke="#ffb347" stroke-width="2" stroke-dasharray="6 4"/>' +
     '<circle cx="' + a.x + '" cy="' + a.y + '" r="4" fill="#ffb347"/>' +
