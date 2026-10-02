@@ -596,9 +596,12 @@ function hexSnapCandidates(px, py) {
 }
 function snapPoint(px, py, enabled) {
   if (!enabled || !GRID_PX || GRID_PX <= 0) return {x: px, y: py};
+  // Bez poloměru — vždycky nejbližší magnetický bod, žádná "mrtvá zóna",
+  // kde by klik propadl bez přichycení (stejný princip jako u tokenů v
+  // gridCellCenter(), jen tu kandidáti jsou vrcholy/středy hran/středy
+  // buněk místo jen středu buňky, viz squareSnapCandidates/hexSnapCandidates).
   const candidates = GRID_TYPE === 'hex' ? hexSnapCandidates(px, py) : squareSnapCandidates(px, py);
-  const radius = GRID_PX * 0.25;
-  let best = null, bestDist = radius;
+  let best = null, bestDist = Infinity;
   for (const c of candidates) {
     const d = Math.hypot(c.x - px, c.y - py);
     if (d < bestDist) { bestDist = d; best = c; }
