@@ -29,11 +29,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($akce === 'ulozit') {
         $id = (int)$_POST['id'];
         $role = in_array($_POST['role'] ?? '', ['admin', 'pj', 'hrac'], true) ? $_POST['role'] : 'hrac';
-        $pdo->prepare('UPDATE ucty SET role = ? WHERE id = ?')->execute([$role, $id]);
-        $pdo->prepare('DELETE FROM ucet_opravneni WHERE ucet_id = ?')->execute([$id]);
-        foreach ((array)($_POST['tabulky'] ?? []) as $t) {
-            if (isset($editableTables[$t])) {
-                $pdo->prepare('INSERT INTO ucet_opravneni (ucet_id, tabulka) VALUES (?, ?)')->execute([$id, $t]);
+        $noveHeslo = (string)($_POST['nove_heslo'] ?? '');
+        if ($noveHeslo !== '' && strlen($noveHeslo) < 8) {
+            $error = 'Nové heslo musí mít aspoň 8 znaků.';
+        } else {
+            $pdo->prepare('UPDATE ucty SET role = ? WHERE id = ?')->execute([$role, $id]);
+            if ($noveHeslo !== '') {
+                $pdo->prepare('UPDATE ucty SET heslo_hash = ? WHERE id = ?')
+                    ->execute([password_hash($noveHeslo, PASSWORD_DEFAULT), $id]);
+            }
+            $pdo->prepare('DELETE FROM ucet_opravneni WHERE ucet_id = ?')->execute([$id]);
+            foreach ((array)($_POST['tabulky'] ?? []) as $t) {
+                if (isset($editableTables[$t])) {
+                    $pdo->prepare('INSERT INTO ucet_opravneni (ucet_id, tabulka) VALUES (?, ?)')->execute([$id, $t]);
+                }
             }
         }
     } elseif ($akce === 'smazat') {
@@ -113,6 +122,10 @@ foreach ($pdo->query('SELECT ucet_id, tabulka FROM ucet_opravneni')->fetchAll() 
                   <option value="<?= $val ?>" <?= $u['role'] === $val ? 'selected' : '' ?>><?= $label ?></option>
                 <?php endforeach; ?>
               </select>
+            </div>
+            <div class="field" style="margin-top:10px;max-width:260px;">
+              <label>Nové heslo (nech prázdné = beze změny)</label>
+              <input type="password" name="nove_heslo" minlength="8" placeholder="min. 8 znaků" autocomplete="new-password">
             </div>
             <div class="note" style="margin-top:10px;">Smí sám editovat (jen pro roli hráč):</div>
             <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;">
