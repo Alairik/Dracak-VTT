@@ -111,10 +111,10 @@ function dracak_vtt_rasovy_modifikator(PDO $pdo, int $rasaId, string $vlastnostK
 
 // Rozsah (lidský, BEZ rasové korekce) 2 "základních" vlastností
 // povolání podle povolani_zakladni_vlastnosti, klíčováno kódem
-// vlastnosti. Kouzelník má v tabulce jen 1 řádek (Inteligence) — viz
-// otevřená otázka v migraci 0052; Charisma u Kouzelníka proto níž
-// spadne do druhé větve (rasový rozsah), přesně jako kterákoliv jiná
-// vlastnost označená v h104 tabulce "X".
+// vlastnosti. Kouzelníkova Charisma (13-18) doplněna migrací 0054 —
+// tabulka v h104 ji měla chybně jako "X" (nesoulad s textem b599,
+// který Inteligenci+Charisma slibuje jako jeho pár), opraveno podle
+// ověření v originální příručce.
 function dracak_vtt_zakladni_vlastnosti_povolani(PDO $pdo, int $povolaniId): array
 {
     $stmt = $pdo->prepare(
@@ -151,7 +151,8 @@ function dracak_vtt_rozsahy_rasy(PDO $pdo, int $rasaId): array
 // Pro všech 5 vlastností spočítá rozsah, ze kterého se má házet: pro
 // vlastnosti základní pro dané povolání vezme lidský rozsah z
 // povolani_zakladni_vlastnosti + rasovou korekci (h104 b602); pro
-// zbylé (nebo chybějící, viz Kouzelník výš) rovnou finální rozsah rasy.
+// zbylé (vlastnost pro dané povolání v h104 označená "X") rovnou
+// finální rozsah rasy.
 // Vrací [kod => ['dolni'=>int,'horni'=>int,'zdroj'=>'povolani'|'rasa']].
 function dracak_vtt_navrzene_rozsahy_atributu(PDO $pdo, int $rasaId, int $povolaniId): array
 {
