@@ -19,8 +19,13 @@ require_once __DIR__ . '/../includes/vtt_postava.php';
 
 $user = dracak_require_login();
 $isPjOrAdmin = in_array($user['role'], ['admin', 'pj'], true);
+// id v URL je nepovinné — bez něj se postava založí zatím bez světa
+// (postavy.svet_id NULL, viz migrace 0053) a čeká na pozdější přiřazení
+// přes hra/postavy_moje.php. Forms v téhle stránce nemají `action`,
+// takže POSTují na stejnou URL a id (pokud bylo) zůstává v query stringu
+// po celou dobu wizardu bez nutnosti hidden inputu.
 $svetId = (int)($_GET['id'] ?? 0);
-$svet = dracak_vtt_require_svet($user, $svetId);
+$svet = $svetId > 0 ? dracak_vtt_require_svet($user, $svetId) : null;
 $pdo = dracak_db();
 
 // Mapování kódu vlastnosti (vlastnosti.kod) na název sloupce v
@@ -62,7 +67,7 @@ function wizard_int_nebo_null($hodnota): ?int
 
 // --- Render jednotlivých kroků ---------------------------------------
 
-function wizard_krok1(array $svet, int $svetId, ?int $vybranaRasaId = null): void
+function wizard_krok1(?array $svet, int $svetId, ?int $vybranaRasaId = null): void
 {
     global $pdo;
     $rasy = $pdo->query('SELECT id, nazev FROM rasy ORDER BY nazev')->fetchAll();
@@ -219,10 +224,14 @@ foreach (POLE_PODLE_KODU as $kod => $pole) {
     $atributyZPostu[$pole] = wizard_int_nebo_null($_POST[$pole] ?? null);
 }
 
-dracak_vtt_page_start('Nová postava — ' . $svet['nazev'], $user);
+dracak_vtt_page_start('Nová postava' . ($svet ? ' — ' . $svet['nazev'] : ''), $user);
 ?>
 <main class="main" style="padding:24px;">
+  <?php if ($svet): ?>
   <p class="crumb"><a href="svet.php?id=<?= $svetId ?>">← <?= htmlspecialchars($svet['nazev']) ?></a></p>
+  <?php else: ?>
+  <p class="crumb"><a href="postavy_moje.php">← Moje postavy</a></p>
+  <?php endif; ?>
   <h1 class="page-title">Nová postava</h1>
 <?php
 
@@ -307,7 +316,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         $povolani = wizard_nacti_zakladni_povolani($pdo, $povolaniId);
         $maxHp = max(1, (int)($_POST['max_hp'] ?? 1));
         $hraciVeSvete = [];
-        if ($isPjOrAdmin) {
+        if ($isPjOrAdmin && $svetId > 0) {
             $stmt = $pdo->prepare(
                 'SELECT u.id, u.jmeno FROM svet_hraci sh JOIN ucty u ON u.id = sh.ucet_id WHERE sh.svet_id = ? ORDER BY u.jmeno'
             );
@@ -330,7 +339,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
                 // rovnou pro kohokoliv u stolu (musí být zapsaný v
                 // svet_hraci pro tenhle svet).
                 $vlastnikId = $user['id'];
-                if ($isPjOrAdmin && !empty($_POST['vlastnik_ucet_id'])) {
+                if ($isPjOrAdmin && $svetId > 0 && !empty($_POST['vlastnik_ucet_id'])) {
                     $stmt = $pdo->prepare('SELECT 1 FROM svet_hraci WHERE svet_id = ? AND ucet_id = ?');
                     $stmt->execute([$svetId, (int)$_POST['vlastnik_ucet_id']]);
                     if ($stmt->fetchColumn()) {
@@ -343,12 +352,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
                      VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)'
                 );
                 $stmt->execute([
-                    $svetId, $vlastnikId, $nazev, $rasaId, $povolaniId,
+                    $svetId > 0 ? $svetId : null, $vlastnikId, $nazev, $rasaId, $povolaniId,
                     $atributyZPostu['sila'], $atributyZPostu['obratnost'], $atributyZPostu['odolnost'],
                     $atributyZPostu['inteligence'], $atributyZPostu['charisma'],
                     $maxHp, $maxHp,
                 ]);
-                header("Location: svet.php?id=$svetId");
+                header($svetId > 0 ? "Location: svet.php?id=$svetId" : 'Location: postavy_moje.php');
                 exit;
             }
         } else {

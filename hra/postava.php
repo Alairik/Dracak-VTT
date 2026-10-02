@@ -12,12 +12,24 @@ if (!$postava) {
     http_response_code(404);
     die('Postava nenalezena.');
 }
-$svet = dracak_vtt_require_svet($user, (int)$postava['svet_id']);
-if (!dracak_vtt_can_edit_hp($user, 'postava', $postava)) {
-    http_response_code(403);
-    die('Tuhle postavu upravovat nesmíš.');
+$svetId = (int)($postava['svet_id'] ?? 0);
+if ($svetId > 0) {
+    $svet = dracak_vtt_require_svet($user, $svetId);
+    if (!dracak_vtt_can_edit_hp($user, 'postava', $postava)) {
+        http_response_code(403);
+        die('Tuhle postavu upravovat nesmíš.');
+    }
+} else {
+    // Postava zatím nepatří do žádného světa — dracak_vtt_can_edit_hp()
+    // by tu pustila libovolného PJ (jeho oprávnění jinak vychází z
+    // dracak_vtt_require_svet() výš, kterou tu nemáme co zavolat), proto
+    // tady výslovně jen vlastník nebo admin.
+    $svet = null;
+    if ($user['role'] !== 'admin' && (int)$postava['vlastnik_ucet_id'] !== (int)$user['id']) {
+        http_response_code(403);
+        die('Tuhle postavu upravovat nesmíš.');
+    }
 }
-$svetId = (int)$svet['id'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nazev = trim((string)($_POST['nazev'] ?? ''));
@@ -54,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $atributy['sila'], $atributy['obratnost'], $atributy['odolnost'], $atributy['inteligence'], $atributy['charisma'],
         $aktualniHp, $maxHp, $aktualniMagenergie, $maxMagenergie, $poznamky, $postavaId,
     ]);
-    header("Location: svet.php?id=$svetId");
+    header($svetId > 0 ? "Location: svet.php?id=$svetId" : 'Location: postavy_moje.php');
     exit;
 }
 
@@ -64,7 +76,12 @@ $povolaniOptions = dracak_db()->query('SELECT id, nazev FROM povolani ORDER BY n
 dracak_vtt_page_start($postava['nazev'], $user);
 ?>
   <main class="main" style="padding:24px;">
+    <?php if ($svet): ?>
     <p class="crumb"><a href="svet.php?id=<?= $svetId ?>">← <?= htmlspecialchars($svet['nazev']) ?></a></p>
+    <?php else: ?>
+    <p class="crumb"><a href="postavy_moje.php">← Moje postavy</a></p>
+    <p class="note">Zatím bez světa.</p>
+    <?php endif; ?>
     <h1 class="page-title">Upravit postavu</h1>
     <form method="post" class="card elev-sm" style="max-width:520px;margin-top:14px;">
       <div class="field"><label for="nazev">Jméno postavy *</label>
@@ -116,7 +133,7 @@ dracak_vtt_page_start($postava['nazev'], $user);
         <textarea id="poznamky" name="poznamky"><?= htmlspecialchars((string)($postava['poznamky'] ?? '')) ?></textarea>
       </div>
       <button class="btn btn-primary" type="submit" style="margin-top:10px;">Uložit</button>
-      <a class="btn btn-ghost" href="svet.php?id=<?= $svetId ?>" style="margin-top:10px;">Zrušit</a>
+      <a class="btn btn-ghost" href="<?= $svet ? "svet.php?id=$svetId" : 'postavy_moje.php' ?>" style="margin-top:10px;">Zrušit</a>
     </form>
   </main>
 <?php dracak_vtt_page_end(); ?>

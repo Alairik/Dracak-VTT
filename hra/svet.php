@@ -126,6 +126,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    if ($akce === 'pripojit_postavu') {
+        // Připojení VLASTNÍ už existující, zatím nepřiřazené postavy (viz
+        // hra/postavy_moje.php) rovnou z téhle stránky — alternativa k
+        // zakládání nové, když si ji hráč připravil dřív bez vazby na
+        // svět. Jen vlastník, žádná výjimka pro PJ/admin (ti postavu
+        // nevlastní, takže by si tu nic nemohli vybrat).
+        $postavaId = (int)($_POST['postava_id'] ?? 0);
+        $stmt = dracak_db()->prepare('SELECT 1 FROM postavy WHERE id = ? AND vlastnik_ucet_id = ? AND svet_id IS NULL');
+        $stmt->execute([$postavaId, $user['id']]);
+        if ($stmt->fetchColumn()) {
+            $stmt = dracak_db()->prepare('UPDATE postavy SET svet_id = ? WHERE id = ?');
+            $stmt->execute([$svetId, $postavaId]);
+        }
+        header("Location: svet.php?id=$svetId");
+        exit;
+    }
+
     if ($akce === 'prevest_postavu') {
         if (!$isPjOrAdmin) { http_response_code(403); die('Jen PJ/admin přiřazuje postavu jinému hráči.'); }
         $postavaId = (int)($_POST['postava_id'] ?? 0);
@@ -191,6 +208,12 @@ $postavy = dracak_db()->prepare(
 );
 $postavy->execute([$svetId]);
 $postavy = $postavy->fetchAll();
+
+// Vlastní zatím nepřiřazené postavy (viz hra/postavy_moje.php) — nabídka
+// "připojit existující" místo zakládání nové od nuly.
+$mojeVolnePostavy = dracak_db()->prepare('SELECT id, nazev FROM postavy WHERE vlastnik_ucet_id = ? AND svet_id IS NULL ORDER BY nazev');
+$mojeVolnePostavy->execute([$user['id']]);
+$mojeVolnePostavy = $mojeVolnePostavy->fetchAll();
 
 // Inventář za postavu — jen krátký přehled do karty, ne plná správa (ta je
 // přes hra/api/pouzij_predmet.php na mapě). Zvlášť dotaz na postavu (max pár
@@ -386,6 +409,19 @@ dracak_vtt_page_start($svet['nazev'], $user);
       </p>
       <p class="note" style="margin:0;">Krok za krokem nahodí atributy i život podle pravidel (h104), hod jde vždycky ručně přepsat. Formulář níž je rychlá/nouzová cesta beze hodu — hodí se třeba na bleskové založení NPC.</p>
     </div>
+    <?php if ($mojeVolnePostavy): ?>
+    <form method="post" class="card elev-sm" style="max-width:520px;margin-top:14px;display:flex;gap:8px;align-items:flex-end;">
+      <input type="hidden" name="akce" value="pripojit_postavu">
+      <div class="field" style="flex:1;margin:0;"><label for="pripojit_postava_id">Nebo připoj svoji už založenou postavu</label>
+        <select class="input" id="pripojit_postava_id" name="postava_id">
+          <?php foreach ($mojeVolnePostavy as $pp): ?>
+            <option value="<?= (int)$pp['id'] ?>"><?= htmlspecialchars($pp['nazev']) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <button class="btn btn-secondary" type="submit">Připojit</button>
+    </form>
+    <?php endif; ?>
     <form method="post" class="card elev-sm" style="max-width:520px;margin-top:14px;">
       <input type="hidden" name="akce" value="nova_postava">
       <div class="field"><label for="p_nazev">Jméno postavy *</label>

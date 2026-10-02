@@ -33,6 +33,12 @@ $isAdmin = $user['role'] === 'admin';
       <div class="tile-desc">Výběr aktivní kampaně, mapy a postavy ve hře.</div>
     </a>
 
+    <a class="tile" href="hra/postavy_moje.php">
+      <div class="tile-icon">🧙</div>
+      <div class="tile-title">Moje postavy</div>
+      <div class="tile-desc">Založ si postavu i bez světa, přiřadíš ji později.</div>
+    </a>
+
     <a class="tile" href="pravidla.php">
       <div class="tile-icon">📖</div>
       <div class="tile-title">Pravidla</div>
