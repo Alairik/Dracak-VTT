@@ -228,7 +228,7 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
 
   <div id="viewport">
     <div id="mapWrap">
-      <img id="mapImg" src="mapa_obrazek.php?id=<?= $mapaId ?>" style="display:block;max-width:none;">
+      <img id="mapImg" src="mapa_obrazek.php?id=<?= $mapaId ?>" draggable="false" style="display:block;max-width:none;-webkit-user-drag:none;user-select:none;">
       <svg id="gridSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:0;"></svg>
       <svg id="zdiSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:5;"></svg>
       <svg id="rulerSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:140;"></svg>
@@ -341,7 +341,11 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
     <label style="display:flex;align-items:center;gap:6px;font-weight:400;">
       <input type="checkbox" id="zedSnap" checked> Přichytávat ke gridu
     </label>
-    <p class="note">Táhni po mapě a nakresli zeď. Klikni na existující zeď pro výběr a smazání.</p>
+    <p class="note">Klikáním polož body zdi (start, libovolně moc mezibodů, konec), pak Uložit. Klikni na existující zeď pro výběr a smazání.</p>
+    <div style="display:flex;gap:6px;margin-top:8px;">
+      <button class="btn btn-primary" type="button" id="zedUlozitBtn" style="flex:1;display:none;">Uložit zeď</button>
+      <button class="btn btn-ghost" type="button" id="zedZrusitBtn" style="flex:1;display:none;">Zrušit</button>
+    </div>
     <button class="btn btn-ghost" type="button" id="zedSmazatBtn" style="width:100%;margin-top:8px;display:none;">Smazat vybranou zeď</button>
   </div>
 
@@ -679,10 +683,39 @@ function aktualizovatZedJednotky() {
     if (label) label.textContent = 'px';
   }
 }
-function drawZedPreview(a, b) {
+// Rozpracovaná zeď = klikem posbírané body (start, libovolně mezibodů,
+// konec) — NEukládá se po jednom, čeká na výslovné "Uložit" (viz
+// zedUlozitBtn). Vykresluje se do rulerSvg (sdílená ephemerní vrstva,
+// stejně jako ruler/drag-preview — zed a ruler nástroj nejdou použít
+// zároveň, takže není kolize).
+function drawZedRozpracovanouCestu(aktualniBod) {
   if (!rulerSvg) return;
-  rulerSvg.innerHTML = '<line x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '"'
-    + ' stroke="#ffd166" stroke-width="' + Math.max(2, zedSirkaPx()) + '" stroke-linecap="round" opacity="0.6"/>';
+  const sw = Math.max(2, zedSirkaPx());
+  let html = '';
+  for (let i = 0; i < zedRozpracovaneBody.length - 1; i++) {
+    const a = zedRozpracovaneBody[i], b = zedRozpracovaneBody[i + 1];
+    html += '<line x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '"'
+      + ' stroke="#ffd166" stroke-width="' + sw + '" stroke-linecap="round" opacity="0.8"/>';
+  }
+  const posledni = zedRozpracovaneBody[zedRozpracovaneBody.length - 1];
+  if (posledni && aktualniBod) {
+    html += '<line x1="' + posledni.x + '" y1="' + posledni.y + '" x2="' + aktualniBod.x + '" y2="' + aktualniBod.y + '"'
+      + ' stroke="#ffd166" stroke-width="' + sw + '" stroke-linecap="round" stroke-dasharray="6 4" opacity="0.5"/>';
+  }
+  zedRozpracovaneBody.forEach(b => { html += '<circle cx="' + b.x + '" cy="' + b.y + '" r="4" fill="#ffd166"/>'; });
+  rulerSvg.innerHTML = html;
+}
+function aktualizovatZedUlozitTlacitko() {
+  const btnUlozit = document.getElementById('zedUlozitBtn');
+  const btnZrusit = document.getElementById('zedZrusitBtn');
+  const zobrazit = zedRozpracovaneBody.length >= 2;
+  if (btnUlozit) btnUlozit.style.display = zobrazit ? '' : 'none';
+  if (btnZrusit) btnZrusit.style.display = zedRozpracovaneBody.length > 0 ? '' : 'none';
+}
+function zrusitZedRozpracovanouCestu() {
+  zedRozpracovaneBody = [];
+  aktualizovatZedUlozitTlacitko();
+  if (rulerSvg) rulerSvg.innerHTML = '';
 }
 
 if (mapImgEl.complete) { renderGrid(); renderZdi(); } else mapImgEl.addEventListener('load', () => { renderGrid(); renderZdi(); });
@@ -739,7 +772,8 @@ function setTool(tool) {
   }
   rulerStart = null;
   if (rulerSvg) rulerSvg.innerHTML = '';
-  zedDrawStart = null;
+  zedRozpracovaneBody = [];
+  aktualizovatZedUlozitTlacitko();
   const popZed = document.getElementById('popover-zed');
   if (popZed) {
     if (tool === 'zed') {
@@ -826,7 +860,7 @@ if (gridUlozitBtn) {
 
 // --- Ruler: čistě klientská pomůcka, nic se neukládá ani nesynchronizuje ---
 let rulerStart = null, rulerClearTimer = null;
-let zedDrawStart = null;
+let zedRozpracovaneBody = [];
 function rulerPoint(e) {
   const r = mapWrap.getBoundingClientRect();
   return {x: e.clientX - r.left, y: e.clientY - r.top};
@@ -917,24 +951,7 @@ if (mapWrap) {
       drawRuler(rulerStart, rulerStart);
       return;
     }
-    if (currentTool === 'zed') {
-      if (e.target.closest('.vtt-token')) return;
-      const p = rulerPoint(e);
-      const blizkaZed = najdiZedBlizkoBodu(p.x, p.y);
-      const btnSmazat = document.getElementById('zedSmazatBtn');
-      if (blizkaZed) {
-        zedVybranaId = blizkaZed.id;
-        if (btnSmazat) btnSmazat.style.display = 'block';
-        renderZdi();
-        return;
-      }
-      zedVybranaId = null;
-      if (btnSmazat) btnSmazat.style.display = 'none';
-      renderZdi();
-      zedDrawStart = snapPoint(p.x, p.y, zedSnapEnabled());
-      drawZedPreview(zedDrawStart, zedDrawStart);
-      return;
-    }
+    if (currentTool === 'zed') return; // zed nekreslí tažením, viz mapWrap 'click' níž
     if (currentTool !== 'select') return;
     const el = e.target.closest('.vtt-token');
     // data-na-tahu je jen klientská pomůcka (viz PHP výš, $naTahu) —
@@ -957,9 +974,9 @@ if (mapWrap) {
       return;
     }
     if (currentTool === 'zed') {
-      if (!zedDrawStart) return;
+      if (zedRozpracovaneBody.length === 0) return;
       const p = rulerPoint(e);
-      drawZedPreview(zedDrawStart, snapPoint(p.x, p.y, zedSnapEnabled()));
+      drawZedRozpracovanouCestu(snapPoint(p.x, p.y, zedSnapEnabled()));
       return;
     }
     if (!dragEl) return;
@@ -987,33 +1004,7 @@ if (mapWrap) {
       if (rulerStart) { rulerStart = null; clearRulerSoon(); }
       return;
     }
-    if (currentTool === 'zed') {
-      if (!zedDrawStart) return;
-      const start = zedDrawStart;
-      zedDrawStart = null;
-      const p = rulerPoint(e);
-      const end = snapPoint(p.x, p.y, zedSnapEnabled());
-      if (rulerSvg) rulerSvg.innerHTML = '';
-      const dist = Math.hypot(end.x - start.x, end.y - start.y);
-      if (dist < 3) return;
-      const sirkaPx = zedSirkaPx();
-      const blokujePohyb = document.getElementById('zedBlokujePohyb').checked;
-      const blokujeVystrel = document.getElementById('zedBlokujeVystrel').checked;
-      const viditelnaHracum = document.getElementById('zedViditelnaHracum').checked;
-      postJson('api/zed_pridat.php', {
-        mapa_id: MAPA_ID, x1: start.x, y1: start.y, x2: end.x, y2: end.y,
-        sirka_px: sirkaPx, blokuje_pohyb: blokujePohyb, blokuje_vystrel: blokujeVystrel, viditelna_hracum: viditelnaHracum,
-      }).then(d => {
-        if (d.error) { logLine('Chyba: ' + d.error); return; }
-        zdiList.push({
-          id: d.id, x1: start.x, y1: start.y, x2: end.x, y2: end.y, sirka_px: sirkaPx,
-          blokuje_pohyb: blokujePohyb, blokuje_vystrel: blokujeVystrel, viditelna_hracum: viditelnaHracum,
-        });
-        posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
-        renderZdi();
-      });
-      return;
-    }
+    if (currentTool === 'zed') return; // zed se zapisuje klikem (viz mapWrap 'click') a ukládá tlačítkem, ne mouseup
     if (!dragEl) return;
     const el = dragEl;
     dragEl = null;
@@ -1036,6 +1027,31 @@ if (mapWrap) {
           posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
           zobrazPing(x, y, d.jmeno || '');
         });
+      return;
+    }
+    if (currentTool === 'zed') {
+      if (e.target.closest('.vtt-token')) return;
+      const p = rulerPoint(e);
+      // Výběr existující zdi jen když zrovna nerozkreslujeme novou cestu —
+      // uprostřed klikání bodů se klik vždycky bere jako další bod, ať
+      // omylem nevybereš/nesmažeš jinou zeď, co ti leží v cestě.
+      if (zedRozpracovaneBody.length === 0) {
+        const blizkaZed = najdiZedBlizkoBodu(p.x, p.y);
+        const btnSmazat = document.getElementById('zedSmazatBtn');
+        if (blizkaZed) {
+          zedVybranaId = blizkaZed.id;
+          if (btnSmazat) btnSmazat.style.display = 'block';
+          renderZdi();
+          return;
+        }
+        zedVybranaId = null;
+        if (btnSmazat) btnSmazat.style.display = 'none';
+        renderZdi();
+      }
+      const bod = snapPoint(p.x, p.y, zedSnapEnabled());
+      zedRozpracovaneBody.push(bod);
+      aktualizovatZedUlozitTlacitko();
+      drawZedRozpracovanouCestu(bod);
       return;
     }
     if (currentTool !== 'select') return;
@@ -1218,6 +1234,48 @@ if (zedSmazatBtn) {
       zedSmazatBtn.style.display = 'none';
       renderZdi();
     });
+  });
+}
+const zedZrusitBtn = document.getElementById('zedZrusitBtn');
+if (zedZrusitBtn) zedZrusitBtn.addEventListener('click', zrusitZedRozpracovanouCestu);
+const zedUlozitBtn = document.getElementById('zedUlozitBtn');
+if (zedUlozitBtn) {
+  zedUlozitBtn.addEventListener('click', () => {
+    if (zedRozpracovaneBody.length < 2) return;
+    const sirkaPx = zedSirkaPx();
+    const blokujePohyb = document.getElementById('zedBlokujePohyb').checked;
+    const blokujeVystrel = document.getElementById('zedBlokujeVystrel').checked;
+    const viditelnaHracum = document.getElementById('zedViditelnaHracum').checked;
+    const useky = [];
+    for (let i = 0; i < zedRozpracovaneBody.length - 1; i++) {
+      useky.push([zedRozpracovaneBody[i], zedRozpracovaneBody[i + 1]]);
+    }
+    // Ukládá se úsek po úseku sekvenčně (ne najednou) — ať chyba uprostřed
+    // lomené zdi nezanechá nekonzistentní stav a zdiList/render odpovídá
+    // přesně tomu, co se fakt uložilo na server.
+    function ulozUsek(i) {
+      if (i >= useky.length) {
+        zedRozpracovaneBody = [];
+        aktualizovatZedUlozitTlacitko();
+        if (rulerSvg) rulerSvg.innerHTML = '';
+        return;
+      }
+      const [a, b] = useky[i];
+      postJson('api/zed_pridat.php', {
+        mapa_id: MAPA_ID, x1: a.x, y1: a.y, x2: b.x, y2: b.y,
+        sirka_px: sirkaPx, blokuje_pohyb: blokujePohyb, blokuje_vystrel: blokujeVystrel, viditelna_hracum: viditelnaHracum,
+      }).then(d => {
+        if (d.error) { logLine('Chyba: ' + d.error); return; }
+        zdiList.push({
+          id: d.id, x1: a.x, y1: a.y, x2: b.x, y2: b.y, sirka_px: sirkaPx,
+          blokuje_pohyb: blokujePohyb, blokuje_vystrel: blokujeVystrel, viditelna_hracum: viditelnaHracum,
+        });
+        posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
+        renderZdi();
+        ulozUsek(i + 1);
+      });
+    }
+    ulozUsek(0);
   });
 }
 const koloBtn = document.getElementById('tb-kolo');
