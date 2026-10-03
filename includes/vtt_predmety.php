@@ -239,12 +239,18 @@ function dracak_vtt_polozka_dosah_sahy(string $typPolozky, array $katalog): ?flo
 // měřítko px->sáh) nebo některá z entit na týhle mapě token nemá.
 function dracak_vtt_vzdalenost_tokenu_sahy(PDO $pdo, int $mapaId, string $typA, int $entitaA, string $typB, int $entitaB): ?float
 {
-    $stmt = $pdo->prepare('SELECT grid_velikost_px FROM mapy WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT grid_velikost_px, grid_typ FROM mapy WHERE id = ?');
     $stmt->execute([$mapaId]);
-    $gridPx = (int)$stmt->fetchColumn();
+    $mapa = $stmt->fetch();
+    $gridPx = (int)($mapa['grid_velikost_px'] ?? 0);
     if ($gridPx <= 0) {
         return null;
     }
+    // Px na 1 sáh — stejná oprava jako pxNaSah() v hra/mapa.php: u hexu
+    // je grid_velikost_px circumradius (střed->vrchol), ale 1 sáh je
+    // vzdálenost STŘED-STŘED sousedních hexů = √3 × circumradius, ne
+    // circumradius samotný.
+    $pxSah = ($mapa['grid_typ'] ?? 'ctverec') === 'hex' ? sqrt(3) * $gridPx : $gridPx;
     $stmt = $pdo->prepare('SELECT x, y FROM tokeny WHERE mapa_id = ? AND typ_entity = ? AND entita_id = ? LIMIT 1');
     $stmt->execute([$mapaId, $typA, $entitaA]);
     $tokenA = $stmt->fetch();
@@ -254,7 +260,24 @@ function dracak_vtt_vzdalenost_tokenu_sahy(PDO $pdo, int $mapaId, string $typA, 
         return null;
     }
     $distPx = hypot((int)$tokenB['x'] - (int)$tokenA['x'], (int)$tokenB['y'] - (int)$tokenA['y']);
-    return $distPx / $gridPx;
+    return $distPx / $pxSah;
+}
+
+// LoS (blokuje_vystrel) mezi dvěma tokeny na týž mapě — viz
+// dracak_vtt_los_blokovana_zdi() v includes/vtt.php. Vrací null, když to
+// nejde ověřit (některá entita na týhle mapě token nemá), stejná
+// konvence jako dracak_vtt_vzdalenost_tokenu_sahy() výš.
+function dracak_vtt_los_blokovana(PDO $pdo, int $mapaId, string $typA, int $entitaA, string $typB, int $entitaB): ?bool
+{
+    $stmt = $pdo->prepare('SELECT x, y FROM tokeny WHERE mapa_id = ? AND typ_entity = ? AND entita_id = ? LIMIT 1');
+    $stmt->execute([$mapaId, $typA, $entitaA]);
+    $tokenA = $stmt->fetch();
+    $stmt->execute([$mapaId, $typB, $entitaB]);
+    $tokenB = $stmt->fetch();
+    if (!$tokenA || !$tokenB) {
+        return null;
+    }
+    return dracak_vtt_los_blokovana_zdi($pdo, $mapaId, (float)$tokenA['x'], (float)$tokenA['y'], (float)$tokenB['x'], (float)$tokenB['y']);
 }
 
 // Uloží novou hodnotu aktualni_hp entity se stejným ořezem 0..max_hp jako

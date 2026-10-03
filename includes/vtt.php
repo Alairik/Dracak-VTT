@@ -136,6 +136,30 @@ function dracak_vtt_pohyb_prochazi_zdi(PDO $pdo, int $mapaId, float $x1, float $
     return false;
 }
 
+// LoS (blokuje_vystrel) mezi dvěma body na týhle mapě — stejný princip
+// jako dracak_vtt_pohyb_prochazi_zdi() výš, jen jiný sloupec zdi a bez
+// výjimky pro PJ/admin: výhled buď je, nebo není blokovaný fyzickým
+// překážkou, nezávisle na tom, kdo se ptá (na rozdíl od pohybu, kde PJ
+// token na zeď/přes ni smí položit záměrně). Použito z
+// includes/vtt_predmety.php (kontrola dosahu kouzel/zbraní) —
+// content/pravidla-hrac.html h1621 řeší LoS jako boolean průsečík
+// paprsku se zdí, ne plný viditelnostní polygon (viz
+// docs/vtt-datovy-model-navrh-v1.md, "Rozhodnutí, která už platí").
+function dracak_vtt_los_blokovana_zdi(PDO $pdo, int $mapaId, float $x1, float $y1, float $x2, float $y2): bool
+{
+    $stmt = $pdo->prepare('SELECT x1, y1, x2, y2 FROM zdi WHERE mapa_id = ? AND blokuje_vystrel = 1');
+    $stmt->execute([$mapaId]);
+    foreach ($stmt->fetchAll() as $z) {
+        if (dracak_vtt_useky_se_protinaji(
+            $x1, $y1, $x2, $y2,
+            (float)$z['x1'], (float)$z['y1'], (float)$z['x2'], (float)$z['y2']
+        )) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function dracak_vtt_entity_row(string $typEntity, int $entitaId): ?array
 {
     $table = $typEntity === 'nestvura_instance' ? 'nestvura_instance' : 'postavy';

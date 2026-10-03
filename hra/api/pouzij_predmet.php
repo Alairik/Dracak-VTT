@@ -118,6 +118,21 @@ if (!$katalog) {
 // plausibilita; zfalšovaná mapa_id by nanejvýš obešla měření
 // vzdálenosti, ne povolení/zákaz akce samotné).
 $maSkutecnyCil = $cilTypEntity !== $typEntity || $cilEntitaId !== $entitaId;
+
+// LoS (zdi.blokuje_vystrel) — nezávislé na dosahu, kontroluje se vždycky
+// když je skutečný cíl a známe mapu, i když dosah položky nejde
+// rozparsovat (viz dracak_vtt_los_blokovana níž). Stejná úroveň jako
+// kontrola dosahu pod tímhle blokem — fyzikální plausibilita, ne
+// bezpečnostní hranice (viz komentář tam).
+if ($maSkutecnyCil && $pozadovanaMapaId !== null) {
+    $losBlokovana = dracak_vtt_los_blokovana($pdo, $pozadovanaMapaId, $typEntity, $entitaId, $cilTypEntity, $cilEntitaId);
+    if ($losBlokovana === true) {
+        http_response_code(422);
+        echo json_encode(['error' => 'Na cíl nevidíš — v cestě je zeď.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
+
 if ($maSkutecnyCil && $pozadovanaMapaId !== null) {
     $dosahSahy = dracak_vtt_polozka_dosah_sahy($typPolozky, $katalog);
     if ($dosahSahy !== null) {
