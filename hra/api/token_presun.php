@@ -18,7 +18,7 @@ $noveY = (int)($data['y'] ?? 0);
 
 $pdo = dracak_db();
 $stmt = $pdo->prepare(
-    'SELECT t.*, m.svet_id, m.sirka_px, m.vyska_px, m.grid_velikost_px, m.grid_typ
+    'SELECT t.*, m.svet_id, m.sirka_px, m.vyska_px, m.grid_velikost_px, m.grid_typ, m.grid_posun_x, m.grid_posun_y
      FROM tokeny t JOIN mapy m ON m.id = t.mapa_id WHERE t.id = ?'
 );
 $stmt->execute([$tokenId]);
@@ -86,6 +86,8 @@ if ($token['typ_entity'] === 'postava') {
             'vyska_px' => $token['vyska_px'],
             'grid_velikost_px' => $token['grid_velikost_px'],
             'grid_typ' => $token['grid_typ'],
+            'grid_posun_x' => $token['grid_posun_x'],
+            'grid_posun_y' => $token['grid_posun_y'],
         ], (int)$vlastnikUcetId, (float)$noveX, (float)$noveY);
     }
 }

@@ -16,6 +16,10 @@ $mapaId = (int)($data['mapa_id'] ?? 0);
 $ucetId = (int)($data['ucet_id'] ?? 0);
 $x = (float)($data['x'] ?? 0);
 $y = (float)($data['y'] ?? 0);
+// x2/y2 nepovinné — s nimi se bere jako obdélníkový výběr (tažení přes
+// víc buněk najednou), bez nich jako jedna buňka pod bodem (x,y).
+$x2 = isset($data['x2']) ? (float)$data['x2'] : null;
+$y2 = isset($data['y2']) ? (float)$data['y2'] : null;
 $odhalit = !empty($data['odhalit']);
 
 $pdo = dracak_db();
@@ -35,5 +39,9 @@ if (!$stmt->fetchColumn()) {
     exit;
 }
 
-dracak_vtt_mlha_nastav_bod($pdo, $mapa, $ucetId, $x, $y, $odhalit);
+if ($x2 !== null && $y2 !== null) {
+    dracak_vtt_mlha_nastav_obdelnik($pdo, $mapa, $ucetId, $x, $y, $x2, $y2, $odhalit);
+} else {
+    dracak_vtt_mlha_nastav_bod($pdo, $mapa, $ucetId, $x, $y, $odhalit);
+}
 echo json_encode(['ok' => true]);

@@ -386,9 +386,13 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
     <label style="display:flex;align-items:center;gap:6px;font-weight:400;">
       <input type="checkbox" id="mlhaAktivniChk" <?= $mapa['mlha_aktivni'] ? 'checked' : '' ?>> Mlha aktivní na týhle mapě
     </label>
-    <p class="note" style="margin-top:4px;">Vypnuté = hráči vidí celou mapu bez odhalování, stejně jako ty.</p>
+    <p class="note" style="margin-top:4px;">Vypnuté = hráči vidí celou mapu bez odhalování, stejně jako ty. Mlha vyžaduje nastavený grid (respektuje jeho buňky/hexy) — bez gridu nejde zapnout.</p>
+    <div style="display:flex;gap:6px;margin-top:10px;">
+      <button class="btn btn-secondary" type="button" id="mlhaOdhalitVseBtn" style="flex:1;font-size:12px;">Odhalit mapu všem</button>
+      <button class="btn btn-ghost" type="button" id="mlhaZatahnoutVseBtn" style="flex:1;font-size:12px;">Zahalit mapu všem</button>
+    </div>
     <?php if ($hraciVeSvete): ?>
-    <label for="mlhaNahledSelect" style="margin-top:10px;">Náhled a ruční úprava mlhy hráče</label>
+    <label for="mlhaNahledSelect" style="margin-top:14px;">Náhled a ruční úprava mlhy hráče</label>
     <select class="input" id="mlhaNahledSelect">
       <option value="">— normální pohled (bez náhledu) —</option>
       <?php foreach ($hraciVeSvete as $h): ?>
@@ -396,12 +400,16 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
       <?php endforeach; ?>
     </select>
     <div id="mlhaKresliciFields" style="display:none;margin-top:8px;">
-      <p class="note" style="margin:0 0 6px;">Vidíš, co má tenhle hráč odhalené (tmavé = skryté). Táhni po mapě a kresli:</p>
+      <p class="note" style="margin:0 0 6px;">Vidíš, co má tenhle hráč odhalené (tmavé = skryté).</p>
       <div style="display:flex;gap:6px;">
+        <button class="btn btn-secondary" type="button" id="mlhaRezimVolnaRukaBtn" style="flex:1;font-size:12px;">Volná ruka</button>
+        <button class="btn btn-ghost" type="button" id="mlhaRezimObdelnikBtn" style="flex:1;font-size:12px;">Obdélník</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:6px;">
         <button class="btn btn-secondary" type="button" id="mlhaOdhalitBtn" style="flex:1;">Odhalit</button>
         <button class="btn btn-ghost" type="button" id="mlhaZatahnoutBtn" style="flex:1;">Zatáhnout</button>
       </div>
-      <p class="note" style="margin-top:6px;" id="mlhaKreslimRezim">Režim: odhalit</p>
+      <p class="note" style="margin-top:6px;" id="mlhaKreslimRezim">Volná ruka — táhni po mapě. Režim: odhalit</p>
     </div>
     <?php else: ?>
     <p class="note">Ve světě zatím není žádný hráč pro náhled.</p>
@@ -514,6 +522,39 @@ const mlhaCanvas = document.getElementById('mlhaCanvas');
 // samé, ale přes hra/api/mlha_nahled.php (PJ-only, cizí mlha na vyžádání).
 // Server je jediný zdroj pravdy, klient si bitmapu jen vykresluje.
 let mlhaPosledniStav = null;
+// Buňka mlhy JE buňka herního gridu (čtverec i hex) — stejná geometrie
+// jako renderGrid()/gridCellCenter() níž, jen vrácená jako Path2D pro
+// vykreslení/optimistické kreslení. Střed (cx,cy) je v souřadnicích mapy.
+function mlhaBunkaTvarCesta(cx, cy) {
+  const p = new Path2D();
+  if (GRID_TYPE === 'hex') {
+    for (let i = 0; i < 6; i++) {
+      const a = Math.PI / 180 * (60 * i - 30);
+      const x = cx + GRID_PX * Math.cos(a), y = cy + GRID_PX * Math.sin(a);
+      if (i === 0) p.moveTo(x, y); else p.lineTo(x, y);
+    }
+    p.closePath();
+  } else {
+    p.rect(cx - GRID_PX / 2, cy - GRID_PX / 2, GRID_PX, GRID_PX);
+  }
+  return p;
+}
+// Střed buňky (row, col) v px — inverzní k gridCellCenter(), jen s
+// explicitním indexem místo "nejbližší k bodu" (potřeba pro vykreslení
+// celé uložené bitmapy, ne jen jednoho kliknutí). Musí být přesná
+// shoda se server-side dracak_vtt_mlha_bunka_stred() (includes/vtt_mlha.php).
+function mlhaBunkaStred(row, col) {
+  if (GRID_TYPE === 'hex') {
+    const colStep = Math.sqrt(3) * GRID_PX, rowStep = 1.5 * GRID_PX;
+    const offX = ((GRID_OFFSET_X % colStep) + colStep) % colStep;
+    const offY = ((GRID_OFFSET_Y % rowStep) + rowStep) % rowStep;
+    const rowShift = (Math.abs(row % 2) === 1) ? colStep / 2 : 0;
+    return {x: offX + col * colStep + rowShift, y: offY + row * rowStep};
+  }
+  const offX = ((GRID_OFFSET_X % GRID_PX) + GRID_PX) % GRID_PX;
+  const offY = ((GRID_OFFSET_Y % GRID_PX) + GRID_PX) % GRID_PX;
+  return {x: offX + col * GRID_PX + GRID_PX / 2, y: offY + row * GRID_PX + GRID_PX / 2};
+}
 function renderMlha(stav) {
   if (!mlhaCanvas) return;
   mlhaPosledniStav = stav;
@@ -526,12 +567,12 @@ function renderMlha(stav) {
   ctx.clearRect(0, 0, w, h);
   if (!stav || stav.zadna_mlha || !stav.sloupcu || !stav.radku) return;
   const bin = atob(stav.bitmapa_b64);
-  const bunka = stav.bunka_px;
-  ctx.fillStyle = 'rgba(8,8,10,0.92)';
-  for (let row = 0; row < stav.radku; row++) {
-    for (let col = 0; col < stav.sloupcu; col++) {
-      if (bin.charCodeAt(row * stav.sloupcu + col) === 1) continue;
-      ctx.fillRect(col * bunka, row * bunka, bunka, bunka);
+  ctx.fillStyle = '#08080a';
+  for (let r = 0; r < stav.radku; r++) {
+    for (let c = 0; c < stav.sloupcu; c++) {
+      if (bin.charCodeAt(r * stav.sloupcu + c) === 1) continue;
+      const stred = mlhaBunkaStred(r + stav.min_row, c + stav.min_col);
+      ctx.fill(mlhaBunkaTvarCesta(stred.x, stred.y));
     }
   }
 }
@@ -1000,52 +1041,106 @@ function zrusitMlhaNahled() {
 }
 const mlhaOdhalitBtn = document.getElementById('mlhaOdhalitBtn');
 const mlhaZatahnoutBtn = document.getElementById('mlhaZatahnoutBtn');
+const mlhaRezimVolnaRukaBtn = document.getElementById('mlhaRezimVolnaRukaBtn');
+const mlhaRezimObdelnikBtn = document.getElementById('mlhaRezimObdelnikBtn');
 const mlhaKreslimRezimEl = document.getElementById('mlhaKreslimRezim');
+// Dva nezávislé přepínače (štětec odhalit/zatáhnout × tvar volná ruka/obdélník)
+// sdílí jeden řádek textu dole v popoveru — každá ze dvou funkcí níž mění
+// jen "svoji" část stavu a pak obě společně přeskládají celý text, aby se
+// vzájemně nepřepisovaly (dřív nastavMlhaKreslimRezim mazala zmínku o tvaru).
+function obnovMlhaRezimText() {
+  if (!mlhaKreslimRezimEl) return;
+  const tvar = mlhaRezimObdelnik ? 'Obdélník — táhni z rohu do rohu.' : 'Volná ruka — táhni po mapě.';
+  const stetec = mlhaKreslimOdhalit ? 'odhalit' : 'zatáhnout';
+  mlhaKreslimRezimEl.textContent = tvar + ' Režim: ' + stetec;
+}
 function nastavMlhaKreslimRezim(odhalit) {
   mlhaKreslimOdhalit = odhalit;
   if (mlhaOdhalitBtn) mlhaOdhalitBtn.classList.toggle('btn-primary', odhalit);
   if (mlhaOdhalitBtn) mlhaOdhalitBtn.classList.toggle('btn-secondary', !odhalit);
   if (mlhaZatahnoutBtn) mlhaZatahnoutBtn.classList.toggle('btn-primary', !odhalit);
   if (mlhaZatahnoutBtn) mlhaZatahnoutBtn.classList.toggle('btn-ghost', odhalit);
-  if (mlhaKreslimRezimEl) mlhaKreslimRezimEl.textContent = 'Režim: ' + (odhalit ? 'odhalit' : 'zatáhnout');
+  obnovMlhaRezimText();
+}
+function nastavMlhaRezimObdelnik(obdelnik) {
+  mlhaRezimObdelnik = obdelnik;
+  mlhaObdelnikStart = null;
+  if (rulerSvg) rulerSvg.innerHTML = '';
+  if (mlhaRezimVolnaRukaBtn) mlhaRezimVolnaRukaBtn.classList.toggle('btn-primary', !obdelnik);
+  if (mlhaRezimVolnaRukaBtn) mlhaRezimVolnaRukaBtn.classList.toggle('btn-secondary', obdelnik);
+  if (mlhaRezimObdelnikBtn) mlhaRezimObdelnikBtn.classList.toggle('btn-primary', obdelnik);
+  if (mlhaRezimObdelnikBtn) mlhaRezimObdelnikBtn.classList.toggle('btn-ghost', !obdelnik);
+  obnovMlhaRezimText();
 }
 if (mlhaOdhalitBtn) mlhaOdhalitBtn.addEventListener('click', () => nastavMlhaKreslimRezim(true));
 if (mlhaZatahnoutBtn) mlhaZatahnoutBtn.addEventListener('click', () => nastavMlhaKreslimRezim(false));
+if (mlhaRezimVolnaRukaBtn) mlhaRezimVolnaRukaBtn.addEventListener('click', () => nastavMlhaRezimObdelnik(false));
+if (mlhaRezimObdelnikBtn) mlhaRezimObdelnikBtn.addEventListener('click', () => nastavMlhaRezimObdelnik(true));
 if (mlhaNahledSelect) {
   mlhaNahledSelect.addEventListener('change', () => {
     mlhaNahledUcetId = mlhaNahledSelect.value ? parseInt(mlhaNahledSelect.value, 10) : null;
     if (mlhaKresliciFields) mlhaKresliciFields.style.display = mlhaNahledUcetId ? '' : 'none';
-    if (mlhaNahledUcetId) nastavMlhaKreslimRezim(true);
+    if (mlhaNahledUcetId) { nastavMlhaRezimObdelnik(false); nastavMlhaKreslimRezim(true); }
     setTool(mlhaNahledUcetId ? 'mlha' : 'select');
     osvezitMlhu();
   });
 }
+const mlhaOdhalitVseBtn = document.getElementById('mlhaOdhalitVseBtn');
+const mlhaZatahnoutVseBtn = document.getElementById('mlhaZatahnoutVseBtn');
+// Hromadná akce pro VŠECHNY hráče světa najednou — bez undo, proto potvrzení.
+function mlhaHromadne(odhalit) {
+  const otazka = odhalit
+    ? 'Odhalit celou mapu úplně všem hráčům? Přepíše se jim tím dosavadní prozkoumané území.'
+    : 'Zatáhnout celou mapu zpátky úplně všem hráčům? Smažou se jim tím všechny dosavadní odhalené oblasti.';
+  if (!confirm(otazka)) return;
+  postJson('api/mlha_hromadne.php', {mapa_id: MAPA_ID, odhalit})
+    .then(d => {
+      if (d.error) { logLine('Chyba: ' + d.error); return; }
+      logLine(odhalit ? 'Mapa odhalena všem hráčům.' : 'Mapa zatažena všem hráčům.');
+      osvezitMlhu();
+    });
+}
+if (mlhaOdhalitVseBtn) mlhaOdhalitVseBtn.addEventListener('click', () => mlhaHromadne(true));
+if (mlhaZatahnoutVseBtn) mlhaZatahnoutVseBtn.addEventListener('click', () => mlhaHromadne(false));
 
 // --- Ruler: čistě klientská pomůcka, nic se neukládá ani nesynchronizuje ---
 let rulerStart = null, rulerClearTimer = null;
 let zedRozpracovaneBody = [];
 let mlhaKreslim = false, mlhaPosledniBunka = null;
+let mlhaRezimObdelnik = false, mlhaObdelnikStart = null;
 function rulerPoint(e) {
   const r = mapWrap.getBoundingClientRect();
   return {x: e.clientX - r.left, y: e.clientY - r.top};
 }
-// PJ ruční kreslení mlhy (viz popover "Mlha") — na rozdíl od
-// dracak_vtt_mlha_odhal_kolem_bodu() žádná LoS kontrola, žádný poloměr,
-// jen přímo ta jedna buňka pod kurzorem. Optimistická lokální úprava
-// bitmapy (okamžitá odezva), server je potvrzuje/ukládá async.
+// PJ ruční kreslení mlhy, volná ruka (viz popover "Mlha") — na rozdíl
+// od dracak_vtt_mlha_odhal_kolem_bodu() žádná LoS kontrola, žádné
+// "nikdy znovu nezatáhnout", jen přímo ta jedna buňka GRIDU pod
+// kurzorem (gridCellCenter() řeší čtverec i hex stejně jako u tokenů).
+// Optimistické kreslení přímo tvaru buňky (okamžitá odezva, žádná
+// bit-manipulace báze64 navíc) — server dotaz potvrzuje/ukládá async;
+// obdélníkový režim (mlhaRezimObdelnik) po odeslání vždycky přetáhne
+// čerstvý stav ze serveru (viz mapWrap mouseup níž), tohle platí jen
+// pro kreslení bod-po-bodu.
 function mlhaNakresliBod(p) {
-  if (!mlhaPosledniStav || mlhaPosledniStav.zadna_mlha || !mlhaNahledUcetId) return;
-  const bunka = mlhaPosledniStav.bunka_px || 32;
-  const col = Math.min(mlhaPosledniStav.sloupcu - 1, Math.max(0, Math.floor(p.x / bunka)));
-  const row = Math.min(mlhaPosledniStav.radku - 1, Math.max(0, Math.floor(p.y / bunka)));
-  const key = row + ':' + col;
+  if (!mlhaNahledUcetId || GRID_PX <= 0) return;
+  const stred = gridCellCenter(p.x, p.y);
+  const key = Math.round(stred.x) + ':' + Math.round(stred.y);
   if (key === mlhaPosledniBunka) return;
   mlhaPosledniBunka = key;
-  const idx = row * mlhaPosledniStav.sloupcu + col;
-  const bin = atob(mlhaPosledniStav.bitmapa_b64);
-  mlhaPosledniStav.bitmapa_b64 = btoa(bin.substring(0, idx) + String.fromCharCode(mlhaKreslimOdhalit ? 1 : 0) + bin.substring(idx + 1));
-  renderMlha(mlhaPosledniStav);
-  postJson('api/mlha_uprava.php', {mapa_id: MAPA_ID, ucet_id: mlhaNahledUcetId, x: p.x, y: p.y, odhalit: mlhaKreslimOdhalit})
+  if (mlhaCanvas) {
+    const ctx = mlhaCanvas.getContext('2d');
+    const tvar = mlhaBunkaTvarCesta(stred.x, stred.y);
+    if (mlhaKreslimOdhalit) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.fill(tvar);
+      ctx.restore();
+    } else {
+      ctx.fillStyle = '#08080a';
+      ctx.fill(tvar);
+    }
+  }
+  postJson('api/mlha_uprava.php', {mapa_id: MAPA_ID, ucet_id: mlhaNahledUcetId, x: stred.x, y: stred.y, odhalit: mlhaKreslimOdhalit})
     .then(d => { if (d.error) logLine('Chyba: ' + d.error); });
 }
 function drawRuler(a, b) {
@@ -1139,9 +1234,13 @@ if (mapWrap) {
     }
     if (currentTool === 'zed') return; // zed nekreslí tažením, viz mapWrap 'click' níž
     if (currentTool === 'mlha') {
-      mlhaKreslim = true;
-      mlhaPosledniBunka = null;
-      mlhaNakresliBod(rulerPoint(e));
+      if (mlhaRezimObdelnik) {
+        mlhaObdelnikStart = rulerPoint(e);
+      } else {
+        mlhaKreslim = true;
+        mlhaPosledniBunka = null;
+        mlhaNakresliBod(rulerPoint(e));
+      }
       return;
     }
     if (currentTool !== 'select') return;
@@ -1172,6 +1271,17 @@ if (mapWrap) {
       return;
     }
     if (currentTool === 'mlha') {
+      if (mlhaRezimObdelnik) {
+        if (!mlhaObdelnikStart) return;
+        const p = rulerPoint(e);
+        if (rulerSvg) {
+          const x = Math.min(mlhaObdelnikStart.x, p.x), y = Math.min(mlhaObdelnikStart.y, p.y);
+          const sw = Math.abs(p.x - mlhaObdelnikStart.x), sh = Math.abs(p.y - mlhaObdelnikStart.y);
+          rulerSvg.innerHTML = '<rect x="' + x + '" y="' + y + '" width="' + sw + '" height="' + sh
+            + '" fill="rgba(255,209,102,0.15)" stroke="#ffd166" stroke-width="2" stroke-dasharray="6 4"/>';
+        }
+        return;
+      }
       if (!mlhaKreslim) return;
       mlhaNakresliBod(rulerPoint(e));
       return;
@@ -1202,7 +1312,22 @@ if (mapWrap) {
       return;
     }
     if (currentTool === 'zed') return; // zed se zapisuje klikem (viz mapWrap 'click') a ukládá tlačítkem, ne mouseup
-    if (currentTool === 'mlha') { mlhaKreslim = false; return; }
+    if (currentTool === 'mlha') {
+      if (mlhaRezimObdelnik) {
+        if (!mlhaObdelnikStart) return;
+        const p = rulerPoint(e);
+        const start = mlhaObdelnikStart;
+        mlhaObdelnikStart = null;
+        if (rulerSvg) rulerSvg.innerHTML = '';
+        postJson('api/mlha_uprava.php', {
+          mapa_id: MAPA_ID, ucet_id: mlhaNahledUcetId,
+          x: start.x, y: start.y, x2: p.x, y2: p.y, odhalit: mlhaKreslimOdhalit,
+        }).then(d => { if (d.error) { logLine('Chyba: ' + d.error); return; } osvezitMlhu(); });
+        return;
+      }
+      mlhaKreslim = false;
+      return;
+    }
     if (!dragEl) return;
     const el = dragEl;
     dragEl = null;

@@ -35,8 +35,11 @@ if (!$stmt->fetchColumn()) {
 
 $stav = dracak_vtt_mlha_nacti($pdo, $mapa, $ucetId);
 echo json_encode([
+    'typ' => $stav['typ'],
     'bunka_px' => $stav['bunka_px'],
     'sloupcu' => $stav['sloupcu'],
     'radku' => $stav['radku'],
+    'min_row' => $stav['min_row'] ?? 0,
+    'min_col' => $stav['min_col'] ?? 0,
     'bitmapa_b64' => base64_encode($stav['bitmapa']),
 ]);

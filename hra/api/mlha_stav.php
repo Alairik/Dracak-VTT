@@ -33,9 +33,16 @@ if (in_array($user['role'], ['admin', 'pj'], true) || !$mapa['mlha_aktivni']) {
 
 $stav = dracak_vtt_mlha_nacti($pdo, $mapa, (int)$user['id']);
 echo json_encode([
+    'typ' => $stav['typ'],
     'bunka_px' => $stav['bunka_px'],
     'sloupcu' => $stav['sloupcu'],
     'radku' => $stav['radku'],
+    // min_row/min_col: klient potřebuje k převodu bitmapy (vždy 0-indexované
+    // řádky/sloupce) zpátky na skutečné (row,col) buňky gridu, viz
+    // hra/mapa.php mlhaBunkaStred() — gridu samotnému totiž nic nebrání
+    // mít zápornou buňku (posun gridu doleva/nahoru od obrázku).
+    'min_row' => $stav['min_row'] ?? 0,
+    'min_col' => $stav['min_col'] ?? 0,
     // Base64 — bitmapa je binární (NUL bajty), JSON string to nezvládne
     // syrově; klient si ho dekóduje přes atob().
     'bitmapa_b64' => base64_encode($stav['bitmapa']),
