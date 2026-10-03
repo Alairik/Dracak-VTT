@@ -78,6 +78,64 @@ function dracak_vtt_je_na_tahu(array $user, int $mapaId, int $tokenId): bool
     return (int)($koloStav['aktivni_token_id'] ?? 0) === $tokenId;
 }
 
+// Orientace trojice bodů: 0 kolineární, 1/2 po/proti směru hod. ručiček.
+function dracak_vtt_orientace(float $ax, float $ay, float $bx, float $by, float $cx, float $cy): int
+{
+    $val = ($by - $ay) * ($cx - $bx) - ($bx - $ax) * ($cy - $by);
+    if (abs($val) < 1e-9) return 0;
+    return $val > 0 ? 1 : 2;
+}
+
+// Bod C leží (kolineárně) na úsečce AB — pomocná funkce jen pro
+// degenerované (kolineární) případy v dracak_vtt_useky_se_protinaji().
+function dracak_vtt_bod_na_usecce(float $ax, float $ay, float $bx, float $by, float $cx, float $cy): bool
+{
+    return $cx <= max($ax, $bx) + 1e-9 && $cx >= min($ax, $bx) - 1e-9
+        && $cy <= max($ay, $by) + 1e-9 && $cy >= min($ay, $by) - 1e-9;
+}
+
+// Standardní test průniku dvou úseček (orientation-based, viz běžný
+// computational-geometry algoritmus) — používá se pro pohyb tokenu přes
+// zeď (dracak_vtt_pohyb_prochazi_zdi) i budoucí LoS (blokuje_vystrel).
+function dracak_vtt_useky_se_protinaji(
+    float $p1x, float $p1y, float $q1x, float $q1y,
+    float $p2x, float $p2y, float $q2x, float $q2y
+): bool {
+    $o1 = dracak_vtt_orientace($p1x, $p1y, $q1x, $q1y, $p2x, $p2y);
+    $o2 = dracak_vtt_orientace($p1x, $p1y, $q1x, $q1y, $q2x, $q2y);
+    $o3 = dracak_vtt_orientace($p2x, $p2y, $q2x, $q2y, $p1x, $p1y);
+    $o4 = dracak_vtt_orientace($p2x, $p2y, $q2x, $q2y, $q1x, $q1y);
+
+    if ($o1 !== $o2 && $o3 !== $o4) {
+        return true;
+    }
+    if ($o1 === 0 && dracak_vtt_bod_na_usecce($p1x, $p1y, $q1x, $q1y, $p2x, $p2y)) return true;
+    if ($o2 === 0 && dracak_vtt_bod_na_usecce($p1x, $p1y, $q1x, $q1y, $q2x, $q2y)) return true;
+    if ($o3 === 0 && dracak_vtt_bod_na_usecce($p2x, $p2y, $q2x, $q2y, $p1x, $p1y)) return true;
+    if ($o4 === 0 && dracak_vtt_bod_na_usecce($p2x, $p2y, $q2x, $q2y, $q1x, $q1y)) return true;
+    return false;
+}
+
+// Blokuje některá zeď (blokuje_pohyb=1) na týhle mapě cestu z bodu A do
+// bodu B? Volá se jen pro roli 'hrac' (viz hra/api/token_presun.php) —
+// PJ/admin token na/přes zeď položit smí (postava odhozená do zdi,
+// vylézání po zdi apod. — zeď blokuje běžný pohyb hráče, ne PJovo
+// úmyslné umístění tokenu).
+function dracak_vtt_pohyb_prochazi_zdi(PDO $pdo, int $mapaId, float $x1, float $y1, float $x2, float $y2): bool
+{
+    $stmt = $pdo->prepare('SELECT x1, y1, x2, y2 FROM zdi WHERE mapa_id = ? AND blokuje_pohyb = 1');
+    $stmt->execute([$mapaId]);
+    foreach ($stmt->fetchAll() as $z) {
+        if (dracak_vtt_useky_se_protinaji(
+            $x1, $y1, $x2, $y2,
+            (float)$z['x1'], (float)$z['y1'], (float)$z['x2'], (float)$z['y2']
+        )) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function dracak_vtt_entity_row(string $typEntity, int $entitaId): ?array
 {
     $table = $typEntity === 'nestvura_instance' ? 'nestvura_instance' : 'postavy';
