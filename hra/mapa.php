@@ -232,6 +232,9 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
       <svg id="gridSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:0;"></svg>
       <svg id="zdiSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:5;"></svg>
       <svg id="rulerSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:140;"></svg>
+      <?php if (!$isPjOrAdmin): ?>
+      <canvas id="mlhaCanvas" style="position:absolute;top:0;left:0;pointer-events:none;z-index:100;"></canvas>
+      <?php endif; ?>
       <?php foreach ($tokeny as $t):
           $entKey = $t['typ_entity'] . ':' . $t['entita_id'];
           $efektyText = implode(', ', $aktivniEfektyByEntity[$entKey] ?? []);
@@ -465,6 +468,41 @@ const viewport = document.getElementById('viewport');
 const logList = document.getElementById('logList');
 const rulerSvg = document.getElementById('rulerSvg');
 const mapImgEl = document.getElementById('mapImg');
+const mlhaCanvas = document.getElementById('mlhaCanvas');
+
+// --- Mlha války: canvas vrstva nad tokeny (z-index 100), jen pro
+// hráče (PJ/admin vidí vždycky celou mapu, mlhaCanvas se pro ně vůbec
+// nevykresluje, viz PHP výš) — proto všude dole stačí kontrola
+// !mlhaCanvas, žádná zvlášť IS_PJ_OR_ADMIN větev. Server je jediný
+// zdroj pravdy (hra/api/mlha_stav.php) — klient si bitmapu jen
+// vykresluje, nepočítá si vlastní odhalování.
+function renderMlha(stav) {
+  if (!mlhaCanvas) return;
+  const w = mapImgEl.naturalWidth || mapWrap.clientWidth;
+  const h = mapImgEl.naturalHeight || mapWrap.clientHeight;
+  if (!w || !h) return;
+  mlhaCanvas.width = w;
+  mlhaCanvas.height = h;
+  const ctx = mlhaCanvas.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
+  if (!stav || stav.zadna_mlha || !stav.sloupcu || !stav.radku) return;
+  const bin = atob(stav.bitmapa_b64);
+  const bunka = stav.bunka_px;
+  ctx.fillStyle = 'rgba(8,8,10,0.92)';
+  for (let row = 0; row < stav.radku; row++) {
+    for (let col = 0; col < stav.sloupcu; col++) {
+      if (bin.charCodeAt(row * stav.sloupcu + col) === 1) continue;
+      ctx.fillRect(col * bunka, row * bunka, bunka, bunka);
+    }
+  }
+}
+function osvezitMlhu() {
+  if (!mlhaCanvas) return;
+  fetch('api/mlha_stav.php?mapa_id=' + MAPA_ID)
+    .then(r => r.json())
+    .then(renderMlha)
+    .catch(() => {});
+}
 
 // --- Grid overlay: čistě vizuální, neinteraktivní (pointer-events:none),
 // nad obrázkem a pod tokeny/rulerem. Čtverec = rovné čáry po GRID_PX.
@@ -734,7 +772,7 @@ function zrusitZedRozpracovanouCestu() {
   if (rulerSvg) rulerSvg.innerHTML = '';
 }
 
-if (mapImgEl.complete) { renderGrid(); renderZdi(); } else mapImgEl.addEventListener('load', () => { renderGrid(); renderZdi(); });
+if (mapImgEl.complete) { renderGrid(); renderZdi(); osvezitMlhu(); } else mapImgEl.addEventListener('load', () => { renderGrid(); renderZdi(); osvezitMlhu(); });
 
 function logLine(text) {
   if (!logList) return;
@@ -1365,6 +1403,7 @@ function applyEvent(u) {
   if (u.typ === 'token_presun') {
     const el = mapWrap && mapWrap.querySelector('.vtt-token[data-id="' + u.payload.token_id + '"]');
     if (el) { el.style.left = u.payload.x_po + 'px'; el.style.top = u.payload.y_po + 'px'; }
+    osvezitMlhu();
   } else if (u.typ === 'kostka_hod') {
     logLine((u.payload.hodil || '?') + ' hodil ' + u.payload.notace + ': [' + u.payload.hody.join(', ') + ']'
       + (u.payload.bonus ? (u.payload.bonus > 0 ? '+' : '') + u.payload.bonus : '') + ' = ' + u.payload.celkem);

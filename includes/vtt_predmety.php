@@ -242,15 +242,10 @@ function dracak_vtt_vzdalenost_tokenu_sahy(PDO $pdo, int $mapaId, string $typA, 
     $stmt = $pdo->prepare('SELECT grid_velikost_px, grid_typ FROM mapy WHERE id = ?');
     $stmt->execute([$mapaId]);
     $mapa = $stmt->fetch();
-    $gridPx = (int)($mapa['grid_velikost_px'] ?? 0);
-    if ($gridPx <= 0) {
+    $pxSah = $mapa ? dracak_vtt_px_na_sah($mapa) : null;
+    if ($pxSah === null) {
         return null;
     }
-    // Px na 1 sáh — stejná oprava jako pxNaSah() v hra/mapa.php: u hexu
-    // je grid_velikost_px circumradius (střed->vrchol), ale 1 sáh je
-    // vzdálenost STŘED-STŘED sousedních hexů = √3 × circumradius, ne
-    // circumradius samotný.
-    $pxSah = ($mapa['grid_typ'] ?? 'ctverec') === 'hex' ? sqrt(3) * $gridPx : $gridPx;
     $stmt = $pdo->prepare('SELECT x, y FROM tokeny WHERE mapa_id = ? AND typ_entity = ? AND entita_id = ? LIMIT 1');
     $stmt->execute([$mapaId, $typA, $entitaA]);
     $tokenA = $stmt->fetch();

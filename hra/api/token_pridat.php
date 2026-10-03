@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/../../includes/vtt.php';
+require_once __DIR__ . '/../../includes/vtt_mlha.php';
 
 header('Content-Type: application/json; charset=utf-8');
 $user = dracak_require_login();
@@ -71,6 +72,12 @@ $stmt = $pdo->prepare(
 );
 $stmt->execute([$mapaId, $dbTypEntity, $entitaId, $x, $y]);
 $tokenId = (int)$pdo->lastInsertId();
+
+// Mlha se odhaluje jen pro postavy (viz dracak_vtt_mlha_odhal_kolem_bodu)
+// — nestvůra hráčům vidění nepřidává.
+if ($dbTypEntity === 'postava') {
+    dracak_vtt_mlha_odhal_kolem_bodu($pdo, $mapa, (int)$postava['vlastnik_ucet_id'], (float)$x, (float)$y);
+}
 
 $eventId = dracak_vtt_log_event((int)$mapa['svet_id'], $mapaId, 'token_pridan', [
     'token_id' => $tokenId,

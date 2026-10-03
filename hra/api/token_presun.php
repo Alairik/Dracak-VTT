@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/../../includes/vtt.php';
+require_once __DIR__ . '/../../includes/vtt_mlha.php';
 
 header('Content-Type: application/json; charset=utf-8');
 $user = dracak_current_user();
@@ -16,7 +17,10 @@ $noveX = (int)($data['x'] ?? 0);
 $noveY = (int)($data['y'] ?? 0);
 
 $pdo = dracak_db();
-$stmt = $pdo->prepare('SELECT t.*, m.svet_id FROM tokeny t JOIN mapy m ON m.id = t.mapa_id WHERE t.id = ?');
+$stmt = $pdo->prepare(
+    'SELECT t.*, m.svet_id, m.sirka_px, m.vyska_px, m.grid_velikost_px, m.grid_typ
+     FROM tokeny t JOIN mapy m ON m.id = t.mapa_id WHERE t.id = ?'
+);
 $stmt->execute([$tokenId]);
 $token = $stmt->fetch();
 if (!$token || !dracak_vtt_svet_access($user, (int)$token['svet_id'])) {
@@ -65,6 +69,25 @@ try {
 } catch (Throwable $e) {
     $pdo->rollBack();
     throw $e;
+}
+
+// Mlha války se odhaluje kolem VLASTNÍKA postavy (postavy.vlastnik_ucet_id),
+// ne kolem toho, kdo akci provedl — PJ může posunout hráčův token za něj
+// (viz dracak_vtt_can_move_token), ale odhaluje se pořád hráčova vlastní
+// mlha, ne PJova. Nestvury hráčům vidění nepřidávají.
+if ($token['typ_entity'] === 'postava') {
+    $vlastnikStmt = $pdo->prepare('SELECT vlastnik_ucet_id FROM postavy WHERE id = ?');
+    $vlastnikStmt->execute([(int)$token['entita_id']]);
+    $vlastnikUcetId = $vlastnikStmt->fetchColumn();
+    if ($vlastnikUcetId !== false) {
+        dracak_vtt_mlha_odhal_kolem_bodu($pdo, [
+            'id' => (int)$token['mapa_id'],
+            'sirka_px' => $token['sirka_px'],
+            'vyska_px' => $token['vyska_px'],
+            'grid_velikost_px' => $token['grid_velikost_px'],
+            'grid_typ' => $token['grid_typ'],
+        ], (int)$vlastnikUcetId, (float)$noveX, (float)$noveY);
+    }
 }
 
 echo json_encode(['ok' => true, 'udalost_id' => $eventId]);

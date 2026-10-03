@@ -136,6 +136,23 @@ function dracak_vtt_pohyb_prochazi_zdi(PDO $pdo, int $mapaId, float $x1, float $
     return false;
 }
 
+// Px na 1 sáh pro danou mapu (řádek z `mapy`, ne jen ID — ať volající
+// nemusí dělat druhý dotaz, když mapu už má načtenou). Čtverec:
+// grid_velikost_px přímo. Hex: grid_velikost_px je "size" (circumradius,
+// střed->vrchol, viz hra/mapa.php renderGrid()), skutečná velikost
+// sáhu (h1621: "jeden hex vždy odpovídá jednomu sáhu") je vzdálenost
+// STŘED-STŘED sousedních hexů = √3×circumradius — stejná oprava jako
+// pxNaSah() v hra/mapa.php. Vrací null bez nastaveného gridu (bez
+// gridu není měřítko px->sáh).
+function dracak_vtt_px_na_sah(array $mapa): ?float
+{
+    $gridPx = (int)($mapa['grid_velikost_px'] ?? 0);
+    if ($gridPx <= 0) {
+        return null;
+    }
+    return ($mapa['grid_typ'] ?? 'ctverec') === 'hex' ? sqrt(3) * $gridPx : (float)$gridPx;
+}
+
 // LoS (blokuje_vystrel) mezi dvěma body na týhle mapě — stejný princip
 // jako dracak_vtt_pohyb_prochazi_zdi() výš, jen jiný sloupec zdi a bez
 // výjimky pro PJ/admin: výhled buď je, nebo není blokovaný fyzickým
