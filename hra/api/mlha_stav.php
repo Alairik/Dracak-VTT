@@ -22,9 +22,11 @@ if (!$mapa || !dracak_vtt_svet_access($user, (int)$mapa['svet_id'])) {
     exit;
 }
 
-// PJ/admin nemá mlhu vůbec — vidí celou mapu vždycky, klient pro ně
-// fog vrstvu ani nevykresluje (viz IS_PJ_OR_ADMIN v hra/mapa.php).
-if (in_array($user['role'], ['admin', 'pj'], true)) {
+// PJ/admin nemá mlhu vůbec — vidí celou mapu vždycky (mimo výslovný
+// náhled hráčova pohledu, viz hra/api/mlha_nahled.php — to je zvlášť
+// endpoint, sem se PJ vůbec nedostane dřív, než bude mít roli hráč).
+// Taky mapa, kde PJ mlhu vypnul (mapy.mlha_aktivni), nemá mlhu nikomu.
+if (in_array($user['role'], ['admin', 'pj'], true) || !$mapa['mlha_aktivni']) {
     echo json_encode(['zadna_mlha' => true]);
     exit;
 }

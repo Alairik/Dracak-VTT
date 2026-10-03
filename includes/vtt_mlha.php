@@ -104,10 +104,40 @@ function dracak_vtt_mlha_odhal_kolem_bodu(PDO $pdo, array $mapa, int $ucetId, fl
     if (!$zmeneno) {
         return;
     }
+    dracak_vtt_mlha_uloz($pdo, $mapaId, $ucetId, $bitmapa, $bunkaPx, $sloupcu, $radku);
+}
 
+function dracak_vtt_mlha_uloz(PDO $pdo, int $mapaId, int $ucetId, string $bitmapa, int $bunkaPx, int $sloupcu, int $radku): void
+{
     $ins = $pdo->prepare(
         'INSERT INTO mlha_valky (mapa_id, ucet_id, bitmapa, sirka_bunky, sloupcu, radku) VALUES (?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE bitmapa = VALUES(bitmapa), sirka_bunky = VALUES(sirka_bunky), sloupcu = VALUES(sloupcu), radku = VALUES(radku)'
     );
     $ins->execute([$mapaId, $ucetId, $bitmapa, $bunkaPx, $sloupcu, $radku]);
+}
+
+// Ruční zásah PJ do JEDNOHO konkrétního bodu (odhalit/zatáhnout) — na
+// rozdíl od dracak_vtt_mlha_odhal_kolem_bodu() výš žádný poloměr, žádná
+// LoS kontrola, žádné "nikdy znovu nezatáhnout". Je to výslovný PJ
+// override (předem odhalená místnost, oprava chyby v odhalení...), ne
+// simulace postavina vidění — proto umí i ZATÁHNOUT (bit zpátky na 0),
+// což dracak_vtt_mlha_odhal_kolem_bodu úmyslně neumí vůbec.
+function dracak_vtt_mlha_nastav_bod(PDO $pdo, array $mapa, int $ucetId, float $x, float $y, bool $odhalit): void
+{
+    $rozmery = dracak_vtt_mlha_rozmery($mapa);
+    if ($rozmery['sloupcu'] <= 0 || $rozmery['radku'] <= 0) {
+        return;
+    }
+    $existujici = dracak_vtt_mlha_nacti($pdo, $mapa, $ucetId);
+    $bitmapa = $existujici['bitmapa'];
+    $sloupcu = $rozmery['sloupcu'];
+    $radku = $rozmery['radku'];
+    $bunkaPx = $rozmery['bunka_px'];
+
+    $sloupecI = min($sloupcu - 1, max(0, (int)floor($x / $bunkaPx)));
+    $radekI = min($radku - 1, max(0, (int)floor($y / $bunkaPx)));
+    $idx = $radekI * $sloupcu + $sloupecI;
+    $bitmapa[$idx] = $odhalit ? "\x01" : "\x00";
+
+    dracak_vtt_mlha_uloz($pdo, (int)$mapa['id'], $ucetId, $bitmapa, $bunkaPx, $sloupcu, $radku);
 }

@@ -124,10 +124,16 @@ $volnePostavy = $stmt->fetchAll();
 $nestvuryKatalog = [];
 $efektyKatalog = [];
 $rychleEfekty = [];
+$hraciVeSvete = [];
 if ($isPjOrAdmin) {
     $nestvuryKatalog = dracak_db()->query('SELECT id, nazev FROM nestvury ORDER BY nazev')->fetchAll();
     $efektyKatalog = dracak_db()->query('SELECT id, nazev, typ FROM efekty ORDER BY nazev')->fetchAll();
     $rychleEfekty = dracak_db()->query('SELECT id, nazev FROM efekty WHERE rychla_volba = 1 ORDER BY nazev')->fetchAll();
+    // Pro popover "Mlha" — výběr, čí mlhu PJ nahlíží/upravuje (viz
+    // hra/api/mlha_nahled.php, hra/api/mlha_uprava.php).
+    $stmt = dracak_db()->prepare('SELECT u.id, u.jmeno FROM svet_hraci sh JOIN ucty u ON u.id = sh.ucet_id WHERE sh.svet_id = ? ORDER BY u.jmeno');
+    $stmt->execute([$svetId]);
+    $hraciVeSvete = $stmt->fetchAll();
 }
 
 require_once __DIR__ . '/../includes/vtt_iniciativa.php';
@@ -232,9 +238,7 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
       <svg id="gridSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:0;"></svg>
       <svg id="zdiSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:5;"></svg>
       <svg id="rulerSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:140;"></svg>
-      <?php if (!$isPjOrAdmin): ?>
       <canvas id="mlhaCanvas" style="position:absolute;top:0;left:0;pointer-events:none;z-index:100;"></canvas>
-      <?php endif; ?>
       <?php foreach ($tokeny as $t):
           $entKey = $t['typ_entity'] . ':' . $t['entita_id'];
           $efektyText = implode(', ', $aktivniEfektyByEntity[$entKey] ?? []);
@@ -279,6 +283,7 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
     <button class="tbtn" type="button" id="tb-log" title="Log"><?php dracak_icon('scroll-text'); ?></button>
     <?php if ($isPjOrAdmin): ?>
       <button class="tbtn" type="button" id="tb-grid" title="Nastavení gridu"><?php dracak_icon('grid-2x2'); ?></button>
+      <button class="tbtn" type="button" id="tb-mlha" title="Mlha války"><?php dracak_icon('cloud-fog'); ?></button>
       <button class="tbtn" type="button" id="tb-kolo" title="Konec kola (odpočítat trvání efektů)"><?php dracak_icon('skip-forward'); ?></button>
       <button class="tbtn" type="button" id="tb-dalsi-tah" title="Další na tahu (iniciativa)"><?php dracak_icon('skip-forward'); ?></button>
       <button class="tbtn" type="button" id="tb-krok-zpet" title="Krok zpět (vrátit poslední akci)"><?php dracak_icon('undo-2'); ?></button>
@@ -374,6 +379,34 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
     <button class="btn btn-primary" type="button" id="gridUlozitBtn" style="width:100%;margin-top:10px;">Uložit</button>
     <p class="note">Náhled na mapě se mění hned, uloží se až tlačítkem.</p>
   </div>
+
+  <div class="popover" id="popover-mlha">
+    <button class="close-x" data-close-popover><?php dracak_icon('x', 14); ?></button>
+    <h3>Mlha války</h3>
+    <label style="display:flex;align-items:center;gap:6px;font-weight:400;">
+      <input type="checkbox" id="mlhaAktivniChk" <?= $mapa['mlha_aktivni'] ? 'checked' : '' ?>> Mlha aktivní na týhle mapě
+    </label>
+    <p class="note" style="margin-top:4px;">Vypnuté = hráči vidí celou mapu bez odhalování, stejně jako ty.</p>
+    <?php if ($hraciVeSvete): ?>
+    <label for="mlhaNahledSelect" style="margin-top:10px;">Náhled a ruční úprava mlhy hráče</label>
+    <select class="input" id="mlhaNahledSelect">
+      <option value="">— normální pohled (bez náhledu) —</option>
+      <?php foreach ($hraciVeSvete as $h): ?>
+        <option value="<?= (int)$h['id'] ?>"><?= htmlspecialchars($h['jmeno']) ?></option>
+      <?php endforeach; ?>
+    </select>
+    <div id="mlhaKresliciFields" style="display:none;margin-top:8px;">
+      <p class="note" style="margin:0 0 6px;">Vidíš, co má tenhle hráč odhalené (tmavé = skryté). Táhni po mapě a kresli:</p>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-secondary" type="button" id="mlhaOdhalitBtn" style="flex:1;">Odhalit</button>
+        <button class="btn btn-ghost" type="button" id="mlhaZatahnoutBtn" style="flex:1;">Zatáhnout</button>
+      </div>
+      <p class="note" style="margin-top:6px;" id="mlhaKreslimRezim">Režim: odhalit</p>
+    </div>
+    <?php else: ?>
+    <p class="note">Ve světě zatím není žádný hráč pro náhled.</p>
+    <?php endif; ?>
+  </div>
   <?php endif; ?>
 
   <div class="panel" id="panel-log">
@@ -462,6 +495,11 @@ let posledniUdalostId = <?= $posledniUdalostId ?>;
 const INVENTAR = <?= json_encode($inventarByEntity, JSON_UNESCAPED_UNICODE) ?>;
 const SVET_POSTAVY = <?= json_encode($svetPostavyKorist, JSON_UNESCAPED_UNICODE) ?>;
 const IS_PJ_OR_ADMIN = <?= $isPjOrAdmin ? 'true' : 'false' ?>;
+let mlhaAktivni = <?= $mapa['mlha_aktivni'] ? 'true' : 'false' ?>;
+// Koho mlhu PJ zrovna nahlíží/upravuje — null = normální PJ pohled
+// (bez náhledu). Jen PJ/admin, hráč tohle vůbec nemá v UI.
+let mlhaNahledUcetId = null;
+let mlhaKreslimOdhalit = true;
 
 const mapWrap = document.getElementById('mapWrap');
 const viewport = document.getElementById('viewport');
@@ -470,14 +508,15 @@ const rulerSvg = document.getElementById('rulerSvg');
 const mapImgEl = document.getElementById('mapImg');
 const mlhaCanvas = document.getElementById('mlhaCanvas');
 
-// --- Mlha války: canvas vrstva nad tokeny (z-index 100), jen pro
-// hráče (PJ/admin vidí vždycky celou mapu, mlhaCanvas se pro ně vůbec
-// nevykresluje, viz PHP výš) — proto všude dole stačí kontrola
-// !mlhaCanvas, žádná zvlášť IS_PJ_OR_ADMIN větev. Server je jediný
-// zdroj pravdy (hra/api/mlha_stav.php) — klient si bitmapu jen
-// vykresluje, nepočítá si vlastní odhalování.
+// --- Mlha války: canvas vrstva nad tokeny (z-index 100). Hráč: vždycky
+// svoje vlastní odhalené území (hra/api/mlha_stav.php). PJ/admin: prázdno,
+// POKUD zrovna nenahlíží konkrétního hráče přes popover "Mlha" — pak to
+// samé, ale přes hra/api/mlha_nahled.php (PJ-only, cizí mlha na vyžádání).
+// Server je jediný zdroj pravdy, klient si bitmapu jen vykresluje.
+let mlhaPosledniStav = null;
 function renderMlha(stav) {
   if (!mlhaCanvas) return;
+  mlhaPosledniStav = stav;
   const w = mapImgEl.naturalWidth || mapWrap.clientWidth;
   const h = mapImgEl.naturalHeight || mapWrap.clientHeight;
   if (!w || !h) return;
@@ -498,6 +537,14 @@ function renderMlha(stav) {
 }
 function osvezitMlhu() {
   if (!mlhaCanvas) return;
+  if (IS_PJ_OR_ADMIN) {
+    if (!mlhaNahledUcetId) { renderMlha(null); return; }
+    fetch('api/mlha_nahled.php?mapa_id=' + MAPA_ID + '&ucet_id=' + mlhaNahledUcetId)
+      .then(r => r.json())
+      .then(renderMlha)
+      .catch(() => {});
+    return;
+  }
   fetch('api/mlha_stav.php?mapa_id=' + MAPA_ID)
     .then(r => r.json())
     .then(renderMlha)
@@ -788,6 +835,7 @@ function postJson(url, body) {
 // --- Popovery a panely ---
 function closeAllPopovers() {
   zrusitZivyNahledGridu();
+  zrusitMlhaNahled();
   document.querySelectorAll('.popover.open').forEach(p => p.classList.remove('open'));
   document.querySelectorAll('.tbtn.active').forEach(b => b.classList.remove('active'));
 }
@@ -921,12 +969,84 @@ if (gridUlozitBtn) {
   });
 }
 
+// --- Mlha: popover má 3 nezávislé věci (viz CLAUDE.md diskuze) —
+// zapnout/vypnout pro mapu, náhled konkrétního hráče, ruční kreslení
+// (odhalit/zatáhnout) do TOHO náhledu. Výběr hráče v selectu rovnou
+// vyzbrojí currentTool='mlha' (viz mousedown/move/up výš) — zvlášť
+// tlačítko na "začít kreslit" by bylo matoucí navíc, náhled a kreslení
+// jsou jedna a ta samá obrazovka.
+const tbMlha = document.getElementById('tb-mlha');
+if (tbMlha) tbMlha.addEventListener('click', () => togglePopover('popover-mlha', tbMlha));
+const mlhaAktivniChk = document.getElementById('mlhaAktivniChk');
+if (mlhaAktivniChk) {
+  mlhaAktivniChk.addEventListener('change', () => {
+    const nova = mlhaAktivniChk.checked;
+    postJson('api/mapa_mlha_aktivni.php', {mapa_id: MAPA_ID, aktivni: nova})
+      .then(d => {
+        if (d.error) { logLine('Chyba: ' + d.error); mlhaAktivniChk.checked = !nova; return; }
+        mlhaAktivni = d.aktivni;
+        logLine(mlhaAktivni ? 'Mlha zapnuta.' : 'Mlha vypnuta — hráči teď vidí celou mapu.');
+      });
+  });
+}
+const mlhaNahledSelect = document.getElementById('mlhaNahledSelect');
+const mlhaKresliciFields = document.getElementById('mlhaKresliciFields');
+function zrusitMlhaNahled() {
+  mlhaNahledUcetId = null;
+  if (mlhaNahledSelect) mlhaNahledSelect.value = '';
+  if (mlhaKresliciFields) mlhaKresliciFields.style.display = 'none';
+  if (currentTool === 'mlha') setTool('select');
+  osvezitMlhu();
+}
+const mlhaOdhalitBtn = document.getElementById('mlhaOdhalitBtn');
+const mlhaZatahnoutBtn = document.getElementById('mlhaZatahnoutBtn');
+const mlhaKreslimRezimEl = document.getElementById('mlhaKreslimRezim');
+function nastavMlhaKreslimRezim(odhalit) {
+  mlhaKreslimOdhalit = odhalit;
+  if (mlhaOdhalitBtn) mlhaOdhalitBtn.classList.toggle('btn-primary', odhalit);
+  if (mlhaOdhalitBtn) mlhaOdhalitBtn.classList.toggle('btn-secondary', !odhalit);
+  if (mlhaZatahnoutBtn) mlhaZatahnoutBtn.classList.toggle('btn-primary', !odhalit);
+  if (mlhaZatahnoutBtn) mlhaZatahnoutBtn.classList.toggle('btn-ghost', odhalit);
+  if (mlhaKreslimRezimEl) mlhaKreslimRezimEl.textContent = 'Režim: ' + (odhalit ? 'odhalit' : 'zatáhnout');
+}
+if (mlhaOdhalitBtn) mlhaOdhalitBtn.addEventListener('click', () => nastavMlhaKreslimRezim(true));
+if (mlhaZatahnoutBtn) mlhaZatahnoutBtn.addEventListener('click', () => nastavMlhaKreslimRezim(false));
+if (mlhaNahledSelect) {
+  mlhaNahledSelect.addEventListener('change', () => {
+    mlhaNahledUcetId = mlhaNahledSelect.value ? parseInt(mlhaNahledSelect.value, 10) : null;
+    if (mlhaKresliciFields) mlhaKresliciFields.style.display = mlhaNahledUcetId ? '' : 'none';
+    if (mlhaNahledUcetId) nastavMlhaKreslimRezim(true);
+    setTool(mlhaNahledUcetId ? 'mlha' : 'select');
+    osvezitMlhu();
+  });
+}
+
 // --- Ruler: čistě klientská pomůcka, nic se neukládá ani nesynchronizuje ---
 let rulerStart = null, rulerClearTimer = null;
 let zedRozpracovaneBody = [];
+let mlhaKreslim = false, mlhaPosledniBunka = null;
 function rulerPoint(e) {
   const r = mapWrap.getBoundingClientRect();
   return {x: e.clientX - r.left, y: e.clientY - r.top};
+}
+// PJ ruční kreslení mlhy (viz popover "Mlha") — na rozdíl od
+// dracak_vtt_mlha_odhal_kolem_bodu() žádná LoS kontrola, žádný poloměr,
+// jen přímo ta jedna buňka pod kurzorem. Optimistická lokální úprava
+// bitmapy (okamžitá odezva), server je potvrzuje/ukládá async.
+function mlhaNakresliBod(p) {
+  if (!mlhaPosledniStav || mlhaPosledniStav.zadna_mlha || !mlhaNahledUcetId) return;
+  const bunka = mlhaPosledniStav.bunka_px || 32;
+  const col = Math.min(mlhaPosledniStav.sloupcu - 1, Math.max(0, Math.floor(p.x / bunka)));
+  const row = Math.min(mlhaPosledniStav.radku - 1, Math.max(0, Math.floor(p.y / bunka)));
+  const key = row + ':' + col;
+  if (key === mlhaPosledniBunka) return;
+  mlhaPosledniBunka = key;
+  const idx = row * mlhaPosledniStav.sloupcu + col;
+  const bin = atob(mlhaPosledniStav.bitmapa_b64);
+  mlhaPosledniStav.bitmapa_b64 = btoa(bin.substring(0, idx) + String.fromCharCode(mlhaKreslimOdhalit ? 1 : 0) + bin.substring(idx + 1));
+  renderMlha(mlhaPosledniStav);
+  postJson('api/mlha_uprava.php', {mapa_id: MAPA_ID, ucet_id: mlhaNahledUcetId, x: p.x, y: p.y, odhalit: mlhaKreslimOdhalit})
+    .then(d => { if (d.error) logLine('Chyba: ' + d.error); });
 }
 function drawRuler(a, b) {
   if (!rulerSvg) return;
@@ -1018,6 +1138,12 @@ if (mapWrap) {
       return;
     }
     if (currentTool === 'zed') return; // zed nekreslí tažením, viz mapWrap 'click' níž
+    if (currentTool === 'mlha') {
+      mlhaKreslim = true;
+      mlhaPosledniBunka = null;
+      mlhaNakresliBod(rulerPoint(e));
+      return;
+    }
     if (currentTool !== 'select') return;
     const el = e.target.closest('.vtt-token');
     // data-na-tahu je jen klientská pomůcka (viz PHP výš, $naTahu) —
@@ -1043,6 +1169,11 @@ if (mapWrap) {
       if (zedRozpracovaneBody.length === 0) return;
       const p = rulerPoint(e);
       drawZedRozpracovanouCestu(snapPoint(p.x, p.y, zedSnapEnabled()));
+      return;
+    }
+    if (currentTool === 'mlha') {
+      if (!mlhaKreslim) return;
+      mlhaNakresliBod(rulerPoint(e));
       return;
     }
     if (!dragEl) return;
@@ -1071,6 +1202,7 @@ if (mapWrap) {
       return;
     }
     if (currentTool === 'zed') return; // zed se zapisuje klikem (viz mapWrap 'click') a ukládá tlačítkem, ne mouseup
+    if (currentTool === 'mlha') { mlhaKreslim = false; return; }
     if (!dragEl) return;
     const el = dragEl;
     dragEl = null;
@@ -1403,7 +1535,6 @@ function applyEvent(u) {
   if (u.typ === 'token_presun') {
     const el = mapWrap && mapWrap.querySelector('.vtt-token[data-id="' + u.payload.token_id + '"]');
     if (el) { el.style.left = u.payload.x_po + 'px'; el.style.top = u.payload.y_po + 'px'; }
-    osvezitMlhu();
   } else if (u.typ === 'kostka_hod') {
     logLine((u.payload.hodil || '?') + ' hodil ' + u.payload.notace + ': [' + u.payload.hody.join(', ') + ']'
       + (u.payload.bonus ? (u.payload.bonus > 0 ? '+' : '') + u.payload.bonus : '') + ' = ' + u.payload.celkem);
@@ -1457,6 +1588,11 @@ function poll() {
       }
     })
     .catch(() => {});
+  // Mlha nemá vlastní event typ — PJ přepínač/ruční kreslení i hráčovo
+  // vlastní odhalení se promítnou tímhle pravidelným refreshem (stejná
+  // "levné v1" logika jako zbytek pollingu), ne zvlášť novým typem v
+  // svet_udalosti.typ ENUM.
+  osvezitMlhu();
 }
 setInterval(poll, 1500);
 </script>
