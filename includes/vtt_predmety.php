@@ -197,33 +197,29 @@ function dracak_vtt_parsuj_dosah_sahy(?string $text): ?float
 
 // Dosah POLOŽKY v sáhách, nebo null (lektvar nemá sloupec dosah vůbec —
 // lektvary.dosah v DB neexistuje; nebo text není parsovatelný, viz výš).
-// Střelné/vrhací zbraně: dostrel_efektivni/dostrel_maximalni jsou v DB
-// už ČÍSELNÉ sloupce (SMALLINT, migrace 0006_zraneni_dosah_zbrani.sql),
-// žádné parsování textu netřeba — berou se jako tvrdá hranice dosahu
+// Střelné/vrhací zbraně: dostřel má podle pravidel TŘI pásma (malý/
+// střední/velký, h1615 "Střelecký souboj") — malý/střední/velký jsou
+// v DB číselné sloupce (SMALLINT, migrace 0059_dostrel_tri_pasma.sql),
+// žádné parsování textu netřeba. Berou se jako tvrdá hranice dosahu
 // místo sloupce dosah (ten je podle schématu "dosah NA BLÍZKO", u
-// střelných/vrhacích zbraní se nepoužívá). dostrel_maximalni (nad
-// efektivní = postih -5 k útoku, viz komentář u sloupce) je přednější,
-// protože je to skutečná fyzická hranice, kam zbraň vůbec dostřelí;
-// postih za překročení efektivního dostřelu tahle kontrola neřeší (to
-// je otázka úspěšnosti zásahu, ne legality použití).
-//
-// POZOR: v produkční DB (database/drd-db-full-v1.sql) i v testovací
-// dracak_test jsou VŠECHNY řádky predmety.dosah/zraneni/
-// dostrel_efektivni/dostrel_maximalni dnes NULL — migrace 0006 sloupce
-// jen PŘIDALA, žádná další migrace je nenaplnila daty. Tahle funkce pro
-// predmety proto v praxi dnes vždy vrátí null (kontrola se přeskočí) —
-// až se zbraním dosah/dostřel doplní, začne fungovat bez další úpravy.
+// střelných/vrhacích zbraní se nepoužívá). dostrel_velky (nejvzdálenější
+// pásmo) je přednější, protože je to skutečná fyzická hranice, kam
+// zbraň vůbec dostřelí ("dál než je velký dostřel zbraně nelze
+// střílet", h1615) — tahle kontrola neřeší postih za střelbu ve
+// středním/velkém pásmu (+1/0/-1 k útoku dle pásma), to je otázka
+// úspěšnosti zásahu, ne legality použití, a čeká na automatizované
+// vyhodnocení útoku (které v enginu zatím vůbec neexistuje).
 function dracak_vtt_polozka_dosah_sahy(string $typPolozky, array $katalog): ?float
 {
     if ($typPolozky === 'kouzlo') {
         return dracak_vtt_parsuj_dosah_sahy($katalog['dosah'] ?? null);
     }
     if ($typPolozky === 'predmet') {
-        if (!empty($katalog['dostrel_maximalni'])) {
-            return (float)$katalog['dostrel_maximalni'];
+        if (!empty($katalog['dostrel_velky'])) {
+            return (float)$katalog['dostrel_velky'];
         }
-        if (!empty($katalog['dostrel_efektivni'])) {
-            return (float)$katalog['dostrel_efektivni'];
+        if (!empty($katalog['dostrel_stredni'])) {
+            return (float)$katalog['dostrel_stredni'];
         }
         return dracak_vtt_parsuj_dosah_sahy($katalog['dosah'] ?? null);
     }
