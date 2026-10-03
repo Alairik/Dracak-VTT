@@ -555,6 +555,13 @@ function mlhaBunkaStred(row, col) {
   const offY = ((GRID_OFFSET_Y % GRID_PX) + GRID_PX) % GRID_PX;
   return {x: offX + col * GRID_PX + GRID_PX / 2, y: offY + row * GRID_PX + GRID_PX / 2};
 }
+// Hráč vidí mlhu plně neprůhlednou (nemá pod ní co vidět — to je
+// smysl mlhy). PJ/admin ji ale vidí jen v NÁHLEDU cizí mlhy (viz
+// osvezitMlhu níž — jinak se PJ mlha vůbec nevykresluje), kde potřebuje
+// průsvitno prokouknout mapu pod ní, ať ví, kam přesně maluje.
+function mlhaBarvaSkryte() {
+  return IS_PJ_OR_ADMIN ? 'rgba(8,8,10,0.65)' : '#08080a';
+}
 function renderMlha(stav) {
   if (!mlhaCanvas) return;
   mlhaPosledniStav = stav;
@@ -567,7 +574,7 @@ function renderMlha(stav) {
   ctx.clearRect(0, 0, w, h);
   if (!stav || stav.zadna_mlha || !stav.sloupcu || !stav.radku) return;
   const bin = atob(stav.bitmapa_b64);
-  ctx.fillStyle = '#08080a';
+  ctx.fillStyle = mlhaBarvaSkryte();
   for (let r = 0; r < stav.radku; r++) {
     for (let c = 0; c < stav.sloupcu; c++) {
       if (bin.charCodeAt(r * stav.sloupcu + c) === 1) continue;
@@ -1136,7 +1143,7 @@ function mlhaNakresliBod(p) {
       ctx.fill(tvar);
       ctx.restore();
     } else {
-      ctx.fillStyle = '#08080a';
+      ctx.fillStyle = mlhaBarvaSkryte();
       ctx.fill(tvar);
     }
   }
