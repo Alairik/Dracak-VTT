@@ -313,7 +313,9 @@ function dracak_vtt_hod_kostkou(int $pocet, int $typ, int $bonus): array
 
 // Společná hlavička/patička pro hra/*.php stránky — ať se neopakuje na
 // třech místech to samé <head> a horní lišta co dashboard.php.
-function dracak_vtt_page_start(string $title, array $user): void
+// $wide = celoplošná stránka s vlastní hlavičkou (viz hra/svet.php) — bez
+// dash-header a bez 1000px limitu dash-shell.
+function dracak_vtt_page_start(string $title, array $user, bool $wide = false): void
 {
     ?>
 <!doctype html>
@@ -328,6 +330,9 @@ function dracak_vtt_page_start(string $title, array $user): void
 <link rel="stylesheet" href="../assets/css/organic.css?v=<?= filemtime(__DIR__ . '/../assets/css/organic.css') ?>">
 </head>
 <body>
+<?php if ($wide): ?>
+<div class="wide-shell">
+<?php return; endif; ?>
 <div class="dash-shell">
   <div class="dash-header">
     <div>

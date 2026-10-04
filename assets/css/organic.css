@@ -303,6 +303,176 @@ input[type=checkbox] { width: auto; }
   border: 1px solid var(--color-neutral-400); border-radius: 999px; padding: 2px 10px;
 }
 
+/* ---------- Svět (hra/svet.php) — široký desktop layout ----------
+   Přehled světa: hlavička, stůl s hráči, světová mapa + zóny, poznámky
+   vpravo. Méně častá správa (shrnutí, mapy, hráči, položky) je schovaná
+   za plovoucím "+" menu v <dialog> oknech. */
+.wide-shell { min-height: 100vh; }
+.svet-header {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  max-width: 1440px; margin: 0 auto; padding: 28px clamp(16px, 4vw, 40px) 18px;
+}
+.svet-pill {
+  display: inline-flex; align-items: center; gap: 8px; flex: none;
+  font-size: 13px; font-weight: 600; padding: 9px 16px; border-radius: 999px;
+  text-decoration: none; color: var(--color-text);
+  background: var(--color-neutral-200); border: 1px solid var(--color-neutral-400);
+}
+.svet-pill:hover { background: var(--color-neutral-300); }
+.svet-pill-ghost { background: none; color: var(--color-neutral-700); }
+.svet-pill-ghost:hover { background: rgba(32, 30, 29, .06); }
+.svet-title-wrap { flex: 1; min-width: 240px; }
+.svet-title { font-size: clamp(26px, 3vw, 36px); margin: 0; line-height: 1.1; }
+.svet-meta { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 12.5px; color: var(--color-neutral-700); }
+.svet-meta .role-badge {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--color-accent-700); background: var(--color-accent-100);
+  border-radius: 999px; padding: 2px 9px;
+}
+
+.svet-main {
+  max-width: 1440px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 40px) 140px;
+  display: flex; flex-direction: column; gap: 30px;
+}
+.svet-panel {
+  background: var(--color-surface); border: 1px solid rgba(32, 30, 29, .1);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-sm);
+}
+.svet-h2 { font-size: 17px; margin: 0; }
+.svet-sub { font-size: 11.5px; color: var(--color-neutral-600); margin: 0; }
+
+/* Stůl — kompaktní pruh max. ~2 řádky výšky (viz zadání) */
+.svet-table-card { padding: 16px 26px 18px; display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+.svet-table-card .svet-h2 { font-size: 16px; margin-bottom: 2px; }
+.svet-table { position: relative; height: 110px; flex: 1; min-width: 420px; max-width: 860px; }
+.svet-table-top {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 58%; height: 68%; border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 38%, var(--color-accent-400), var(--color-accent-700) 85%);
+  box-shadow: inset 0 0 0 6px rgba(255, 255, 255, .08), var(--shadow-md);
+}
+.svet-seat {
+  position: absolute; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; gap: 3px; width: 92px;
+  text-decoration: none; color: inherit;
+}
+.svet-avatar {
+  width: 38px; height: 38px; border-radius: 50%; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 12px; box-shadow: var(--shadow-sm);
+  border: 2px solid rgba(255, 255, 255, .6);
+}
+a.svet-seat:hover .svet-avatar { box-shadow: var(--shadow-md); border-color: var(--color-accent-200); }
+.svet-avatar-empty {
+  border: 2px dashed var(--color-neutral-500); color: var(--color-neutral-600);
+  background: rgba(255, 255, 255, .4); font-size: 16px; font-weight: 400; box-shadow: none;
+}
+.svet-seat-label { background: rgba(255, 250, 241, .88); border-radius: 6px; padding: 1px 5px; position: relative; }
+.svet-seat-name { font-weight: 600; font-size: 10.5px; line-height: 1.15; text-align: center; }
+.svet-seat-sub { font-size: 9px; color: var(--color-neutral-600); line-height: 1.2; text-align: center; }
+.svet-hp { width: 48px; height: 4px; background: var(--color-neutral-300); border-radius: 999px; overflow: hidden; }
+.svet-hp > div { height: 100%; background: var(--color-accent-2-500); }
+.svet-hp.low > div { background: var(--color-danger); }
+
+.svet-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr); gap: 26px; align-items: start; }
+.svet-col { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+
+/* Proklik na světovou mapu */
+.svet-mapcard {
+  display: block; border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm);
+  border: 1px solid rgba(32, 30, 29, .1); text-decoration: none; color: inherit;
+}
+.svet-mapcard:hover { box-shadow: var(--shadow-md); }
+.svet-mapcard-img {
+  height: 240px; display: flex; align-items: center; justify-content: center;
+  background: repeating-linear-gradient(135deg, var(--color-accent-200) 0 16px, var(--color-accent-100) 16px 32px);
+  background-size: cover; background-position: center;
+}
+.svet-mapcard-img span {
+  font-size: 12px; color: var(--color-accent-800);
+  background: rgba(255, 250, 241, .7); padding: 5px 12px; border-radius: 999px;
+}
+.svet-mapcard-foot {
+  padding: 16px 22px; display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; background: var(--color-surface); flex-wrap: wrap;
+}
+.svet-mapcard-title { font-weight: 700; font-size: 17px; }
+
+/* Naposledy navštívené zóny */
+.svet-zones-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.svet-zones-head .svet-sub { font-style: italic; max-width: 360px; }
+.svet-zones { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.svet-zone {
+  display: flex; gap: 12px; align-items: center; padding: 10px 14px;
+  background: var(--color-surface); border: 1px solid rgba(32, 30, 29, .1);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-sm);
+  text-decoration: none; color: inherit;
+}
+.svet-zone:hover { box-shadow: var(--shadow-md); border-color: var(--color-accent-300); }
+.svet-zone-thumb {
+  width: 50px; height: 50px; flex: none; border-radius: var(--radius-sm);
+  background: repeating-linear-gradient(135deg, var(--color-accent-200) 0 7px, var(--color-accent-100) 7px 14px);
+  background-size: cover; background-position: center;
+}
+.svet-zone-body { flex: 1; min-width: 0; }
+.svet-zone-name { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.svet-zone-when { font-size: 11px; color: var(--color-neutral-600); }
+.svet-zone-when .tag { font-size: 9.5px; padding: 0 7px; margin-left: 4px; }
+.svet-allmaps { margin-top: 12px; font-size: 13px; }
+.svet-allmaps summary { cursor: pointer; font-weight: 600; color: var(--color-accent-700); }
+.svet-allmaps ul { margin: 8px 0 0; padding-left: 18px; }
+
+/* Poznámky */
+.svet-notes { padding: 22px 24px; min-width: 0; }
+.svet-notes .svet-sub { margin: 4px 0 16px; }
+.svet-note-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+.svet-note { background: var(--color-neutral-100); border-radius: var(--radius-md); padding: 11px 14px; display: flex; flex-direction: column; gap: 5px; }
+.svet-note-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 10.5px; color: var(--color-neutral-600); }
+.svet-note p { margin: 0; font-size: 12.5px; line-height: 1.5; }
+.svet-note-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 10.5px; color: var(--color-neutral-600); }
+.svet-note-foot .btn { font-size: 11px; padding: 2px 8px; }
+.svet-note-empty { font-size: 12.5px; color: var(--color-neutral-600); font-style: italic; margin: 0 0 16px; }
+.svet-notes textarea { min-height: 64px; font-size: 13px; }
+.svet-note-opts { margin-top: 8px; font-size: 12px; }
+.svet-note-opts summary { cursor: pointer; color: var(--color-neutral-700); }
+.svet-note-opts .field { margin: 8px 0 0; }
+.svet-note-opts label.chk { display: flex; align-items: center; gap: 6px; font-weight: 400; font-size: 12.5px; margin-bottom: 4px; }
+.svet-note-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
+
+/* Plovoucí "+" menu */
+.svet-fab {
+  position: fixed; right: clamp(16px, 4vw, 40px); bottom: 28px; z-index: 40;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
+}
+.svet-fab-menu { display: none; flex-direction: column; align-items: flex-end; gap: 8px; }
+.svet-fab.open .svet-fab-menu { display: flex; }
+.svet-fab-item {
+  display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600;
+  color: var(--color-text); background: var(--color-surface); text-decoration: none;
+  border: 1px solid rgba(32, 30, 29, .12); padding: 9px 16px; border-radius: 999px;
+  box-shadow: var(--shadow-md); cursor: pointer;
+}
+.svet-fab-item:hover { border-color: var(--color-accent-300); }
+.svet-fab-btn {
+  width: 56px; height: 56px; border-radius: 50%; border: none;
+  background: var(--color-accent); color: #fff; font-size: 26px; line-height: 1;
+  box-shadow: var(--shadow-lg); cursor: pointer; transition: transform .15s ease;
+}
+.svet-fab-btn:hover { background: var(--color-accent-600); }
+.svet-fab.open .svet-fab-btn { transform: rotate(45deg); }
+
+/* Dialogy pro formuláře z "+" menu */
+.svet-dialog {
+  width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 48px);
+  border: 1px solid rgba(32, 30, 29, .1); border-radius: var(--radius-lg);
+  background: var(--color-surface); color: var(--color-text);
+  box-shadow: var(--shadow-lg); padding: 22px 24px;
+}
+.svet-dialog::backdrop { background: rgba(32, 30, 29, .4); }
+.svet-dialog-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; }
+.svet-dialog-head h2 { font-size: 19px; }
+.svet-dialog .rel-label { margin-top: 16px; }
+
 /* ---------- Responsive ---------- */
 @media (max-width: 900px) {
   .shell { display: block; }
@@ -321,4 +491,7 @@ input[type=checkbox] { width: auto; }
   .dash-shell { padding: 32px 16px 48px; }
   .dash-brand { font-size: 24px; }
   .tile-grid { grid-template-columns: 1fr; }
+  .svet-grid { grid-template-columns: 1fr; }
+  .svet-table { min-width: 0; flex-basis: 100%; height: 150px; }
+  .svet-mapcard-img { height: 180px; }
 }
