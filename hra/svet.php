@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__ . '/../includes/vtt.php';
 require_once __DIR__ . '/../includes/vtt_predmety.php';
+require_once __DIR__ . '/../includes/vtt_poznamky.php';
 
 $user = dracak_require_login();
 $svetId = (int)($_GET['id'] ?? 0);
@@ -192,6 +193,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header("Location: svet.php?id=$svetId");
         exit;
     }
+
+    if ($akce === 'pridat_poznamku') {
+        // Kdokoli s přístupem do světa (PJ i hráč) — žádná role-based
+        // výjimka, viz includes/vtt_poznamky.php.
+        $text = trim((string)($_POST['text'] ?? ''));
+        if ($text === '') { http_response_code(422); die('Poznámka nemůže být prázdná.'); }
+        $sdileno = array_map('intval', (array)($_POST['sdileno'] ?? []));
+        dracak_vtt_poznamka_pridat(dracak_db(), $svetId, (int)$user['id'], $text, $sdileno);
+        header("Location: svet.php?id=$svetId");
+        exit;
+    }
+
+    if ($akce === 'smazat_poznamku') {
+        dracak_vtt_poznamka_smazat(dracak_db(), (int)($_POST['poznamka_id'] ?? 0), $user);
+        header("Location: svet.php?id=$svetId");
+        exit;
+    }
 }
 
 $mapy = dracak_db()->prepare('SELECT * FROM mapy WHERE svet_id = ? ORDER BY typ_mapy DESC, nazev');
@@ -222,6 +240,9 @@ $inventarePostav = [];
 foreach ($postavy as $p) {
     $inventarePostav[(int)$p['id']] = dracak_vtt_inventar('postava', (int)$p['id']);
 }
+
+$poznamky = dracak_vtt_poznamky_viditelne(dracak_db(), $user, $svetId);
+$moznostiSdileni = dracak_vtt_poznamky_moznosti_sdileni(dracak_db(), $svetId, (int)$user['id']);
 
 $rasyOptions = dracak_db()->query('SELECT id, nazev FROM rasy ORDER BY nazev')->fetchAll();
 $povolaniOptions = dracak_db()->query('SELECT id, nazev FROM povolani ORDER BY nazev')->fetchAll();
@@ -280,6 +301,49 @@ dracak_vtt_page_start($svet['nazev'], $user);
         <p><?= nl2br(htmlspecialchars((string)($svet['posledni_shrnuti'] ?? '—'))) ?></p>
       <?php endif; ?>
     </div>
+
+    <h2 class="page-title" style="font-size:20px;margin-top:28px;">Poznámky</h2>
+    <p class="note" style="margin-top:-6px;">Kdokoli u stolu si může napsat poznámku a vybrat, komu konkrétnímu ji ukáže — PJ ji vidí jen když mu ji někdo nasdílí, stejně jako kterýkoliv jiný hráč.</p>
+    <?php if (!$poznamky): ?>
+      <div class="empty-state">Zatím žádná poznámka, kterou bys viděl.</div>
+    <?php else: ?>
+      <div class="records-grid">
+        <?php foreach ($poznamky as $p): $jeAutor = (int)$p['autor_ucet_id'] === (int)$user['id']; ?>
+          <div class="card elev-sm rec-card">
+            <div class="rec-grid">
+              <div class="k">Autor:</div><div><?= htmlspecialchars($p['autor_jmeno']) ?></div>
+            </div>
+            <p style="margin:8px 0;"><?= nl2br(htmlspecialchars($p['text'])) ?></p>
+            <?php if ($jeAutor || $user['role'] === 'admin'): ?>
+              <p class="note" style="margin:0 0 8px;">Nasdíleno: <?= $p['sdileno_s'] ? htmlspecialchars(implode(', ', $p['sdileno_s'])) : 'nikomu (jen ty)' ?></p>
+              <form method="post" onsubmit="return confirm('Smazat tuhle poznámku?');">
+                <input type="hidden" name="akce" value="smazat_poznamku">
+                <input type="hidden" name="poznamka_id" value="<?= (int)$p['id'] ?>">
+                <button class="btn btn-ghost" type="submit" style="font-size:12px;">Smazat</button>
+              </form>
+            <?php endif; ?>
+          </div>
+        <?php endforeach; ?>
+      </div>
+    <?php endif; ?>
+    <form method="post" class="card elev-sm" style="max-width:520px;margin-top:14px;">
+      <input type="hidden" name="akce" value="pridat_poznamku">
+      <div class="field"><label for="poznamka_text">Nová poznámka</label>
+        <textarea id="poznamka_text" name="text" required></textarea>
+      </div>
+      <?php if ($moznostiSdileni): ?>
+      <div class="field"><label>Nasdílet komu (nepovinné, lze víc)</label>
+        <?php foreach ($moznostiSdileni as $m): ?>
+          <label style="display:flex;align-items:center;gap:6px;font-weight:400;font-size:13px;margin-bottom:4px;">
+            <input type="checkbox" name="sdileno[]" value="<?= (int)$m['id'] ?>"> <?= htmlspecialchars($m['jmeno']) ?>
+          </label>
+        <?php endforeach; ?>
+      </div>
+      <?php else: ?>
+        <p class="note">Nikdo jiný ve světě zatím není, komu by šlo sdílet.</p>
+      <?php endif; ?>
+      <button class="btn btn-primary" type="submit">Uložit poznámku</button>
+    </form>
 
     <?php if ($isPjOrAdmin): ?>
     <h2 class="page-title" style="font-size:20px;margin-top:28px;">Hráči u stolu</h2>
