@@ -14,18 +14,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($akce === 'shrnuti') {
         if (!$isPjOrAdmin) { http_response_code(403); die('Jen PJ/admin může upravit shrnutí.'); }
-        $stmt = dracak_db()->prepare(
-            'UPDATE svet SET posledni_shrnuti = ?, pripraveno_priste = ?,
-             auto_hod_kostkou = ?, auto_aplikace_efektu = ?, auto_vyhodnoceni_pasti = ?, auto_zranitelnost = ?
-             WHERE id = ?'
-        );
+        $stmt = dracak_db()->prepare('UPDATE svet SET posledni_shrnuti = ?, pripraveno_priste = ? WHERE id = ?');
         $stmt->execute([
             trim((string)($_POST['posledni_shrnuti'] ?? '')) ?: null,
             trim((string)($_POST['pripraveno_priste'] ?? '')) ?: null,
-            isset($_POST['auto_hod_kostkou']) ? 1 : 0,
-            isset($_POST['auto_aplikace_efektu']) ? 1 : 0,
-            isset($_POST['auto_vyhodnoceni_pasti']) ? 1 : 0,
-            isset($_POST['auto_zranitelnost']) ? 1 : 0,
             $svetId,
         ]);
         header("Location: svet.php?id=$svetId");
@@ -200,7 +192,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $text = trim((string)($_POST['text'] ?? ''));
         if ($text === '') { http_response_code(422); die('Poznámka nemůže být prázdná.'); }
         $sdileno = array_map('intval', (array)($_POST['sdileno'] ?? []));
-        dracak_vtt_poznamka_pridat(dracak_db(), $svetId, (int)$user['id'], $text, $sdileno);
+        // Místo nepovinné, musí ale patřit do TOHOTO světa — jinak by
+        // šlo poznámku navázat na mapu z cizího světa.
+        $mapaId = !empty($_POST['mapa_id']) ? (int)$_POST['mapa_id'] : null;
+        if ($mapaId !== null) {
+            $stmt = dracak_db()->prepare('SELECT 1 FROM mapy WHERE id = ? AND svet_id = ?');
+            $stmt->execute([$mapaId, $svetId]);
+            if (!$stmt->fetchColumn()) { $mapaId = null; }
+        }
+        dracak_vtt_poznamka_pridat(dracak_db(), $svetId, (int)$user['id'], $text, $sdileno, (int)$svet['aktualni_den_offset'], $mapaId);
         header("Location: svet.php?id=$svetId");
         exit;
     }
@@ -267,7 +267,12 @@ dracak_vtt_page_start($svet['nazev'], $user);
 ?>
   <main class="main" style="padding:24px;">
     <p class="crumb"><a href="svety.php">← Světy</a></p>
-    <h1 class="page-title"><?= htmlspecialchars($svet['nazev']) ?></h1>
+    <h1 class="page-title">
+      <?= htmlspecialchars($svet['nazev']) ?>
+      <?php if ($isPjOrAdmin): ?>
+        <a class="btn btn-ghost" style="font-size:13px;vertical-align:middle;" href="svet_administrace.php?id=<?= $svetId ?>">⚙ Administrace</a>
+      <?php endif; ?>
+    </h1>
 
     <div class="card elev-sm" style="margin-top:14px;">
       <?php if ($isPjOrAdmin): ?>
@@ -308,10 +313,15 @@ dracak_vtt_page_start($svet['nazev'], $user);
       <div class="empty-state">Zatím žádná poznámka, kterou bys viděl.</div>
     <?php else: ?>
       <div class="records-grid">
-        <?php foreach ($poznamky as $p): $jeAutor = (int)$p['autor_ucet_id'] === (int)$user['id']; ?>
+        <?php foreach ($poznamky as $p): $jeAutor = (int)$p['autor_ucet_id'] === (int)$user['id'];
+          $dniPred = (int)$svet['aktualni_den_offset'] - (int)$p['den_pri_vytvoreni']; ?>
           <div class="card elev-sm rec-card">
             <div class="rec-grid">
               <div class="k">Autor:</div><div><?= htmlspecialchars($p['autor_jmeno']) ?></div>
+              <div class="k">Kdy:</div><div><?= dracak_vtt_pocet_dni_text($dniPred) ?></div>
+              <?php if ($p['mapa_nazev']): ?>
+              <div class="k">Místo:</div><div><?= htmlspecialchars($p['mapa_nazev']) ?></div>
+              <?php endif; ?>
             </div>
             <p style="margin:8px 0;"><?= nl2br(htmlspecialchars($p['text'])) ?></p>
             <?php if ($jeAutor || $user['role'] === 'admin'): ?>
@@ -331,6 +341,16 @@ dracak_vtt_page_start($svet['nazev'], $user);
       <div class="field"><label for="poznamka_text">Nová poznámka</label>
         <textarea id="poznamka_text" name="text" required></textarea>
       </div>
+      <?php if ($mapy): ?>
+      <div class="field"><label for="poznamka_mapa_id">Místo (nepovinné)</label>
+        <select class="input" id="poznamka_mapa_id" name="mapa_id">
+          <option value="">— bez místa —</option>
+          <?php foreach ($mapy as $m): ?>
+            <option value="<?= (int)$m['id'] ?>"><?= htmlspecialchars($m['nazev']) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <?php endif; ?>
       <?php if ($moznostiSdileni): ?>
       <div class="field"><label>Nasdílet komu (nepovinné, lze víc)</label>
         <?php foreach ($moznostiSdileni as $m): ?>

@@ -16,8 +16,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         http_response_code(422);
         die('Svět musí mít název.');
     }
-    $stmt = dracak_db()->prepare('INSERT INTO svet (nazev, popis, pj_ucet_id) VALUES (?, ?, ?)');
-    $stmt->execute([$nazev, $popis !== '' ? $popis : null, $user['id']]);
+    // Počáteční herní datum — od něj se svět "posouvá" (viz
+    // hra/svet_administrace.php); prázdné pole = dnešní reálné datum,
+    // ale je to čistě PJova fikce, žádný vztah ke skutečnému kalendáři.
+    $pocatecniDatum = trim((string)($_POST['pocatecni_datum'] ?? ''));
+    if ($pocatecniDatum === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $pocatecniDatum)) {
+        $pocatecniDatum = date('Y-m-d');
+    }
+    $stmt = dracak_db()->prepare('INSERT INTO svet (nazev, popis, pocatecni_datum, pj_ucet_id) VALUES (?, ?, ?, ?)');
+    $stmt->execute([$nazev, $popis !== '' ? $popis : null, $pocatecniDatum, $user['id']]);
     header('Location: svety.php');
     exit;
 }
@@ -70,6 +77,10 @@ dracak_vtt_page_start('Světy', $user);
       </div>
       <div class="field"><label for="popis">Popis</label>
         <textarea id="popis" name="popis"></textarea>
+      </div>
+      <div class="field"><label for="pocatecni_datum">Počáteční herní datum</label>
+        <input class="input" type="date" id="pocatecni_datum" name="pocatecni_datum" value="<?= date('Y-m-d') ?>">
+        <p class="note" style="margin:4px 0 0;">Jen tvoje fikce, ne reálný kalendář — odtud se svět posouvá (viz administrace světa).</p>
       </div>
       <button class="btn btn-primary" type="submit">Založit</button>
     </form>

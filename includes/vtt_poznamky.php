@@ -20,15 +20,17 @@ function dracak_vtt_poznamky_viditelne(PDO $pdo, array $user, int $svetId): arra
 {
     if ($user['role'] === 'admin') {
         $stmt = $pdo->prepare(
-            'SELECT p.*, u.jmeno AS autor_jmeno FROM svet_poznamky p
+            'SELECT p.*, u.jmeno AS autor_jmeno, m.nazev AS mapa_nazev FROM svet_poznamky p
              JOIN ucty u ON u.id = p.autor_ucet_id
+             LEFT JOIN mapy m ON m.id = p.mapa_id
              WHERE p.svet_id = ? ORDER BY p.vytvoreno DESC'
         );
         $stmt->execute([$svetId]);
     } else {
         $stmt = $pdo->prepare(
-            'SELECT DISTINCT p.*, u.jmeno AS autor_jmeno FROM svet_poznamky p
+            'SELECT DISTINCT p.*, u.jmeno AS autor_jmeno, m.nazev AS mapa_nazev FROM svet_poznamky p
              JOIN ucty u ON u.id = p.autor_ucet_id
+             LEFT JOIN mapy m ON m.id = p.mapa_id
              LEFT JOIN svet_poznamka_sdileni s ON s.poznamka_id = p.id
              WHERE p.svet_id = ? AND (p.autor_ucet_id = ? OR s.ucet_id = ?)
              ORDER BY p.vytvoreno DESC'
@@ -71,10 +73,15 @@ function dracak_vtt_poznamky_moznosti_sdileni(PDO $pdo, int $svetId, int $autorU
     return $stmt->fetchAll();
 }
 
-function dracak_vtt_poznamka_pridat(PDO $pdo, int $svetId, int $autorUcetId, string $text, array $sdilenoSUcetId): int
+// $denPriVytvoreni = snapshot svet.aktualni_den_offset v okamžiku zápisu
+// (volající ho musí dodat — tahle funkce svet nedočítá, ať nedojde k
+// nekonzistenci mezi tím, co PJ viděl na obrazovce, a tím, co se
+// skutečně uloží, viz hra/svet.php). $mapaId nepovinné — vazba na
+// konkrétní místo, ke kterému se poznámka váže.
+function dracak_vtt_poznamka_pridat(PDO $pdo, int $svetId, int $autorUcetId, string $text, array $sdilenoSUcetId, int $denPriVytvoreni, ?int $mapaId = null): int
 {
-    $stmt = $pdo->prepare('INSERT INTO svet_poznamky (svet_id, autor_ucet_id, text) VALUES (?, ?, ?)');
-    $stmt->execute([$svetId, $autorUcetId, $text]);
+    $stmt = $pdo->prepare('INSERT INTO svet_poznamky (svet_id, autor_ucet_id, text, den_pri_vytvoreni, mapa_id) VALUES (?, ?, ?, ?, ?)');
+    $stmt->execute([$svetId, $autorUcetId, $text, $denPriVytvoreni, $mapaId]);
     $poznamkaId = (int)$pdo->lastInsertId();
     if ($sdilenoSUcetId) {
         $ins = $pdo->prepare('INSERT IGNORE INTO svet_poznamka_sdileni (poznamka_id, ucet_id) VALUES (?, ?)');
@@ -97,4 +104,20 @@ function dracak_vtt_poznamka_smazat(PDO $pdo, int $poznamkaId, array $user): boo
     $stmt = $pdo->prepare('DELETE FROM svet_poznamky WHERE id = ? AND autor_ucet_id = ?');
     $stmt->execute([$poznamkaId, $user['id']]);
     return $stmt->rowCount() > 0;
+}
+
+// "dnes" / "před 1 dnem" / "před 2 dny" / "před 5 dny" — $n je HERNÍCH
+// dní (aktualni_den_offset teď minus v okamžiku vzniku), ne reálný čas.
+function dracak_vtt_pocet_dni_text(int $n): string
+{
+    if ($n <= 0) {
+        return 'dnes';
+    }
+    if ($n === 1) {
+        return 'před 1 dnem';
+    }
+    if ($n <= 4) {
+        return "před $n dny";
+    }
+    return "před $n dní";
 }
