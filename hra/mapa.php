@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/../includes/vtt.php';
+require_once __DIR__ . '/../includes/vtt_mapa_body.php';
 
 $user = dracak_require_login();
 $mapaId = (int)($_GET['id'] ?? 0);
@@ -67,6 +68,26 @@ foreach ($zdi as &$z) {
     $z['viditelna_hracum'] = (bool)$z['viditelna_hracum'];
 }
 unset($z);
+
+// Piny — jen na světových mapách (typ_mapy='svet'), viz
+// includes/vtt_mapa_body.php. Zónové mapy žádné piny nemají (pin VEDE
+// na zónovou mapu, nesedí mu na sobě samé).
+$mapaBody = $mapa['typ_mapy'] === 'svet' ? dracak_vtt_mapa_body_pro_mapu(dracak_db(), $mapaId, $isPjOrAdmin) : [];
+foreach ($mapaBody as &$b) {
+    $b['npc'] = $b['cilova_mapa_id'] ? dracak_vtt_mapa_bod_npc(dracak_db(), (int)$b['cilova_mapa_id']) : [];
+}
+unset($b);
+// Nabídka zónových map pro "cílová mapa" při zakládání pinu — jen
+// zóny (ne jiné světové mapy) ze STEJNÉHO světa.
+$zonoveMapyVeSvete = $isPjOrAdmin ? dracak_db()->prepare(
+    "SELECT id, nazev FROM mapy WHERE svet_id = ? AND typ_mapy = 'zona' ORDER BY nazev"
+) : null;
+if ($zonoveMapyVeSvete) {
+    $zonoveMapyVeSvete->execute([$svetId]);
+    $zonoveMapyVeSvete = $zonoveMapyVeSvete->fetchAll();
+} else {
+    $zonoveMapyVeSvete = [];
+}
 
 // Aktivní efekty pro všechny entity, co mají na téhle mapě token.
 $aktivniEfektyByEntity = [];
@@ -239,6 +260,23 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
       <svg id="zdiSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:5;"></svg>
       <svg id="rulerSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:140;"></svg>
       <canvas id="mlhaCanvas" style="position:absolute;top:0;left:0;pointer-events:none;z-index:100;"></canvas>
+      <?php if ($mapa['typ_mapy'] === 'svet'): ?>
+      <div id="pinIconTemplates" style="display:none;">
+        <span data-typ="mesto"><?php dracak_icon('castle', 28); ?></span>
+        <span data-typ="vesnice"><?php dracak_icon('home', 28); ?></span>
+        <span data-typ="tajne_misto"><?php dracak_icon('eye-off', 28); ?></span>
+        <span data-typ="jine"><?php dracak_icon('map-pin', 28); ?></span>
+      </div>
+      <div id="mapaBodyLayer" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:50;">
+        <?php foreach ($mapaBody as $b): ?>
+          <button type="button" class="mapa-bod-marker" data-bod-id="<?= (int)$b['id'] ?>"
+            style="position:absolute;left:<?= (int)$b['x'] ?>px;top:<?= (int)$b['y'] ?>px;transform:translate(-50%,-100%);pointer-events:auto;background:none;border:none;cursor:pointer;padding:0;<?= $b['viditelny_hracum'] ? '' : 'opacity:.6;' ?>"
+            title="<?= htmlspecialchars($b['nazev']) ?>">
+            <?php dracak_icon($b['typ'] === 'mesto' ? 'castle' : ($b['typ'] === 'vesnice' ? 'home' : ($b['typ'] === 'tajne_misto' ? 'eye-off' : 'map-pin')), 28); ?>
+          </button>
+        <?php endforeach; ?>
+      </div>
+      <?php endif; ?>
       <?php foreach ($tokeny as $t):
           $entKey = $t['typ_entity'] . ':' . $t['entita_id'];
           $efektyText = implode(', ', $aktivniEfektyByEntity[$entKey] ?? []);
@@ -278,6 +316,9 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
     <button class="tbtn" type="button" id="tb-ping" title="Ukázat na mapu ostatním"><?php dracak_icon('crosshair'); ?></button>
     <?php if ($isPjOrAdmin): ?>
       <button class="tbtn" type="button" id="tb-zed" title="Kreslit zeď"><?php dracak_icon('brick-wall'); ?></button>
+    <?php endif; ?>
+    <?php if ($isPjOrAdmin && $mapa['typ_mapy'] === 'svet'): ?>
+      <button class="tbtn" type="button" id="tb-pin" title="Přidat pin (místo)"><?php dracak_icon('map-pin'); ?></button>
     <?php endif; ?>
     <button class="tbtn" type="button" id="tb-kostky" title="Hodit kostkou"><?php dracak_icon('dices'); ?></button>
     <button class="tbtn" type="button" id="tb-log" title="Log"><?php dracak_icon('scroll-text'); ?></button>
@@ -356,6 +397,53 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
     </div>
     <button class="btn btn-ghost" type="button" id="zedSmazatBtn" style="width:100%;margin-top:8px;display:none;">Smazat vybranou zeď</button>
   </div>
+
+  <?php if ($mapa['typ_mapy'] === 'svet'): ?>
+  <div class="popover" id="popover-pin-novy">
+    <button class="close-x" data-close-popover><?php dracak_icon('x', 14); ?></button>
+    <h3>Nový pin</h3>
+    <input type="hidden" id="pinNovyX">
+    <input type="hidden" id="pinNovyY">
+    <label for="pinNovyNazev">Název *</label>
+    <input class="input" type="text" id="pinNovyNazev" required>
+    <label for="pinNovyTyp">Typ</label>
+    <select class="input" id="pinNovyTyp">
+      <option value="mesto">Město</option>
+      <option value="vesnice">Vesnice</option>
+      <option value="tajne_misto">Tajné místo</option>
+      <option value="jine">Jiné</option>
+    </select>
+    <label for="pinNovyCilovaMapa">Cílová mapa (nepovinné)</label>
+    <select class="input" id="pinNovyCilovaMapa">
+      <option value="">— bez cílové mapy —</option>
+      <?php foreach ($zonoveMapyVeSvete as $zm): ?>
+        <option value="<?= (int)$zm['id'] ?>"><?= htmlspecialchars($zm['nazev']) ?></option>
+      <?php endforeach; ?>
+    </select>
+    <label for="pinNovyPopis">Popis</label>
+    <textarea id="pinNovyPopis"></textarea>
+    <label style="display:flex;align-items:center;gap:6px;font-weight:400;">
+      <input type="checkbox" id="pinNovyViditelny" checked> Viditelný hráčům
+    </label>
+    <button class="btn btn-primary" type="button" id="pinNovyUlozitBtn" style="width:100%;margin-top:10px;">Založit pin</button>
+  </div>
+
+  <div class="popover" id="popover-pin-info">
+    <button class="close-x" data-close-popover><?php dracak_icon('x', 14); ?></button>
+    <h3 id="pinInfoNazev">Pin</h3>
+    <p class="note" id="pinInfoTyp"></p>
+    <p id="pinInfoPopis"></p>
+    <div id="pinInfoNpcWrap" style="display:none;">
+      <h4 class="rel-label">NPC na místě</h4>
+      <ul id="pinInfoNpcList" style="margin:0 0 10px;padding-left:18px;font-size:12.5px;"></ul>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <a class="btn btn-secondary" id="pinInfoOtevritBtn" href="#" style="flex:1;display:none;">Otevřít mapu</a>
+      <button class="btn btn-secondary" type="button" id="pinInfoAktivniBtn" style="flex:1;display:none;">Nastavit jako aktivní</button>
+    </div>
+    <button class="btn btn-ghost" type="button" id="pinInfoSmazatBtn" style="width:100%;margin-top:8px;display:none;">Smazat pin</button>
+  </div>
+  <?php endif; ?>
 
   <div class="popover" id="popover-grid">
     <button class="close-x" data-close-popover><?php dracak_icon('x', 14); ?></button>
@@ -498,6 +586,9 @@ let GRID_OFFSET_Y = <?= (int)($mapa['grid_posun_y'] ?? 0) ?>;
 let gridSaved = {px: GRID_PX, typ: GRID_TYPE, offX: GRID_OFFSET_X, offY: GRID_OFFSET_Y};
 const ZDI_INITIAL = <?= json_encode(array_values($zdi), JSON_UNESCAPED_UNICODE) ?>;
 let zdiList = ZDI_INITIAL.slice();
+// Piny (jen na světové mapě, viz $mapaBody v PHP) — typ určuje ikonu v
+// CSS/JS stejně jako server-side výběr ikony pro počáteční vykreslení.
+const MAPA_BODY = <?= json_encode(array_values($mapaBody), JSON_UNESCAPED_UNICODE) ?>;
 let zedVybranaId = null;
 let posledniUdalostId = <?= $posledniUdalostId ?>;
 const INVENTAR = <?= json_encode($inventarByEntity, JSON_UNESCAPED_UNICODE) ?>;
@@ -914,6 +1005,7 @@ const toolButtons = {
   ruler: document.getElementById('tb-ruler'),
   ping: document.getElementById('tb-ping'),
   zed: document.getElementById('tb-zed'),
+  pin: document.getElementById('tb-pin'),
 };
 function setTool(tool) {
   currentTool = tool;
@@ -945,6 +1037,7 @@ if (toolButtons.select) toolButtons.select.addEventListener('click', () => setTo
 if (toolButtons.ruler) toolButtons.ruler.addEventListener('click', () => setTool(currentTool === 'ruler' ? 'select' : 'ruler'));
 if (toolButtons.ping) toolButtons.ping.addEventListener('click', () => setTool(currentTool === 'ping' ? 'select' : 'ping'));
 if (toolButtons.zed) toolButtons.zed.addEventListener('click', () => setTool(currentTool === 'zed' ? 'select' : 'zed'));
+if (toolButtons.pin) toolButtons.pin.addEventListener('click', () => setTool(currentTool === 'pin' ? 'select' : 'pin'));
 
 // --- Grid panel: živý náhled před uložením (viz zrusitZivyNahledGridu
 // volané z closeAllPopovers — zavření bez uložení náhled vrátí zpět). ---
@@ -1384,6 +1477,23 @@ if (mapWrap) {
       drawZedRozpracovanouCestu(bod);
       return;
     }
+    if (currentTool === 'pin') {
+      // Vždycky znovu otevře s čerstvými souřadnicemi (ne toggle) — dva
+      // kliky po sobě by jinak podruhé jen zavřely formulář, ne
+      // přepsaly souřadnice na nový bod.
+      const p = rulerPoint(e);
+      const xEl = document.getElementById('pinNovyX'), yEl = document.getElementById('pinNovyY');
+      if (xEl) xEl.value = Math.round(p.x);
+      if (yEl) yEl.value = Math.round(p.y);
+      closeAllPopovers();
+      const pop = document.getElementById('popover-pin-novy');
+      if (pop && toolButtons.pin) {
+        pop.style.top = toolButtons.pin.getBoundingClientRect().top + 'px';
+        pop.classList.add('open');
+        toolButtons.pin.classList.add('active');
+      }
+      return;
+    }
     if (currentTool !== 'select') return;
     if (e.target.closest('.vtt-token')) return;
     const wrapRect = mapWrap.getBoundingClientRect();
@@ -1399,6 +1509,113 @@ if (mapWrap) {
       postJson('api/token_pridat.php', {mapa_id: MAPA_ID, typ_entity: 'nestvura', nestvura_id: parseInt(nestvuraSel.value, 10), x, y})
         .then(d => { if (d.error) { logLine('Chyba přidání: ' + d.error); return; } location.reload(); });
     }
+  });
+}
+
+// --- Piny na světové mapě (jen typ_mapy='svet', viz MAPA_BODY/popover-pin-*) ---
+let pinVybranyId = null;
+function otevriPinInfo(bod) {
+  pinVybranyId = bod.id;
+  document.getElementById('pinInfoNazev').textContent = bod.nazev;
+  const typLabel = {mesto: 'Město', vesnice: 'Vesnice', tajne_misto: 'Tajné místo', jine: 'Jiné místo'}[bod.typ] || bod.typ;
+  document.getElementById('pinInfoTyp').textContent = typLabel + (IS_PJ_OR_ADMIN && !bod.viditelny_hracum ? ' — skryté hráčům' : '');
+  document.getElementById('pinInfoPopis').textContent = bod.popis || '';
+  const npcWrap = document.getElementById('pinInfoNpcWrap');
+  const npcList = document.getElementById('pinInfoNpcList');
+  if (bod.npc && bod.npc.length) {
+    npcWrap.style.display = '';
+    npcList.innerHTML = bod.npc.map(n => {
+      const rp = [n.rasa_nazev, n.povolani_nazev].filter(Boolean).join(' / ');
+      return '<li>' + n.nazev + (rp ? ' <span style="opacity:.65;">(' + rp + ', ' + n.uroven + '. úr.)</span>' : '') + '</li>';
+    }).join('');
+  } else {
+    npcWrap.style.display = 'none';
+  }
+  const otevritBtn = document.getElementById('pinInfoOtevritBtn');
+  const aktivniBtn = document.getElementById('pinInfoAktivniBtn');
+  const smazatBtn = document.getElementById('pinInfoSmazatBtn');
+  if (bod.cilova_mapa_id) {
+    otevritBtn.style.display = '';
+    otevritBtn.href = 'mapa.php?id=' + bod.cilova_mapa_id;
+    aktivniBtn.style.display = IS_PJ_OR_ADMIN ? '' : 'none';
+  } else {
+    otevritBtn.style.display = 'none';
+    aktivniBtn.style.display = 'none';
+  }
+  smazatBtn.style.display = IS_PJ_OR_ADMIN ? '' : 'none';
+  const btn = document.querySelector('.mapa-bod-marker[data-bod-id="' + bod.id + '"]');
+  const pop = document.getElementById('popover-pin-info');
+  if (pop && btn) {
+    closeAllPopovers();
+    pop.style.top = btn.getBoundingClientRect().top + 'px';
+    pop.classList.add('open');
+  }
+}
+document.querySelectorAll('.mapa-bod-marker').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const bod = MAPA_BODY.find(b => b.id === parseInt(btn.dataset.bodId, 10));
+    if (bod) otevriPinInfo(bod);
+  });
+});
+const pinInfoAktivniBtn = document.getElementById('pinInfoAktivniBtn');
+if (pinInfoAktivniBtn) {
+  pinInfoAktivniBtn.addEventListener('click', () => {
+    const bod = MAPA_BODY.find(b => b.id === pinVybranyId);
+    if (!bod || !bod.cilova_mapa_id) return;
+    postJson('api/aktivni_mapa_nastavit.php', {mapa_id: bod.cilova_mapa_id})
+      .then(d => { if (d.error) { logLine('Chyba: ' + d.error); return; } logLine('Aktivní mapa nastavena na: ' + bod.nazev); });
+  });
+}
+const pinInfoSmazatBtn = document.getElementById('pinInfoSmazatBtn');
+if (pinInfoSmazatBtn) {
+  pinInfoSmazatBtn.addEventListener('click', () => {
+    if (!pinVybranyId || !confirm('Smazat tenhle pin?')) return;
+    postJson('api/mapa_bod_smazat.php', {id: pinVybranyId})
+      .then(d => {
+        if (d.error) { logLine('Chyba: ' + d.error); return; }
+        const btn = document.querySelector('.mapa-bod-marker[data-bod-id="' + pinVybranyId + '"]');
+        if (btn) btn.remove();
+        closeAllPopovers();
+      });
+  });
+}
+const pinNovyUlozitBtn = document.getElementById('pinNovyUlozitBtn');
+if (pinNovyUlozitBtn) {
+  pinNovyUlozitBtn.addEventListener('click', () => {
+    const nazev = document.getElementById('pinNovyNazev').value.trim();
+    if (!nazev) { logLine('Pin musí mít název.'); return; }
+    const typ = document.getElementById('pinNovyTyp').value;
+    const cilovaMapaEl = document.getElementById('pinNovyCilovaMapa');
+    const cilovaMapaId = cilovaMapaEl.value ? parseInt(cilovaMapaEl.value, 10) : null;
+    const popis = document.getElementById('pinNovyPopis').value.trim();
+    const viditelnyHracum = document.getElementById('pinNovyViditelny').checked;
+    const x = parseInt(document.getElementById('pinNovyX').value, 10);
+    const y = parseInt(document.getElementById('pinNovyY').value, 10);
+    postJson('api/mapa_bod_pridat.php', {
+      mapa_id: MAPA_ID, nazev, typ, x, y, cilova_mapa_id: cilovaMapaId, popis, viditelny_hracum: viditelnyHracum,
+    }).then(d => {
+      if (d.error) { logLine('Chyba: ' + d.error); return; }
+      const bod = {id: d.id, nazev, typ, x, y, cilova_mapa_id: cilovaMapaId, popis, viditelny_hracum: viditelnyHracum, npc: []};
+      MAPA_BODY.push(bod);
+      const layer = document.getElementById('mapaBodyLayer');
+      if (layer) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'mapa-bod-marker';
+        btn.dataset.bodId = String(bod.id);
+        btn.title = nazev;
+        btn.style.cssText = 'position:absolute;left:' + x + 'px;top:' + y + 'px;transform:translate(-50%,-100%);pointer-events:auto;background:none;border:none;cursor:pointer;padding:0;' + (viditelnyHracum ? '' : 'opacity:.6;');
+        const tmpl = document.querySelector('#pinIconTemplates [data-typ="' + typ + '"]');
+        btn.innerHTML = tmpl ? tmpl.innerHTML : '';
+        btn.addEventListener('click', (e) => { e.stopPropagation(); otevriPinInfo(bod); });
+        layer.appendChild(btn);
+      }
+      document.getElementById('pinNovyNazev').value = '';
+      document.getElementById('pinNovyPopis').value = '';
+      closeAllPopovers();
+      setTool('select');
+    });
   });
 }
 
