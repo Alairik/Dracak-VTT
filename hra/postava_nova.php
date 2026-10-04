@@ -18,7 +18,6 @@ require_once __DIR__ . '/../includes/vtt_postava.php';
 // tenhle soubor je pro hráče PRIMÁRNÍ cesta, ne náhrada.
 
 $user = dracak_require_login();
-$isPjOrAdmin = in_array($user['role'], ['admin', 'pj'], true);
 // id v URL je nepovinné — bez něj se postava založí zatím bez světa
 // (postavy.svet_id NULL, viz migrace 0053) a čeká na pozdější přiřazení
 // přes hra/postavy_moje.php. Forms v téhle stránce nemají `action`,
@@ -26,6 +25,9 @@ $isPjOrAdmin = in_array($user['role'], ['admin', 'pj'], true);
 // po celou dobu wizardu bez nutnosti hidden inputu.
 $svetId = (int)($_GET['id'] ?? 0);
 $svet = $svetId > 0 ? dracak_vtt_require_svet($user, $svetId) : null;
+// Bez vybraného světa nemá "jsem PJ" smysl (není čeho být PJ) — gate
+// na "přiřadit postavu jinému hráči" níž je i tak vždycky AND $svetId>0.
+$isPjOrAdmin = $svetId > 0 && dracak_vtt_je_pj_sveta($user, $svetId);
 $pdo = dracak_db();
 
 // Mapování kódu vlastnosti (vlastnosti.kod) na název sloupce v

@@ -4,11 +4,6 @@ require_once __DIR__ . '/../../includes/vtt.php';
 
 header('Content-Type: application/json; charset=utf-8');
 $user = dracak_require_login();
-if (!in_array($user['role'], ['admin', 'pj'], true)) {
-    http_response_code(403);
-    echo json_encode(['error' => 'Jen PJ/admin může mazat zdi.']);
-    exit;
-}
 
 $data = json_decode((string)file_get_contents('php://input'), true) ?: [];
 $zedId = (int)($data['id'] ?? 0);
@@ -20,6 +15,11 @@ $zed = $stmt->fetch();
 if (!$zed || !dracak_vtt_svet_access($user, (int)$zed['svet_id'])) {
     http_response_code(404);
     echo json_encode(['error' => 'Zeď nenalezena.']);
+    exit;
+}
+if (!dracak_vtt_je_pj_sveta($user, (int)$zed['svet_id'])) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Jen PJ/admin může mazat zdi.']);
     exit;
 }
 

@@ -5,11 +5,6 @@ require_once __DIR__ . '/../../includes/vtt_mlha.php';
 
 header('Content-Type: application/json; charset=utf-8');
 $user = dracak_require_login();
-if (!in_array($user['role'], ['admin', 'pj'], true)) {
-    http_response_code(403);
-    echo json_encode(['error' => 'Jen PJ/admin ručně upravuje mlhu.']);
-    exit;
-}
 
 $data = json_decode((string)file_get_contents('php://input'), true) ?: [];
 $mapaId = (int)($data['mapa_id'] ?? 0);
@@ -29,6 +24,11 @@ $mapa = $stmt->fetch();
 if (!$mapa || !dracak_vtt_svet_access($user, (int)$mapa['svet_id'])) {
     http_response_code(404);
     echo json_encode(['error' => 'Mapa nenalezena.']);
+    exit;
+}
+if (!dracak_vtt_je_pj_sveta($user, (int)$mapa['svet_id'])) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Jen PJ/admin ručně upravuje mlhu.']);
     exit;
 }
 $stmt = $pdo->prepare('SELECT 1 FROM svet_hraci WHERE svet_id = ? AND ucet_id = ?');

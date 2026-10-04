@@ -11,11 +11,6 @@ require_once __DIR__ . '/../../includes/vtt_iniciativa.php';
 
 header('Content-Type: application/json; charset=utf-8');
 $user = dracak_require_login();
-if (!in_array($user['role'], ['admin', 'pj'], true)) {
-    http_response_code(403);
-    echo json_encode(['error' => 'Jen PJ/admin může posunout tah.']);
-    exit;
-}
 
 $data = json_decode((string)file_get_contents('php://input'), true) ?: [];
 $mapaId = (int)($data['mapa_id'] ?? 0);
@@ -30,6 +25,11 @@ if (!$mapa || !dracak_vtt_svet_access($user, (int)$mapa['svet_id'])) {
     exit;
 }
 $svetId = (int)$mapa['svet_id'];
+if (!dracak_vtt_je_pj_sveta($user, $svetId)) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Jen PJ/admin může posunout tah.']);
+    exit;
+}
 
 $stmt = $pdo->prepare('SELECT * FROM kolo_stav WHERE mapa_id = ?');
 $stmt->execute([$mapaId]);

@@ -4,9 +4,9 @@ require_once __DIR__ . '/../includes/vtt.php';
 require_once __DIR__ . '/../includes/vtt_predmety.php';
 
 $user = dracak_require_login();
-$isPjOrAdmin = in_array($user['role'], ['admin', 'pj'], true);
 $svetId = (int)($_GET['id'] ?? 0);
 $svet = dracak_vtt_require_svet($user, $svetId);
+$isPjOrAdmin = dracak_vtt_je_pj_sveta($user, $svetId);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $akce = $_POST['akce'] ?? '';

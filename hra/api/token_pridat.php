@@ -5,7 +5,6 @@ require_once __DIR__ . '/../../includes/vtt_mlha.php';
 
 header('Content-Type: application/json; charset=utf-8');
 $user = dracak_require_login();
-$isPjOrAdmin = in_array($user['role'], ['admin', 'pj'], true);
 
 $data = json_decode((string)file_get_contents('php://input'), true) ?: [];
 $mapaId = (int)($data['mapa_id'] ?? 0);
@@ -22,6 +21,7 @@ if (!$mapa || !dracak_vtt_svet_access($user, (int)$mapa['svet_id'])) {
     echo json_encode(['error' => 'Mapa nenalezena.']);
     exit;
 }
+$isPjOrAdmin = dracak_vtt_je_pj_sveta($user, (int)$mapa['svet_id']);
 
 if ($typEntity === 'nestvura') {
     if (!$isPjOrAdmin) {

@@ -45,7 +45,7 @@ if (!dracak_vtt_je_na_tahu($user, (int)$token['mapa_id'], $tokenId)) {
 // Zeď blokuje pohyb jen hráčům — PJ/admin smí token na zeď i přes ni
 // položit záměrně (postava odhozená do zdi, vylézání apod.), viz
 // dracak_vtt_pohyb_prochazi_zdi().
-$isPjOrAdmin = in_array($user['role'], ['admin', 'pj'], true);
+$isPjOrAdmin = dracak_vtt_je_pj_sveta($user, (int)$token['svet_id']);
 if (!$isPjOrAdmin && dracak_vtt_pohyb_prochazi_zdi($pdo, (int)$token['mapa_id'], (float)$token['x'], (float)$token['y'], (float)$noveX, (float)$noveY)) {
     http_response_code(403);
     echo json_encode(['error' => 'Cesta vede přes zeď, kterou nejde projít.']);

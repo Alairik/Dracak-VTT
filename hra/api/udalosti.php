@@ -24,7 +24,7 @@ $stmt = dracak_db()->prepare(
 );
 $stmt->execute([$svetId, $od]);
 $udalosti = $stmt->fetchAll();
-$isPjOrAdmin = in_array($user['role'], ['admin', 'pj'], true);
+$isPjOrAdmin = dracak_vtt_je_pj_sveta($user, $svetId);
 foreach ($udalosti as &$u) {
     $u['payload'] = json_decode((string)$u['payload'], true);
 }

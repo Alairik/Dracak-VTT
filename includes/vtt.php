@@ -3,17 +3,41 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/auth.php';
 
-// pj/admin mají ke všem světům stejný přístup jako ke zbytku appky
-// (identické právo jako dnešní dracak_can_edit pro pj). hráč potřebuje
-// být zapsaný v svet_hraci pro konkrétní svet.
+// Přístup do světa vůbec (číst/hrát v něm) — admin má všude, PJ TOHOTO
+// světa (svet.pj_ucet_id) má taky, jinak musí být zapsaný v svet_hraci.
+// `role` sama o sobě už NEDÁVÁ přístup nikam — jeden účet může být PJ
+// svého vlastního světa a zároveň jen hráč v cizím (viz
+// dracak_vtt_je_pj_sveta níž, co rozlišuje PJ pravomoci uvnitř světa,
+// kam už přístup je).
 function dracak_vtt_svet_access(array $user, int $svetId): bool
 {
-    if (in_array($user['role'], ['admin', 'pj'], true)) {
+    if ($user['role'] === 'admin') {
+        return true;
+    }
+    if (dracak_vtt_je_pj_sveta($user, $svetId)) {
         return true;
     }
     $stmt = dracak_db()->prepare('SELECT 1 FROM svet_hraci WHERE svet_id = ? AND ucet_id = ?');
     $stmt->execute([$svetId, $user['id']]);
     return (bool)$stmt->fetchColumn();
+}
+
+// Má tenhle účet PJ pravomoci v TOMHLE KONKRÉTNÍM světě? Admin vždycky;
+// jinak jen zakladatel světa (svet.pj_ucet_id) — ucty.role='pj' dnes
+// znamená jen "umí založit svět" (viz hra/svety.php), ne "má PJ práva
+// všude". Nahrazuje starý vzorec in_array($user['role'], ['admin','pj'])
+// na všech místech, co kontrolovaly PJ práva KE KONKRÉTNÍMU světu/mapě/
+// tokenu/zdi — ten starý vzorec dával PJ práva v KAŽDÉM světě v appce,
+// ne jen ve vlastním.
+function dracak_vtt_je_pj_sveta(array $user, int $svetId): bool
+{
+    if ($user['role'] === 'admin') {
+        return true;
+    }
+    $stmt = dracak_db()->prepare('SELECT pj_ucet_id FROM svet WHERE id = ?');
+    $stmt->execute([$svetId]);
+    $pjUcetId = $stmt->fetchColumn();
+    return $pjUcetId !== false && (int)$pjUcetId === (int)$user['id'];
 }
 
 function dracak_vtt_require_svet(array $user, int $svetId): array
@@ -28,12 +52,13 @@ function dracak_vtt_require_svet(array $user, int $svetId): array
     return $svet;
 }
 
-// Kdo smí hýbat konkrétním tokenem: pj/admin vždy, hráč jen svou vlastní
-// postavou (tokeny.entita_id -> postavy.vlastnik_ucet_id). Instance
-// nestvůry smí hýbat jen pj/admin.
+// Kdo smí hýbat konkrétním tokenem: PJ světa, jehož je tahle mapa
+// (svet_id — volající ho musí mít v $token, typicky z JOIN mapy m),
+// nebo admin vždy; hráč jen svou vlastní postavou (tokeny.entita_id ->
+// postavy.vlastnik_ucet_id). Instance nestvůry smí hýbat jen PJ/admin.
 function dracak_vtt_can_move_token(array $user, array $token): bool
 {
-    if (in_array($user['role'], ['admin', 'pj'], true)) {
+    if (dracak_vtt_je_pj_sveta($user, (int)$token['svet_id'])) {
         return true;
     }
     if ($token['typ_entity'] !== 'postava') {
@@ -66,7 +91,13 @@ function dracak_vtt_can_move_token(array $user, array $token): bool
 // řadě", ne kolik mu zbývá akcí v rámci tahu.
 function dracak_vtt_je_na_tahu(array $user, int $mapaId, int $tokenId): bool
 {
-    if (in_array($user['role'], ['admin', 'pj'], true)) {
+    if ($user['role'] === 'admin') {
+        return true;
+    }
+    $stmt = dracak_db()->prepare('SELECT svet_id FROM mapy WHERE id = ?');
+    $stmt->execute([$mapaId]);
+    $svetId = $stmt->fetchColumn();
+    if ($svetId !== false && dracak_vtt_je_pj_sveta($user, (int)$svetId)) {
         return true;
     }
     $stmt = dracak_db()->prepare('SELECT aktivni_token_id FROM kolo_stav WHERE mapa_id = ?');
@@ -186,11 +217,25 @@ function dracak_vtt_entity_row(string $typEntity, int $entitaId): ?array
     return $row ?: null;
 }
 
-// pj/admin upraví život komukoliv, hráč jen svojí vlastní postavě —
-// instance nestvůry je vždy v gesci PJ.
+// PJ světa upraví život komukoliv v něm, hráč jen svojí vlastní postavě
+// — instance nestvůry je vždy v gesci PJ. Svet_id entity: postava ho má
+// přímo (může být i NULL/0 — postava zatím bez světa, viz migrace 0053;
+// pak tahle funkce PJ výjimku nedá, volající si pro tenhle okrajový
+// případ řeší vlastní fallback, viz hra/postava.php), nestvura_instance
+// jen přes svůj mapa_id.
 function dracak_vtt_can_edit_hp(array $user, string $typEntity, array $entity): bool
 {
-    if (in_array($user['role'], ['admin', 'pj'], true)) {
+    if ($user['role'] === 'admin') {
+        return true;
+    }
+    if ($typEntity === 'postava') {
+        $svetId = (int)($entity['svet_id'] ?? 0);
+    } else {
+        $stmt = dracak_db()->prepare('SELECT svet_id FROM mapy WHERE id = ?');
+        $stmt->execute([(int)($entity['mapa_id'] ?? 0)]);
+        $svetId = (int)($stmt->fetchColumn() ?: 0);
+    }
+    if ($svetId > 0 && dracak_vtt_je_pj_sveta($user, $svetId)) {
         return true;
     }
     return $typEntity === 'postava' && (int)($entity['vlastnik_ucet_id'] ?? 0) === (int)$user['id'];

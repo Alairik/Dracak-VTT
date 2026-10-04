@@ -31,7 +31,7 @@ $stmt = dracak_db()->prepare(
 );
 $stmt->execute([$mapaId]);
 $tokeny = $stmt->fetchAll();
-if (!in_array($user['role'], ['admin', 'pj'], true)) {
+if (!dracak_vtt_je_pj_sveta($user, $svetId)) {
     $tokeny = array_values(array_filter($tokeny, fn($t) => (bool)$t['viditelny_hracum']));
 }
 

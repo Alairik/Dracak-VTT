@@ -4,11 +4,6 @@ require_once __DIR__ . '/../../includes/vtt_predmety.php';
 
 header('Content-Type: application/json; charset=utf-8');
 $user = dracak_require_login();
-if (!in_array($user['role'], ['admin', 'pj'], true)) {
-    http_response_code(403);
-    echo json_encode(['error' => 'Jen PJ/admin může předávat kořist.']);
-    exit;
-}
 
 $data = json_decode((string)file_get_contents('php://input'), true) ?: [];
 $nestvuraInstanceId = (int)($data['nestvura_instance_id'] ?? 0);
@@ -38,6 +33,11 @@ $svetMapa = dracak_vtt_entity_svet_mapa('nestvura_instance', $nestvura);
 if ($svetMapa['svet_id'] === 0 || !dracak_vtt_svet_access($user, $svetMapa['svet_id'])) {
     http_response_code(403);
     echo json_encode(['error' => 'Bez přístupu.']);
+    exit;
+}
+if (!dracak_vtt_je_pj_sveta($user, $svetMapa['svet_id'])) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Jen PJ/admin může předávat kořist.']);
     exit;
 }
 // Server-side, nevěřit klientovi: kořist jde vzít, jen když je nestvůra

@@ -3,7 +3,6 @@ declare(strict_types=1);
 require_once __DIR__ . '/../includes/vtt.php';
 
 $user = dracak_require_login();
-$isPjOrAdmin = in_array($user['role'], ['admin', 'pj'], true);
 $mapaId = (int)($_GET['id'] ?? 0);
 
 $stmt = dracak_db()->prepare('SELECT * FROM mapy WHERE id = ?');
@@ -15,6 +14,7 @@ if (!$mapa) {
 }
 $svet = dracak_vtt_require_svet($user, (int)$mapa['svet_id']);
 $svetId = (int)$svet['id'];
+$isPjOrAdmin = dracak_vtt_je_pj_sveta($user, $svetId);
 
 $stmt = dracak_db()->prepare(
     'SELECT t.id, t.typ_entity, t.entita_id, t.x, t.y, t.z_poradi, t.viditelny_hracum,
