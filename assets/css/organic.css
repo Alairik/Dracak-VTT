@@ -195,6 +195,14 @@ input[type=checkbox] { width: auto; }
 .error { color: var(--color-danger); font-size: 13px; margin-top: 8px; }
 .note { color: var(--color-neutral-600); font-size: 12px; }
 
+/* ---------- Section grid (skupiny sekcí vedle sebe na širších oknech —
+   mobile-first neznamená "vždycky na šířku mobilu", na 900px+ se dvě
+   související skupiny sekcí (viz hra/svet.php) zobrazí vedle sebe) ---------- */
+.section-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+/* Karty uvnitř section-grid sloupce (~500px) jsou na 2 vedle sebe moc
+   úzké (viz Postavy — atributy/inventář) — radši jedna pod druhou. */
+.section-grid .records-grid { grid-template-columns: 1fr; }
+
 /* ---------- Record card (seznam záznamů) ---------- */
 .records-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
 .rec-card { padding: 16px 20px; }
@@ -308,6 +316,7 @@ input[type=checkbox] { width: auto; }
   .sidebar.open { transform: translateX(0); }
   .main { padding: 68px 18px 40px; max-width: 100%; }
   .records-grid { grid-template-columns: 1fr; }
+  .section-grid { grid-template-columns: 1fr; gap: 0; }
   .filter-row { gap: 10px; }
   .dash-shell { padding: 32px 16px 48px; }
   .dash-brand { font-size: 24px; }
