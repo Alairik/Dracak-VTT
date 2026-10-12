@@ -46,6 +46,23 @@ function dracak_vtt_mapa_bod_npc(PDO $pdo, int $cilovaMapaId): array
     return $stmt->fetchAll();
 }
 
+// Jméno vendorované ikony (assets/icons/) pro daný typ pinu — na jednom
+// místě, ať se nerozjíždí mezi šablonou ikon a markerem na mapě (viz
+// hra/mapa.php).
+function dracak_vtt_mapa_bod_ikona(string $typ): string
+{
+    return match ($typ) {
+        'mesto' => 'castle',
+        'vesnice' => 'home',
+        'tajne_misto' => 'eye-off',
+        'budova' => 'building-2',
+        'mistnost' => 'door-open',
+        'sklep' => 'warehouse',
+        'prechod' => 'signpost',
+        default => 'map-pin',
+    };
+}
+
 function dracak_vtt_mapa_bod_pridat(PDO $pdo, int $mapaId, string $nazev, string $typ, int $x, int $y, ?int $cilovaMapaId, ?string $popis, bool $viditelnyHracum): int
 {
     $stmt = $pdo->prepare(

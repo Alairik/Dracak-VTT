@@ -69,21 +69,24 @@ foreach ($zdi as &$z) {
 }
 unset($z);
 
-// Piny — jen na světových mapách (typ_mapy='svet'), viz
-// includes/vtt_mapa_body.php. Zónové mapy žádné piny nemají (pin VEDE
-// na zónovou mapu, nesedí mu na sobě samé).
-$mapaBody = $mapa['typ_mapy'] === 'svet' ? dracak_vtt_mapa_body_pro_mapu(dracak_db(), $mapaId, $isPjOrAdmin) : [];
+// Piny — dřív jen na světové mapě, teď na libovolné (viz migrace
+// 0062_piny_hierarchie_a_typy.sql): zóna může mít piny na budovy,
+// budova na místnosti atd., libovolně hluboko. Pin na mapě samotné
+// (ne jen na světové) umožňuje tenhle vnořený rozpad.
+$mapaBody = dracak_vtt_mapa_body_pro_mapu(dracak_db(), $mapaId, $isPjOrAdmin);
 foreach ($mapaBody as &$b) {
     $b['npc'] = $b['cilova_mapa_id'] ? dracak_vtt_mapa_bod_npc(dracak_db(), (int)$b['cilova_mapa_id']) : [];
 }
 unset($b);
-// Nabídka zónových map pro "cílová mapa" při zakládání pinu — jen
-// zóny (ne jiné světové mapy) ze STEJNÉHO světa.
+// Nabídka map pro "cílová mapa" při zakládání pinu — jen zóny (ne
+// světová mapa samotná, ta je vždycky kořen) ze STEJNÉHO světa a
+// nikdy mapa, na které pin zrovna zakládáme (přímý self-loop by
+// breadcrumbu/stromu v dalších fázích rozbil procházení).
 $zonoveMapyVeSvete = $isPjOrAdmin ? dracak_db()->prepare(
-    "SELECT id, nazev FROM mapy WHERE svet_id = ? AND typ_mapy = 'zona' ORDER BY nazev"
+    "SELECT id, nazev FROM mapy WHERE svet_id = ? AND typ_mapy = 'zona' AND id != ? ORDER BY nazev"
 ) : null;
 if ($zonoveMapyVeSvete) {
-    $zonoveMapyVeSvete->execute([$svetId]);
+    $zonoveMapyVeSvete->execute([$svetId, $mapaId]);
     $zonoveMapyVeSvete = $zonoveMapyVeSvete->fetchAll();
 } else {
     $zonoveMapyVeSvete = [];
@@ -260,11 +263,14 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
       <svg id="zdiSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:5;"></svg>
       <svg id="rulerSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:140;"></svg>
       <canvas id="mlhaCanvas" style="position:absolute;top:0;left:0;pointer-events:none;z-index:100;"></canvas>
-      <?php if ($mapa['typ_mapy'] === 'svet'): ?>
       <div id="pinIconTemplates" style="display:none;">
         <span data-typ="mesto"><?php dracak_icon('castle', 28); ?></span>
         <span data-typ="vesnice"><?php dracak_icon('home', 28); ?></span>
         <span data-typ="tajne_misto"><?php dracak_icon('eye-off', 28); ?></span>
+        <span data-typ="budova"><?php dracak_icon('building-2', 28); ?></span>
+        <span data-typ="mistnost"><?php dracak_icon('door-open', 28); ?></span>
+        <span data-typ="sklep"><?php dracak_icon('warehouse', 28); ?></span>
+        <span data-typ="prechod"><?php dracak_icon('signpost', 28); ?></span>
         <span data-typ="jine"><?php dracak_icon('map-pin', 28); ?></span>
       </div>
       <div id="mapaBodyLayer" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:50;">
@@ -272,11 +278,10 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
           <button type="button" class="mapa-bod-marker" data-bod-id="<?= (int)$b['id'] ?>"
             style="position:absolute;left:<?= (int)$b['x'] ?>px;top:<?= (int)$b['y'] ?>px;transform:translate(-50%,-100%);pointer-events:auto;background:none;border:none;cursor:pointer;padding:0;<?= $b['viditelny_hracum'] ? '' : 'opacity:.6;' ?>"
             title="<?= htmlspecialchars($b['nazev']) ?>">
-            <?php dracak_icon($b['typ'] === 'mesto' ? 'castle' : ($b['typ'] === 'vesnice' ? 'home' : ($b['typ'] === 'tajne_misto' ? 'eye-off' : 'map-pin')), 28); ?>
+            <?php dracak_icon(dracak_vtt_mapa_bod_ikona($b['typ']), 28); ?>
           </button>
         <?php endforeach; ?>
       </div>
-      <?php endif; ?>
       <?php foreach ($tokeny as $t):
           $entKey = $t['typ_entity'] . ':' . $t['entita_id'];
           $efektyText = implode(', ', $aktivniEfektyByEntity[$entKey] ?? []);
@@ -317,7 +322,7 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
     <?php if ($isPjOrAdmin): ?>
       <button class="tbtn" type="button" id="tb-zed" title="Kreslit zeď"><?php dracak_icon('brick-wall'); ?></button>
     <?php endif; ?>
-    <?php if ($isPjOrAdmin && $mapa['typ_mapy'] === 'svet'): ?>
+    <?php if ($isPjOrAdmin): ?>
       <button class="tbtn" type="button" id="tb-pin" title="Přidat pin (místo)"><?php dracak_icon('map-pin'); ?></button>
     <?php endif; ?>
     <button class="tbtn" type="button" id="tb-kostky" title="Hodit kostkou"><?php dracak_icon('dices'); ?></button>
@@ -398,7 +403,6 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
     <button class="btn btn-ghost" type="button" id="zedSmazatBtn" style="width:100%;margin-top:8px;display:none;">Smazat vybranou zeď</button>
   </div>
 
-  <?php if ($mapa['typ_mapy'] === 'svet'): ?>
   <div class="popover" id="popover-pin-novy">
     <button class="close-x" data-close-popover><?php dracak_icon('x', 14); ?></button>
     <h3>Nový pin</h3>
@@ -411,6 +415,10 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
       <option value="mesto">Město</option>
       <option value="vesnice">Vesnice</option>
       <option value="tajne_misto">Tajné místo</option>
+      <option value="budova">Budova</option>
+      <option value="mistnost">Místnost</option>
+      <option value="sklep">Sklep / dungeon</option>
+      <option value="prechod">Přechod</option>
       <option value="jine">Jiné</option>
     </select>
     <label for="pinNovyCilovaMapa">Cílová mapa (nepovinné)</label>
@@ -443,7 +451,6 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
     </div>
     <button class="btn btn-ghost" type="button" id="pinInfoSmazatBtn" style="width:100%;margin-top:8px;display:none;">Smazat pin</button>
   </div>
-  <?php endif; ?>
 
   <div class="popover" id="popover-grid">
     <button class="close-x" data-close-popover><?php dracak_icon('x', 14); ?></button>

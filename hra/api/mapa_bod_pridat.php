@@ -9,7 +9,7 @@ $user = dracak_require_login();
 $data = json_decode((string)file_get_contents('php://input'), true) ?: [];
 $mapaId = (int)($data['mapa_id'] ?? 0);
 $nazev = trim((string)($data['nazev'] ?? ''));
-$typ = in_array($data['typ'] ?? '', ['mesto', 'vesnice', 'tajne_misto', 'jine'], true) ? $data['typ'] : 'jine';
+$typ = in_array($data['typ'] ?? '', ['mesto', 'vesnice', 'tajne_misto', 'budova', 'mistnost', 'sklep', 'prechod', 'jine'], true) ? $data['typ'] : 'jine';
 $x = (int)($data['x'] ?? 0);
 $y = (int)($data['y'] ?? 0);
 $popis = trim((string)($data['popis'] ?? '')) ?: null;
@@ -36,8 +36,15 @@ if ($nazev === '') {
     exit;
 }
 // Cílová mapa (pokud zadaná) musí patřit do stejného světa — jinak by
-// šlo pinem na jednom světě otevřít mapu z úplně cizí kampaně.
+// šlo pinem na jednom světě otevřít mapu z úplně cizí kampaně. Sama na
+// sebe taky nesmí (pin na mapě, co vede zpátky na tu samou mapu, by
+// byl nekonečná smyčka pro strom/breadcrumb z další fáze).
 if ($cilovaMapaId !== null) {
+    if ($cilovaMapaId === $mapaId) {
+        http_response_code(422);
+        echo json_encode(['error' => 'Pin nemůže vést na mapu, na které sám je.']);
+        exit;
+    }
     $stmt = $pdo->prepare('SELECT 1 FROM mapy WHERE id = ? AND svet_id = ?');
     $stmt->execute([$cilovaMapaId, (int)$mapa['svet_id']]);
     if (!$stmt->fetchColumn()) {
