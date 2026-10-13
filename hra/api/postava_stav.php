@@ -12,7 +12,7 @@ require_once __DIR__ . '/../../includes/vtt_predmety.php';
 // Vstup JSON: {postava_id, akce, ...}. Akce:
 //   hp {delta} · magenergie {delta} · unava {delta} · zkusenost {delta}
 //   penize {mena: zl|st|md, hodnota} · vyber {pole, hodnota} · text {pole, hodnota}
-//   velikost {hodnota}
+//   velikost {hodnota} · pohyblivost_rucne {hodnota|null}
 //   inventar_pridat {typ_polozky: predmet|lektvar|kouzlo, polozka_id, mnozstvi}
 //   inventar_zmena {typ_polozky: predmet|lektvar, polozka_id, delta} · inventar_odebrat {typ_polozky, polozka_id}
 header('Content-Type: application/json; charset=utf-8');
@@ -153,6 +153,20 @@ switch ($akce) {
             odpoved(422, ['error' => 'Neplatná velikost.']);
         }
         $pdo->prepare('UPDATE postavy SET velikost = ? WHERE id = ?')->execute([$v !== '' ? $v : null, $postavaId]);
+        odpoved(200, ['ok' => true]);
+    }
+    case 'pohyblivost_rucne': {
+        // Ručně zadaná (okamžitá) pohyblivost — platí jen ve světě s vypnutým
+        // svet.auto_pohyblivost (Fáze 5, migrace 0077/0078). Prázdná hodnota = zrušit.
+        if (!pole_existuje($postava, 'pohyblivost_rucne')) {
+            odpoved(422, ['error' => 'Ruční pohyblivost se zatím nedá ukládat (chybí migrace 0078).']);
+        }
+        $v = $data['hodnota'] ?? null;
+        $hodnota = ($v === null || $v === '') ? null : (int)$v;
+        if ($hodnota !== null && ($hodnota < 1 || $hodnota > 60)) {
+            odpoved(422, ['error' => 'Pohyblivost zadej v rozsahu 1–60.']);
+        }
+        $pdo->prepare('UPDATE postavy SET pohyblivost_rucne = ? WHERE id = ?')->execute([$hodnota, $postavaId]);
         odpoved(200, ['ok' => true]);
     }
     case 'inventar_pridat':

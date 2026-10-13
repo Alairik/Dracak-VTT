@@ -259,6 +259,8 @@
       zapis({ akce: 'penize', mena: el.dataset.mena, hodnota: Math.max(0, Number(el.value) || 0) });
     } else if (zmena === 'velikost') {
       zapis({ akce: 'velikost', hodnota: el.value });
+    } else if (zmena === 'pohyblivost_rucne') {
+      zapis({ akce: 'pohyblivost_rucne', hodnota: el.value === '' ? null : Number(el.value) });
     }
   });
 

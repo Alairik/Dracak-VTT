@@ -210,6 +210,7 @@ $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' =>
           <div class="dn-bar <?= $unava['stupen'] === 0 ? 'ok' : ($unava['stupen'] >= 3 ? 'out' : 'low') ?>"><i style="width:<?= max(0, min(100, round($unava['body'] / (max(1, $unava['vytrvalost']) * 4) * 100))) ?>%"></i><b style="left:25%"></b><b style="left:50%"></b><b style="left:75%"></b></div>
           <?php if ($unava['dusledky']): ?>
             <ul class="dn-dusledky"><?php foreach ($unava['dusledky'] as $du): ?><li><?= $e($du) ?></li><?php endforeach; ?></ul>
+            <?php if (!$d['nastaveni_pohybu']['auto_unava']): ?><div class="dn-metr-pozn"><strong>Postihy se automaticky neuplatňují</strong> (PJ je ve světě vypnul) — řeší je PJ ručně.</div><?php endif; ?>
           <?php else: ?><div class="dn-metr-pozn">bez únavy</div><?php endif; ?>
         <?php else: ?>
           <div class="dn-metr-pozn">Doplň odolnost (vytrvalost = odolnost).</div>
@@ -234,12 +235,25 @@ $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' =>
         <?php else: ?>
         <div class="dn-metr-pozn">Doplň sílu, aby šla spočítat nosnost.</div>
         <?php endif; ?>
+        <?php if (!$d['nastaveni_pohybu']['auto_naklad']): ?><div class="dn-metr-pozn"><strong>Naložení se nevyhodnocuje</strong> (PJ vypnul automatiku nákladu) — váha se jen sčítá.</div><?php endif; ?>
       </section>
 
       <!-- Pohyblivost -->
       <section class="dn-metr" aria-label="Pohyblivost">
         <div class="dn-metr-hlava"><span>Pohyblivost</span></div>
-        <?php if ($poh): ?>
+        <?php if ($poh && $poh['rucne']): ?>
+          <div class="dn-metr-cislo"><strong><?= $poh['pohyblivost'] ?? '—' ?></strong><span><?= $poh['bonus_pohyblivosti'] !== null ? 'bonus ' . $znam($poh['bonus_pohyblivosti']) : '' ?></span></div>
+          <div class="dn-metr-pozn">Pohyblivost se v tomhle světě zadává ručně (PJ vypnul výpočet).</div>
+          <?php if ($ma('pohyblivost_rucne')): ?>
+            <div class="field"><label for="pohyblivost_rucne">Pohyblivost</label>
+              <input type="number" id="pohyblivost_rucne" min="1" max="60" step="1" value="<?= $poh['pohyblivost'] !== null ? (int)$poh['pohyblivost'] : '' ?>" data-zmena="pohyblivost_rucne"></div>
+          <?php else: ?><div class="dn-metr-pozn">Ruční zadání čeká na migraci 0078.</div><?php endif; ?>
+          <?php if ($poh['rasovy_zaklad'] !== null && !$poh['omdleva']): ?><div class="dn-metr-pozn">výpočet by dal <?= (int)$poh['zakladni'] ?> před naložením</div><?php endif; ?>
+          <?php if ($d['rychlost']): $ry = $d['rychlost']; ?>
+            <div class="dn-metr-pozn">chůze za hodinu: procházka <strong><?= (int)$ry['chuze']['prochazka'] ?></strong> · chůze <strong><?= (int)$ry['chuze']['chuze'] ?></strong> · spěch <strong><?= (int)$ry['chuze']['spech'] ?></strong> bodů</div>
+            <div class="dn-metr-pozn">běh za kolo: poklus <strong><?= (int)$ry['beh']['poklus'] ?></strong> · běh <strong><?= (int)$ry['beh']['beh'] ?></strong> · sprint <strong><?= (int)$ry['beh']['sprint'] ?></strong> bodů</div>
+          <?php endif; ?>
+        <?php elseif ($poh): ?>
           <div class="dn-metr-cislo"><strong><?= $poh['pohyblivost'] ?? '—' ?></strong><span><?= $poh['bonus_pohyblivosti'] !== null ? 'bonus ' . $znam($poh['bonus_pohyblivosti']) : '' ?></span></div>
           <div class="dn-metr-pozn">základní <?= (int)$poh['zakladni'] ?> = rasa <?= (int)$poh['rasovy_zaklad'] ?>, obr. <?= $znam($poh['bonus_obratnost'] - $poh['unava_postih']) ?>, 2× síla (<?= $znam($poh['bonus_sila'] - $poh['unava_postih']) ?>)<?= $nalozeni && $nalozeni['kod'] !== 'zadne' ? ' · po naložení' : '' ?></div>
           <?php if ($poh['unava_postih'] > 0): ?><div class="dn-metr-pozn">únava: bez ní by základní pohyblivost byla <?= (int)$poh['zakladni_bez_unavy'] ?></div><?php endif; ?>
@@ -282,7 +296,7 @@ $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' =>
             </div>
           <?php endforeach; ?>
         </div>
-        <p class="note">Stupeň vlastnosti (1–21) a z něj bonus/postih podle Tabulky postihů a bonusů.<?= $unava && $unava['stupen'] > 0 && $unava['stupen'] < 4 ? ' Přeškrtnuto = bez únavy; únava (' . $e($unava['nazev']) . ') snižuje bonus za sílu a obratnost' . ($unava['postih_int'] ? ', stupeň inteligence' . ($unava['postih_cha'] ? ' a charismy' : '') : '') . '.' : '' ?></p>
+        <p class="note">Stupeň vlastnosti (1–21) a z něj bonus/postih podle Tabulky postihů a bonusů.<?= $unava && $unava['stupen'] > 0 && $unava['stupen'] < 4 && $d['nastaveni_pohybu']['auto_unava'] ? ' Přeškrtnuto = bez únavy; únava (' . $e($unava['nazev']) . ') snižuje bonus za sílu a obratnost' . ($unava['postih_int'] ? ', stupeň inteligence' . ($unava['postih_cha'] ? ' a charismy' : '') : '') . '.' : '' ?></p>
       </div>
 
       <div class="dn-karta">
@@ -386,7 +400,7 @@ $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' =>
           <p class="note">Postih k hodu na útok i obranu: méně než třetina životů (podle odolnosti), velké naložení −1. Při životech na mezi vyřazení a pod ní postava nebojuje (h1610).</p>
         <?php else: ?><p class="note">Doplň odolnost.</p><?php endif; ?>
         <div class="dn-dvojice"><span>únava</span><strong><?= $unava ? $e($unava['nazev']) : '—' ?></strong></div>
-        <?php if ($unava && $unava['stupen'] > 0 && $unava['stupen'] < 4): ?><p class="note">Únava snižuje bonus za sílu i obratnost o <?= (int)$unava['postih_sil_obr'] ?> — ÚČ a OČ výše to už zahrnují.<?= in_array('sprint', $unava['zakazy'], true) ? ' Nesmí sprintovat' . (in_array('beh', $unava['zakazy'], true) ? ' ani běžet (poklus smí)' : '') . '.' : '' ?></p><?php endif; ?>
+        <?php if ($unava && $unava['stupen'] > 0 && $unava['stupen'] < 4 && $d['nastaveni_pohybu']['auto_unava']): ?><p class="note">Únava snižuje bonus za sílu i obratnost o <?= (int)$unava['postih_sil_obr'] ?> — ÚČ a OČ výše to už zahrnují.<?= in_array('sprint', $unava['zakazy'], true) ? ' Nesmí sprintovat' . (in_array('beh', $unava['zakazy'], true) ? ' ani běžet (poklus smí)' : '') . '.' : '' ?></p><?php endif; ?>
         <?php if ($unava && $unava['omdleva']): ?><p class="note"><strong>Postava omdlévá</strong> — bez pomoci umírá během 1k6 hodin.</p><?php endif; ?>
       </div>
 

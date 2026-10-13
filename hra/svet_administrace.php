@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/../includes/vtt.php';
+require_once __DIR__ . '/../includes/vtt_pohyblivost.php';
 
 // Administrace světa — PJ-only stránka, kam patří věci, co nejsou
 // denní provoz (hráči/mapy/postavy na hra/svet.php), ale nastavení
@@ -31,6 +32,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             isset($_POST['auto_zranitelnost']) ? 1 : 0,
             $svetId,
         ]);
+        header("Location: svet_administrace.php?id=$svetId");
+        exit;
+    }
+
+    if ($akce === 'pohyb') {
+        // Fáze 5 (migrace 0077): bez sloupců se nic neukládá.
+        $mamSloupce = (int)dracak_db()->query(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'svet' AND COLUMN_NAME = 'auto_unava'"
+        )->fetchColumn() > 0;
+        if ($mamSloupce) {
+            dracak_db()->prepare('UPDATE svet SET auto_naklad = ?, auto_pohyblivost = ?, auto_unava = ? WHERE id = ?')->execute([
+                isset($_POST['auto_naklad']) ? 1 : 0,
+                isset($_POST['auto_pohyblivost']) ? 1 : 0,
+                isset($_POST['auto_unava']) ? 1 : 0,
+                $svetId,
+            ]);
+        }
         header("Location: svet_administrace.php?id=$svetId");
         exit;
     }
@@ -83,7 +101,7 @@ dracak_vtt_page_start('Administrace — ' . $svet['nazev'], $user);
         </div>
         <button class="btn btn-primary" type="submit">Posunout</button>
       </form>
-      <p class="note" style="margin:0 0 10px;">Ruční posun — cesta po mapě ani čas v dungeonu se dnes nepočítají automaticky (chybí podklad v přepisu pravidel pro přesné tabulky rychlosti, viz h1634). Kladné číslo posune čas dopředu, záporné ho vrátí zpět (oprava přehmatu); pod nulu offset neklesne.</p>
+      <p class="note" style="margin:0 0 10px;">Ruční posun — čas světa se po cestě sám neposouvá (svět eviduje jen celé dny); délku cesty spočítá kalkulačka cesty, tady posuneš čas podle ní. Kladné číslo posune čas dopředu, záporné ho vrátí zpět (oprava přehmatu); pod nulu offset neklesne.</p>
       <form method="post" style="display:flex;gap:8px;align-items:flex-end;">
         <input type="hidden" name="akce" value="upravit_datum">
         <div class="field" style="flex:1;margin:0;"><label for="pocatecni_datum">Počáteční datum</label>
@@ -112,5 +130,32 @@ dracak_vtt_page_start('Administrace — ' . $svet['nazev'], $user);
       <button class="btn btn-primary" type="submit">Uložit</button>
     </form>
     <p class="note" style="max-width:520px;">Automatizace zatím jen ukládá nastavení — samotné napojení na kouzla/schopnosti/pasti přijde v další vrstvě.</p>
+
+    <h2 class="page-title" style="font-size:20px;margin-top:28px;">Pohyb, naložení a únava</h2>
+    <p class="note" style="margin-top:-6px;">Tohle engine počítá sám (deník postavy, družina, <a href="cesta.php?id=<?= $svetId ?>">kalkulačka cesty</a>). Vypni, co chceš u stolu řešit ručně.</p>
+    <?php
+      $pohybNast = dracak_vtt_svet_cestovani_nastaveni(dracak_db(), $svetId);
+      $pohybSloupce = array_key_exists('auto_unava', $svet);
+    ?>
+    <?php if (!$pohybSloupce): ?>
+      <p class="note" style="max-width:520px;">Přepínače čekají na ruční SQL pro migraci 0077 (docs/sql-k-rucnimu-spusteni.sql).</p>
+    <?php else: ?>
+    <form method="post" class="card elev-sm" style="max-width:520px;">
+      <input type="hidden" name="akce" value="pohyb">
+      <label style="display:flex;align-items:flex-start;gap:6px;font-weight:400;font-size:13px;margin-bottom:8px;">
+        <input type="checkbox" name="auto_naklad" <?= $pohybNast['auto_naklad'] ? 'checked' : '' ?>>
+        <span>Náklad z inventáře (a peníze) se počítá do naložení<br><small class="note">Vypnuto: naložení se nevyhodnocuje, žádný postih.</small></span>
+      </label>
+      <label style="display:flex;align-items:flex-start;gap:6px;font-weight:400;font-size:13px;margin-bottom:8px;">
+        <input type="checkbox" name="auto_pohyblivost" <?= $pohybNast['auto_pohyblivost'] ? 'checked' : '' ?>>
+        <span>Pohyblivost se počítá z rasy, obratnosti a síly<br><small class="note">Vypnuto: pohyblivost zadáš ručně u každé postavy v deníku (zjednodušení).</small></span>
+      </label>
+      <label style="display:flex;align-items:flex-start;gap:6px;font-weight:400;font-size:13px;margin-bottom:14px;">
+        <input type="checkbox" name="auto_unava" <?= $pohybNast['auto_unava'] ? 'checked' : '' ?>>
+        <span>Únava ubírá bonusy a stupně (Tabulka únavy)<br><small class="note">Vypnuto: únava se jen eviduje, postihy aplikuješ ručně.</small></span>
+      </label>
+      <button class="btn btn-primary" type="submit">Uložit</button>
+    </form>
+    <?php endif; ?>
   </main>
 <?php dracak_vtt_page_end(); ?>

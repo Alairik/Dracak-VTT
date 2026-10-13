@@ -297,6 +297,9 @@ function dracak_vtt_cesta_vypocet(PDO $pdo, array $ucastnici, array $zvirata, fl
         }
         $vyt = (int)$p['odolnost'];
         $naklad = dracak_vtt_postava_naklad_mn($pdo, (int)$p['id'], $p);
+        $nastaveni = dracak_vtt_svet_cestovani_nastaveni($pdo, !empty($p['svet_id']) ? (int)$p['svet_id'] : null);
+        // Vypnutá automatika nákladu: inventář se do naložení nepočítá (ani na zvíře).
+        $nakladMn = $nastaveni['auto_naklad'] ? (float)$naklad['naklad_mn'] : 0.0;
         $doprava = dracak_vtt_postava_doprava($pdo, $p);
         $naZvireti = $doprava !== null && $doprava['typ'] === 'zvire';
         $poznamky = [];
@@ -307,7 +310,7 @@ function dracak_vtt_cesta_vypocet(PDO $pdo, array $ucastnici, array $zvirata, fl
         if ($naZvireti) {
             $zv = $doprava['zvire'];
             $vahaJezdce = max(0.0, (float)($u['vaha_jezdce'] ?? 0));
-            $nakladZvirete = $vahaJezdce + (float)$naklad['naklad_mn'];
+            $nakladZvirete = $vahaJezdce + $nakladMn;
             $zp = dracak_vtt_zvire_pohyblivost($pdo, $zv, $nakladZvirete);
             if ($zp['pohyblivost'] === null) {
                 $chyby[] = $nazev . ': ' . $zv['nazev'] . ' nese ' . round($nakladZvirete) . ' mn, to je nad 4× jeho nosnosti — neunese to.';
@@ -353,7 +356,11 @@ function dracak_vtt_cesta_vypocet(PDO $pdo, array $ucastnici, array $zvirata, fl
             continue;
         }
         if ($rychlosti[0] === null) {
-            $chyby[] = $nazev . ': pohyblivost' . ($pohNyni['pohyblivost'] === null ? ' neexistuje (náklad nad 4× nosnosti)' : ' (bonus ' . $pohNyni['bonus_pohyblivosti'] . ') je mimo Tabulky rychlosti') . '.';
+            if ($pohNyni['rucne'] && !$pohNyni['rucne_zadana']) {
+                $chyby[] = $nazev . ': pohyblivost se ve světě zadává ručně a není zadaná (deník postavy).';
+            } else {
+                $chyby[] = $nazev . ': pohyblivost' . ($pohNyni['pohyblivost'] === null ? ' neexistuje (náklad nad 4× nosnosti)' : ' (bonus ' . $pohNyni['bonus_pohyblivosti'] . ') je mimo Tabulky rychlosti') . '.';
+            }
             continue;
         }
         $subjekty[] = [
@@ -362,7 +369,7 @@ function dracak_vtt_cesta_vypocet(PDO $pdo, array $ucastnici, array $zvirata, fl
         ];
         $popisy[] = [
             'klic' => 'p:' . $p['id'], 'nazev' => $nazev, 'druh' => 'pesky', 'postava_id' => (int)$p['id'],
-            'naklad' => (float)$naklad['naklad_mn'], 'nalozeni' => $pohNyni['nalozeni']['kod'] ?? null,
+            'naklad' => $nakladMn, 'nalozeni' => $pohNyni['nalozeni']['kod'] ?? null,
             'pohyblivost' => $pohNyni['pohyblivost'], 'bonus' => $pohNyni['bonus_pohyblivosti'],
             'rychlost' => $rychlosti[0], 'rychlosti_podle_stupne' => $rychlosti, 'poznamky' => $poznamky,
         ];

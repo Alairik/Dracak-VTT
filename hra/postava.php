@@ -155,7 +155,10 @@ dracak_vtt_page_start($postava['nazev'], $user);
       </div>
       <h3 class="rel-label">Pohyb a únava</h3>
       <p class="note" style="margin:0 0 4px;">
-        <?php if ($pohyblivost): ?>
+        <?php if ($pohyblivost && $pohyblivost['rucne']): ?>
+          <strong>Pohyblivost zadaná ručně: <?= $pohyblivost['pohyblivost'] ?? 'nezadána' ?></strong>
+          — PJ ve světě vypnul výpočet pohyblivosti; hodnotu zadáš v deníku postavy.
+        <?php elseif ($pohyblivost): ?>
           <strong>Základní pohyblivost (bez naložení): <?= $pohyblivost['zakladni'] ?></strong>
           — rasa <?= $pohyblivost['rasovy_zaklad'] ?>,
           obratnost <?= $znamenko($pohyblivost['bonus_obratnost'] - $pohyblivost['unava_postih']) ?>,

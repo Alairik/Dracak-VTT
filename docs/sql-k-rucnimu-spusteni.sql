@@ -1,7 +1,7 @@
 -- Dračák VTT — SQL k ručnímu spuštění (phpMyAdmin, admin účet, vybraná databáze Dračáku).
 -- Vlož CELÝ obsah najednou do karty SQL a spusť. Lze spustit opakovaně — každá část
 -- se provede jen tehdy, když ještě není provedená (jinak vypíše "už bylo provedeno").
--- Na konci je kontrola: má vyjít  rychlost_chuze = 16, rychlost_behu = 16, sloupec_nosnost_tah = 1.
+-- Na konci je kontrola: má vyjít  rychlost_chuze = 16, rychlost_behu = 16, sloupec_nosnost_tah = 1, sloupce_pohyb = 4.
 
 -- 1) 0074: tabulky rychlosti pohybu (Tabulka rychlosti při chůzi / při běhu) + jejich řádky
 CREATE TABLE IF NOT EXISTS rychlost_chuze (
@@ -67,8 +67,43 @@ PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
+-- 3) 0077: přepínače automatiky pohybu ve světě (zapnuté ve výchozím stavu)
+SET @sql = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE svet ADD COLUMN auto_naklad TINYINT(1) NOT NULL DEFAULT 1 AFTER auto_zranitelnost',
+  'SELECT ''0077 auto_naklad už bylo provedeno'' AS info')
+  FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'svet' AND COLUMN_NAME = 'auto_naklad');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+SET @sql = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE svet ADD COLUMN auto_pohyblivost TINYINT(1) NOT NULL DEFAULT 1 AFTER auto_naklad',
+  'SELECT ''0077 auto_pohyblivost už bylo provedeno'' AS info')
+  FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'svet' AND COLUMN_NAME = 'auto_pohyblivost');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+SET @sql = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE svet ADD COLUMN auto_unava TINYINT(1) NOT NULL DEFAULT 1 AFTER auto_pohyblivost',
+  'SELECT ''0077 auto_unava už bylo provedeno'' AS info')
+  FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'svet' AND COLUMN_NAME = 'auto_unava');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- 4) 0078: ručně zadaná pohyblivost postavy
+SET @sql = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE postavy ADD COLUMN pohyblivost_rucne SMALLINT NULL AFTER doprava_zvire_id',
+  'SELECT ''0078 už bylo provedeno'' AS info')
+  FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'postavy' AND COLUMN_NAME = 'pohyblivost_rucne');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
 -- Kontrola
 SELECT
   (SELECT COUNT(*) FROM rychlost_chuze) AS rychlost_chuze,
   (SELECT COUNT(*) FROM rychlost_behu) AS rychlost_behu,
-  (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'jizdni_zvirata' AND COLUMN_NAME = 'nosnost_tah_mn') AS sloupec_nosnost_tah;
+  (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'jizdni_zvirata' AND COLUMN_NAME = 'nosnost_tah_mn') AS sloupec_nosnost_tah,
+  (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE()
+     AND ((TABLE_NAME = 'svet' AND COLUMN_NAME IN ('auto_naklad', 'auto_pohyblivost', 'auto_unava'))
+       OR (TABLE_NAME = 'postavy' AND COLUMN_NAME = 'pohyblivost_rucne'))) AS sloupce_pohyb;

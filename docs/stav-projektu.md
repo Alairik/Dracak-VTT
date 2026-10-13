@@ -18,8 +18,9 @@ Přečti celý tenhle soubor, pak `CLAUDE.md` (hlavně pravidla o tom, že
 zdroj pravdy o hře jsou pravidla v `content/`, ne repo/DB, a o
 neodhadování mechaniky). **Fáze 1 a 2 ze sekce "Rozpracováno:
 cestování..." jsou v kódu hotové**; **Fáze 1b (váha/kontejnery) je
-částečně hotová, Fáze 4 (kalkulačka cesty) je v kódu, další je Fáze 3
-(povozy) a Fáze 5 (přepínače)** — viz níž. Stav předchozí
+částečně hotová, Fáze 4 (kalkulačka cesty) a 5 (přepínače) jsou v kódu,
+zbývá Fáze 3 (povozy) a dokončení 1b (kontejnery) — obojí čeká na
+rozhodnutí uživatele** — viz níž. Stav předchozí
 konverzace je zapsaný přesně proto, aby ses nemusel/a ptát na věci, co
 už byly rozhodnuté (viz "Architektonická rozhodnutí" a celá sekce
 "Rozpracováno" níže — všechno v ní je buď přímo citovaný text pravidel,
@@ -35,8 +36,9 @@ ním čeká, dokud se to neprovede ručně.
 **Ruční DDL blok je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný soubor, ve
 kterém jsou všechny dosud neprovedené DDL příkazy v pořadí; uživatel ho
 dostává jako text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav:
-čeká blok pro `0074` (tabulky `rychlost_chuze`, `rychlost_behu`) a `0075`
-(`jizdni_zvirata.nosnost_tah_mn`)** — ověřeno na kopii produkčního stavu
+čeká blok pro `0074` (tabulky `rychlost_chuze`, `rychlost_behu`), `0075`
+(`jizdni_zvirata.nosnost_tah_mn`), `0077` (3 přepínače `svet.auto_*`) a
+`0078` (`postavy.pohyblivost_rucne`)** — ověřeno na kopii produkčního stavu
 (dvakrát za sebou, pak `migrate.php` pod DML-only účtem: 0074–0076 doběhly).
 Do spuštění deploy v posledním kroku skončí HTTP 500 (FTP část proběhne,
 kód je nasazený a bez tabulek funguje v degradovaném režimu). Předchozí
@@ -201,8 +203,9 @@ MariaDB.** Postup, který v session fungoval:
 
 ## Rozpracováno: cestování, pohyblivost, únava, naložení
 
-**Stav: Fáze 1, 2 a 4 jsou v kódu (DDL k nim je provedené až na 0074/0075,
-viz "Čeká na ruční spuštění"), Fáze 3 a 5 zatím ne.** Tohle je aktuálně otevřený úkol a nejspíš další věc, na
+**Stav: Fáze 1, 2, 4 a 5 jsou v kódu (DDL k nim je provedené až na
+0074/0075/0077/0078, viz "Čeká na ruční spuštění"), Fáze 3 (povozy) a 1b
+(kontejnery) čekají na rozhodnutí.** Tohle je aktuálně otevřený úkol a nejspíš další věc, na
 které se bude pokračovat.
 
 ### Co je podložené přímo v `content/pravidla-hrac.html` (ne odhad)
@@ -308,7 +311,7 @@ domácí rozšíření" vlastní hodnotu nemají, dědí ji za běhu od rodiče
 
 ### Další krok — SCHVÁLENÝ fázový plán (2026-10, čeká na realizaci)
 
-Fáze 1, 2 a 4 jsou v kódu (viz níž), Fáze 3 a 5 ne. Fáze 4 se předběhla
+Fáze 1, 2, 4 a 5 jsou v kódu (viz níž), Fáze 3 ne. Fáze 4 se předběhla
 kvůli tomu, že byla odblokovaná fotkami tabulek, a povozy (Fáze 3) čekají
 na rozhodnutí o zdroji dat; Fáze 4 v1 počítá jen pěší, jezdce a nosiče.
 
@@ -481,10 +484,23 @@ kontejnery** (vaky, truhly apod.).
   vliv únavy na rychlost zvířat (kniha neříká), vliv dovedností Nosič /
   Jízda na koni / Kočí.
 
-**Fáze 5 — Administrace světa**
-- `auto_naklad`/`auto_pohyblivost`/`auto_unava` přepínače (stejný vzor
-  jako 4 stávající v `svet_administrace.php`) + možnost hráč/PJ zadá
-  pohyblivost ručně místo výpočtu (zjednodušení).
+**Fáze 5 — Administrace světa — HOTOVO V KÓDU (2026-10-13, čeká na ruční DDL 0077/0078)**
+- `0077_svet_auto_cestovani.sql` (DDL, 3× ALTER `svet`): `auto_naklad`,
+  `auto_pohyblivost`, `auto_unava`, **zapnuté ve výchozím stavu** (na rozdíl
+  od 4 starších `auto_*` přepínačů, které zatím jen ukládají nastavení,
+  tyhle engine opravdu čte). `0078_postava_pohyblivost_rucne.sql` (DDL):
+  `postavy.pohyblivost_rucne` (okamžitá pohyblivost zadaná ručně).
+- `dracak_vtt_svet_cestovani_nastaveni()` + `dracak_vtt_postava_pohyblivost()`
+  (obálka nad `..._vypocet`) v `includes/vtt_pohyblivost.php`: vypnutý náklad
+  = bez naložení; vypnutá únava = bez postihů (pohyblivost, ÚČ, OČ, INT/CHA
+  v deníku i kalkulačka cesty); vypnutá pohyblivost = platí ruční hodnota
+  (v kalkulačce chyba, když není zadaná). Bez sloupců na DB se bere všechno
+  zapnuto.
+- UI: `hra/svet_administrace.php` sekce "Pohyb, naložení a únava";
+  `hra/denik.php` ruční pole pohyblivosti (akce `pohyblivost_rucne` v
+  `hra/api/postava_stav.php`), upozornění u únavy a naložení.
+- Ověřeno na MariaDB: všechny režimy (auto, bez únavy, bez nákladu, ruční
+  pohyblivost) + degradovaný režim bez sloupců.
 
 ---
 

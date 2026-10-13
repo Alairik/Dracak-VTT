@@ -113,7 +113,7 @@ function dracak_vtt_pohyblivost_po_nalozeni(int $zakladni, int $ctvrtiny): int
 // únavy na nosnost mlčí. Vysílená postava (omdlévá) pohyblivost nemá:
 // 'pohyblivost' null a 'omdleva' true. 'zakladni_bez_unavy' je základní
 // pohyblivost, jaká by byla bez únavy.
-function dracak_vtt_postava_pohyblivost(PDO $pdo, array $postava, int|float|null $nakladMn = null, bool $sUnavou = true): ?array
+function dracak_vtt_postava_pohyblivost_vypocet(PDO $pdo, array $postava, int|float|null $nakladMn, bool $sUnavou): ?array
 {
     if (empty($postava['rasa_id']) || ($postava['sila'] ?? null) === null || ($postava['obratnost'] ?? null) === null) {
         return null;
@@ -159,6 +159,61 @@ function dracak_vtt_postava_pohyblivost(PDO $pdo, array $postava, int|float|null
             ? dracak_vtt_obratnost_bonus($pdo, max(1, $pohyblivost))
             : null,
     ];
+}
+
+// Přepínače automatiky pohybu světa (svet.auto_naklad / auto_pohyblivost /
+// auto_unava, migrace 0077) — ve výchozím stavu zapnuté. Bez sloupců na DB
+// (migrace ještě není provedená) nebo bez světa se bere všechno zapnuté.
+function dracak_vtt_svet_cestovani_nastaveni(PDO $pdo, ?int $svetId): array
+{
+    static $cache = [];
+    $vychozi = ['auto_naklad' => true, 'auto_pohyblivost' => true, 'auto_unava' => true];
+    if (!$svetId) {
+        return $vychozi;
+    }
+    if (!isset($cache[$svetId])) {
+        try {
+            $stmt = $pdo->prepare('SELECT auto_naklad, auto_pohyblivost, auto_unava FROM svet WHERE id = ?');
+            $stmt->execute([$svetId]);
+            $r = $stmt->fetch();
+            $cache[$svetId] = $r ? ['auto_naklad' => (bool)$r['auto_naklad'], 'auto_pohyblivost' => (bool)$r['auto_pohyblivost'], 'auto_unava' => (bool)$r['auto_unava']] : $vychozi;
+        } catch (PDOException $e) {
+            $cache[$svetId] = $vychozi;
+        }
+    }
+    return $cache[$svetId];
+}
+
+// Pohyblivost postavy s ohledem na přepínače světa (viz výpočet výš):
+//   auto_naklad vypnuto      -> náklad se nevyhodnocuje (bez naložení)
+//   auto_unava vypnuto       -> únava neubírá bonus za sílu/obratnost
+//   auto_pohyblivost vypnuto -> 'pohyblivost' je hodnota zadaná ručně
+//                               (postavy.pohyblivost_rucne; null = nezadáno),
+//                               ostatní pole zůstávají informativně z výpočtu
+// Výsledek má navíc 'rucne' (bool) a 'rucne_zadana' (bool).
+function dracak_vtt_postava_pohyblivost(PDO $pdo, array $postava, int|float|null $nakladMn = null, bool $sUnavou = true): ?array
+{
+    $nast = dracak_vtt_svet_cestovani_nastaveni($pdo, !empty($postava['svet_id']) ? (int)$postava['svet_id'] : null);
+    if (!$nast['auto_unava']) {
+        $sUnavou = false;
+    }
+    if (!$nast['auto_naklad']) {
+        $nakladMn = null;
+    }
+    $vypocet = dracak_vtt_postava_pohyblivost_vypocet($pdo, $postava, $nakladMn, $sUnavou);
+    if ($nast['auto_pohyblivost']) {
+        return $vypocet === null ? null : $vypocet + ['rucne' => false, 'rucne_zadana' => false];
+    }
+    $rucne = ($postava['pohyblivost_rucne'] ?? null) !== null ? (int)$postava['pohyblivost_rucne'] : null;
+    $zaklad = $vypocet ?? [
+        'rasovy_zaklad' => null, 'bonus_obratnost' => 0, 'bonus_sila' => 0, 'unava_postih' => 0, 'omdleva' => false,
+        'zakladni_bez_unavy' => null, 'zakladni' => null, 'nosnost_mn' => null, 'naklad_mn' => $nakladMn, 'nalozeni' => null,
+    ];
+    $zaklad['pohyblivost'] = $rucne;
+    $zaklad['bonus_pohyblivosti'] = $rucne !== null ? dracak_vtt_obratnost_bonus($pdo, max(1, $rucne)) : null;
+    $zaklad['rucne'] = true;
+    $zaklad['rucne_zadana'] = $rucne !== null;
+    return $zaklad;
 }
 
 // Rychlost pohybu pro bonus za pohyblivost: TABULKA RYCHLOSTI PŘI CHŮZI
