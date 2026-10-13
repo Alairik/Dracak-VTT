@@ -496,9 +496,11 @@ Soubory:
   stavu migrace 0064.
 - Peníze se počítají do nákladu (1 mince = 1 mn, h3).
 
-Známé mezery: rodová zbraň a velikost jen pro 7 základních ras (+ klany
-přes rodiče) — homebrew rasy mají v textu rozsah velikosti (proto
-`postavy.velikost` ručně) a rodovou zbraň mimo DB; OČ počítá jen tělovou
+Známé mezery: velikost z rasy jen pro 7 základních ras (+ klany přes
+rodiče) — homebrew rasy mají v textu rozsah velikosti (proto
+`postavy.velikost` ručně); rodová zbraň (+1 ÚČ) je v kódu jako konstanta
+pro 7 základních ras (h1609) i 10 homebrew (řádek "rodová zbraň:" v jejich
+blocích), ne v DB; OČ počítá jen tělovou
 zbroj + štít +1 (jak se kombinují rukavice/přilbice/boty z homebrew
 ceníku, pravidla v repu neříkají); vrhací varianta zbraně se páruje
 jménem ("Dýka" -> "Dýka (vrhací)"); kouzla/schopnosti jsou jen ke čtení

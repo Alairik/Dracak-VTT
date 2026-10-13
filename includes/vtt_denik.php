@@ -13,8 +13,10 @@ require_once __DIR__ . '/vtt_predmety.php';
 // TABULKA RODOVÝCH ZBRANÍ (h1609, b: "rodová zbraň dává postavě +1 k
 // útočnému číslu, pokud ji používá"). Klíč = základní rasa; trpasličí
 // klany a varianty ji dědí od rodiče (rodic_rasa_id). Homebrew rasy mají
-// rodovou zbraň v textu svého bloku, ale v DB není — pro ně null.
-// Hodnoty jsou předpony názvu zbraně v katalogu (malými písmeny).
+// rodovou zbraň v řádku "rodová zbraň:" svého bloku (h37 Barnové b169, h42
+// Caelové b198, h47 Furan b231, h51 Gnollové b276, h56 Kobold b304, h61
+// Magiliw b330, h66 Naro'shai b360, h72 Skaven b395, h77 Tauren b420, h86
+// Tiefling b460). Hodnoty jsou názvy zbraně v katalogu (malými písmeny).
 const DRACAK_VTT_RODOVA_ZBRAN = [
     'Hobit' => ['lehká kuše'],
     'Kudůk' => ['sekera'],
@@ -23,6 +25,16 @@ const DRACAK_VTT_RODOVA_ZBRAN = [
     'Člověk' => ['široký meč'],
     'Barbar' => ['meč bastard', 'bastard'],
     'Kroll' => ['těžký kyj'],
+    'Barnové' => ['kopí'],
+    'Caelové' => ['dýka'],
+    'Furan' => ['hůl okovaná'],
+    'Gnollové' => ['hůl okovaná'],
+    'Kobold' => ['krátký meč'],
+    'Magiliw' => ['prak'],
+    "Naro'shai" => ['šavle'],
+    'Skaven' => ['krátký luk'],
+    'Tauren' => ['sudlice'],
+    'Tiefling' => ['palcát'],
 ];
 
 // Velikost podle h1690 (kolonka Velikost): A hobit/kudůk/trpaslík, B
