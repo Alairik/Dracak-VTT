@@ -86,7 +86,7 @@
   najít odpovídající pasáž v těchhle souborech. Nejde o jednorázovou
   volbu "odhad, nebo přesně" — odhad není rovnocenná možnost k nabídnutí,
   je to jediná cesta, co nikdy nejde vzít.
-  - **"Nenašel jsem to" / "to tu není" se netvrdí po jednom gREPu nebo
+  - **"Nenašel jsem to" / "to tu není" se netvrdí po jednom hledání nebo
     jedné naražené větě.** Narazit v textu na "viz kapitola X — mimo
     rozsah tohoto dokumentu" znamená, že mimo rozsah je TA KONKRÉTNÍ
     PASÁŽ/ÚRYVEK, ne nutně že kapitola X v souboru vůbec chybí — ověř to
