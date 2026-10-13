@@ -66,7 +66,7 @@ dracak_vtt_page_start('Moje postavy', $user);
               <div class="k">Úroveň:</div><div><?= (int)$p['uroven'] ?></div>
               <div class="k">Život:</div><div><?= (int)$p['aktualni_hp'] ?> / <?= (int)$p['max_hp'] ?></div>
             </div>
-            <div class="rec-actions"><a class="btn btn-secondary" href="postava.php?id=<?= (int)$p['id'] ?>">Upravit</a></div>
+            <div class="rec-actions"><a class="btn btn-primary" href="denik.php?id=<?= (int)$p['id'] ?>">Deník</a> <a class="btn btn-secondary" href="postava.php?id=<?= (int)$p['id'] ?>">Upravit</a></div>
             <?php if ($p['svet_id'] === null): ?>
               <?php if ($mojeSvety): ?>
                 <form method="post" style="display:flex;gap:6px;margin-top:8px;">

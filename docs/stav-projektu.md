@@ -443,34 +443,54 @@ kontejnery** (vaky, truhly apod.).
 
 ---
 
-## Osobní deník postavy (rozpracováno)
+## Osobní deník postavy (první verze hotová, čeká na návrh od Claude Design)
 
 Požadavek uživatele: "ultimátní detailní přehled postavy, hráči tam budou
 trávit spoustu času". Podklady: **`docs/zadani-osobni-denik-design.md`**
 (zadání/prompt pro Claude Design — obsah z pravidel h1690, stav dat,
 scénáře, požadavky; rešerše online) a referenční snímky v
 `docs/zadani-osobni-denik-img/`. Vzhled bude navrhovat Claude Design; do
-té doby je v kódu první, funkčně úplná verze.
+té doby je v kódu první, funkčně úplná verze (vlastní návrh vycházející z
+rešerše: stabilní vs. volatilní info, trvale viditelný stavový pás).
 
-Hotovo (výpočty, ověřeno na skutečné MariaDB proti příkladům z pravidel
-— Sindor h1690, Krwell/Kram h1610–h1612, Emanuel h1610, Fergo h1683):
-- `includes/vtt_denik.php` — `dracak_vtt_denik_data()`: bonusy vlastností,
-  bojeschopnost (mez vyřazení, postih pod 1/3 životů), ÚČ tváří v tvář i
-  střelecký + rodová zbraň, OČ (KZ zbroje, bez zbroje KZ 1), postřeh,
-  velikost, hranice naložení ×1–×4, zkušenost a další úroveň, peníze,
-  schopnosti/kouzla/jazyky/efekty/inventář.
-- Migrace (DDL = ručně v phpMyAdminu, viz seznam nahoře): `0070`
-  (postavy: zkusenost, penize_zl/st/md, velikost, zbroj_id, stit_id,
-  drzena_zbran_id, puvod, osobnost), `0071` (predmety: sila_zbrane,
-  delka_zbrane). DML: `0072` (SZ ze textu popisu, 87 zbraní), `0073`
-  (kategorie střelná/vrhací podle h2059).
+Soubory:
+- **`hra/denik.php`** — hlavní obrazovka (stavový pás: životy, magenergie,
+  únava, naložení, pohyblivost, OČ/ÚČ; sekce Přehled / Boj / Schopnosti a
+  kouzla / Vybavení / Postava). Odkazuje se na něj ze sedadla u stolu i z
+  karet postav ve `svet.php` a z `postavy_moje.php`. Po zápisech i
+  pollingem (5 s) se překresluje jako fragment (`?fragment=1`).
+  `assets/css/denik.css`, `assets/js/denik.js`.
+- **`hra/api/postava_stav.php`** — rychlé zápisy (±životy, ±magy, ±únava,
+  zkušenost [jen PJ], peníze, zbroj/štít/držená zbraň, texty, velikost);
+  životy a magenergie se logují do `svet_udalosti` jako na mapě.
+- **`hra/denik_tisk.php`** — tisková A4 verze papírového deníku podle
+  kolonek h1690 (předvyplněná, `?id=`) a prázdný formulář (bez `id`).
+- **`includes/vtt_denik.php`** — výpočty podle pravidel (bonusy, bojeschopnost,
+  ÚČ tváří v tvář i střelecký + rodová zbraň, OČ, postřeh, velikost, hranice
+  naložení ×1–×4, zkušenost, peníze, schopnosti/kouzla/jazyky/efekty).
+  Ověřeno na skutečné MariaDB proti příkladům z pravidel (Sindor h1690,
+  Krwell/Kram h1610–h1612, Emanuel h1610, Fergo h1683): `Sindor` v deníku
+  vychází přesně jako v knize (pohyblivost 10, 8/5/3, nosnost 330/660/990/
+  1320, OČ 1, dýka ÚČ 1 / střelecký 2 / OZ −2 / dostřel 5/9/12).
+- Migrace: `0070` (postavy: zkušenost, penize_zl/st/md, velikost, zbroj_id,
+  stit_id, drzena_zbran_id, puvod, osobnost) a `0071` (predmety:
+  sila_zbrane, delka_zbrane) jsou DDL = v `docs/sql-k-rucnimu-spusteni.sql`;
+  DML `0072` (SZ ze textu popisu, 87 zbraní) a `0073` (kategorie
+  střelná/vrhací podle h2059) proběhnou samy. **Deník funguje i před ručním
+  SQL** (chybějící pole ukáže jako "čeká na migraci"), ověřeno na DB ve
+  stavu migrace 0064.
 - Peníze se počítají do nákladu (1 mince = 1 mn, h3).
 
 Známé mezery: rodová zbraň a velikost jen pro 7 základních ras (+ klany
-přes rodiče) — homebrew rasy mají v textu rozsah velikosti a rodovou
-zbraň mimo DB; OČ počítá jen tělovou zbroj + štít +1 (jak se kombinují
-rukavice/přilbice/boty z homebrew ceníku, pravidla v repu neříkají);
-vrhací varianta zbraně se páruje jménem ("Dýka" -> "Dýka (vrhací)").
+přes rodiče) — homebrew rasy mají v textu rozsah velikosti (proto
+`postavy.velikost` ručně) a rodovou zbraň mimo DB; OČ počítá jen tělovou
+zbroj + štít +1 (jak se kombinují rukavice/přilbice/boty z homebrew
+ceníku, pravidla v repu neříkají); vrhací varianta zbraně se páruje
+jménem ("Dýka" -> "Dýka (vrhací)"); kouzla/schopnosti jsou jen ke čtení
+(nelze je "naučit" z deníku, `postava_zna_kouzlo` se plní jinde); chybí
+finty, přesvědčení, erb/portrét, kontejnery a nosiče nákladu (Fáze 1b),
+historie změn postavy; deník cizí postavy ostatním hráčům zatím není
+přístupný.
 
 ---
 

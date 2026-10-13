@@ -367,7 +367,7 @@ $sedadloPostavy = static function (array $p) use ($user, $isPjOrAdmin, $inicialy
         'title' => $p['nazev'] . ' (' . $p['vlastnik_jmeno'] . ') — život ' . (int)$p['aktualni_hp'] . '/' . $maxHp,
         'inicialy' => $inicialy($p['nazev']),
         'hpPct' => $hpPct,
-        'odkaz' => ($isPjOrAdmin || (int)$p['vlastnik_ucet_id'] === (int)$user['id']) ? 'postava.php?id=' . (int)$p['id'] : null,
+        'odkaz' => ($isPjOrAdmin || (int)$p['vlastnik_ucet_id'] === (int)$user['id']) ? 'denik.php?id=' . (int)$p['id'] : null,
     ];
 };
 $sedadla = [[
@@ -571,7 +571,7 @@ dracak_vtt_page_start($svet['nazev'], $user, true);
                   </ul>
                 <?php endif; ?>
                 <?php if ($isPjOrAdmin || (int)$p['vlastnik_ucet_id'] === (int)$user['id']): ?>
-                  <div class="rec-actions"><a class="btn btn-secondary" href="postava.php?id=<?= (int)$p['id'] ?>">Upravit</a></div>
+                  <div class="rec-actions"><a class="btn btn-primary" href="denik.php?id=<?= (int)$p['id'] ?>">Deník</a> <a class="btn btn-secondary" href="postava.php?id=<?= (int)$p['id'] ?>">Upravit</a></div>
                 <?php endif; ?>
                 <?php if ($isPjOrAdmin && count($hraciVeSvete) > 1): ?>
                   <form method="post" style="display:flex;gap:6px;margin-top:8px;">

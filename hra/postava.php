@@ -106,6 +106,7 @@ dracak_vtt_page_start($postava['nazev'], $user);
     <p class="note">Zatím bez světa.</p>
     <?php endif; ?>
     <h1 class="page-title">Upravit postavu</h1>
+    <p class="note" style="margin:0 0 8px;"><a href="denik.php?id=<?= $postavaId ?>">→ Osobní deník (přehled postavy)</a></p>
     <form method="post" class="card elev-sm" style="max-width:520px;margin-top:14px;">
       <div class="field"><label for="nazev">Jméno postavy *</label>
         <input class="input" type="text" id="nazev" name="nazev" required value="<?= htmlspecialchars($postava['nazev']) ?>">
