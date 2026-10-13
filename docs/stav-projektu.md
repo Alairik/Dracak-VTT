@@ -75,6 +75,23 @@ sekce "Proč DB vůbec existuje".
   se nakonec postavilo. Nečíst jako aktuální stav.
 - **Tenhle soubor** — aktuální stav, after-the-fact.
 
+### Lokální ověření na skutečné DB (funguje v cloud session)
+
+Testy nad zjednodušenými tabulkami (SQLite) přehlédly chybu v 0064
+(Naro'shai — viz 0069), proto: **migrace i UI ověřuj proti skutečné
+MariaDB.** Postup, který v session fungoval:
+1. `apt-get install -y mariadb-server`, spustit `mysqld_safe --user=mysql &`.
+2. `mariadb -uroot --default-character-set=utf8mb4` — **bez tohoto
+   přepínače se UTF-8 v importu rozbije** a `WHERE nazev = 'Trpaslík'`
+   tiše nezasáhne nic. Import: `database/drd-db-full-v1.sql`, pak
+   `database/0002_ucty_a_role.sql`, pak `database/migrations/*.sql` po
+   řadě (root má DDL, takže projdou všechny).
+3. Lokální `config.php` (je v `.gitignore`) s DB uživatelem na
+   `127.0.0.1`; testovací účet přes `password_hash()` do `ucty`.
+4. `php -S 127.0.0.1:8099 -t .` a Playwright (`/opt/node22/lib/node_modules/playwright`,
+   Chromium `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`,
+   `--no-sandbox`) — přihlásit přes `index.php`, screenshot stránky.
+
 ---
 
 ## Hotovo — podle oblastí
@@ -284,8 +301,9 @@ pořadí — každá staví na předchozí.
 
 **Fáze 1 — Oprava dat + živá Pohyblivost/Únava na postavě — HOTOVO V KÓDU**
 - `0064_oprava_rasy_pohyblivost_zaklad.sql` (čisté UPDATE, proběhne sama
-  přes `migrate.php`) — opraveno pro všech 17 ras s hodnotou v textu,
-  viz výš.
+  přes `migrate.php`) — opraveno pro 16 z 17 ras s hodnotou v textu, viz
+  výš. **Naro'shai** zasáhla až `0069` (v DB se jmenuje s rovným
+  apostrofem, 0064 hledala typografický).
 - `0065_postava_unava.sql` — `postavy.unava SMALLINT UNSIGNED NOT NULL
   DEFAULT 0`. **DDL: MUSÍ se ručně spustit přes phpMyAdmin (admin účet)**;
   `migrate.php` ho pak při dalším deployi sám zapíše do `migrace_log`
