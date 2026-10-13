@@ -242,6 +242,8 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
   .strom-link:hover { background:rgba(255,255,255,.1); }
   .strom-link.aktivni { background:var(--color-accent-600, #7a3b2e); color:#fff; font-weight:600; }
 
+  .mapa-bod-marker.pin-editing { cursor:move; outline:2px dashed #ffd166; outline-offset:3px; border-radius:50%; }
+
   .vtt-token { position:absolute; width:40px; text-align:center; user-select:none; }
   .vtt-token .puck { width:40px; height:40px; border-radius:50%; color:#fff; display:flex; align-items:center;
                       justify-content:center; font-size:11px; font-weight:600; box-shadow:0 2px 6px rgba(0,0,0,.5); }
@@ -470,6 +472,9 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
     <button class="close-x" data-close-popover><?php dracak_icon('x', 14); ?></button>
     <h3>Upravit pin</h3>
     <input type="hidden" id="pinUpravitId">
+    <input type="hidden" id="pinUpravitX">
+    <input type="hidden" id="pinUpravitY">
+    <p class="note" style="margin-top:0;">Pin na mapě teď jde přetáhnout na nové místo — zůstává tažitelný, dokud je tohle okno otevřené.</p>
     <label for="pinUpravitNazev">Název *</label>
     <input class="input" type="text" id="pinUpravitNazev" required>
     <label for="pinUpravitTyp">Typ</label>
@@ -1078,8 +1083,20 @@ function postJson(url, body) {
 function closeAllPopovers() {
   zrusitZivyNahledGridu();
   zrusitMlhaNahled();
+  ukoncitEditaciPinu();
   document.querySelectorAll('.popover.open').forEach(p => p.classList.remove('open'));
   document.querySelectorAll('.tbtn.active').forEach(b => b.classList.remove('active'));
+}
+// Pin v editačním módu (popover-pin-upravit otevřený) jde přetáhnout na
+// nové místo — viz mapWrap mousedown/move/up níž. Platí jen pro TENHLE
+// konkrétní pin a jen dokud je formulář otevřený, ať to nekoliduje s
+// běžným tažením tokenů/kreslením zdi/měřítkem.
+let pinEditujiId = null;
+function ukoncitEditaciPinu() {
+  if (pinEditujiId === null) return;
+  const el = document.querySelector('.mapa-bod-marker[data-bod-id="' + pinEditujiId + '"]');
+  if (el) el.classList.remove('pin-editing');
+  pinEditujiId = null;
 }
 function togglePopover(id, btn) {
   const wasOpen = document.getElementById(id).classList.contains('open');
@@ -1420,6 +1437,7 @@ if (nestvuraHledat) {
 
 // --- Drag i klik na token (klik = otevřít panel Spravovat, drag = přesun) ---
 let dragEl = null, dragOffsetX = 0, dragOffsetY = 0, dragMoved = false, dragStartClientX = 0, dragStartClientY = 0;
+let pinDragEl = null, pinDragMoved = false;
 const spravovatPanel = document.getElementById('panel-spravovat');
 let spravovanyToken = null;
 
@@ -1449,6 +1467,22 @@ function otevritSpravovat(el) {
 
 if (mapWrap) {
   mapWrap.addEventListener('mousedown', (e) => {
+    if (pinEditujiId !== null) {
+      // Přetažení pinu v editačním módu — nezávislé na currentTool
+      // (platí vždycky, dokud je formulář Upravit pin otevřený), ale jen
+      // pro TENHLE konkrétní marker, ať nekoliduje s běžným ovládáním
+      // mapy, když uživatel klikne jinam.
+      const el = e.target.closest('.mapa-bod-marker');
+      if (el && parseInt(el.dataset.bodId, 10) === pinEditujiId) {
+        // Pin se pozicuje stejně jako při zakládání (transform
+        // translate(-50%,-100%), left/top = přímo souřadnice bodu, žádný
+        // "grab offset" jako u tokenu) — tažení proto jen sleduje kurzor
+        // 1:1, viz mousemove/mouseup níž.
+        pinDragEl = el;
+        pinDragMoved = false;
+        return;
+      }
+    }
     if (currentTool === 'ruler') {
       // Měřítko musí jít začít i kliknutím přímo na token (časté měření
       // "dosáhne token A na token B") — ruler nijak nekoliduje s
@@ -1484,6 +1518,13 @@ if (mapWrap) {
     dragOffsetY = e.clientY - rect.top;
   });
   window.addEventListener('mousemove', (e) => {
+    if (pinDragEl) {
+      pinDragMoved = true;
+      const p = rulerPoint(e);
+      pinDragEl.style.left = Math.round(p.x) + 'px';
+      pinDragEl.style.top = Math.round(p.y) + 'px';
+      return;
+    }
     if (currentTool === 'ruler') {
       if (!rulerStart) return;
       drawRuler(rulerStart, rulerPoint(e));
@@ -1532,6 +1573,17 @@ if (mapWrap) {
     }
   });
   window.addEventListener('mouseup', (e) => {
+    if (pinDragEl) {
+      // Jen uloží novou pozici do skrytých polí formuláře — zápis do DB
+      // proběhne až kliknutím na "Uložit změny", spolu s ostatními
+      // upravovanými poli (stejný vzor jako zbytek téhle edit formy).
+      if (pinDragMoved) {
+        document.getElementById('pinUpravitX').value = parseInt(pinDragEl.style.left, 10);
+        document.getElementById('pinUpravitY').value = parseInt(pinDragEl.style.top, 10);
+      }
+      pinDragEl = null;
+      return;
+    }
     if (currentTool === 'ruler') {
       if (rulerStart) { rulerStart = null; clearRulerSoon(); }
       return;
@@ -1687,6 +1739,10 @@ function otevriPinInfo(bod) {
 document.querySelectorAll('.mapa-bod-marker').forEach(btn => {
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
+    // V editačním módu klik na TENHLE pin už jen táhne (viz mousedown/
+    // move/up výš) — nemá znovu přepínat na info popover a tím
+    // nechtěně zavírat rozdělaný formulář úprav.
+    if (pinEditujiId !== null && parseInt(btn.dataset.bodId, 10) === pinEditujiId) return;
     const bod = MAPA_BODY.find(b => b.id === parseInt(btn.dataset.bodId, 10));
     if (bod) otevriPinInfo(bod);
   });
@@ -1722,6 +1778,8 @@ if (pinInfoUpravitBtn) {
     const bod = MAPA_BODY.find(b => b.id === pinVybranyId);
     if (!bod) return;
     document.getElementById('pinUpravitId').value = bod.id;
+    document.getElementById('pinUpravitX').value = bod.x;
+    document.getElementById('pinUpravitY').value = bod.y;
     document.getElementById('pinUpravitNazev').value = bod.nazev;
     document.getElementById('pinUpravitTyp').value = bod.typ;
     document.getElementById('pinUpravitCilovaMapa').value = bod.cilova_mapa_id || '';
@@ -1733,6 +1791,8 @@ if (pinInfoUpravitBtn) {
     if (pop && zdroj) {
       pop.style.top = zdroj.getBoundingClientRect().top + 'px';
       pop.classList.add('open');
+      pinEditujiId = bod.id;
+      zdroj.classList.add('pin-editing');
     }
   });
 }
@@ -1747,15 +1807,19 @@ if (pinUpravitUlozitBtn) {
     const cilovaMapaId = cilovaMapaEl.value ? parseInt(cilovaMapaEl.value, 10) : null;
     const popis = document.getElementById('pinUpravitPopis').value.trim();
     const viditelnyHracum = document.getElementById('pinUpravitViditelny').checked;
-    postJson('api/mapa_bod_upravit.php', {id, nazev, typ, cilova_mapa_id: cilovaMapaId, popis, viditelny_hracum: viditelnyHracum})
+    const x = parseInt(document.getElementById('pinUpravitX').value, 10);
+    const y = parseInt(document.getElementById('pinUpravitY').value, 10);
+    postJson('api/mapa_bod_upravit.php', {id, nazev, typ, cilova_mapa_id: cilovaMapaId, popis, viditelny_hracum: viditelnyHracum, x, y})
       .then(d => {
         if (d.error) { logLine('Chyba: ' + d.error); return; }
         const bod = MAPA_BODY.find(b => b.id === id);
         if (bod) {
-          Object.assign(bod, {nazev, typ, cilova_mapa_id: cilovaMapaId, popis, viditelny_hracum: viditelnyHracum});
+          Object.assign(bod, {nazev, typ, cilova_mapa_id: cilovaMapaId, popis, viditelny_hracum: viditelnyHracum, x, y});
         }
         const btn = document.querySelector('.mapa-bod-marker[data-bod-id="' + id + '"]');
         if (btn) {
+          btn.style.left = x + 'px';
+          btn.style.top = y + 'px';
           btn.title = nazev;
           btn.style.opacity = viditelnyHracum ? '' : '.6';
           const tmpl = document.querySelector('#pinIconTemplates [data-typ="' + typ + '"]');

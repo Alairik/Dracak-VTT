@@ -80,6 +80,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    if ($akce === 'upravit_obrazek_mapy') {
+        // Nahradit obrázek existující mapy (update vzhledu, nebo úplně
+        // jiná mapa pod stejným záznamem) — dřív jedině založit celý
+        // svět znovu. Mapa.svet_id se ověřuje, ať nejde přepsat obrázek
+        // mapy z cizího světa jen uhodnutím id. Šířka/výška se vždycky
+        // přepočítá z nového souboru — nový obrázek nemusí mít stejný
+        // rozměr jako starý, grid/mlha by jinak seděly špatně.
+        if (!$isPjOrAdmin) { http_response_code(403); die('Jen PJ/admin upravuje obrázek mapy.'); }
+        $mapaId = (int)($_POST['mapa_id'] ?? 0);
+        $stmt = dracak_db()->prepare('SELECT obrazek_cesta FROM mapy WHERE id = ? AND svet_id = ?');
+        $stmt->execute([$mapaId, $svetId]);
+        $puvodniRadek = $stmt->fetch();
+        if (!$puvodniRadek) { http_response_code(404); die('Mapa nenalezena v tomhle světě.'); }
+        if (empty($_FILES['obrazek']['tmp_name']) || !is_uploaded_file($_FILES['obrazek']['tmp_name'])) {
+            http_response_code(422);
+            die('Vyber soubor s novým obrázkem.');
+        }
+        $povoleneTypy = ['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/webp' => 'webp'];
+        $info = getimagesize($_FILES['obrazek']['tmp_name']);
+        if ($info === false || !isset($povoleneTypy[$info['mime']])) {
+            http_response_code(422);
+            die('Obrázek mapy musí být PNG, JPG nebo WEBP.');
+        }
+        $nazevSouboru = bin2hex(random_bytes(16)) . '.' . $povoleneTypy[$info['mime']];
+        $cil = __DIR__ . '/../uploads/mapy/' . $nazevSouboru;
+        if (!move_uploaded_file($_FILES['obrazek']['tmp_name'], $cil)) {
+            dracak_fail_safely('Nepodařilo se uložit nahraný obrázek mapy.');
+        }
+        $stmt = dracak_db()->prepare('UPDATE mapy SET obrazek_cesta = ?, sirka_px = ?, vyska_px = ? WHERE id = ?');
+        $stmt->execute([$nazevSouboru, $info[0], $info[1], $mapaId]);
+        // Starý soubor smazat AŽ PO úspěšném zápisu do DB — ať selhání
+        // uprostřed nikdy nenechá mapu bez platného obrázku.
+        if ($puvodniRadek['obrazek_cesta']) {
+            $staryObrazek = __DIR__ . '/../uploads/mapy/' . $puvodniRadek['obrazek_cesta'];
+            if (is_file($staryObrazek)) {
+                @unlink($staryObrazek);
+            }
+        }
+        header("Location: svet.php?id=$svetId");
+        exit;
+    }
+
     if ($akce === 'nova_postava') {
         $nazev = trim((string)($_POST['nazev'] ?? ''));
         if ($nazev === '') { http_response_code(422); die('Postava musí mít jméno.'); }
@@ -417,20 +459,25 @@ dracak_vtt_page_start($svet['nazev'], $user, true);
 
       <div class="svet-col">
         <?php if ($svetovaMapa): ?>
-          <a class="svet-mapcard" href="mapa.php?id=<?= (int)$svetovaMapa['id'] ?>">
-            <?php if ($svetovaMapa['obrazek_cesta']): ?>
-              <div class="svet-mapcard-img" style="background-image:url('mapa_obrazek.php?id=<?= (int)$svetovaMapa['id'] ?>');"></div>
-            <?php else: ?>
-              <div class="svet-mapcard-img"><span>Mapa zatím bez obrázku</span></div>
-            <?php endif; ?>
-            <div class="svet-mapcard-foot">
-              <div>
-                <div class="svet-mapcard-title"><?= htmlspecialchars($svetovaMapa['nazev']) ?></div>
-                <div class="svet-sub" style="font-size:12px;">Světová mapa</div>
+          <div class="svet-mapcard-wrap">
+            <a class="svet-mapcard" href="mapa.php?id=<?= (int)$svetovaMapa['id'] ?>">
+              <?php if ($svetovaMapa['obrazek_cesta']): ?>
+                <div class="svet-mapcard-img" style="background-image:url('mapa_obrazek.php?id=<?= (int)$svetovaMapa['id'] ?>');"></div>
+              <?php else: ?>
+                <div class="svet-mapcard-img"><span>Mapa zatím bez obrázku</span></div>
+              <?php endif; ?>
+              <div class="svet-mapcard-foot">
+                <div>
+                  <div class="svet-mapcard-title"><?= htmlspecialchars($svetovaMapa['nazev']) ?></div>
+                  <div class="svet-sub" style="font-size:12px;">Světová mapa</div>
+                </div>
+                <span class="btn btn-primary">Otevřít mapu →</span>
               </div>
-              <span class="btn btn-primary">Otevřít mapu →</span>
-            </div>
-          </a>
+            </a>
+            <?php if ($isPjOrAdmin): ?>
+              <button class="svet-thumb-edit" type="button" data-edit-mapa="<?= (int)$svetovaMapa['id'] ?>" data-edit-mapa-nazev="<?= htmlspecialchars($svetovaMapa['nazev'], ENT_QUOTES) ?>" title="Nahrát nový obrázek mapy"><?php dracak_icon('pencil', 14); ?></button>
+            <?php endif; ?>
+          </div>
         <?php else: ?>
           <div class="empty-state" style="padding:40px 20px;">
             Svět zatím nemá světovou mapu.
@@ -450,6 +497,7 @@ dracak_vtt_page_start($svet['nazev'], $user, true);
           <?php else: ?>
             <div class="svet-zones">
               <?php foreach ($posledniZony as $z): ?>
+                <div class="svet-zone-wrap">
                 <a class="svet-zone" href="mapa.php?id=<?= (int)$z['id'] ?>">
                   <div class="svet-zone-thumb"<?= $z['obrazek_cesta'] ? ' style="background-image:url(\'mapa_obrazek.php?id=' . (int)$z['id'] . '\');"' : '' ?>></div>
                   <div class="svet-zone-body">
@@ -460,6 +508,10 @@ dracak_vtt_page_start($svet['nazev'], $user, true);
                     </div>
                   </div>
                 </a>
+                <?php if ($isPjOrAdmin): ?>
+                  <button class="svet-thumb-edit" type="button" data-edit-mapa="<?= (int)$z['id'] ?>" data-edit-mapa-nazev="<?= htmlspecialchars($z['nazev'], ENT_QUOTES) ?>" title="Nahrát nový obrázek mapy"><?php dracak_icon('pencil', 12); ?></button>
+                <?php endif; ?>
+                </div>
               <?php endforeach; ?>
             </div>
           <?php endif; ?>
@@ -734,6 +786,20 @@ dracak_vtt_page_start($svet['nazev'], $user, true);
     </form>
   </dialog>
 
+  <dialog class="svet-dialog" id="dlg-mapa-obrazek">
+    <div class="svet-dialog-head"><h2>Nahrát nový obrázek mapy</h2><button class="btn btn-ghost btn-icon" type="button" data-close aria-label="Zavřít">✕</button></div>
+    <form method="post" enctype="multipart/form-data">
+      <input type="hidden" name="akce" value="upravit_obrazek_mapy">
+      <input type="hidden" name="mapa_id" id="mapaObrazekId">
+      <p class="note" style="margin-top:0;">Mapa: <strong id="mapaObrazekNazev">—</strong></p>
+      <div class="field"><label for="mapa_obrazek_soubor">Nový obrázek (PNG/JPG/WEBP) *</label>
+        <input type="file" id="mapa_obrazek_soubor" name="obrazek" accept="image/png,image/jpeg,image/webp" required>
+      </div>
+      <p class="note">Nahradí stávající obrázek úplně, klidně i jiným rozměrem. Grid (velikost/posun) zůstává jak byl nastavený — po nahrání zkontroluj na mapě, jestli ještě sedí. Mlha války hráčů se při změně rozměru bezpečně vynuluje (začne se odhalovat znovu), neukáže se nikomu nic navíc.</p>
+      <button class="btn btn-primary" type="submit">Nahrát</button>
+    </form>
+  </dialog>
+
   <?php if ($postavy): ?>
   <dialog class="svet-dialog" id="dlg-polozka">
     <div class="svet-dialog-head"><h2>Přidat položku postavě</h2><button class="btn btn-ghost btn-icon" type="button" data-close aria-label="Zavřít">✕</button></div>
@@ -806,6 +872,16 @@ dracak_vtt_page_start($svet['nazev'], $user, true);
       btn.addEventListener('click', function () {
         var dlg = document.getElementById(btn.getAttribute('data-dialog'));
         if (!dlg) return;
+        setOpen(false);
+        dlg.showModal();
+      });
+    });
+    document.querySelectorAll('[data-edit-mapa]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var dlg = document.getElementById('dlg-mapa-obrazek');
+        if (!dlg) return;
+        document.getElementById('mapaObrazekId').value = btn.getAttribute('data-edit-mapa');
+        document.getElementById('mapaObrazekNazev').textContent = btn.getAttribute('data-edit-mapa-nazev') || '—';
         setOpen(false);
         dlg.showModal();
       });

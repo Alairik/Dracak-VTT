@@ -92,16 +92,17 @@ function dracak_vtt_mapa_bod_pridat(PDO $pdo, int $svetId, int $mapaId, string $
     return (int)$pdo->lastInsertId();
 }
 
-// Upravitelné je jen popisné (název/typ/popis/viditelnost) + kam pin
-// vede — ne mapa_id ani x/y (to je POZICE pinu, přesun na jinou mapu
-// nebo jinam na stejné mapě tahle funkce neřeší, nikdo o to nepožádal).
-function dracak_vtt_mapa_bod_upravit(PDO $pdo, int $bodId, int $svetId, string $nazev, string $typ, ?int $cilovaMapaId, ?string $popis, bool $viditelnyHracum): bool
+// Upravitelné: popisné pole + kam pin vede + pozice (x/y) na TÉŽE mapě
+// (přetažení v editačním módu, viz hra/mapa.php). mapa_id (na které
+// konkrétní mapě pin je) se pořád nemění — přesun na jinou mapu nikdo
+// nepožadoval, jen posun po mapě, na které už je.
+function dracak_vtt_mapa_bod_upravit(PDO $pdo, int $bodId, int $svetId, string $nazev, string $typ, ?int $cilovaMapaId, ?string $popis, bool $viditelnyHracum, int $x, int $y): bool
 {
     $stmt = $pdo->prepare(
-        'UPDATE mapa_body SET nazev = ?, typ = ?, cilova_mapa_id = ?, popis = ?, viditelny_hracum = ?
+        'UPDATE mapa_body SET nazev = ?, typ = ?, cilova_mapa_id = ?, popis = ?, viditelny_hracum = ?, x = ?, y = ?
          WHERE id = ? AND svet_id = ?'
     );
-    $stmt->execute([$nazev, $typ, $cilovaMapaId, $popis, $viditelnyHracum ? 1 : 0, $bodId, $svetId]);
+    $stmt->execute([$nazev, $typ, $cilovaMapaId, $popis, $viditelnyHracum ? 1 : 0, $x, $y, $bodId, $svetId]);
     return $stmt->rowCount() > 0;
 }
 

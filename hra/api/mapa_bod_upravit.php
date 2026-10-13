@@ -19,9 +19,13 @@ $pdo = dracak_db();
 // konverzace o "piny mají mít napojení na svět". mapa_id ale pořád
 // potřebujeme zvlášť, je to vlastní lokální zóna pinu (beze změny),
 // na rozdíl od cilova_mapa_id (kam pin vede) — ta je editovatelná.
-$stmt = $pdo->prepare('SELECT svet_id, mapa_id FROM mapa_body WHERE id = ?');
+$stmt = $pdo->prepare('SELECT svet_id, mapa_id, x, y FROM mapa_body WHERE id = ?');
 $stmt->execute([$bodId]);
 $bod = $stmt->fetch();
+// x/y nepovinné v requestu — needitovaná pozice (jen přejmenování apod.)
+// zůstává na svém místě, nespadne na 0,0.
+$x = isset($data['x']) ? (int)$data['x'] : (int)($bod['x'] ?? 0);
+$y = isset($data['y']) ? (int)$data['y'] : (int)($bod['y'] ?? 0);
 if (!$bod || !dracak_vtt_svet_access($user, (int)$bod['svet_id'])) {
     http_response_code(404);
     echo json_encode(['error' => 'Pin nenalezen.']);
@@ -45,11 +49,11 @@ if ($chybaCile !== null) {
     exit;
 }
 
-$ok = dracak_vtt_mapa_bod_upravit($pdo, $bodId, (int)$bod['svet_id'], $nazev, $typ, $cilovaMapaId, $popis, $viditelnyHracum);
+$ok = dracak_vtt_mapa_bod_upravit($pdo, $bodId, (int)$bod['svet_id'], $nazev, $typ, $cilovaMapaId, $popis, $viditelnyHracum, $x, $y);
 
 $eventId = dracak_vtt_log_event((int)$bod['svet_id'], (int)$bod['mapa_id'], 'mapa_bod_pridan', [
     'id' => $bodId, 'nazev' => $nazev, 'typ' => $typ, 'cilova_mapa_id' => $cilovaMapaId,
-    'viditelny_hracum' => $viditelnyHracum, 'akce' => 'upraven',
+    'viditelny_hracum' => $viditelnyHracum, 'x' => $x, 'y' => $y, 'akce' => 'upraven',
 ], (int)$user['id']);
 
-echo json_encode(['ok' => $ok, 'udalost_id' => $eventId]);
+echo json_encode(['ok' => $ok, 'x' => $x, 'y' => $y, 'udalost_id' => $eventId]);
