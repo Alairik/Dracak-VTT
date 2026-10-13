@@ -72,7 +72,7 @@ Zdroj: kompletní sweep artefaktu "Pravidla DrD + domácí pravidla" (68 459 ř�
 
 - [ ] Určení hodnoty pokladů (PPP) — Tabulka odhadu ceny se nedochovala vůbec, jen odkaz
 - [ ] Druid — tabulka Druidovy magenergie pro úrovně 16.–36. (PPP nejasně čitelná, PPE jen vzorek)
-- [ ] Pohyb pod širým nebem (PPP) — Tabulky rychlosti chůze/běhu a náročnosti terénu, dochovalo se jen slovní shrnutí
+- [x] ~~Pohyb pod širým nebem (PPP) — Tabulky rychlosti chůze/běhu a náročnosti terénu~~ — vyřešeno 2026-10: Tabulka rychlosti při chůzi i při běhu dodána foto uživatelem (nebyly v HTML přepisu). Náročnost terénu nikdy nechyběla — je to sloupec "náročnost" v Tabulce naložení povozu (h1641), text to sám prohlašuje za stejné jednotky ("v bodech pohybu, viz výše"). Viz `docs/stav-projektu.md`, sekce "Rozpracováno: cestování..." pro plné hodnoty.
 - [ ] Rychlost lodí (PPP) — Tabulka rychlostí lodí a Tabulka veslování
 - [ ] Poškození lodí (PPP) — Tabulka bouří (odolnost lodí)
 - [ ] Vlastní boj / potápění (PPP) — tabulka postihů podle hloubky

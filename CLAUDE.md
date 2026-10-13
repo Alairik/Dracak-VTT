@@ -98,6 +98,16 @@
     povolání) neodkazuje křížově stejnými jednotkami ("v bodech pohybu,
     viz výše" apod.) — může to být přesně ta chybějící hodnota, jen pod
     jinou nadpisem.
+- **`docs/stav-projektu.md` je živý přehled "co je hotové, co se řeší,
+  jaký je další krok" — udržuj ho aktuální, vždy, ne až někdy později.**
+  Při každé netriviální práci (nová funkce, oprava dat, architektonické
+  rozhodnutí, zjištění z pravidel, co mění plán) zapiš update do tohohle
+  souboru ve STEJNÉM kroku/commitu, ne jako samostatný "uklízecí" úkol
+  nazítří — jinak zastará přesně jako `docs/vtt-datovy-model-navrh-v1.md`
+  a `docs/kontrolni-seznam-neuplnych-mist.md`, které už drift měly a
+  musely se dohánět zpětně. Soubor existuje proto, aby se v projektu
+  dokázal rychle zorientovat i model/session bez historie konverzace —
+  jestli po tvé práci neodpovídá realitě, úkol není hotový.
 - **"Homebrew" v komentářích `drd-db-full-v1.sql` (Stopař stínů, Panoš,
   Střelec, Divoch, Šaman a další rozšířená povolání/rasy) neznamená
   "nestandardní doplněk, který stojí bokem."** Je to jen odkaz na to, že
