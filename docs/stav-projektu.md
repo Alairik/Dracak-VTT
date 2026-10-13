@@ -31,12 +31,12 @@ prvním takovém souboru deploy zastaví** (HTTP 500 v posledním kroku
 `deploy.yml`; FTP část proběhne normálně, kód je nasazený). Všechno za
 ním čeká, dokud se to neprovede ručně.
 
-**Aktuální blok k vložení je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný
-soubor, ve kterém jsou všechny dosud neprovedené DDL příkazy v pořadí
-(`0065`, `0067`, `0068`, `0070`, `0071`); uživatel ho dostává jako text ke
-zkopírování (viz pravidlo v `CLAUDE.md`). Ověřeno na kopii produkčního
-stavu: po něm `migrate.php` doběhne a provede i čisté UPDATE migrace
-(`0066`, `0069`, `0072`, `0073`). `DROP TABLE stupne_unavy;` (stará
+**Ruční DDL blok je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný soubor, ve
+kterém jsou všechny dosud neprovedené DDL příkazy v pořadí; uživatel ho
+dostává jako text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav:
+prázdný** — poslední blok (`0065`, `0067`, `0068`, `0070`, `0071`) uživatel
+provedl a deploy ho potvrdil (migrate.php: `0066`, `0069`, `0072`, `0073`
+proběhly samy, smoke test zelený). `DROP TABLE stupne_unavy;` (stará
 nepoužívaná tabulka z 0008) uživatel zatím nechtěl/neprovedl — jako
 migrace jít nemůže (`migrate.php` odmítne DROP).
 
