@@ -18,9 +18,9 @@ Přečti celý tenhle soubor, pak `CLAUDE.md` (hlavně pravidla o tom, že
 zdroj pravdy o hře jsou pravidla v `content/`, ne repo/DB, a o
 neodhadování mechaniky). **Fáze 1 a 2 ze sekce "Rozpracováno:
 cestování..." jsou v kódu hotové**; **Fáze 1b (váha/kontejnery) je
-částečně hotová, Fáze 4 (kalkulačka cesty) a 5 (přepínače) jsou v kódu,
-zbývá Fáze 3 (povozy) a dokončení 1b (kontejnery) — obojí čeká na
-rozhodnutí uživatele** — viz níž. Stav předchozí
+částečně hotová, Fáze 3 (povozy), 4 (kalkulačka cesty) a 5 (přepínače)
+jsou v kódu, zbývá dokončení 1b (kontejnery) — čeká na rozhodnutí
+uživatele** — viz níž. Stav předchozí
 konverzace je zapsaný přesně proto, aby ses nemusel/a ptát na věci, co
 už byly rozhodnuté (viz "Architektonická rozhodnutí" a celá sekce
 "Rozpracováno" níže — všechno v ní je buď přímo citovaný text pravidel,
@@ -37,8 +37,9 @@ ním čeká, dokud se to neprovede ručně.
 kterém jsou všechny dosud neprovedené DDL příkazy v pořadí; uživatel ho
 dostává jako text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav:
 čeká blok pro `0074` (tabulky `rychlost_chuze`, `rychlost_behu`), `0075`
-(`jizdni_zvirata.nosnost_tah_mn`), `0077` (3 přepínače `svet.auto_*`) a
-`0078` (`postavy.pohyblivost_rucne`)** — ověřeno na kopii produkčního stavu
+(`jizdni_zvirata.nosnost_tah_mn`), `0077` (3 přepínače `svet.auto_*`),
+`0078` (`postavy.pohyblivost_rucne`) a `0079` (tabulky `povozy`,
+`povoz_nalozeni`)** — ověřeno na kopii produkčního stavu
 (dvakrát za sebou, pak `migrate.php` pod DML-only účtem: 0074–0076 doběhly).
 Do spuštění deploy v posledním kroku skončí HTTP 500 (FTP část proběhne,
 kód je nasazený a bez tabulek funguje v degradovaném režimu). Předchozí
@@ -204,7 +205,7 @@ MariaDB.** Postup, který v session fungoval:
 ## Rozpracováno: cestování, pohyblivost, únava, naložení
 
 **Stav: Fáze 1, 2, 4 a 5 jsou v kódu (DDL k nim je provedené až na
-0074/0075/0077/0078, viz "Čeká na ruční spuštění"), Fáze 3 (povozy) a 1b
+0074/0075/0077/0078/0079, viz "Čeká na ruční spuštění"), Fáze 1b
 (kontejnery) čekají na rozhodnutí.** Tohle je aktuálně otevřený úkol a nejspíš další věc, na
 které se bude pokračovat.
 
@@ -311,9 +312,8 @@ domácí rozšíření" vlastní hodnotu nemají, dědí ji za běhu od rodiče
 
 ### Další krok — SCHVÁLENÝ fázový plán (2026-10, čeká na realizaci)
 
-Fáze 1, 2, 4 a 5 jsou v kódu (viz níž), Fáze 3 ne. Fáze 4 se předběhla
-kvůli tomu, že byla odblokovaná fotkami tabulek, a povozy (Fáze 3) čekají
-na rozhodnutí o zdroji dat; Fáze 4 v1 počítá jen pěší, jezdce a nosiče.
+Fáze 1, 2, 3, 4 a 5 jsou v kódu (viz níž); zbývá Fáze 1b (kontejnery).
+Fáze 4 se dělala dřív než 3, protože ji odblokovaly fotky tabulek.
 
 **Fáze 1 — Oprava dat + živá Pohyblivost/Únava na postavě — HOTOVO V KÓDU**
 - `0064_oprava_rasy_pohyblivost_zaklad.sql` (čisté UPDATE, proběhne sama
@@ -435,17 +435,37 @@ kontejnery** (vaky, truhly apod.).
 - Zatím se z dopravy nic nepočítá (rychlost družiny, únava zvířete,
   váha jezdce v nákladu zvířete) — to je Fáze 4 / 1b.
 
-**Fáze 3 — Povozy**
-- Žádná trvalá entita "svět vlastní povoz" — typ vozu + zápřah se volí
-  ad-hoc přímo při cestování, stejně jednoduché jako dnešní "zadej dny".
-- **Zdroje už v repu jsou** (zjištěno při Fázi 2): PPP h1639–h1641 (typy,
-  nosnost spřežení, naložení podle terénu) + homebrew tabulka POVOZY v
-  h2057: žebřiňák, valník, krytý vůz, maringotka, malý/velký kočár,
-  malý/velký dostavník — cena ve stříbru, váha vozu (mn), nosnost
-  (násobek váhy vozu), únava řidiče (1 bod za N bodů zvířete), kapacita
-  osob. Pozor: typy v PPP (vůz/kočár/dostavník) a v h2057 (8 modelů) se
-  nekryjí 1:1 — před stavbou číselníku rozhodnout, ze které tabulky se
-  bere, nebo ji slít.
+**Fáze 3 — Povozy — HOTOVO V KÓDU (2026-10-13, čeká na ruční DDL 0079)**
+- Dříve otevřená otázka "PPP typy vs. h2057 — sloučit?" se vyřešila
+  zjištěním: **8 modelů** (žebřiňák, valník, krytý vůz, maringotka, malý/velký
+  kočár, malý/velký dostavník) je i v základních pravidlech PJ (Tabulka ceny
+  povozů a Tabulka řízení, h2366); PPP typy vůz/kočár/dostavník jsou jen
+  jejich seskupení. Váhy se v PPP a v homebrew h2057 mírně liší — `povozy`
+  drží obě rozmezí (`vaha_*` = PPP, `vaha_hb_*` = h2057), kalkulačka
+  předvyplní PPP a PJ číslo přepíše. Únava cestujících u žebřiňáku/valníku
+  (1 bod za 4 body zvířete) je jen v h2057, ostatní v PPP.
+- `0079_povozy.sql` (DDL + INSERT IGNORE): `povozy` (kategorie, váhy,
+  násobek nosnosti, únava cestujících, `klus` ne/jen_dobra_cesta/ano, Tabulka
+  řízení, kapacita osob) a `povoz_nalozeni` (Tabulka naložení povozu: ≤10
+  100 %, ≤12 90 %, ≤15 80 %, ≤20 65 %, ≤30 30 %, nad 30 nelze projet).
+- `includes/vtt_cestovani.php`: `dracak_vtt_povoz_sprezeni()` (čtvrtina váhy
+  proti nosnosti spřežení = nosnost zvířete × (1 + 0,5 × (počet − 1)), v
+  tahu `nosnost_tah_mn`), `dracak_vtt_povoz_procento_nakladu()`,
+  `dracak_vtt_povoz_rizeni()` (% úspěchu kočího klusem, −N % za každý bod
+  náročnosti nad 10) a povoz v `dracak_vtt_cesta_vypocet()` (cestující na
+  povoze, bezpečný náklad, rychlost spřežení, omezení tempa: vozy nejvýš
+  krokem, klusem jen při náročnosti ≤10, maringotka nikdy).
+- **Ověřeno proti knize:** Tabulka nosnosti spřežení přesně (klasický kůň
+  3 200/12 800, pár 4 800/19 200, trojka 6 400/25 600, 2 páry 8 000/32 000,
+  3 páry 11 200/44 800; jezdecký kůň 3 000/12 000 … 10 500/42 000); příklad
+  krytého vozu 6 000 mn v pahorkatině (80 % z 12 000 = 9 600, celkem
+  15 600); příklad řízení z PJ (krytý vůz, klus, náročnost 12 = 78 %).
+- UI: karta "Povoz" v `hra/cesta.php` (typ, váha, násobek, náklad, tažné
+  zvíře, spřežení), sloupec "Na povoze" u postav, souhrn povozu ve výsledku.
+- **Neřeší:** nehody (hod kočího k% za započatou směnu je jen zobrazená
+  pravděpodobnost), dovednost Kočí, otevřené kočáry (polovina váhy — PJ
+  zadá váhu), vícenásobné povozy v jedné cestě, váha nákladu jako položky
+  povozu (čeká na model kontejnerů, Fáze 1b).
 
 **Fáze 4 — Jádro: hodinová simulace cestování — HOTOVO V KÓDU (v1, 2026-10-13)**
 - Odblokováno fotkami tabulek (viz "Co je podložené"). Zdroj pravidel:
@@ -586,9 +606,8 @@ přístupný.
   bez DROP: nová tabulka inventáře + kopie dat (větší refactor).
 - Rozsah importu ceníku h2055 (doporučeno: nejdřív jen kontejnery) a
   kapacita kontejneru jako tvrdý limit s přepsáním PJ (doporučeno).
-- Povozy (Fáze 3): sloučit PPP typy (vůz/kočár/dostavník) s homebrew
-  tabulkou POVOZY (h2057, 8 modelů)? Katalog zatím nemá žádného
-  spotřebitele, proto nezačato.
+- Povozy: váhy vozů se v PPP a v homebrew h2057 liší (obě rozmezí jsou v
+  DB; kalkulačka předvyplní PPP) — potvrdit, které má být výchozí.
 - **`DROP TABLE` tří mrtvých tabulek z migrace 0008:** `stupne_unavy`,
   `narocnost_akci_unava`, `odstraneni_unavy`. Všechny jsou jiný model
   únavy než v pravidlech (hranice 10 + odolnost, "spánek −10 bodů",

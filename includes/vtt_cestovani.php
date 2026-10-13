@@ -254,6 +254,83 @@ function dracak_vtt_zvire_pohyblivost(PDO $pdo, array $zvire, float $nakladMn): 
     return ['pohyblivost' => $poh, 'bonus' => dracak_vtt_obratnost_bonus($pdo, max(1, $poh)), 'nalozeni' => $nalozeni];
 }
 
+// ---------------------------------------------------------------------
+// Povozy a spřežení (PPP h1639–h1641, PJ h2366; tabulky povozy a
+// povoz_nalozeni, migrace 0079)
+// ---------------------------------------------------------------------
+
+// Číselník povozů v pořadí tabulky; prázdný, dokud migrace 0079 není na DB.
+function dracak_vtt_povozy(PDO $pdo): array
+{
+    try {
+        return $pdo->query('SELECT * FROM povozy ORDER BY id')->fetchAll();
+    } catch (PDOException $e) {
+        return [];
+    }
+}
+
+// TABULKA NALOŽENÍ POVOZU: kolik % provozního nákladu (posádka + náklad, bez
+// váhy vozu) lze při dané náročnosti naložit. Hranice jsou "nejvýše"
+// (10 = 100 %, do 12 = 90 %, … nad 30 = 0 %). null = tabulka není na DB.
+function dracak_vtt_povoz_procento_nakladu(PDO $pdo, float $narocnost): ?int
+{
+    try {
+        $stmt = $pdo->prepare('SELECT procento FROM povoz_nalozeni WHERE narocnost_do >= ? ORDER BY narocnost_do LIMIT 1');
+        $stmt->execute([$narocnost]);
+        $p = $stmt->fetchColumn();
+        return $p === false ? null : (int)$p;
+    } catch (PDOException $e) {
+        return null;
+    }
+}
+
+// Nosnost spřežení: z nákladu, do něhož je zvíře zapřaženo, se počítá jen
+// čtvrtina; každé další zvíře přidává jen polovinu nosnosti (h1639, Tabulka
+// nosnosti spřežení). Celková váha pro spřežení = váha vozu + posádka +
+// náklad. Zvíře se pak naloží jako při jízdě: čtvrtina váhy proti
+// "nosnosti spřežení" = nosnost zvířete × (1 + 0,5 × (počet − 1)), stejná
+// Tabulka naložení ×1/×2/×3/×4. Nosnost zvířete se bere "v tahu"
+// (jizdni_zvirata.nosnost_tah_mn, tažný kůň 1000), jinak z Tabulky
+// jezdeckých zvířat. Ověřeno proti Tabulce nosnosti spřežení: klasický kůň
+// 800 → 1 zvíře 4×800 = 3 200 / max 12 800, pár 4 800 / 19 200;
+// jezdecký kůň 750 → pár 4 500 / 18 000.
+//
+// Vrací ['kapacita_mn' => nosnost spřežení v mn (čtvrtinová jednotka),
+//        'nosnost_v_zaprahu_mn', 'max_uveze_mn', 'nalozeni', 'pohyblivost',
+//        'bonus'] — pohyblivost/bonus null nad 4× (spřežení to neutáhne).
+function dracak_vtt_povoz_sprezeni(PDO $pdo, array $zvire, int $pocet, float $celkovaVahaMn): array
+{
+    $nosnostZvirete = (int)($zvire['nosnost_tah_mn'] ?? $zvire['nosnost_mn']);
+    $kapacita = $nosnostZvirete * (1 + 0.5 * max(0, $pocet - 1));
+    $nalozeni = dracak_vtt_nalozeni($celkovaVahaMn / 4, (int)round($kapacita));
+    $poh = $nalozeni['ctvrtiny'] !== null
+        ? dracak_vtt_pohyblivost_po_nalozeni((int)$zvire['pohyblivost'], $nalozeni['ctvrtiny'])
+        : null;
+    return [
+        'kapacita_mn' => $kapacita,
+        'nosnost_v_zaprahu_mn' => $kapacita * 4,
+        'max_uveze_mn' => $kapacita * 16,
+        'nalozeni' => $nalozeni,
+        'pohyblivost' => $poh,
+        'bonus' => $poh !== null ? dracak_vtt_obratnost_bonus($pdo, max(1, $poh)) : null,
+    ];
+}
+
+// Pravděpodobnost úspěšného řízení (%, PJ Tabulka řízení): při klusu a
+// rychleji klesá o povozu příslušné % za každý bod náročnosti nad 10; padne-li
+// kočímu na k% víc, nastane nehoda. Hodnota se hází za každou započatou
+// směnu jízdy. V hodinové simulaci jsou jen tempa chůze, z nich se řízení
+// týká spěchu (= klus; procházka a chůze = volný krok a krok se nehází).
+// null = řízení se nehází. Dovednost Kočí tuhle šanci ještě mění (ne tady).
+function dracak_vtt_povoz_rizeni(array $povoz, string $tempo, float $narocnost): ?float
+{
+    if ($tempo !== 'spech') {
+        return null;
+    }
+    $zaklad = (float)$povoz['rizeni_klus'];
+    return max(0.0, min(100.0, $zaklad - max(0.0, $narocnost - 10) * (float)$povoz['rizeni_snizeni']));
+}
+
 // Sestaví subjekty simulace z postav a zvířat a spustí ji.
 //
 // $ucastnici: [['postava' => řádek z postavy, 'vaha_jezdce' => float]]
@@ -263,13 +340,19 @@ function dracak_vtt_zvire_pohyblivost(PDO $pdo, array $zvire, float $nakladMn): 
 // $zvirata: [['zvire' => řádek z jizdni_zvirata, 'naklad' => float]] —
 //   doprovodná zvířata s nákladem (bez jezdce), jdou s družinou.
 // $zastavPriStupni: 1–3.
+// $povoz: null, nebo ['povoz' => řádek z povozy, 'vaha_vozu' => float,
+//   'nasobek' => float (konstrukční nosnost jako násobek váhy vozu),
+//   'zvire' => řádek z jizdni_zvirata (tažné zvíře), 'pocet' => int (1, 2, 3,
+//   4, 6), 'naklad' => float (náklad a posádka mimo označené postavy)].
+//   Postavy s 'na_povoze' => true v $ucastnici jedou na povozu: jejich váha
+//   (vaha_jezdce) a náklad z inventáře jdou na povoz.
 //
 // Vrací ['simulace' => výsledek dracak_vtt_cesta_simulace, 'subjekty' => popis
 // každého (název, typ, vytrvalost, rychlost podle stupně, poznámky),
-// 'chyby' => [text], 'tempo' => ..., 'narocnost' => ...] — když něco chybí
+// 'chyby' => [text], 'povoz' => info o povozu|null] — když něco chybí
 // (postava bez odolnosti/rasy/síly, rychlost mimo tabulku, zvíře
 // přetížené), simulace se nespustí a 'chyby' říkají co.
-function dracak_vtt_cesta_vypocet(PDO $pdo, array $ucastnici, array $zvirata, float $vzdalenostMil, float $narocnost, string $tempo, int $zastavPriStupni): array
+function dracak_vtt_cesta_vypocet(PDO $pdo, array $ucastnici, array $zvirata, float $vzdalenostMil, float $narocnost, string $tempo, int $zastavPriStupni, ?array $povoz = null): array
 {
     $chyby = [];
     $popisy = [];
@@ -288,6 +371,8 @@ function dracak_vtt_cesta_vypocet(PDO $pdo, array $ucastnici, array $zvirata, fl
         return $r;
     };
 
+    $provozniNaklad = 0.0;
+    $pasazeru = 0;
     foreach ($ucastnici as $u) {
         $p = $u['postava'];
         $nazev = (string)$p['nazev'];
@@ -305,6 +390,27 @@ function dracak_vtt_cesta_vypocet(PDO $pdo, array $ucastnici, array $zvirata, fl
         $poznamky = [];
         if ($naklad['neuplny']) {
             $poznamky[] = 'náklad je neúplný součet (položky bez váhy)';
+        }
+
+        if ($povoz !== null && !empty($u['na_povoze'])) {
+            // Cestující na povozu: jeho váha a náklad jdou na povoz, únavu mu
+            // dává zvíře v zápřahu (1 bod za N bodů zvířete).
+            $vahaPostavy = max(0.0, (float)($u['vaha_jezdce'] ?? 0));
+            $provozniNaklad += $nakladMn + $vahaPostavy;
+            $pasazeru++;
+            if ($vahaPostavy <= 0) {
+                $poznamky[] = 'váha postavy není zadaná — na povoz se počítá jen její náklad';
+            }
+            $subjekty[] = [
+                'klic' => 'p:' . $p['id'], 'nazev' => $nazev . ' (na povozu)', 'vytrvalost' => $vyt,
+                'body' => (float)($p['unava'] ?? 0), 'sazba' => $sazbaTempa / max(1, (int)$povoz['povoz']['unava_za_body_zvirete']),
+                'rychlost' => null,
+            ];
+            $popisy[] = [
+                'klic' => 'p:' . $p['id'], 'nazev' => $nazev, 'druh' => 'pasazer', 'postava_id' => (int)$p['id'],
+                'naklad_na_povoze' => $nakladMn + $vahaPostavy, 'poznamky' => $poznamky,
+            ];
+            continue;
         }
 
         if ($naZvireti) {
@@ -402,16 +508,83 @@ function dracak_vtt_cesta_vypocet(PDO $pdo, array $ucastnici, array $zvirata, fl
         ];
     }
 
+    // Povoz se spřežením: jede rychlostí zvířat v zápřahu po naložení (váha
+    // vozu + posádka + náklad, čtvrtina proti nosnosti spřežení).
+    $povozInfo = null;
+    if ($povoz !== null) {
+        $pv = $povoz['povoz'];
+        $zv = $povoz['zvire'];
+        $pocetZvirat = (int)$povoz['pocet'];
+        $vahaVozu = (float)$povoz['vaha_vozu'];
+        $nasobek = (float)$povoz['nasobek'];
+        $provozni = $provozniNaklad + max(0.0, (float)$povoz['naklad']);
+        $pozn = [];
+        $ok = true;
+
+        if ($tempo === 'spech' && $pv['klus'] === 'ne') {
+            $chyby[] = $pv['nazev'] . ' se dá jet jen krokem — spěch (klus) nejde.';
+            $ok = false;
+        } elseif ($tempo === 'spech' && $pv['klus'] === 'jen_dobra_cesta' && $narocnost > 10) {
+            $chyby[] = $pv['nazev'] . ': klusem se dá jet jen za velmi dobrých podmínek (náročnost nejvýš 10); zvol chůzi nebo procházku.';
+            $ok = false;
+        }
+        $procento = dracak_vtt_povoz_procento_nakladu($pdo, $narocnost);
+        if ($procento === null) {
+            $chyby[] = 'Tabulka naložení povozu zatím není na databázi (migrace 0079).';
+            $ok = false;
+        } elseif ($procento === 0) {
+            $chyby[] = 'Při náročnosti ' . round($narocnost, 1) . ' povoz neprojede (Tabulka naložení povozu: nad 30 = 0 %).';
+            $ok = false;
+        }
+        $maxProvozni = $vahaVozu * $nasobek * ($procento ?? 0) / 100;
+        if ($ok && $provozni > $maxProvozni + 0.5) {
+            $pozn[] = 'Provozní náklad ' . round($provozni) . ' mn je nad bezpečným maximem ' . round($maxProvozni) . ' mn (' . $procento . ' % z ' . round($vahaVozu * $nasobek) . ' mn konstrukční nosnosti) — o sjízdnosti rozhoduje PJ.';
+        }
+        if ($pv['kapacita_osob'] !== null && $pasazeru > (int)$pv['kapacita_osob'] + (int)$pv['ridicu']) {
+            $pozn[] = 'Označených cestujících je ' . $pasazeru . ', povoz je určen pro ' . (int)$pv['kapacita_osob'] . ' + ' . (int)$pv['ridicu'] . ' řidiče.';
+        }
+        $sp = dracak_vtt_povoz_sprezeni($pdo, $zv, $pocetZvirat, $vahaVozu + $provozni);
+        $rychlost = null;
+        if ($sp['pohyblivost'] === null) {
+            $chyby[] = 'Spřežení (' . $pocetZvirat . '× ' . $zv['nazev'] . ') povoz neutáhne: celková váha ' . round($vahaVozu + $provozni) . ' mn je nad ' . round($sp['max_uveze_mn']) . ' mn (4× nosnost spřežení).';
+        } elseif ($ok) {
+            $rychlost = dracak_vtt_cesta_rychlost_tempa($pdo, $sp['bonus'], $tempo);
+            if ($rychlost === null) {
+                $chyby[] = 'Bonus pohyblivosti spřežení (' . $sp['bonus'] . ') je mimo Tabulky rychlosti.';
+            }
+        }
+        if ($rychlost !== null && $ok) {
+            $subjekty[] = [
+                'klic' => 'w:sprezeni', 'nazev' => 'spřežení — ' . $pocetZvirat . '× ' . $zv['nazev'],
+                'vytrvalost' => (int)$zv['vytrvalost'], 'body' => 0.0, 'sazba' => $sazbaTempa,
+                'rychlost' => [0 => $rychlost, 1 => $rychlost, 2 => $rychlost, 3 => $rychlost],
+            ];
+        }
+        $rizeni = dracak_vtt_povoz_rizeni($pv, $tempo, $narocnost);
+        $povozInfo = [
+            'nazev' => $pv['nazev'], 'vaha_vozu' => $vahaVozu, 'provozni_naklad' => $provozni,
+            'max_provozni_naklad' => $maxProvozni, 'procento' => $procento,
+            'celkem_pro_sprezeni' => $vahaVozu + $provozni, 'sprezeni' => $pocetZvirat . '× ' . $zv['nazev'],
+            'nosnost_v_zaprahu_mn' => $sp['nosnost_v_zaprahu_mn'], 'max_uveze_mn' => $sp['max_uveze_mn'],
+            'nalozeni' => $sp['nalozeni']['kod'], 'pohyblivost' => $sp['pohyblivost'], 'bonus' => $sp['bonus'],
+            'rychlost' => $rychlost, 'rizeni_procent' => $rizeni,
+            'hodu_rizeni_za_hodinu' => $rizeni !== null ? 6 : 0,
+            'unava_cestujiciho_za_body_zvirete' => (int)$pv['unava_za_body_zvirete'],
+            'poznamky' => $pozn,
+        ];
+    }
+
     if ($chyby || !$subjekty) {
         if (!$subjekty && !$chyby) {
             $chyby[] = 'Nikdo necestuje.';
         }
-        return ['simulace' => null, 'subjekty' => $popisy, 'chyby' => $chyby];
+        return ['simulace' => null, 'subjekty' => $popisy, 'chyby' => $chyby, 'povoz' => $povozInfo];
     }
     return [
         'simulace' => dracak_vtt_cesta_simulace($subjekty, $vzdalenostMil, $narocnost, $zastavPriStupni),
         'subjekty' => $popisy,
         'subjekty_sim' => $subjekty,
         'chyby' => [],
+        'povoz' => $povozInfo,
     ];
 }

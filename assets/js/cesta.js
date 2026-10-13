@@ -37,13 +37,35 @@
     });
   }
 
+  // Povoz: zapnutí, předvyplnění váhy a násobku podle typu, cestující.
+  const povozZap = $('cs-povoz-zapnout');
+  function povozPredvypln() {
+    const o = $('cs-povoz-typ').selectedOptions[0];
+    if (!o) return;
+    $('cs-povoz-vaha').value = o.dataset.vaha;
+    $('cs-povoz-nasobek').value = o.dataset.nasobek;
+  }
+  if (povozZap) {
+    povozPredvypln();
+    povozZap.addEventListener('change', () => {
+      $('cs-povoz-pole').hidden = !povozZap.checked;
+      wrap.querySelectorAll('.cs-napovoze').forEach((cb) => {
+        const tr = cb.closest('tr');
+        cb.disabled = !povozZap.checked || tr.classList.contains('cs-nelze');
+        if (cb.disabled) cb.checked = false;
+      });
+    });
+    $('cs-povoz-typ').addEventListener('change', povozPredvypln);
+  }
+
   function telo(zapsat) {
     const ucastnici = [];
     wrap.querySelectorAll('tr[data-postava]').forEach((tr) => {
       const cb = tr.querySelector('.cs-ucastnik');
       if (!cb || !cb.checked) return;
       const vaha = tr.querySelector('.cs-vaha');
-      ucastnici.push({ postava_id: Number(tr.dataset.postava), vaha_jezdce: vaha ? num(vaha.value, 0) : 0 });
+      const povoz = tr.querySelector('.cs-napovoze');
+      ucastnici.push({ postava_id: Number(tr.dataset.postava), vaha_jezdce: vaha ? num(vaha.value, 0) : 0, na_povoze: !!(povoz && povoz.checked) });
     });
     const zvirata = [];
     wrap.querySelectorAll('.cs-zvire').forEach((r) => {
@@ -54,6 +76,10 @@
       teren: num($('cs-teren').value, 1), vliv: num($('cs-vliv').value, 1),
       tempo: wrap.querySelector('input[name="cs-tempo"]:checked').value, zastav: Number($('cs-zastav').value),
       ucastnici, zvirata, zapsat: !!zapsat,
+      povoz: povozZap && povozZap.checked ? {
+        povoz_id: Number($('cs-povoz-typ').value), vaha_vozu: num($('cs-povoz-vaha').value, 0), nasobek: num($('cs-povoz-nasobek').value, 0),
+        zvire_id: Number($('cs-povoz-zvire').value), pocet: Number($('cs-povoz-pocet').value), naklad: num($('cs-povoz-naklad').value, 0),
+      } : null,
     };
   }
 
@@ -79,6 +105,19 @@
     let h = '';
     if (d.chyby && d.chyby.length) {
       h += '<h3 class="dn-h3">Nejde spočítat</h3><ul class="cs-chyby">' + d.chyby.map((c) => '<li>' + esc(c) + '</li>').join('') + '</ul>';
+    }
+    const pv = d.povoz;
+    if (pv) {
+      const nal = { zadne: 'žádné', mirne: 'mírné', stredni: 'střední', velke: 'velké', prilis_velke: 'nad 4×' };
+      h += '<h3 class="dn-h3">Povoz — ' + esc(pv.nazev) + '</h3><div class="dn-tab-wrap"><table class="dn-tab"><tbody>' +
+        '<tr><td>Váha vozu + provozní náklad (posádka, náklad)</td><td class="c">' + fmt(pv.vaha_vozu, 0) + ' + ' + fmt(pv.provozni_naklad, 0) + ' = <strong>' + fmt(pv.celkem_pro_sprezeni, 0) + ' mn</strong></td></tr>' +
+        '<tr><td>Bezpečný provozní náklad při této náročnosti' + (pv.procento !== null ? ' (' + pv.procento + ' % konstrukční nosnosti)' : '') + '</td><td class="c">' + fmt(pv.max_provozni_naklad, 0) + ' mn</td></tr>' +
+        '<tr><td>Spřežení ' + esc(pv.sprezeni) + ': nosnost v zápřahu / nejvíc uveze</td><td class="c">' + fmt(pv.nosnost_v_zaprahu_mn, 0) + ' / ' + fmt(pv.max_uveze_mn, 0) + ' mn</td></tr>' +
+        '<tr><td>Naložení zvířat / jejich pohyblivost</td><td class="c">' + esc(nal[pv.nalozeni] || pv.nalozeni) + ' / ' + (pv.pohyblivost !== null ? pv.pohyblivost : '—') + (pv.bonus !== null ? ' (bonus ' + (pv.bonus > 0 ? '+' : '') + pv.bonus + ')' : '') + '</td></tr>' +
+        '<tr><td>Cestující dostane 1 bod únavy za</td><td class="c">' + pv.unava_cestujiciho_za_body_zvirete + ' bodů únavy zvířat</td></tr>' +
+        (pv.rizeni_procent !== null ? '<tr><td>Řízení klusem: úspěch kočího (hází se za každou započatou směnu)</td><td class="c">' + fmt(pv.rizeni_procent, 1) + ' %</td></tr>' : '') +
+        '</tbody></table></div>';
+      if (pv.poznamky && pv.poznamky.length) h += '<ul class="cs-chyby">' + pv.poznamky.map((p) => '<li>' + esc(p) + '</li>').join('') + '</ul>';
     }
     const v = d.vysledek;
     if (v) {

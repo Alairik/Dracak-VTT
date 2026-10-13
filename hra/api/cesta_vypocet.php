@@ -12,7 +12,8 @@ require_once __DIR__ . '/../../includes/vtt_cestovani.php';
 //   svet_id, vzdalenost (míle), povrch, teren, vliv (násobky; náročnost =
 //   povrch × teren × vliv, PJ pravidla h2366), tempo (prochazka|chuze|spech),
 //   zastav (1–3: úsek končí těsně před tímto stupněm únavy),
-//   ucastnici [{postava_id, vaha_jezdce}], zvirata [{zvire_id, naklad}],
+//   ucastnici [{postava_id, vaha_jezdce, na_povoze}], zvirata [{zvire_id, naklad}],
+//   povoz {povoz_id, vaha_vozu, nasobek, zvire_id, pocet (1/2/3/4/6), naklad} | null,
 //   zapsat (bool)
 header('Content-Type: application/json; charset=utf-8');
 $user = dracak_require_login();
@@ -68,7 +69,10 @@ foreach ((array)($data['ucastnici'] ?? []) as $u) {
         odpoved_cesta(422, ['error' => 'Postava ' . $pid . ' není v tomhle světě.']);
     }
     $ids[$pid] = true;
-    $ucastnici[] = ['postava' => $postava, 'vaha_jezdce' => max(0, min(100000, (float)($u['vaha_jezdce'] ?? 0)))];
+    $ucastnici[] = [
+        'postava' => $postava, 'vaha_jezdce' => max(0, min(100000, (float)($u['vaha_jezdce'] ?? 0))),
+        'na_povoze' => !empty($u['na_povoze']),
+    ];
 }
 $zvirata = [];
 foreach (array_slice((array)($data['zvirata'] ?? []), 0, 12) as $z) {
@@ -80,7 +84,38 @@ foreach (array_slice((array)($data['zvirata'] ?? []), 0, 12) as $z) {
     }
 }
 
-$vypocet = dracak_vtt_cesta_vypocet($pdo, $ucastnici, $zvirata, $vzdalenost, $narocnost, $tempo, $zastav);
+$povoz = null;
+$pd = $data['povoz'] ?? null;
+if (is_array($pd) && !empty($pd['povoz_id'])) {
+    $stmt = $pdo->prepare('SELECT * FROM povozy WHERE id = ?');
+    try {
+        $stmt->execute([(int)$pd['povoz_id']]);
+        $pv = $stmt->fetch();
+    } catch (PDOException $e) {
+        $pv = false;
+    }
+    $stmt = $pdo->prepare('SELECT * FROM jizdni_zvirata WHERE id = ?');
+    $stmt->execute([(int)($pd['zvire_id'] ?? 0)]);
+    $tazne = $stmt->fetch();
+    $pocet = (int)($pd['pocet'] ?? 2);
+    $vahaVozu = (float)($pd['vaha_vozu'] ?? 0);
+    $nasobek = (float)($pd['nasobek'] ?? 0);
+    if (!$pv || !$tazne) {
+        odpoved_cesta(422, ['error' => 'Povoz nebo tažné zvíře nenalezeno.']);
+    }
+    if (!in_array($pocet, [1, 2, 3, 4, 6], true)) {
+        odpoved_cesta(422, ['error' => 'Spřežení: 1 zvíře, pár, trojka, 2 páry nebo 3 páry (1, 2, 3, 4, 6).']);
+    }
+    if ($vahaVozu < 500 || $vahaVozu > 30000 || $nasobek < 0.5 || $nasobek > 5) {
+        odpoved_cesta(422, ['error' => 'Váha vozu (500–30000 mn) nebo násobek nosnosti (0,5–5) je mimo rozsah.']);
+    }
+    $povoz = [
+        'povoz' => $pv, 'vaha_vozu' => $vahaVozu, 'nasobek' => $nasobek, 'zvire' => $tazne, 'pocet' => $pocet,
+        'naklad' => max(0, min(1000000, (float)($pd['naklad'] ?? 0))),
+    ];
+}
+
+$vypocet = dracak_vtt_cesta_vypocet($pdo, $ucastnici, $zvirata, $vzdalenost, $narocnost, $tempo, $zastav, $povoz);
 $stupne = [0 => 'bez únavy', 1 => 'unavená', 2 => 'vyčerpaná', 3 => 'úplně vyčerpaná', 4 => 'vysílená'];
 
 $sim = $vypocet['simulace'];
@@ -144,6 +179,7 @@ odpoved_cesta(200, [
     'tempo' => DRACAK_VTT_TEMPA_CHUZE[$tempo]['nazev'],
     'chyby' => $vypocet['chyby'],
     'subjekty' => $vypocet['subjekty'],
+    'povoz' => $vypocet['povoz'] ?? null,
     'vysledek' => $vysledek,
     'zapsano' => $zapsano,
 ]);

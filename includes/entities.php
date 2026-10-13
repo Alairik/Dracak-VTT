@@ -341,6 +341,8 @@ return [
     // odolnost, "spánek −10 bodů"…; skutečná pravidla: content/pravidla-hrac.html
     // h1634, vytrvalost = odolnost, 4 stupně) a nic je nepoužívá.
     'jizdni_zvirata' => ['label' => 'Jízdní zvířata', 'group' => 'ciselniky', 'hidden_from_players' => false, 'order_by' => 'id'],
+    'povozy' => ['label' => 'Povozy', 'group' => 'ciselniky', 'hidden_from_players' => false, 'order_by' => 'id'],
+    'povoz_nalozeni' => ['label' => 'Naložení povozu podle terénu', 'group' => 'ciselniky', 'hidden_from_players' => false, 'order_by' => 'narocnost_do'],
     'rychlost_chuze' => ['label' => 'Rychlost při chůzi', 'group' => 'ciselniky', 'hidden_from_players' => false, 'order_by' => 'bonus_pohyblivosti'],
     'rychlost_behu' => ['label' => 'Rychlost při běhu', 'group' => 'ciselniky', 'hidden_from_players' => false, 'order_by' => 'bonus_pohyblivosti'],
     'vysledky_testu' => ['label' => 'Výsledky testu (škála)', 'group' => 'ciselniky', 'hidden_from_players' => false, 'order_by' => 'poradi'],

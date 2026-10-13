@@ -17,3 +17,6 @@
 #cs-vysledek { margin-top: 10px; }
 #cs-vysledek .dn-tab-wrap { margin-bottom: 14px; }
 .cs-wrap .dn-pas { position: static; }
+.cs-radek { display: flex; gap: 8px; align-items: center; font-weight: 600; text-transform: none; letter-spacing: 0; }
+.cs-povoz-pole { margin-top: 12px; }
+.cs-povoz-radek { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }

@@ -34,6 +34,7 @@ try {
     // tabulka jizdni_zvirata ještě není (migrace 0067) — kalkulačka jede jen pěšky
 }
 $tabulkyRychlosti = dracak_vtt_rychlost_pohybu($pdo, 0) !== null;
+$povozy = dracak_vtt_povozy($pdo);
 
 $e = static fn($v): string => htmlspecialchars((string)$v, ENT_QUOTES);
 $cislo = static function ($n): string {
@@ -123,7 +124,7 @@ dracak_vtt_page_start('Cesta — ' . $svet['nazev'], $user, true, ['../assets/cs
       <h3 class="dn-h3">Kdo cestuje</h3>
       <?php if (!$radky): ?><p class="note">Ve světě zatím nejsou žádné postavy.</p><?php else: ?>
       <div class="dn-tab-wrap"><table class="dn-tab">
-        <thead><tr><th></th><th>Postava</th><th class="c">Únava</th><th class="c">Náklad</th><th class="c">Pohyblivost</th><th>Doprava</th><th class="c">Váha jezdce (mn)</th></tr></thead>
+        <thead><tr><th></th><th>Postava</th><th class="c">Únava</th><th class="c">Náklad</th><th class="c">Pohyblivost</th><th>Doprava</th><th class="c">Na povoze</th><th class="c">Váha postavy (mn)</th></tr></thead>
         <tbody>
         <?php foreach ($radky as $r): $p = $r['p']; $d = $r['d']; $un = $d['unava']; $poh = $d['pohyblivost']; $zv = $d['doprava'] && $d['doprava']['typ'] === 'zvire' ? $d['doprava']['zvire'] : null; ?>
           <tr data-postava="<?= (int)$p['id'] ?>" class="<?= $r['mozne'] ? '' : 'cs-nelze' ?>">
@@ -134,12 +135,13 @@ dracak_vtt_page_start('Cesta — ' . $svet['nazev'], $user, true, ['../assets/cs
             <td class="c"><?= $cislo($d['naklad']['naklad_mn']) ?> mn<?= $d['naklad']['neuplny'] ? ' <span class="dn-stitek neuplne" title="Součet nákladu je neúplný (položky bez váhy)">?</span>' : '' ?></td>
             <td class="c"><?= $poh && $poh['pohyblivost'] !== null ? (int)$poh['pohyblivost'] : '—' ?></td>
             <td><?= $zv ? $e($zv['nazev']) : 'pěšky' ?></td>
-            <td class="c"><?php if ($zv): ?><input type="number" class="cs-vaha" min="0" step="10" value="0" aria-label="Váha jezdce <?= $e($p['nazev']) ?>"><?php else: ?>—<?php endif; ?></td>
+            <td class="c"><?php if ($povozy): ?><input type="checkbox" class="cs-napovoze" <?= $r['mozne'] ? '' : 'disabled' ?> disabled aria-label="<?= $e($p['nazev']) ?> jede na povoze"><?php else: ?>—<?php endif; ?></td>
+            <td class="c"><input type="number" class="cs-vaha" min="0" step="10" value="0" data-jezdec="<?= $zv ? 1 : 0 ?>" aria-label="Váha postavy <?= $e($p['nazev']) ?>"></td>
           </tr>
         <?php endforeach; ?>
         </tbody>
       </table></div>
-      <p class="note">Doprava se vybírá u postavy. Zvíře pod jezdcem nese jeho váhu + jeho náklad z inventáře; jezdec dostává třetinu bodů únavy zvířete. Váhu postavy pravidla neuvádějí jako jedno číslo (rozsah podle rasy, např. člověk 1300–2300 mn) a deník ji neeviduje — zadej ji ručně, jinak se nepočítá.</p>
+      <p class="note">Doprava se vybírá u postavy. Zvíře pod jezdcem nese jeho váhu + jeho náklad z inventáře; jezdec dostává třetinu bodů únavy zvířete. Váhu postavy pravidla neuvádějí jako jedno číslo (rozsah podle rasy, např. člověk 1300–2300 mn) a deník ji neeviduje — zadej ji ručně, jinak se nepočítá. Počítá se jen u postav na zvířeti nebo na povoze (pěší nese jen svůj náklad).</p>
       <?php endif; ?>
     </div>
 
@@ -156,6 +158,33 @@ dracak_vtt_page_start('Cesta — ' . $svet['nazev'], $user, true, ['../assets/cs
           <button type="button" class="btn btn-ghost cs-zvire-smazat" aria-label="Odebrat zvíře">✕</button>
         </div>
       </template>
+      <?php endif; ?>
+    </div>
+
+    <div class="dn-karta dn-sirka-cela">
+      <h3 class="dn-h3">Povoz</h3>
+      <?php if (!$povozy): ?><p class="note">Číselník povozů zatím není na databázi (čeká ruční SQL pro migraci 0079, viz docs/sql-k-rucnimu-spusteni.sql).</p><?php elseif (!$zvirata): ?><p class="note">Číselník jízdních zvířat zatím není na databázi.</p><?php else: ?>
+      <label class="cs-radek"><input type="checkbox" id="cs-povoz-zapnout"> Cestuje se s povozem</label>
+      <div id="cs-povoz-pole" class="cs-povoz-pole" hidden>
+        <div class="field"><label for="cs-povoz-typ">Povoz</label>
+          <select id="cs-povoz-typ">
+            <?php foreach ($povozy as $pv): ?>
+              <option value="<?= (int)$pv['id'] ?>" data-vaha="<?= (int)round(((int)$pv['vaha_od_mn'] + (int)$pv['vaha_do_mn']) / 2) ?>" data-nasobek="<?= $e($pv['nosnost_nasobek_od']) ?>"><?= $e($pv['nazev']) ?> (váha <?= (int)$pv['vaha_od_mn'] ?>–<?= (int)$pv['vaha_do_mn'] ?> mn, nosnost <?= rtrim(rtrim($e($pv['nosnost_nasobek_od']), '0'), '.') ?><?= $pv['nosnost_nasobek_od'] != $pv['nosnost_nasobek_do'] ? '–' . rtrim(rtrim($e($pv['nosnost_nasobek_do']), '0'), '.') : '' ?>× váhy)</option>
+            <?php endforeach; ?>
+          </select></div>
+        <div class="cs-povoz-radek">
+          <div class="field"><label for="cs-povoz-vaha">Váha vozu (mn)</label><input type="number" id="cs-povoz-vaha" min="500" max="30000" step="50"></div>
+          <div class="field"><label for="cs-povoz-nasobek">Nosnost (× váha vozu)</label><input type="number" id="cs-povoz-nasobek" min="0.5" max="5" step="any"></div>
+          <div class="field"><label for="cs-povoz-naklad">Další náklad a posádka (mn)</label><input type="number" id="cs-povoz-naklad" min="0" step="50" value="0"></div>
+        </div>
+        <div class="cs-povoz-radek">
+          <div class="field"><label for="cs-povoz-zvire">Tažné zvíře</label>
+            <select id="cs-povoz-zvire"><?php foreach ($zvirata as $z): ?><option value="<?= (int)$z['id'] ?>" <?= $z['nazev'] === 'klasický kůň' ? 'selected' : '' ?>><?= $e($z['nazev']) ?><?= !empty($z['nosnost_tah_mn']) ? ' (v tahu ' . (int)$z['nosnost_tah_mn'] . ' mn)' : ' (nosnost ' . (int)$z['nosnost_mn'] . ' mn)' ?></option><?php endforeach; ?></select></div>
+          <div class="field"><label for="cs-povoz-pocet">Spřežení</label>
+            <select id="cs-povoz-pocet"><option value="1">1 zvíře</option><option value="2" selected>pár (2)</option><option value="3">trojka (3)</option><option value="4">2 páry (4)</option><option value="6">3 páry (6)</option></select></div>
+        </div>
+        <p class="note">Váha vozu se předvyplní středem rozsahu z PPP (homebrew tabulka povozů h2057 má mírně jiná rozmezí) — přepiš podle konkrétního vozu. Do váhy pro spřežení se počítá vůz, posádka a náklad; zvíře se pak nakládá jako při jízdě (čtvrtina váhy proti nosnosti spřežení). Postavy označené "Na povoze" jedou na povoze, jejich váha a náklad se přičtou. Vozy se dají jet nejvýše krokem, klusem jen po velmi dobré cestě (maringotka nikdy); řízení klusem je riziko nehody.</p>
+      </div>
       <?php endif; ?>
     </div>
   </form>
