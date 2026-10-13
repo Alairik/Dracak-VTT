@@ -179,8 +179,13 @@ aktuálně otevřený úkol a nejspíš další věc, na které se bude pokračo
   h2355).
 
 ### Co chybí / zůstává otevřené
-- Tabulka rychlosti LODÍ a veslování — potvrzeno nedochovalo se (jiná
-  kapitola, netýká se pozemního cestování).
+- Tabulka rychlosti lodí, veslování, bouří i Tabulka lodí — **dodané
+  foto uživatelem 2026-10, doplněno přímo do
+  `content/pravidla-hrac.html`** (h1646/h1651, nahrazeny původní "(Pozn.:
+  ... nedochovalo se)" poznámky skutečnými tabulkami). Netýká se
+  pozemního cestování, šlo jen o vedlejší nález při hledání tabulky
+  terénu — zmíněno tu jen pro úplnost evidence, žádná VTT mechanika
+  s loděmi zatím nevzniká.
 - Nebyl ověřen zbytek kapitoly Dovednosti na další propojení (uživatel
   se ptal, jestli jsou zohledněné VŠECHNY dovednosti — zatím prošité jen
   tyhle 4 nejrelevantnější, ne celá kapitola řádek po řádku).
