@@ -64,6 +64,23 @@ $tlacitka = static function (string $akce, array $kroky, array $extra = []) use 
     }
     return $out;
 };
+// Hledání v katalogu pravidel a přidání do inventáře jedním klikem.
+$picker = static function (array $typy) use ($e): string {
+    $nazvy = ['predmet' => 'předmět', 'lektvar' => 'lektvar', 'kouzlo' => 'kouzlo'];
+    $o = '<div class="dn-picker" data-typy="' . $e(implode(',', $typy)) . '">';
+    if (count($typy) > 1) {
+        $o .= '<select class="dn-picker-typ" aria-label="Druh položky">';
+        foreach ($typy as $t) { $o .= '<option value="' . $e($t) . '">' . $e($nazvy[$t]) . '</option>'; }
+        $o .= '</select>';
+    } else {
+        $o .= '<input type="hidden" class="dn-picker-typ" value="' . $e($typy[0]) . '">';
+    }
+    $o .= '<input type="search" class="dn-picker-q" placeholder="Hledat v katalogu (aspoň 2 znaky)…" autocomplete="off" aria-label="Hledat v katalogu">';
+    if ($typy !== ['kouzlo']) {
+        $o .= '<input type="number" class="dn-picker-ks" value="1" min="1" max="1000" title="Množství" aria-label="Množství">';
+    }
+    return $o . '<ul class="dn-picker-vysledky" hidden></ul></div>';
+};
 $inicialy = (static function (string $jmeno): string {
     $slova = preg_split('/\s+/u', trim($jmeno), -1, PREG_SPLIT_NO_EMPTY) ?: ['?'];
     $o = '';
@@ -438,6 +455,7 @@ $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' =>
 
       <div class="dn-karta dn-sirka-cela">
         <h3 class="dn-h3">Kouzla <span class="dn-pocet"><?= count($d['kouzla']) ?></span></h3>
+        <?= $picker(['kouzlo']) ?>
         <?php if (!$d['kouzla']): ?><p class="note">Postava zatím nezná žádné kouzlo.</p>
         <?php else: ?>
           <div class="dn-seznam">
@@ -452,7 +470,10 @@ $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' =>
                   <?php if ($k['typ_unavy']): ?><span class="dn-stitek"><?= $e($k['typ_unavy']) ?></span><?php endif; ?>
                 </summary>
                 <div class="dn-pol-telo">
-                  <?php if ($svetId > 0): ?><div class="dn-hod-akce"><button type="button" class="btn btn-primary" data-pouzij="kouzlo" data-polozka="<?= (int)$k['id'] ?>" data-nazev="<?= $e($k['nazev']) ?>"<?= $k['skodi'] ? ' data-skodi="1"' : '' ?>>Seslat<?= $k['cena_magenergie'] ? ' (' . $e($k['cena_magenergie']) . ')' : '' ?></button></div><?php endif; ?>
+                  <div class="dn-hod-akce">
+                  <?php if ($svetId > 0): ?><button type="button" class="btn btn-primary" data-pouzij="kouzlo" data-polozka="<?= (int)$k['id'] ?>" data-nazev="<?= $e($k['nazev']) ?>"<?= $k['skodi'] ? ' data-skodi="1"' : '' ?>>Seslat<?= $k['cena_magenergie'] ? ' (' . $e($k['cena_magenergie']) . ')' : '' ?></button><?php endif; ?>
+                    <button type="button" class="btn btn-ghost" data-inv="odebrat" data-typ="kouzlo" data-id="<?= (int)$k['id'] ?>" data-nazev="<?= $e($k['nazev']) ?>">Zapomenout</button>
+                  </div>
                   <p class="note"><?= $e(implode(' · ', array_filter([$k['seznam'], $k['rozsah'] ? 'rozsah ' . $k['rozsah'] : null, $k['doba_seslani'] ? 'sesílání ' . $k['doba_seslani'] : null]))) ?></p>
                   <?= nl2br($e($k['popis'] ?? '')) ?>
                 </div>
@@ -470,11 +491,12 @@ $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' =>
     <div class="dn-grid">
       <div class="dn-karta dn-sirka-2">
         <h3 class="dn-h3">Inventář</h3>
-        <?php if (!$d['inventar']): ?><p class="note">Inventář je prázdný.</p>
+        <?= $picker(['predmet', 'lektvar']) ?>
+        <?php if (!$d['inventar']): ?><p class="note">Inventář je prázdný. Najdi položku v katalogu výše a klikni na ni.</p>
         <?php else: ?>
           <div class="dn-tab-wrap">
             <table class="dn-tab">
-              <thead><tr><th>Předmět</th><th>Druh</th><th class="c">ks</th><th class="c">váha / ks</th><th class="c">váha celkem</th></tr></thead>
+              <thead><tr><th>Předmět</th><th>Druh</th><th class="c">ks</th><th class="c">váha / ks</th><th class="c">váha celkem</th><th></th></tr></thead>
               <tbody>
               <?php foreach ($d['inventar'] as $i): ?>
                 <tr>
@@ -482,14 +504,17 @@ $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' =>
                   <td><span class="dn-stitek"><?= $e($i['typ']) ?></span></td>
                   <td class="c"><?= (int)$i['mnozstvi'] ?></td>
                   <td class="c"><?= $i['vaha_ks'] !== null ? $mn($i['vaha_ks']) : '<span class="dn-stitek neuplne" title="Váha v katalogu chybí">bez váhy</span>' ?></td>
-                  <td class="c"><?= $i['vaha_celkem'] !== null ? $mn($i['vaha_celkem']) : '—' ?><?php if ($i['kategorie'] === 'lektvar' && $svetId > 0): ?> <button type="button" class="dn-pm dn-pm-mini" data-pouzij="lektvar" data-polozka="<?= (int)$i['id'] ?>" data-nazev="<?= $e($i['nazev']) ?>"<?= !empty($i['skodi']) ? ' data-skodi="1"' : '' ?>>Vypít</button><?php endif; ?></td>
+                  <td class="c"><?= $i['vaha_celkem'] !== null ? $mn($i['vaha_celkem']) : '—' ?></td>
+                  <td class="c dn-inv-akce"><?php if ($i['kategorie'] === 'lektvar' && $svetId > 0): ?> <button type="button" class="dn-pm dn-pm-mini" data-pouzij="lektvar" data-polozka="<?= (int)$i['id'] ?>" data-nazev="<?= $e($i['nazev']) ?>"<?= !empty($i['skodi']) ? ' data-skodi="1"' : '' ?>>Vypít</button><?php endif; ?>
+                    <button type="button" class="dn-pm dn-pm-mini" data-inv="zmena" data-typ="<?= $e($i['kategorie']) ?>" data-id="<?= (int)$i['id'] ?>" data-delta="-1" aria-label="Ubrat kus">−</button><button type="button" class="dn-pm dn-pm-mini" data-inv="zmena" data-typ="<?= $e($i['kategorie']) ?>" data-id="<?= (int)$i['id'] ?>" data-delta="1" aria-label="Přidat kus">+</button><button type="button" class="dn-pm dn-pm-mini" data-inv="odebrat" data-typ="<?= $e($i['kategorie']) ?>" data-id="<?= (int)$i['id'] ?>" data-nazev="<?= $e($i['nazev']) ?>" aria-label="Odebrat z inventáře">✕</button>
+                  </td>
                 </tr>
               <?php endforeach; ?>
               </tbody>
               <tfoot>
-                <tr><td colspan="4">Vybavení (základní náklad)</td><td class="c"><strong><?= $mn($nakl['naklad_mn'] - $nakl['penize_mn']) ?> mn</strong></td></tr>
-                <?php if ($nakl['penize_pocitany']): ?><tr><td colspan="4">Peníze (1 mince = 1 mn)</td><td class="c"><?= $mn($nakl['penize_mn']) ?> mn</td></tr><?php endif; ?>
-                <tr class="celkem"><td colspan="4">Celkový náklad</td><td class="c"><strong><?= $mn($nakl['naklad_mn']) ?> mn</strong></td></tr>
+                <tr><td colspan="4">Vybavení (základní náklad)</td><td class="c"><strong><?= $mn($nakl['naklad_mn'] - $nakl['penize_mn']) ?> mn</strong></td><td></td></tr>
+                <?php if ($nakl['penize_pocitany']): ?><tr><td colspan="4">Peníze (1 mince = 1 mn)</td><td class="c"><?= $mn($nakl['penize_mn']) ?> mn</td><td></td></tr><?php endif; ?>
+                <tr class="celkem"><td colspan="4">Celkový náklad</td><td class="c"><strong><?= $mn($nakl['naklad_mn']) ?> mn</strong></td><td></td></tr>
               </tfoot>
             </table>
           </div>

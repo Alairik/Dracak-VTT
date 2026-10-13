@@ -473,6 +473,11 @@ Soubory:
   pořadí tahů) s výběrem **cíle** (jiná postava světa / nestvůra na aktivní
   mapě); zraňující kouzlo "na sebe" žádá potvrzení. Kostky schopnosti: tlačítko
   Hodit (`kostka_hod.php`, jen ve světě).
+- **Správa inventáře z deníku** (dřív mohl předmět dát jen PJ podle ID ve
+  `svet.php`, odebrat nikdo): hledání v katalogu (`hra/api/katalog_hledat.php`)
+  a přidání jedním klikem, ± kus, odebrat, "zapomenout" kouzlo — akce
+  `inventar_*` v `postava_stav.php` (vlastník i PJ/admin; odebraná zbroj/
+  štít/zbraň se zároveň přestane nosit/držet).
 - **`hra/denik_tisk.php`** — tisková A4 verze papírového deníku podle
   kolonek h1690 (předvyplněná, `?id=`) a prázdný formulář (bez `id`).
 - **`includes/vtt_denik.php`** — výpočty podle pravidel (bonusy, bojeschopnost,
@@ -497,7 +502,7 @@ přes rodiče) — homebrew rasy mají v textu rozsah velikosti (proto
 zbroj + štít +1 (jak se kombinují rukavice/přilbice/boty z homebrew
 ceníku, pravidla v repu neříkají); vrhací varianta zbraně se páruje
 jménem ("Dýka" -> "Dýka (vrhací)"); kouzla/schopnosti jsou jen ke čtení
-(nelze je "naučit" z deníku, `postava_zna_kouzlo` se plní jinde); chybí
+(vybírají se z celého katalogu bez kontroly seznamu kouzel povolání — pravidla učení kouzel se neověřují); chybí
 finty, přesvědčení, erb/portrét, kontejnery a nosiče nákladu (Fáze 1b),
 historie změn postavy; deník cizí postavy ostatním hráčům zatím není
 přístupný.

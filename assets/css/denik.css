@@ -178,6 +178,18 @@
 .dn-text-akce { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
 .dn-ulozeno { font-size: 12px; color: var(--color-accent-2-700); }
 
+/* Hledání v katalogu */
+.dn-picker { position: relative; display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 10px; }
+.dn-picker select, .dn-picker-q, .dn-picker-ks { width: auto; padding: 6px 10px; font-size: 13px; }
+.dn-picker-q { flex: 1; min-width: 180px; }
+.dn-picker-ks { width: 72px; text-align: center; }
+.dn-picker-vysledky { position: absolute; left: 0; right: 0; top: 100%; z-index: 30; margin: 2px 0 0; padding: 4px; list-style: none; max-height: 280px; overflow: auto; background: var(--color-surface); border: 1px solid var(--color-neutral-400); border-radius: var(--radius-sm); box-shadow: var(--shadow-md); }
+.dn-picker-vysledky li { padding: 6px 10px; border-radius: 6px; cursor: pointer; display: flex; justify-content: space-between; gap: 10px; font-size: 13.5px; }
+.dn-picker-vysledky li:hover, .dn-picker-vysledky li:focus { background: var(--color-accent-100); outline: none; }
+.dn-picker-vysledky li small { color: var(--color-neutral-600); }
+.dn-picker-prazdne { color: var(--color-neutral-600); cursor: default !important; }
+.dn-inv-akce { white-space: nowrap; text-align: right; }
+
 /* Hody a použití */
 .dn-hod-akce { margin: 8px 0 4px; }
 .dn-hod-bunka { white-space: nowrap; }

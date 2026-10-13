@@ -13,6 +13,8 @@ require_once __DIR__ . '/../../includes/vtt_predmety.php';
 //   hp {delta} · magenergie {delta} · unava {delta} · zkusenost {delta}
 //   penize {mena: zl|st|md, hodnota} · vyber {pole, hodnota} · text {pole, hodnota}
 //   velikost {hodnota}
+//   inventar_pridat {typ_polozky: predmet|lektvar|kouzlo, polozka_id, mnozstvi}
+//   inventar_zmena {typ_polozky: predmet|lektvar, polozka_id, delta} · inventar_odebrat {typ_polozky, polozka_id}
 header('Content-Type: application/json; charset=utf-8');
 $user = dracak_require_login();
 
@@ -151,6 +153,65 @@ switch ($akce) {
             odpoved(422, ['error' => 'Neplatná velikost.']);
         }
         $pdo->prepare('UPDATE postavy SET velikost = ? WHERE id = ?')->execute([$v !== '' ? $v : null, $postavaId]);
+        odpoved(200, ['ok' => true]);
+    }
+    case 'inventar_pridat':
+    case 'inventar_zmena':
+    case 'inventar_odebrat': {
+        // Správa inventáře postavy: předměty a lektvary po kusech, kouzla
+        // (znalost) jen přidat/odebrat. Vlastník i PJ/admin (stejné právo
+        // jako u životů); PJ-only přidávání z katalogu ve svet.php zůstává.
+        $typ = (string)($data['typ_polozky'] ?? '');
+        $cfg = dracak_vtt_polozka_config($typ);
+        if (!$cfg) {
+            odpoved(422, ['error' => 'Neplatný typ položky.']);
+        }
+        $polozkaId = (int)($data['polozka_id'] ?? 0);
+        if (!dracak_vtt_polozka_katalog($typ, $polozkaId)) {
+            odpoved(404, ['error' => 'Položka v katalogu neexistuje.']);
+        }
+        $tabulka = $cfg['inventar'];
+        $fk = $cfg['fk'];
+        if ($akce === 'inventar_pridat') {
+            if ($typ === 'kouzlo') {
+                $pdo->prepare("INSERT IGNORE INTO $tabulka (postava_id, $fk) VALUES (?, ?)")->execute([$postavaId, $polozkaId]);
+            } else {
+                $mnozstvi = max(1, min(1000, (int)($data['mnozstvi'] ?? 1)));
+                $pdo->prepare(
+                    "INSERT INTO $tabulka (postava_id, $fk, mnozstvi) VALUES (?, ?, ?)
+                     ON DUPLICATE KEY UPDATE mnozstvi = LEAST(65000, mnozstvi + VALUES(mnozstvi))"
+                )->execute([$postavaId, $polozkaId, $mnozstvi]);
+            }
+            odpoved(200, ['ok' => true]);
+        }
+        $odebrat = $akce === 'inventar_odebrat';
+        if (!$odebrat) {
+            if ($typ === 'kouzlo') {
+                odpoved(422, ['error' => 'Kouzlo nemá množství.']);
+            }
+            $stmt = $pdo->prepare("SELECT mnozstvi FROM $tabulka WHERE postava_id = ? AND $fk = ?");
+            $stmt->execute([$postavaId, $polozkaId]);
+            $kusu = $stmt->fetchColumn();
+            if ($kusu === false) {
+                odpoved(404, ['error' => 'Tuhle položku postava nemá.']);
+            }
+            $nove = (int)$kusu + $delta;
+            if ($nove < 1) {
+                $odebrat = true;
+            } else {
+                $pdo->prepare("UPDATE $tabulka SET mnozstvi = ? WHERE postava_id = ? AND $fk = ?")->execute([min(65000, $nove), $postavaId, $polozkaId]);
+                odpoved(200, ['ok' => true]);
+            }
+        }
+        $pdo->prepare("DELETE FROM $tabulka WHERE postava_id = ? AND $fk = ?")->execute([$postavaId, $polozkaId]);
+        if ($typ === 'predmet') {
+            // Odebraný předmět se už nemůže nosit ani držet.
+            foreach (['zbroj_id', 'stit_id', 'drzena_zbran_id'] as $sloupec) {
+                if (pole_existuje($postava, $sloupec)) {
+                    $pdo->prepare("UPDATE postavy SET $sloupec = NULL WHERE id = ? AND $sloupec = ?")->execute([$postavaId, $polozkaId]);
+                }
+            }
+        }
         odpoved(200, ['ok' => true]);
     }
     default:

@@ -130,6 +130,70 @@
     }
   });
 
+  // Správa inventáře: ± kus, odebrat, zapomenout kouzlo.
+  document.addEventListener('click', function (ev) {
+    const tl = ev.target.closest('[data-inv]');
+    if (!tl || !wrap.contains(tl)) return;
+    const typ = tl.dataset.typ;
+    if (tl.dataset.inv === 'zmena') {
+      zapis({ akce: 'inventar_zmena', typ_polozky: typ, polozka_id: Number(tl.dataset.id), delta: Number(tl.dataset.delta) });
+    } else if (tl.dataset.inv === 'odebrat') {
+      const co = typ === 'kouzlo' ? 'Zapomenout kouzlo ' : 'Odebrat z inventáře: ';
+      if (window.confirm(co + (tl.dataset.nazev || '') + '?')) {
+        zapis({ akce: 'inventar_odebrat', typ_polozky: typ, polozka_id: Number(tl.dataset.id) });
+      }
+    }
+  });
+
+  // Hledání v katalogu (hra/api/katalog_hledat.php) a přidání jedním klikem.
+  let hledaniCasovac = null;
+  document.addEventListener('input', function (ev) {
+    const q = ev.target;
+    if (!q.matches || !q.matches('.dn-picker-q') || !wrap.contains(q)) return;
+    const box = q.closest('.dn-picker');
+    const seznam = box.querySelector('.dn-picker-vysledky');
+    rozepsano = q.value.trim() !== '' || rozepsano;
+    clearTimeout(hledaniCasovac);
+    if (q.value.trim().length < 2) { seznam.hidden = true; seznam.innerHTML = ''; return; }
+    hledaniCasovac = setTimeout(async function () {
+      const typ = box.querySelector('.dn-picker-typ').value;
+      try {
+        const r = await fetch('api/katalog_hledat.php?typ=' + encodeURIComponent(typ) + '&q=' + encodeURIComponent(q.value.trim()), { credentials: 'same-origin' });
+        const data = await r.json();
+        seznam.innerHTML = '';
+        (data.vysledky || []).forEach(function (v) {
+          const li = document.createElement('li');
+          li.tabIndex = 0;
+          li.dataset.id = v.id; li.dataset.typ = typ;
+          const n = document.createElement('span'); n.textContent = v.nazev;
+          const i = document.createElement('small'); i.textContent = v.info || '';
+          li.append(n, i);
+          seznam.appendChild(li);
+        });
+        if (!(data.vysledky || []).length) {
+          const li = document.createElement('li'); li.className = 'dn-picker-prazdne'; li.textContent = 'Nic nenalezeno.'; seznam.appendChild(li);
+        }
+        seznam.hidden = false;
+      } catch (e) { /* hledání se nepovedlo — zkusí se při dalším psaní */ }
+    }, 250);
+  });
+  function vyberZKatalogu(li) {
+    if (!li || !li.dataset.id) return;
+    const box = li.closest('.dn-picker');
+    const ks = box.querySelector('.dn-picker-ks');
+    rozepsano = false;
+    zapis({ akce: 'inventar_pridat', typ_polozky: li.dataset.typ, polozka_id: Number(li.dataset.id), mnozstvi: ks ? Number(ks.value) || 1 : 1 });
+  }
+  document.addEventListener('click', function (ev) {
+    const li = ev.target.closest('.dn-picker-vysledky li');
+    if (li && wrap.contains(li)) { vyberZKatalogu(li); return; }
+    // Klik mimo zavře otevřené výsledky.
+    document.querySelectorAll('.dn-picker-vysledky').forEach(function (u) { if (!u.parentElement.contains(ev.target)) u.hidden = true; });
+  });
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter' && ev.target.matches && ev.target.matches('.dn-picker-vysledky li')) vyberZKatalogu(ev.target);
+  });
+
   // Hody na útok / střelbu / obranu (hra/api/hod_postavy.php).
   document.addEventListener('click', async function (ev) {
     const tl = ev.target.closest('[data-hod]');
