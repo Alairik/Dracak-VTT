@@ -295,12 +295,18 @@ každá staví na předchozí.
     Než je engine bude aplikovat automaticky, je potřeba tabulku
     přepsat do `content/pravidla-hrac.html` (foto znovu).
   - **Stínová únava** (h1634 b10869) se nerozlišuje — jeden součet bodů.
-  - **Stará tabulka `stupne_unavy` (migrace 0008) je nepoužitá a
-    nesedí s pravidly** (model "hranice 10 + oprava za ODO", 3 stupně,
+  - **Stará tabulka `stupne_unavy` (migrace 0008) nesedí s pravidly a
+    nic ji nepoužívá** (model "hranice 10 + oprava za ODO", 3 stupně,
     jeden postih −3/−6; v textu pravidel ani "hranice únavy" nenajdu).
-    Stejný druh chyby jako 0007 u pohyblivosti. Nic na ni nesahá, ale
-    je v editoru jako číselník — rozhodnout, jestli ji nahradit
-    správným modelem.
+    Stejný druh chyby jako 0007. Rozhodnuto (uživatel): co nemá oporu v
+    pravidlech a nic to nepoužívá, nemusí tam být — vyřazena z editoru
+    (`entities.php`). **Na DB se musí ručně dropnout** přes phpMyAdmin
+    (admin): `DROP TABLE stupne_unavy;` — jako migrace to nejde
+    (`migrate.php` soubor s DROP odmítne a web účet ho ani nemá).
+    Sesterské tabulky z téže migrace, `narocnost_akci_unava` a
+    `odstraneni_unavy`, vypadají na stejný starý model (např. "Spánek
+    −10 bodů únavy" proti h1634 "zmizí tolik bodů, kolik je odolnost") —
+    zatím nezkontrolované proti pravidlům, nesahat dokud se neověří.
   - Tabulka výcviků (h1603, b10603): "základní pohyblivost postavy se
     zvýší o 1" — bonus k pohyblivosti z výcviku se nepočítá.
 

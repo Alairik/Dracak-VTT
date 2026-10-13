@@ -162,8 +162,9 @@ function dracak_vtt_postava_pohyblivost(PDO $pdo, array $postava, ?int $nakladMn
 // "úplně vyčerpaná"; plná Tabulka únavy (postihy ke všem čtyřem
 // vlastnostem u každého stupně) v content/ není. Dokud ji někdo
 // nepřepíše, engine nemá co z postihů automaticky aplikovat.
-// (DB tabulka stupne_unavy z migrace 0008 se NEPOUŽÍVÁ — je to jiný,
-// v textu nedohledatelný model: hranice 10+oprava za ODO, 3 stupně.)
+// (DB tabulka stupne_unavy z migrace 0008 byla jiný, v textu
+// nedohledatelný model — hranice 10+oprava za ODO, 3 stupně; pryč z
+// editoru, tabulka se na DB dropne ručně.)
 const DRACAK_VTT_UNAVA_STUPNE = [
     0 => ['nazev' => 'bez únavy', 'popis' => null],
     1 => ['nazev' => 'unavená', 'popis' => 'postih −1 k síle/obratnosti, žádný sprint'],

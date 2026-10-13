@@ -11,6 +11,14 @@
 - **Pushuj jen na `main`.** Deploy (`.github/workflows/deploy.yml`) se
   spouští při pushi na `main` a nahrává obsah repa přímo na FTP hosting —
   žádné vedlejší feature branche pro tenhle projekt.
+  **Mergni a pushni sám, automaticky, bez ptaní — je to trvalé povolení
+  od uživatele.** Pokud session běží na pracovní větvi (např. `ccr-…`
+  přidělené prostředím), po dokončení práce ji sám mergni do `main`
+  (fast-forward, bez PR) a pushni; na to se neptej, nečekej na
+  potvrzení a nenech hotovou práci ležet na vedlejší větvi. Jediné, co
+  uživateli po pushi řekni, je co z toho vyžaduje jeho ruku (typicky
+  migrace s CREATE/ALTER, viz níž — ty `migrate.php` nespustí a zastaví
+  se na nich, takže následující migrace čekají, dokud je neprovede).
 - **Nová DB migrace = nový soubor v `database/migrations/NNNN_popis.sql`,
   nikdy úprava starého.** Po pushi na `main` se automaticky spustí sama —
   poslední krok `deploy.yml` po úspěšném FTP Deploy zavolá
@@ -78,6 +86,18 @@
   Než se cokoliv z tohohle plošně doplňuje na desítky/stovky záznamů,
   radši se zeptat, protože špatně navržený efekt je hůř opravitelný
   než žádný.
+- **Když něco nevíš, koukni do pravidel — repo není zdroj pravdy o hře,
+  pravidla jsou.** Kód, DB (seed i hodnoty z migrací), komentáře,
+  názvy sloupců a `docs/*.md` jsou jen pokus někoho o přepis pravidel a
+  už se několikrát ukázaly špatně (pohyblivost ras v 0007, nosnost v
+  0007, `stupne_unavy` v 0008 — všechno bez zdroje). Proto: (1) existující
+  hodnota v DB/kódu NENÍ důkaz, že je správně — ověř ji proti textu
+  pravidel (`content/pravidla-*.html`, `toc-*.html`), než na ní něco
+  postavíš; (2) když si nejsi jistý, nejdřív hledej v pravidlech, ne v
+  kódu; (3) když informace v `content/` opravdu není (chybějící tabulka
+  v přepisu), řekni to a požádej uživatele o foto/doplnění knihy —
+  nedomýšlej a nehádej; (4) co v DB nemá oporu v pravidlech a nic to
+  nepoužívá, nemusí tam být.
 - **Nejistota v herní mechanice (výpočty, vzorce, co přesně dělá
   iniciativa/finta/atribut) se neřeší odhadem.** Skutečný text pravidel
   je v `content/pravidla-hrac.html`, `pravidla-pj.html`,
