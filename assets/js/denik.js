@@ -125,6 +125,12 @@
       });
       return;
     }
+    if (akce === 'spanek') {
+      if (window.confirm('Prospat ' + tl.dataset.hodin + ' h: únava klesne o ' + tl.dataset.bodu + ' bodů (jeden stupeň). Postavy mohou spát nejvýš 2× denně.')) {
+        zapis({ akce: 'spanek' });
+      }
+      return;
+    }
     if (tl.dataset.delta !== undefined) {
       zapis({ akce: akce, delta: Number(tl.dataset.delta) });
     }

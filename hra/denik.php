@@ -216,6 +216,9 @@ $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' =>
           <div class="dn-metr-pozn">Doplň odolnost (vytrvalost = odolnost).</div>
         <?php endif; ?>
         <?php if ($ma('unava')): ?><div class="dn-pms"><?= $tlacitka('unava', [-5, -1, 1, 5]) ?></div>
+          <?php if ($d['spanek'] && (int)$unava['body'] > 0): ?>
+            <button type="button" class="btn btn-secondary dn-spanek" data-akce="spanek" data-hodin="<?= (int)$d['spanek']['hodin'] ?>" data-bodu="<?= (int)$d['spanek']['bodu'] ?>" title="Podle pravidel (h1634): kolik hodin spánku sníží únavu o stupeň a kolik bodů tím zmizí">Prospat <?= (int)$d['spanek']['hodin'] ?> h (−<?= (int)$d['spanek']['bodu'] ?> b.)</button>
+          <?php endif; ?>
         <?php else: ?><div class="dn-metr-pozn">Únava se zatím nedá ukládat (čeká na migraci 0065).</div><?php endif; ?>
       </section>
 

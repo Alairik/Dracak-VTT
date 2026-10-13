@@ -10,7 +10,7 @@ require_once __DIR__ . '/../../includes/vtt_predmety.php';
 // se ale zapisují do logu světa stejně jako tam, ať se na mapě projeví.
 //
 // Vstup JSON: {postava_id, akce, ...}. Akce:
-//   hp {delta} · magenergie {delta} · unava {delta} · zkusenost {delta}
+//   hp {delta} · magenergie {delta} · unava {delta} · spanek {} · zkusenost {delta}
 //   penize {mena: zl|st|md, hodnota} · vyber {pole, hodnota} · text {pole, hodnota}
 //   velikost {hodnota} · pohyblivost_rucne {hodnota|null}
 //   inventar_pridat {typ_polozky: predmet|lektvar|kouzlo, polozka_id, mnozstvi}
@@ -91,6 +91,21 @@ switch ($akce) {
         $nova = max(0, min(65535, (int)$postava['unava'] + $delta));
         $pdo->prepare('UPDATE postavy SET unava = ? WHERE id = ?')->execute([$nova, $postavaId]);
         odpoved(200, ['ok' => true]);
+    }
+    case 'spanek': {
+        // Prospaná doba "ke snížení o stupeň únavy" (h1634 b10872): zmizí tolik
+        // bodů únavy, kolik je odolnost. Hodiny počítá dracak_vtt_spanek().
+        if (!pole_existuje($postava, 'unava')) {
+            odpoved(422, ['error' => 'Únava se zatím nedá ukládat (chybí migrace 0065).']);
+        }
+        require_once __DIR__ . '/../../includes/vtt_pohyblivost.php';
+        $spanek = dracak_vtt_spanek($pdo, $postava);
+        if (!$spanek) {
+            odpoved(422, ['error' => 'Doplň odolnost postavy (vytrvalost = odolnost).']);
+        }
+        $nova = max(0, (int)$postava['unava'] - $spanek['bodu']);
+        $pdo->prepare('UPDATE postavy SET unava = ? WHERE id = ?')->execute([$nova, $postavaId]);
+        odpoved(200, ['ok' => true, 'hodin' => $spanek['hodin'], 'unava' => $nova]);
     }
     case 'zkusenost': {
         if (!pole_existuje($postava, 'zkusenost')) {

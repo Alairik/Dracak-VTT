@@ -434,3 +434,21 @@ function dracak_vtt_postava_unava_stupen(array $postava): ?array
     }
     return dracak_vtt_unava_stupen((int)($postava['unava'] ?? 0), (int)$postava['odolnost']);
 }
+
+// Spánek (h1634 b10872): "hodiny spánku ke snížení o stupeň únavy = 8 − polovina
+// bonusu za odolnost (zaokrouhleno nahoru, přičti polovinu postihu); po tomto
+// spánku zmizí tolik bodů únavy, kolik je odolnost." Příklad z knihy: odolnost
+// 21 (bonus +5) → 8 − 3 = 5 hodin. Postihu (záporný bonus) se polovina
+// přičítá, zaokrouhluje se stejně nahoru — kniha zaokrouhlení u postihu
+// výslovně neříká. Postavy mohou spát nejvýš 2× denně (b10872) — to se tu
+// nehlídá. Vrací ['hodin' => int, 'bodu' => int (= odolnost)] nebo null bez
+// odolnosti.
+function dracak_vtt_spanek(PDO $pdo, array $postava): ?array
+{
+    if (($postava['odolnost'] ?? null) === null || (int)$postava['odolnost'] <= 0) {
+        return null;
+    }
+    $bonus = dracak_vtt_obratnost_bonus($pdo, (int)$postava['odolnost']) ?? 0;
+    $hodin = $bonus >= 0 ? 8 - (int)ceil($bonus / 2) : 8 + (int)ceil(-$bonus / 2);
+    return ['hodin' => $hodin, 'bodu' => (int)$postava['odolnost']];
+}

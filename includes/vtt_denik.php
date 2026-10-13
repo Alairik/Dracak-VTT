@@ -530,6 +530,7 @@ function dracak_vtt_denik_data(PDO $pdo, array $postava, bool $plne = true): arr
         'bojeschopnost' => $bojeschopnost,
         'unava' => $unava,
         'nastaveni_pohybu' => $nastaveni,
+        'spanek' => dracak_vtt_spanek($pdo, $postava),
         'pohyblivost' => $pohyblivost,
         'rychlost' => dracak_vtt_rychlost_pohybu($pdo, $pohyblivost['bonus_pohyblivosti'] ?? null),
         'naklad' => $naklad,

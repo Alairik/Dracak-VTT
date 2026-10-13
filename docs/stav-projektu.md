@@ -497,9 +497,13 @@ kontejnery** (vaky, truhly apod.).
   zastaví, výběr postav, váha jezdce (ručně — pravidla ji nemají jako
   jedno číslo, rasa má rozsah) a doprovodná zvířata. Odkazy: "Cesta" na
   `svet.php` a `druzina.php` (jen PJ).
+- **Spánek (2026-10-13):** v deníku tlačítko "Prospat N h" (`dracak_vtt_spanek()`,
+  akce `spanek` v `postava_stav.php`): h1634 b10872 — hodin = 8 − polovina
+  bonusu za odolnost (nahoru; příklad knihy odolnost 21 → 5 h sedí), zmizí
+  tolik bodů únavy, kolik je odolnost. Zaokrouhlení u záporného bonusu kniha
+  neříká (beru nahoru); "poloviční spánek" a limit 2× denně se nehlídají.
 - **Záměrně v1 NENÍ:** poklus/běh/sprint (počítají se na kola), polovina
-  únavy koní při cvalu, odpočinek a spánek (h1634 b10872: 8 − ½ bonusu
-  odolnosti hodin, zmizí tolik bodů, kolik je odolnost), posun světového
+  únavy koní při cvalu, odpočinek bez spánku, posun světového
   času (svět eviduje jen celé dny: `aktualni_den_offset`), povozy (Fáze 3),
   vliv únavy na rychlost zvířat (kniha neříká), vliv dovedností Nosič /
   Jízda na koni / Kočí.
