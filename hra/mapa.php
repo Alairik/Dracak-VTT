@@ -92,6 +92,11 @@ if ($zonoveMapyVeSvete) {
     $zonoveMapyVeSvete = [];
 }
 
+// Breadcrumb (odkud se sem přišlo) a celý strom míst ve světě pro
+// postranní panel — viz includes/vtt_mapa_body.php.
+$mapaCesta = dracak_vtt_mapa_cesta(dracak_db(), $mapaId);
+$mapaStrom = dracak_vtt_mapa_strom(dracak_db(), $svetId);
+
 // Aktivní efekty pro všechny entity, co mají na téhle mapě token.
 $aktivniEfektyByEntity = [];
 if ($tokeny) {
@@ -187,9 +192,13 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
 
   .topbar { position:fixed; top:14px; left:50%; transform:translateX(-50%); z-index:200;
             background:rgba(24,22,20,.88); color:#fff; border-radius:999px; padding:8px 18px;
-            display:flex; align-items:center; gap:10px; font-size:14px; backdrop-filter:blur(4px); }
+            display:flex; align-items:center; gap:10px; font-size:14px; backdrop-filter:blur(4px);
+            max-width:min(80vw, 900px); }
   .topbar a { color:#e8c9a8; text-decoration:none; font-weight:600; }
-  .topbar .typ { font-size:11px; opacity:.65; }
+  .topbar .typ { font-size:11px; opacity:.65; flex:none; }
+  .breadcrumb { display:flex; align-items:center; gap:7px; overflow-x:auto; white-space:nowrap; min-width:0; }
+  .breadcrumb .sep { opacity:.4; }
+  .breadcrumb span:not(.sep) { font-weight:600; }
 
   .toolbar { position:fixed; left:16px; top:50%; transform:translateY(-50%); z-index:200;
              display:flex; flex-direction:column; gap:8px; background:rgba(24,22,20,.88);
@@ -224,6 +233,15 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
 
   #logList { font-size:12.5px; display:flex; flex-direction:column-reverse; gap:5px; }
 
+  .strom, .strom ul { list-style:none; margin:0; padding-left:14px; }
+  .strom { padding-left:0; }
+  .strom li { margin:2px 0; }
+  .strom-link { display:flex; align-items:center; gap:6px; color:#ddd; text-decoration:none;
+                padding:4px 6px; border-radius:6px; font-size:13px; }
+  .strom-link svg { flex:none; width:14px; height:14px; }
+  .strom-link:hover { background:rgba(255,255,255,.1); }
+  .strom-link.aktivni { background:var(--color-accent-600, #7a3b2e); color:#fff; font-weight:600; }
+
   .vtt-token { position:absolute; width:40px; text-align:center; user-select:none; }
   .vtt-token .puck { width:40px; height:40px; border-radius:50%; color:#fff; display:flex; align-items:center;
                       justify-content:center; font-size:11px; font-weight:600; box-shadow:0 2px 6px rgba(0,0,0,.5); }
@@ -248,7 +266,16 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
 
 <div class="topbar">
   <a href="svet.php?id=<?= $svetId ?>">← <?= htmlspecialchars($svet['nazev']) ?></a>
-  <span><?= htmlspecialchars($mapa['nazev']) ?></span>
+  <div class="breadcrumb">
+    <?php foreach ($mapaCesta as $i => $krok): ?>
+      <?php if ($i > 0): ?><span class="sep">›</span><?php endif; ?>
+      <?php if ((int)$krok['id'] === $mapaId): ?>
+        <span><?= htmlspecialchars($krok['nazev']) ?></span>
+      <?php else: ?>
+        <a href="mapa.php?id=<?= (int)$krok['id'] ?>"><?= htmlspecialchars($krok['nazev']) ?></a>
+      <?php endif; ?>
+    <?php endforeach; ?>
+  </div>
   <span class="typ">(<?= $mapa['typ_mapy'] === 'svet' ? 'světová mapa' : 'zóna' ?>)</span>
 </div>
 
@@ -319,6 +346,9 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
     <button class="tbtn armed" type="button" id="tb-move" title="Vybrat / přesunout"><?php dracak_icon('move'); ?></button>
     <button class="tbtn" type="button" id="tb-ruler" title="Měřit vzdálenost"><?php dracak_icon('ruler'); ?></button>
     <button class="tbtn" type="button" id="tb-ping" title="Ukázat na mapu ostatním"><?php dracak_icon('crosshair'); ?></button>
+    <?php if ($mapaStrom): ?>
+      <button class="tbtn" type="button" id="tb-strom" title="Mapa míst"><?php dracak_icon('list-tree'); ?></button>
+    <?php endif; ?>
     <?php if ($isPjOrAdmin): ?>
       <button class="tbtn" type="button" id="tb-zed" title="Kreslit zeď"><?php dracak_icon('brick-wall'); ?></button>
     <?php endif; ?>
@@ -449,6 +479,7 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
       <a class="btn btn-secondary" id="pinInfoOtevritBtn" href="#" style="flex:1;display:none;">Otevřít mapu</a>
       <button class="btn btn-secondary" type="button" id="pinInfoAktivniBtn" style="flex:1;display:none;">Nastavit jako aktivní</button>
     </div>
+    <button class="btn btn-secondary" type="button" id="pinInfoCestovatBtn" style="width:100%;margin-top:8px;display:none;">Cestovat sem</button>
     <button class="btn btn-ghost" type="button" id="pinInfoSmazatBtn" style="width:100%;margin-top:8px;display:none;">Smazat pin</button>
   </div>
 
@@ -509,6 +540,38 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
     <?php else: ?>
     <p class="note">Ve světě zatím není žádný hráč pro náhled.</p>
     <?php endif; ?>
+  </div>
+  <?php endif; ?>
+
+  <?php if ($mapaStrom):
+    // Rekurzivní vykreslení stromu (svět → piny → zóny → jejich piny...).
+    // Čistě zobrazovací — dřina je hotová v dracak_vtt_mapa_strom().
+    $renderStromUzel = function (array $uzel) use (&$renderStromUzel, $mapaId) {
+        $aktivni = (int)$uzel['id'] === $mapaId;
+        echo '<li><a href="mapa.php?id=' . (int)$uzel['id'] . '" class="strom-link' . ($aktivni ? ' aktivni' : '') . '">';
+        if (!empty($uzel['pin_typ'])) {
+            dracak_icon(dracak_vtt_mapa_bod_ikona($uzel['pin_typ']), 14);
+        }
+        echo '<span>' . htmlspecialchars($uzel['nazev']) . '</span></a>';
+        if ($uzel['deti']) {
+            echo '<ul>';
+            foreach ($uzel['deti'] as $dite) {
+                $renderStromUzel($dite);
+            }
+            echo '</ul>';
+        }
+        echo '</li>';
+    };
+  ?>
+  <div class="panel" id="panel-strom">
+    <button class="close-x" data-close-panel><?php dracak_icon('x', 16); ?></button>
+    <h3>Mapa míst</h3>
+    <input class="input" type="text" id="stromHledat" placeholder="Hledat místo…" style="margin-bottom:10px;">
+    <ul class="strom" id="stromRoot">
+      <?php foreach ($mapaStrom as $koren) {
+          $renderStromUzel($koren);
+      } ?>
+    </ul>
   </div>
   <?php endif; ?>
 
@@ -1004,6 +1067,28 @@ const tbKostky = document.getElementById('tb-kostky');
 if (tbKostky) tbKostky.addEventListener('click', () => togglePopover('popover-kostky', tbKostky));
 const tbLog = document.getElementById('tb-log');
 if (tbLog) tbLog.addEventListener('click', () => document.getElementById('panel-log').classList.toggle('open'));
+const tbStrom = document.getElementById('tb-strom');
+if (tbStrom) tbStrom.addEventListener('click', () => document.getElementById('panel-strom').classList.toggle('open'));
+const stromHledat = document.getElementById('stromHledat');
+if (stromHledat) {
+  // Ukáže uzel, pokud sedí jeho vlastní název NEBO sedí název
+  // libovolného potomka (ať je vidět i cesta k zanořené shodě).
+  const filtrovatStrom = (dotaz) => {
+    const q = dotaz.trim().toLowerCase();
+    const navstiv = (li) => {
+      const odkaz = li.querySelector(':scope > a.strom-link');
+      let shoda = !q || (odkaz && odkaz.textContent.toLowerCase().includes(q));
+      const podUl = li.querySelector(':scope > ul');
+      if (podUl) {
+        podUl.querySelectorAll(':scope > li').forEach((podLi) => { if (navstiv(podLi)) shoda = true; });
+      }
+      li.style.display = shoda ? '' : 'none';
+      return shoda;
+    };
+    document.querySelectorAll('#stromRoot > li').forEach(navstiv);
+  };
+  stromHledat.addEventListener('input', (e) => filtrovatStrom(e.target.value));
+}
 
 // --- Nástroje toolbaru: select/move (výchozí), ruler (měření), ping, zeď ---
 let currentTool = 'select';
@@ -1519,12 +1604,16 @@ if (mapWrap) {
   });
 }
 
-// --- Piny na světové mapě (jen typ_mapy='svet', viz MAPA_BODY/popover-pin-*) ---
+// --- Piny (na libovolné mapě od fáze 2, viz MAPA_BODY/popover-pin-*) ---
 let pinVybranyId = null;
 function otevriPinInfo(bod) {
   pinVybranyId = bod.id;
   document.getElementById('pinInfoNazev').textContent = bod.nazev;
-  const typLabel = {mesto: 'Město', vesnice: 'Vesnice', tajne_misto: 'Tajné místo', jine: 'Jiné místo'}[bod.typ] || bod.typ;
+  const typLabel = {
+    mesto: 'Město', vesnice: 'Vesnice', tajne_misto: 'Tajné místo',
+    budova: 'Budova', mistnost: 'Místnost', sklep: 'Sklep / dungeon', prechod: 'Přechod',
+    jine: 'Jiné místo',
+  }[bod.typ] || bod.typ;
   document.getElementById('pinInfoTyp').textContent = typLabel + (IS_PJ_OR_ADMIN && !bod.viditelny_hracum ? ' — skryté hráčům' : '');
   document.getElementById('pinInfoPopis').textContent = bod.popis || '';
   const npcWrap = document.getElementById('pinInfoNpcWrap');
@@ -1540,6 +1629,7 @@ function otevriPinInfo(bod) {
   }
   const otevritBtn = document.getElementById('pinInfoOtevritBtn');
   const aktivniBtn = document.getElementById('pinInfoAktivniBtn');
+  const cestovatBtn = document.getElementById('pinInfoCestovatBtn');
   const smazatBtn = document.getElementById('pinInfoSmazatBtn');
   if (bod.cilova_mapa_id) {
     otevritBtn.style.display = '';
@@ -1549,6 +1639,7 @@ function otevriPinInfo(bod) {
     otevritBtn.style.display = 'none';
     aktivniBtn.style.display = 'none';
   }
+  cestovatBtn.style.display = IS_PJ_OR_ADMIN ? '' : 'none';
   smazatBtn.style.display = IS_PJ_OR_ADMIN ? '' : 'none';
   const btn = document.querySelector('.mapa-bod-marker[data-bod-id="' + bod.id + '"]');
   const pop = document.getElementById('popover-pin-info');
@@ -1572,6 +1663,22 @@ if (pinInfoAktivniBtn) {
     if (!bod || !bod.cilova_mapa_id) return;
     postJson('api/aktivni_mapa_nastavit.php', {mapa_id: bod.cilova_mapa_id})
       .then(d => { if (d.error) { logLine('Chyba: ' + d.error); return; } logLine('Aktivní mapa nastavena na: ' + bod.nazev); });
+  });
+}
+const pinInfoCestovatBtn = document.getElementById('pinInfoCestovatBtn');
+if (pinInfoCestovatBtn) {
+  pinInfoCestovatBtn.addEventListener('click', () => {
+    const bod = MAPA_BODY.find(b => b.id === pinVybranyId);
+    if (!bod) return;
+    const vstup = prompt('Kolik dní cesta na „' + bod.nazev + '“ zabrala?', '1');
+    if (vstup === null) return;
+    const dny = parseInt(vstup, 10);
+    if (isNaN(dny) || dny < 0) { logLine('Zadej nezáporné celé číslo dní.'); return; }
+    postJson('api/pin_cestovat.php', {bod_id: bod.id, dny})
+      .then(d => {
+        if (d.error) { logLine('Chyba: ' + d.error); return; }
+        logLine('Cesta na „' + bod.nazev + '“ — herní čas posunut o ' + dny + ' ' + (dny === 1 ? 'den' : (dny < 5 ? 'dny' : 'dní')) + '.');
+      });
   });
 }
 const pinInfoSmazatBtn = document.getElementById('pinInfoSmazatBtn');

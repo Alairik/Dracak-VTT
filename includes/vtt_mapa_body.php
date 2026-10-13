@@ -79,3 +79,90 @@ function dracak_vtt_mapa_bod_smazat(PDO $pdo, int $bodId, int $mapaId): bool
     $stmt->execute([$bodId, $mapaId]);
     return $stmt->rowCount() > 0;
 }
+
+// Cesta od kořene (světová mapa) k zadané mapě, pro breadcrumb nahoře
+// na hra/mapa.php. mapa_body.cilova_mapa_id nemá UNIQUE (viz migrace
+// 0062 — jedna mapa smí mít dva piny, co na ni vedou, např. dva vchody
+// do sklepení), takže rodič není vždycky jednoznačný — bereme
+// deterministicky ten s nejnižším id. $navstivene brání nekonečné
+// smyčce, kdyby někdy vznikl cyklus (A vede na B, B vede na A) —
+// mapa_bod_pridat.php hlídá jen přímý self-loop, ne tenhle dvoukrokový.
+function dracak_vtt_mapa_cesta(PDO $pdo, int $mapaId): array
+{
+    $cesta = [];
+    $aktualni = $mapaId;
+    $navstivene = [];
+    while ($aktualni !== null && !isset($navstivene[$aktualni])) {
+        $navstivene[$aktualni] = true;
+        $stmt = $pdo->prepare('SELECT id, nazev FROM mapy WHERE id = ?');
+        $stmt->execute([$aktualni]);
+        $mapa = $stmt->fetch();
+        if (!$mapa) {
+            break;
+        }
+        array_unshift($cesta, ['id' => (int)$mapa['id'], 'nazev' => (string)$mapa['nazev']]);
+        $stmt = $pdo->prepare('SELECT mapa_id FROM mapa_body WHERE cilova_mapa_id = ? ORDER BY id ASC LIMIT 1');
+        $stmt->execute([$aktualni]);
+        $rodic = $stmt->fetchColumn();
+        $aktualni = $rodic !== false ? (int)$rodic : null;
+    }
+    return $cesta;
+}
+
+// Celý strom míst ve světě (pro postranní panel na hra/mapa.php) —
+// jeden dotaz na mapy, jeden na piny, strom poskládaný v PHP (ne
+// WITH RECURSIVE — neznámá MariaDB verze na produkčním Wedos
+// hostingu, radši bez závislosti na konkrétní verzi). $navstivene se
+// předává PO HODNOTĚ, ne odkazem — zabrání to jen cyklu po jedné
+// větvi (ancestor), ne opakovanému výskytu stejné mapy pod dvěma
+// různými piny (to je žádoucí, viz komentář u dracak_vtt_mapa_cesta).
+function dracak_vtt_mapa_strom(PDO $pdo, int $svetId): array
+{
+    $stmt = $pdo->prepare("SELECT id, nazev, typ_mapy FROM mapy WHERE svet_id = ?");
+    $stmt->execute([$svetId]);
+    $mapyById = [];
+    foreach ($stmt->fetchAll() as $m) {
+        $mapyById[(int)$m['id']] = $m;
+    }
+
+    $stmt = $pdo->prepare(
+        'SELECT b.mapa_id, b.cilova_mapa_id, b.nazev, b.typ FROM mapa_body b
+         JOIN mapy m ON m.id = b.mapa_id WHERE m.svet_id = ? ORDER BY b.nazev'
+    );
+    $stmt->execute([$svetId]);
+    $pinyPodleMapy = [];
+    foreach ($stmt->fetchAll() as $p) {
+        $pinyPodleMapy[(int)$p['mapa_id']][] = $p;
+    }
+
+    $sestav = function (int $mapaId, array $navstivene) use (&$sestav, $mapyById, $pinyPodleMapy): ?array {
+        if (isset($navstivene[$mapaId]) || !isset($mapyById[$mapaId])) {
+            return null;
+        }
+        $navstivene[$mapaId] = true;
+        $uzel = ['id' => $mapaId, 'nazev' => (string)$mapyById[$mapaId]['nazev'], 'deti' => []];
+        foreach ($pinyPodleMapy[$mapaId] ?? [] as $pin) {
+            if ($pin['cilova_mapa_id'] === null) {
+                continue;
+            }
+            $podstrom = $sestav((int)$pin['cilova_mapa_id'], $navstivene);
+            if ($podstrom !== null) {
+                $podstrom['pin_nazev'] = (string)$pin['nazev'];
+                $podstrom['pin_typ'] = (string)$pin['typ'];
+                $uzel['deti'][] = $podstrom;
+            }
+        }
+        return $uzel;
+    };
+
+    $koreny = [];
+    foreach ($mapyById as $id => $m) {
+        if ($m['typ_mapy'] === 'svet') {
+            $uzel = $sestav((int)$id, []);
+            if ($uzel !== null) {
+                $koreny[] = $uzel;
+            }
+        }
+    }
+    return $koreny;
+}
