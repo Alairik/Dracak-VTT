@@ -208,7 +208,9 @@ $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' =>
         <?php if ($unava): ?>
           <div class="dn-metr-cislo"><strong><?= (int)$unava['body'] ?></strong><span>/ <?= (int)$unava['vytrvalost'] ?> vytrvalost</span></div>
           <div class="dn-bar <?= $unava['stupen'] === 0 ? 'ok' : ($unava['stupen'] >= 3 ? 'out' : 'low') ?>"><i style="width:<?= max(0, min(100, round($unava['body'] / (max(1, $unava['vytrvalost']) * 4) * 100))) ?>%"></i><b style="left:25%"></b><b style="left:50%"></b><b style="left:75%"></b></div>
-          <div class="dn-metr-pozn"><?= $unava['popis'] ? $e($unava['popis']) : 'bez únavy' ?></div>
+          <?php if ($unava['dusledky']): ?>
+            <ul class="dn-dusledky"><?php foreach ($unava['dusledky'] as $du): ?><li><?= $e($du) ?></li><?php endforeach; ?></ul>
+          <?php else: ?><div class="dn-metr-pozn">bez únavy</div><?php endif; ?>
         <?php else: ?>
           <div class="dn-metr-pozn">Doplň odolnost (vytrvalost = odolnost).</div>
         <?php endif; ?>
@@ -239,7 +241,15 @@ $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' =>
         <div class="dn-metr-hlava"><span>Pohyblivost</span></div>
         <?php if ($poh): ?>
           <div class="dn-metr-cislo"><strong><?= $poh['pohyblivost'] ?? '—' ?></strong><span><?= $poh['bonus_pohyblivosti'] !== null ? 'bonus ' . $znam($poh['bonus_pohyblivosti']) : '' ?></span></div>
-          <div class="dn-metr-pozn">základní <?= (int)$poh['zakladni'] ?> = rasa <?= (int)$poh['rasovy_zaklad'] ?>, obr. <?= $znam($poh['bonus_obratnost']) ?>, 2× síla (<?= $znam($poh['bonus_sila']) ?>)<?= $nalozeni && $nalozeni['kod'] !== 'zadne' ? ' · po naložení' : '' ?></div>
+          <div class="dn-metr-pozn">základní <?= (int)$poh['zakladni'] ?> = rasa <?= (int)$poh['rasovy_zaklad'] ?>, obr. <?= $znam($poh['bonus_obratnost'] - $poh['unava_postih']) ?>, 2× síla (<?= $znam($poh['bonus_sila'] - $poh['unava_postih']) ?>)<?= $nalozeni && $nalozeni['kod'] !== 'zadne' ? ' · po naložení' : '' ?></div>
+          <?php if ($poh['unava_postih'] > 0): ?><div class="dn-metr-pozn">únava: bez ní by základní pohyblivost byla <?= (int)$poh['zakladni_bez_unavy'] ?></div><?php endif; ?>
+          <?php if ($poh['omdleva']): ?><div class="dn-metr-pozn"><strong>postava omdlévá — nepohybuje se</strong></div><?php endif; ?>
+          <?php if ($d['rychlost']): $ry = $d['rychlost']; ?>
+            <div class="dn-metr-pozn">chůze za hodinu: procházka <strong><?= (int)$ry['chuze']['prochazka'] ?></strong> · chůze <strong><?= (int)$ry['chuze']['chuze'] ?></strong> · spěch <strong><?= (int)$ry['chuze']['spech'] ?></strong> bodů</div>
+            <div class="dn-metr-pozn">běh za kolo: poklus <strong><?= (int)$ry['beh']['poklus'] ?></strong> · běh <strong><?= (int)$ry['beh']['beh'] ?></strong> · sprint <strong><?= (int)$ry['beh']['sprint'] ?></strong> bodů</div>
+          <?php elseif ($poh['bonus_pohyblivosti'] !== null): ?>
+            <div class="dn-metr-pozn">Rychlost pohybu: bonus <?= $znam($poh['bonus_pohyblivosti']) ?> je mimo Tabulky rychlosti (−5 až +10) nebo čeká na migraci 0074.</div>
+          <?php endif; ?>
           <?php if ($d['doprava'] && $d['doprava']['typ'] === 'zvire'): $z = $d['doprava']['zvire']; ?>
             <div class="dn-metr-pozn">jede na: <strong><?= $e($z['nazev']) ?></strong> (pohyblivost <?= (int)$z['pohyblivost'] ?>)</div>
           <?php endif; ?>
@@ -266,12 +276,13 @@ $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' =>
           <?php foreach ($vlastnostiNazvy as $kl => $nazev): ?>
             <div class="dn-vlast">
               <span class="dn-vlast-k"><?= $e($nazev) ?></span>
-              <span class="dn-vlast-h"><?= $d['stupne'][$kl] ?? '—' ?></span>
-              <span class="dn-vlast-b <?= ($d['bonusy'][$kl] ?? 0) < 0 ? 'minus' : '' ?>"><?= $znam($d['bonusy'][$kl]) ?></span>
+              <?php $stEf = $d['stupne_ef'][$kl] ?? null; $stZ = $d['stupne'][$kl] ?? null; $boEf = $d['bonusy_ef'][$kl] ?? null; $boZ = $d['bonusy'][$kl] ?? null; ?>
+              <span class="dn-vlast-h"><?php if ($stEf !== null && $stEf !== $stZ): ?><s title="bez únavy"><?= (int)$stZ ?></s> <?= (int)$stEf ?><?php else: ?><?= $stZ ?? '—' ?><?php endif; ?></span>
+              <span class="dn-vlast-b <?= ($boEf ?? 0) < 0 ? 'minus' : '' ?>"><?php if ($boEf !== null && $boEf !== $boZ): ?><s title="bez únavy"><?= $znam($boZ) ?></s> <?= $znam($boEf) ?><?php else: ?><?= $znam($boZ) ?><?php endif; ?></span>
             </div>
           <?php endforeach; ?>
         </div>
-        <p class="note">Stupeň vlastnosti (1–21) a z něj bonus/postih podle Tabulky postihů a bonusů.</p>
+        <p class="note">Stupeň vlastnosti (1–21) a z něj bonus/postih podle Tabulky postihů a bonusů.<?= $unava && $unava['stupen'] > 0 && $unava['stupen'] < 4 ? ' Přeškrtnuto = bez únavy; únava (' . $e($unava['nazev']) . ') snižuje bonus za sílu a obratnost' . ($unava['postih_int'] ? ', stupeň inteligence' . ($unava['postih_cha'] ? ' a charismy' : '') : '') . '.' : '' ?></p>
       </div>
 
       <div class="dn-karta">
@@ -375,7 +386,8 @@ $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' =>
           <p class="note">Postih k hodu na útok i obranu: méně než třetina životů (podle odolnosti), velké naložení −1. Při životech na mezi vyřazení a pod ní postava nebojuje (h1610).</p>
         <?php else: ?><p class="note">Doplň odolnost.</p><?php endif; ?>
         <div class="dn-dvojice"><span>únava</span><strong><?= $unava ? $e($unava['nazev']) : '—' ?></strong></div>
-        <?php if ($unava && $unava['popis']): ?><p class="note"><?= $e($unava['popis']) ?></p><?php endif; ?>
+        <?php if ($unava && $unava['stupen'] > 0 && $unava['stupen'] < 4): ?><p class="note">Únava snižuje bonus za sílu i obratnost o <?= (int)$unava['postih_sil_obr'] ?> — ÚČ a OČ výše to už zahrnují.<?= in_array('sprint', $unava['zakazy'], true) ? ' Nesmí sprintovat' . (in_array('beh', $unava['zakazy'], true) ? ' ani běžet (poklus smí)' : '') . '.' : '' ?></p><?php endif; ?>
+        <?php if ($unava && $unava['omdleva']): ?><p class="note"><strong>Postava omdlévá</strong> — bez pomoci umírá během 1k6 hodin.</p><?php endif; ?>
       </div>
 
       <div class="dn-karta dn-sirka-cela">
@@ -471,7 +483,7 @@ $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' =>
                 </summary>
                 <div class="dn-pol-telo">
                   <div class="dn-hod-akce">
-                  <?php if ($svetId > 0): ?><button type="button" class="btn btn-primary" data-pouzij="kouzlo" data-polozka="<?= (int)$k['id'] ?>" data-nazev="<?= $e($k['nazev']) ?>"<?= $k['skodi'] ? ' data-skodi="1"' : '' ?>>Seslat<?= $k['cena_magenergie'] ? ' (' . $e($k['cena_magenergie']) . ')' : '' ?></button><?php endif; ?>
+                  <?php if ($svetId > 0): ?><button type="button" class="btn btn-primary" data-pouzij="kouzlo" data-polozka="<?= (int)$k['id'] ?>" data-nazev="<?= $e($k['nazev']) ?>"<?= $k['skodi'] ? ' data-skodi="1"' : '' ?><?= $unava && in_array('kouzla', $unava['zakazy'], true) ? ' data-unava-zakaz="' . $e($unava['nazev']) . '"' : '' ?>>Seslat<?= $k['cena_magenergie'] ? ' (' . $e($k['cena_magenergie']) . ')' : '' ?></button><?php endif; ?>
                     <button type="button" class="btn btn-ghost" data-inv="odebrat" data-typ="kouzlo" data-id="<?= (int)$k['id'] ?>" data-nazev="<?= $e($k['nazev']) ?>">Zapomenout</button>
                   </div>
                   <p class="note"><?= $e(implode(' · ', array_filter([$k['seznam'], $k['rozsah'] ? 'rozsah ' . $k['rozsah'] : null, $k['doba_seslani'] ? 'sesílání ' . $k['doba_seslani'] : null]))) ?></p>

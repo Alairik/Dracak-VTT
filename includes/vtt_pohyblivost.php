@@ -104,7 +104,16 @@ function dracak_vtt_pohyblivost_po_nalozeni(int $zakladni, int $ctvrtiny): int
 // neořezává (vzorec dává běžně i víc než 21 u silných postav).
 // Nad 4× nosnosti tabulka naložení nic neříká: 'pohyblivost' i
 // 'bonus_pohyblivosti' jsou pak null (postava to neunese / PJ rozhodne).
-function dracak_vtt_postava_pohyblivost(PDO $pdo, array $postava, int|float|null $nakladMn = null): ?array
+//
+// Únava ($sUnavou = true, výchozí): bonus za sílu a obratnost klesá podle
+// Tabulky únavy (DRACAK_VTT_UNAVA_STUPNE), takže klesá i základní
+// pohyblivost: rasa + (OBR − p) + 2×(SIL − p) = o 3·p méně (p = postih;
+// příklad Hrun h1634 b10871: unavený 19 → 16). Nosnost se počítá z
+// původního bonusu za sílu — tabulka nosnosti zná jen −5…+5, kniha o vlivu
+// únavy na nosnost mlčí. Vysílená postava (omdlévá) pohyblivost nemá:
+// 'pohyblivost' null a 'omdleva' true. 'zakladni_bez_unavy' je základní
+// pohyblivost, jaká by byla bez únavy.
+function dracak_vtt_postava_pohyblivost(PDO $pdo, array $postava, int|float|null $nakladMn = null, bool $sUnavou = true): ?array
 {
     if (empty($postava['rasa_id']) || ($postava['sila'] ?? null) === null || ($postava['obratnost'] ?? null) === null) {
         return null;
@@ -115,12 +124,17 @@ function dracak_vtt_postava_pohyblivost(PDO $pdo, array $postava, int|float|null
     }
     $bonusSil = dracak_vtt_obratnost_bonus($pdo, (int)$postava['sila']);
     $bonusObr = dracak_vtt_obratnost_bonus($pdo, (int)$postava['obratnost']);
-    $zakladni = $rasovyZaklad + $bonusObr + 2 * $bonusSil;
+    $zakladniBezUnavy = $rasovyZaklad + $bonusObr + 2 * $bonusSil;
+
+    $unava = $sUnavou ? dracak_vtt_postava_unava_stupen($postava) : null;
+    $omdleva = $unava !== null && $unava['omdleva'];
+    $postih = $unava['postih_sil_obr'] ?? 0;
+    $zakladni = $rasovyZaklad + ($bonusObr - $postih) + 2 * ($bonusSil - $postih);
 
     $nosnost = dracak_vtt_nosnost_mn($pdo, $bonusSil);
     $nalozeni = null;
-    $pohyblivost = $zakladni;
-    if ($nakladMn !== null && $nosnost !== null) {
+    $pohyblivost = $omdleva ? null : $zakladni;
+    if (!$omdleva && $nakladMn !== null && $nosnost !== null) {
         $nalozeni = dracak_vtt_nalozeni($nakladMn, $nosnost);
         if ($nalozeni['ctvrtiny'] !== null) {
             $pohyblivost = dracak_vtt_pohyblivost_po_nalozeni($zakladni, $nalozeni['ctvrtiny']);
@@ -133,6 +147,9 @@ function dracak_vtt_postava_pohyblivost(PDO $pdo, array $postava, int|float|null
         'rasovy_zaklad' => $rasovyZaklad,
         'bonus_obratnost' => $bonusObr,
         'bonus_sila' => $bonusSil,
+        'unava_postih' => $postih,
+        'omdleva' => $omdleva,
+        'zakladni_bez_unavy' => $zakladniBezUnavy,
         'zakladni' => $zakladni,
         'nosnost_mn' => $nosnost,
         'naklad_mn' => $nakladMn,
@@ -142,6 +159,44 @@ function dracak_vtt_postava_pohyblivost(PDO $pdo, array $postava, int|float|null
             ? dracak_vtt_obratnost_bonus($pdo, max(1, $pohyblivost))
             : null,
     ];
+}
+
+// Rychlost pohybu pro bonus za pohyblivost: TABULKA RYCHLOSTI PŘI CHŮZI
+// (body chůze za hodinu) a PŘI BĚHU (body běhu za kolo), h1634 + Bestiář
+// h2393 pro +6…+10; tabulky rychlost_chuze/rychlost_behu (migrace 0074).
+// null, když je bonus mimo tabulku (pod −5 nebo nad +10 — pravidla tam
+// nic neříkají) nebo tabulky v DB ještě nejsou (migrace čeká na ruční
+// DDL). Výsledek:
+//   ['bonus' => int,
+//    'chuze' => ['prochazka' => int, 'chuze' => int, 'spech' => int],
+//    'beh'   => ['poklus' => int, 'beh' => int, 'sprint' => int]]
+function dracak_vtt_rychlost_pohybu(PDO $pdo, ?int $bonus): ?array
+{
+    if ($bonus === null) {
+        return null;
+    }
+    static $cache = null;
+    if ($cache === null) {
+        $cache = ['chuze' => [], 'beh' => []];
+        try {
+            foreach ($pdo->query('SELECT bonus_pohyblivosti, prochazka, chuze, spech FROM rychlost_chuze') as $r) {
+                $cache['chuze'][(int)$r['bonus_pohyblivosti']] = [
+                    'prochazka' => (int)$r['prochazka'], 'chuze' => (int)$r['chuze'], 'spech' => (int)$r['spech'],
+                ];
+            }
+            foreach ($pdo->query('SELECT bonus_pohyblivosti, poklus, beh, sprint FROM rychlost_behu') as $r) {
+                $cache['beh'][(int)$r['bonus_pohyblivosti']] = [
+                    'poklus' => (int)$r['poklus'], 'beh' => (int)$r['beh'], 'sprint' => (int)$r['sprint'],
+                ];
+            }
+        } catch (PDOException $e) {
+            $cache = ['chuze' => [], 'beh' => []];
+        }
+    }
+    if (!isset($cache['chuze'][$bonus], $cache['beh'][$bonus])) {
+        return null;
+    }
+    return ['bonus' => $bonus, 'chuze' => $cache['chuze'][$bonus], 'beh' => $cache['beh'][$bonus]];
 }
 
 // Náklad postavy z inventáře (postava_predmety x predmety.vaha) a z peněz.
@@ -240,27 +295,51 @@ function dracak_vtt_postava_doprava(PDO $pdo, array $postava): ?array
 // Únava
 // =====================================================================
 
-// Stupně únavy podle h1634 b10870 (vytrvalost = odolnost, b10869): nad
-// vytrvalost unavená, nad 2× vyčerpaná, nad 3× úplně vyčerpaná, nad 4×
+// Stupně únavy: prahy podle h1634 b10870 (vytrvalost = odolnost, b10869) —
+// nad vytrvalost unavená, nad 2× vyčerpaná, nad 3× úplně vyčerpaná, nad 4×
 // vysílená. Prahy jsou ostré ("nad"): body == vytrvalost je ještě bez
 // únavy (příklad Hrun b10871: odolnost 15, 90 kol běhu = 15 bodů, unavený
-// je až dál).
+// je až dál). Postihy a omezení v každém stupni: TABULKA ÚNAVY (h1634,
+// přepsáno z fotografie knihy).
 //
-// 'popis' je doslovný text ze shrnutí v b10870. Strukturované postihy
-// (číslo po atributech) tu ZÁMĚRNĚ nejsou: přepis v repu uvádí cíl
-// postihu výslovně jen u "unavená" (síla/obratnost) a int/chr jen u
-// "úplně vyčerpaná"; plná Tabulka únavy (postihy ke všem čtyřem
-// vlastnostem u každého stupně) v content/ není. Dokud ji někdo
-// nepřepíše, engine nemá co z postihů automaticky aplikovat.
+//   postih_sil_obr  o kolik klesá BONUS za sílu i za obratnost (celkem, ne
+//                   přírůstek proti předchozímu stupni; "postih může být i
+//                   horší než −5")
+//   postih_int/cha  o kolik klesá STUPEŇ inteligence/charismy (inteligence
+//                   nikdy pod 2 — viz dracak_vtt_unava_efektivni_stupen)
+//   zakazy          co postava nesmí; omezení nižšího stupně platí i ve
+//                   vyšším ("vyčerpaný či hůře", h950): sprint, beh, kouzla
+//                   (i z předmětů), zaostrovani_vule (kouzelník), meditace a
+//                   mimosmyslove (hraničář)
+//   jen_plazeni     může se jen plazit (procházka s postihem −1)
+//   omdleva         vysílená: omdlévá, bez pomoci umírá během 1k6 hodin —
+//                   tabulka u ní žádné číselné postihy neuvádí (null)
+// Postih k bonusu platí všude, kde se bonus za sílu/obratnost používá:
+// pohyblivost (příklad Hrun b10871: 19 → 16 = −1 OBR −2 za 2× SIL), ÚČ, OČ.
+// Nosnost ze síly se NEMĚNÍ (tabulka nosnosti zná jen bonus −5…+5 a text
+// nic neříká) — viz dracak_vtt_postava_pohyblivost.
 // (DB tabulka stupne_unavy z migrace 0008 byla jiný, v textu
-// nedohledatelný model — hranice 10+oprava za ODO, 3 stupně; pryč z
-// editoru, tabulka se na DB dropne ručně.)
+// nedohledatelný model — hranice 10+oprava za ODO, 3 stupně; nepoužívá se.)
 const DRACAK_VTT_UNAVA_STUPNE = [
-    0 => ['nazev' => 'bez únavy', 'popis' => null],
-    1 => ['nazev' => 'unavená', 'popis' => 'postih −1 k síle/obratnosti, žádný sprint'],
-    2 => ['nazev' => 'vyčerpaná', 'popis' => 'postih −2, bez běhu/sprintu/kouzel/meditace/zaostření vůle u kouzelníka/hraničáře'],
-    3 => ['nazev' => 'úplně vyčerpaná', 'popis' => 'postih −3, stupeň inteligence −4, stupeň charismy −2, jen plazení s postihem −1'],
-    4 => ['nazev' => 'vysílená', 'popis' => 'postava omdlévá, bez pomoci umírá během 1k6 hodin'],
+    0 => ['nazev' => 'bez únavy', 'popis' => null,
+        'postih_sil_obr' => 0, 'postih_int' => 0, 'postih_cha' => 0,
+        'zakazy' => [], 'jen_plazeni' => false, 'omdleva' => false, 'dusledky' => []],
+    1 => ['nazev' => 'unavená', 'popis' => 'bonus za sílu a obratnost −1, nesmí sprintovat',
+        'postih_sil_obr' => 1, 'postih_int' => 0, 'postih_cha' => 0,
+        'zakazy' => ['sprint'], 'jen_plazeni' => false, 'omdleva' => false,
+        'dusledky' => ['Bonus za sílu a obratnost klesá o 1', 'Nesmí používat sprint']],
+    2 => ['nazev' => 'vyčerpaná', 'popis' => 'bonus za sílu a obratnost −2, stupeň inteligence −2, bez běhu a sprintu (poklus smí), bez kouzel (i z předmětů); kouzelník nezaostří vůli, hraničář nemeditují ani nepoužívá mimosmyslové schopnosti',
+        'postih_sil_obr' => 2, 'postih_int' => 2, 'postih_cha' => 0,
+        'zakazy' => ['sprint', 'beh', 'kouzla', 'zaostrovani_vule', 'meditace', 'mimosmyslove'], 'jen_plazeni' => false, 'omdleva' => false,
+        'dusledky' => ['Bonus za sílu a obratnost klesá o 2', 'Stupeň inteligence se snižuje o 2', 'Nesmí používat běh ani sprint (ale smí poklus)', 'Nemůže sesílat kouzla (ani z předmětů)', 'Kouzelník nedokáže zaostřit vůli, hraničář nemůže meditovat ani používat mimosmyslové schopnosti']],
+    3 => ['nazev' => 'úplně vyčerpaná', 'popis' => 'bonus za sílu a obratnost −3, stupeň inteligence −4, stupeň charismy −2, může se jen plazit (procházka s postihem −1); platí i omezení vyčerpané postavy',
+        'postih_sil_obr' => 3, 'postih_int' => 4, 'postih_cha' => 2,
+        'zakazy' => ['sprint', 'beh', 'kouzla', 'zaostrovani_vule', 'meditace', 'mimosmyslove'], 'jen_plazeni' => true, 'omdleva' => false,
+        'dusledky' => ['Bonus za sílu a obratnost klesá o 3', 'Stupeň inteligence se snižuje o 4', 'Stupeň charismy se snižuje o 2', 'Může se jen plazit (procházka s postihem −1)']],
+    4 => ['nazev' => 'vysílená', 'popis' => 'postava omdlévá, bez pomoci umírá během 1k6 hodin',
+        'postih_sil_obr' => null, 'postih_int' => null, 'postih_cha' => null,
+        'zakazy' => ['sprint', 'beh', 'kouzla', 'zaostrovani_vule', 'meditace', 'mimosmyslove'], 'jen_plazeni' => false, 'omdleva' => true,
+        'dusledky' => ['Postava omdlévá, a pokud jí někdo neposkytne pomoc, umírá během 1k6 hodin']],
 ];
 
 // Čistá funkce: body únavy + vytrvalost -> stupeň 0–4.
@@ -272,13 +351,21 @@ function dracak_vtt_unava_stupen(int $body, int $vytrvalost): array
             $stupen = $nasobek;
         }
     }
-    return [
-        'body' => $body,
-        'vytrvalost' => $vytrvalost,
-        'stupen' => $stupen,
-        'nazev' => DRACAK_VTT_UNAVA_STUPNE[$stupen]['nazev'],
-        'popis' => DRACAK_VTT_UNAVA_STUPNE[$stupen]['popis'],
-    ];
+    return ['body' => $body, 'vytrvalost' => $vytrvalost, 'stupen' => $stupen] + DRACAK_VTT_UNAVA_STUPNE[$stupen];
+}
+
+// Efektivní STUPEŇ vlastnosti po únavě (inteligence/charisma). Postih se
+// odečte, ale vlastnost se nikdy nezvýší: "inteligence nemůže nikdy být
+// nižší než 2" znamená spodní mez pro snížení, ne zvednutí postavy, která
+// už nižší inteligenci má. Charisma pod 2 tabulka neřeší — nejnižší stupeň
+// vlastnosti je 1. null postih (vysílená) = beze změny (postava je bez
+// vědomí, číselný postih tabulka neuvádí).
+function dracak_vtt_unava_efektivni_stupen(?int $stupen, ?int $postih, int $minimum): ?int
+{
+    if ($stupen === null || $postih === null || $postih === 0) {
+        return $stupen;
+    }
+    return min($stupen, max($minimum, $stupen - $postih));
 }
 
 // Stupeň únavy konkrétní postavy ($postava = řádek z `postavy`, sloupce

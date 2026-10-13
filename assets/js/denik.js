@@ -212,6 +212,9 @@
     const tl = ev.target.closest('[data-pouzij]');
     if (!tl || !wrap.contains(tl)) return;
     ev.preventDefault();
+    // Tabulka únavy: vyčerpaná (a horší) postava nemůže sesílat kouzla.
+    if (tl.dataset.unavaZakaz &&
+        !window.confirm('Postava je ' + tl.dataset.unavaZakaz + ' a podle Tabulky únavy nemůže sesílat kouzla (ani z předmětů). Přesto seslat ' + tl.dataset.nazev + '?')) return;
     const cilEl = document.getElementById('dn-cil');
     const cil = cilEl ? cilEl.value : '';
     // Zraňující kouzlo/lektvar bez zvoleného cíle by zranilo toho, kdo ho použil.

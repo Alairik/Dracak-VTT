@@ -480,6 +480,21 @@ function dracak_vtt_denik_data(PDO $pdo, array $postava, bool $plne = true): arr
     }
     $zakladniRasa = dracak_vtt_zakladni_rasa($pdo, !empty($postava['rasa_id']) ? (int)$postava['rasa_id'] : null);
 
+    // Únava snižuje bonus za sílu a obratnost (ÚČ, OČ, pohyblivost) a stupeň
+    // inteligence a charismy (Tabulka únavy, h1634) — dál se počítá s
+    // efektivními hodnotami; základní zůstávají v 'bonusy'/'stupne'.
+    $unava = dracak_vtt_postava_unava_stupen($postava);
+    $postihSilObr = $unava['postih_sil_obr'] ?? 0;
+    $bonusyEf = $bonusy;
+    foreach (['sila', 'obratnost'] as $atr) {
+        if ($bonusy[$atr] !== null) {
+            $bonusyEf[$atr] = $bonusy[$atr] - $postihSilObr;
+        }
+    }
+    $stupneEf = $stupne;
+    $stupneEf['inteligence'] = dracak_vtt_unava_efektivni_stupen($stupne['inteligence'], $unava['postih_int'] ?? 0, 2);
+    $stupneEf['charisma'] = dracak_vtt_unava_efektivni_stupen($stupne['charisma'], $unava['postih_cha'] ?? 0, 1);
+
     $naklad = dracak_vtt_postava_naklad_mn($pdo, (int)$postava['id'], $postava);
     $pohyblivost = dracak_vtt_postava_pohyblivost($pdo, $postava, $naklad['naklad_mn']);
     $nosnost = $pohyblivost['nosnost_mn'] ?? null;
@@ -495,11 +510,11 @@ function dracak_vtt_denik_data(PDO $pdo, array $postava, bool $plne = true): arr
 
     $zbrane = [];
     $obrana = null;
-    if ($bonusy['sila'] !== null && $bonusy['obratnost'] !== null) {
-        $zbrane = dracak_vtt_zbrane_postavy($pdo, $postava, $bonusy['sila'], $bonusy['obratnost'], $zakladniRasa);
+    if ($bonusyEf['sila'] !== null && $bonusyEf['obratnost'] !== null) {
+        $zbrane = dracak_vtt_zbrane_postavy($pdo, $postava, $bonusyEf['sila'], $bonusyEf['obratnost'], $zakladniRasa);
     }
-    if ($bonusy['obratnost'] !== null) {
-        $obrana = dracak_vtt_obrana($pdo, $postava, $bonusy['obratnost']);
+    if ($bonusyEf['obratnost'] !== null) {
+        $obrana = dracak_vtt_obrana($pdo, $postava, $bonusyEf['obratnost']);
     }
 
     return [
@@ -508,12 +523,15 @@ function dracak_vtt_denik_data(PDO $pdo, array $postava, bool $plne = true): arr
         'rodova_zbran' => $zakladniRasa !== null && isset(DRACAK_VTT_RODOVA_ZBRAN[$zakladniRasa]) ? DRACAK_VTT_RODOVA_ZBRAN[$zakladniRasa][0] : null,
         'stupne' => $stupne,
         'bonusy' => $bonusy,
+        'stupne_ef' => $stupneEf,
+        'bonusy_ef' => $bonusyEf,
         'bojeschopnost' => $bojeschopnost,
-        'unava' => dracak_vtt_postava_unava_stupen($postava),
+        'unava' => $unava,
         'pohyblivost' => $pohyblivost,
+        'rychlost' => dracak_vtt_rychlost_pohybu($pdo, $pohyblivost['bonus_pohyblivosti'] ?? null),
         'naklad' => $naklad,
         'hranice_nalozeni' => $nosnost !== null ? [$nosnost, $nosnost * 2, $nosnost * 3, $nosnost * 4] : null,
-        'postrech' => $stupne['inteligence'] !== null ? dracak_vtt_postrech($stupne['inteligence'], $zakladniRasa) : null,
+        'postrech' => $stupneEf['inteligence'] !== null ? dracak_vtt_postrech($stupneEf['inteligence'], $zakladniRasa) : null,
         'zbrane' => $zbrane,
         'obrana' => $obrana,
         'zkusenost' => dracak_vtt_zkusenost($pdo, $postava),

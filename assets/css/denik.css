@@ -226,3 +226,8 @@
   .dn-pas { position: static; box-shadow: none; }
   .dn-pms, .dn-nav, .dn-nav-horni, .dn-text-akce { display: none !important; }
 }
+
+/* Důsledky únavy (Tabulka únavy) a přeškrtnuté hodnoty bez únavy */
+.dn-dusledky { margin: 4px 0 0; padding-left: 16px; font-size: 11.5px; color: var(--color-neutral-600); line-height: 1.4; }
+.dn-dusledky li { margin: 0; }
+.dn-vlast-h s, .dn-vlast-b s { opacity: .5; font-size: .8em; margin-right: 2px; }

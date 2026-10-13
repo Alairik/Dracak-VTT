@@ -122,6 +122,22 @@
   v přepisu), řekni to a požádej uživatele o foto/doplnění knihy —
   nedomýšlej a nehádej; (4) co v DB nemá oporu v pravidlech a nic to
   nepoužívá, nemusí tam být.
+- **"Doplň to do pravidel" znamená do `/pravidla.php` — a když na těch
+  datech VTT staví, i do DB.** Dvě vrstvy, obě:
+  1. **Text knihy** = `content/pravidla-hrac.html` / `-pj.html` /
+     `-bestiar.html`; to je to, co `pravidla.php` čtenáři posílá (tabulky
+     jako `<div class="table-wrap"><table>` podle okolních). **Každý nový
+     blok (`p`, `tr`, `li`, `h*` s `data-blk="1"`) musí mít unikátní
+     `id="bNNNNN"`** — řady: hrac 93xxx, pj 94xxx, bestiar 95xxx (další
+     volné = nejvyšší existující + 1) — bez id nejde editovat tužkou ani
+     přepsat přes `pravidla_texty`. Když přepisuješ existující blok, drž
+     jeho id.
+  2. **DB** = strukturovaná data, ze kterých počítá engine (číselníky,
+     tabulky; nová migrace podle pravidel výš, s citací h/b-id v hlavičce).
+     `pravidla.php` sám z DB bere jen: živé karty nadpisů napojených
+     přes `edit-links.json`/`content-links.json` a přepisy v tabulce
+     `pravidla_texty` (ty mají přednost před textem v souboru!).
+     Text knihy se tedy NEdoplňuje jen do DB a naopak.
 - **Nejistota v herní mechanice (výpočty, vzorce, co přesně dělá
   iniciativa/finta/atribut) se neřeší odhadem.** Skutečný text pravidel
   je v `content/pravidla-hrac.html`, `pravidla-pj.html`,

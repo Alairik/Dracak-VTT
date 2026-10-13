@@ -158,8 +158,8 @@ dracak_vtt_page_start($postava['nazev'], $user);
         <?php if ($pohyblivost): ?>
           <strong>Základní pohyblivost (bez naložení): <?= $pohyblivost['zakladni'] ?></strong>
           — rasa <?= $pohyblivost['rasovy_zaklad'] ?>,
-          obratnost <?= $znamenko($pohyblivost['bonus_obratnost']) ?>,
-          2× síla (<?= $znamenko($pohyblivost['bonus_sila']) ?>)<br>
+          obratnost <?= $znamenko($pohyblivost['bonus_obratnost'] - $pohyblivost['unava_postih']) ?>,
+          2× síla (<?= $znamenko($pohyblivost['bonus_sila'] - $pohyblivost['unava_postih']) ?>)<?= $pohyblivost['unava_postih'] > 0 ? ' — únava ubírá ' . $pohyblivost['unava_postih'] . ' k bonusu za sílu i obratnost (bez ní ' . $pohyblivost['zakladni_bez_unavy'] . ')' : '' ?><br>
           <?php if ($pohyblivost['nosnost_mn'] !== null && $pohyblivost['nalozeni']): ?>
             Náklad z inventáře: <?= round($naklad['naklad_mn'], 1) ?> mn z nosnosti <?= $pohyblivost['nosnost_mn'] ?> mn
             — naložení <?= $nalozeniNazvy[$pohyblivost['nalozeni']['kod']] ?>.

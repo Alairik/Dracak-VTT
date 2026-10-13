@@ -28312,9 +28312,73 @@ Roj může v jednom celém kole 4x zaútočit nebo 4x bránit či libovolně kom
 <p data-blk="1" data-part="hrac" data-sec="h1634" id="b10865"><strong>Nosnost, naložení a pohyblivost</strong> (opakování z PPZ) — nosnost dle síly (Tabulka nosnosti, bonus −5 až +5 → 210–510 mn), naložení (Tabulka naložení: žádné/mírné/střední/velké dle násobku nosnosti, snižuje pohyblivost na ¾/½/¼). Základní pohyblivost = rasový základ + bonus za obratnost + 2× bonus za sílu.</p>
 <p class="cb cb-example" data-blk="1" data-part="hrac" data-sec="h1634" id="b10866"><em>PŘÍKLAD:</em> Barbar Hrun (síla 19, obratnost 9) má základní pohyblivost 12+(−1)+2×(+4)=19 (bonus +4 nenaložen). S nákladem 1540 mn (přes trojnásobek nosnosti) má postih −3 k boji a pohyblivost klesá na 5; po odhození torny a vaku stoupá na 15 (+2), po odhození meče na 19 (+4).</p>
 <p data-blk="1" data-part="hrac" data-sec="h1634" id="b10867"><strong>Rychlost a body pohybu</strong> — místo pevné rychlosti se používají body pohybu potřebné na uražení 1 míle podle terénu (např. cesta 10 bodů, hustý les 20 bodů = poloviční rychlost). Tři stupně chůze (procházka/chůze/spěch) a tři stupně běhu (poklus/běh/sprint) — Tabulka rychlosti při chůzi (bonus −5 až +5 → 12–42/20–70/28–98 bodů za hodinu) a Tabulka rychlosti při běhu (16–56/24–84/48–138 bodů za kolo dle poklus/běh/sprint). Náročnost terénu se udává zvlášť pro chůzi (body/míli) a běh (body/10 sáhů) — číselně stejná.</p>
-<p class="cb cb-note" data-blk="1" data-part="hrac" data-sec="h1634" id="b10868"><em>(Pozn.: konkrétní číselné Tabulky rychlosti při chůzi/běhu, stejně jako plná Tabulka únavy s postihy ke všem čtyřem vlastnostem u každého stupně, se v přepisu zdroje nedochovaly jako tabulky — jen slovní shrnutí uvedené výše (u rychlosti jen rozsahy hodnot; u únavy jen cíl postihu explicitně u "unavená" a u "úplně vyčerpaná", ne u všech čtyř stupňů). Všechny tři je potřeba znovu přepsat z fotografie knihy, než na nich půjde stavět automatizaci. Náročnost terénu naproti tomu nechybí, jen je pod jinou hlavičkou — viz sloupec "náročnost" v Tabulce naložení povozu, h1641, výslovně ve stejných jednotkách.)</em></p>
+<p data-blk="1" data-part="hrac" data-sec="h1634" id="b93008"><strong>TABULKA RYCHLOSTI PŘI CHŮZI</strong> (bodů chůze za hodinu; bonusy +6 a vyšší viz Bestiář)</p>
+<div class="table-wrap"><table>
+<thead>
+<tr data-part="hrac">
+<th style="text-align: center;">bonus za pohybl.</th>
+<th style="text-align: center;">procházka</th>
+<th style="text-align: center;">chůze</th>
+<th style="text-align: center;">spěch</th>
+</tr>
+</thead>
+<tbody>
+<tr data-blk="1" data-part="hrac" data-sec="h1634" id="b93009"><td style="text-align: center;">−5</td><td style="text-align: center;">12</td><td style="text-align: center;">20</td><td style="text-align: center;">28</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1634" id="b93010"><td style="text-align: center;">−4</td><td style="text-align: center;">15</td><td style="text-align: center;">25</td><td style="text-align: center;">35</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1634" id="b93011"><td style="text-align: center;">−3</td><td style="text-align: center;">18</td><td style="text-align: center;">30</td><td style="text-align: center;">42</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1634" id="b93012"><td style="text-align: center;">−2</td><td style="text-align: center;">21</td><td style="text-align: center;">35</td><td style="text-align: center;">49</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1634" id="b93013"><td style="text-align: center;">−1</td><td style="text-align: center;">24</td><td style="text-align: center;">40</td><td style="text-align: center;">56</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1634" id="b93014"><td style="text-align: center;">0</td><td style="text-align: center;">27</td><td style="text-align: center;">45</td><td style="text-align: center;">63</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1634" id="b93015"><td style="text-align: center;">+1</td><td style="text-align: center;">30</td><td style="text-align: center;">50</td><td style="text-align: center;">70</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1634" id="b93016"><td style="text-align: center;">+2</td><td style="text-align: center;">33</td><td style="text-align: center;">55</td><td style="text-align: center;">77</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1634" id="b93017"><td style="text-align: center;">+3</td><td style="text-align: center;">36</td><td style="text-align: center;">60</td><td style="text-align: center;">84</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1634" id="b93018"><td style="text-align: center;">+4</td><td style="text-align: center;">39</td><td style="text-align: center;">65</td><td style="text-align: center;">91</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1634" id="b93019"><td style="text-align: center;">+5</td><td style="text-align: center;">42</td><td style="text-align: center;">70</td><td style="text-align: center;">98</td></tr>
+</tbody>
+</table></div>
+<p data-blk="1" data-part="hrac" data-sec="h1634" id="b93020"><strong>TABULKA RYCHLOSTI PŘI BĚHU</strong> (bodů běhu za kolo; bonusy +6 a vyšší viz Bestiář)</p>
+<div class="table-wrap"><table>
+<thead>
+<tr data-part="hrac">
+<th style="text-align: center;">bonus za pohybl.</th>
+<th style="text-align: center;">poklus</th>
+<th style="text-align: center;">běh</th>
+<th style="text-align: center;">sprint</th>
+</tr>
+</thead>
+<tbody>
+<tr data-blk="1" data-part="hrac" data-sec="h1634" id="b93021"><td style="text-align: center;">−5</td><td style="text-align: center;">16</td><td style="text-align: center;">24</td><td style="text-align: center;">48</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1634" id="b93022"><td style="text-align: center;">−4</td><td style="text-align: center;">20</td><td style="text-align: center;">30</td><td style="text-align: center;">57</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1634" id="b93023"><td style="text-align: center;">−3</td><td style="text-align: center;">24</td><td style="text-align: center;">36</td><td style="text-align: center;">66</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1634" id="b93024"><td style="text-align: center;">−2</td><td style="text-align: center;">28</td><td style="text-align: center;">42</td><td style="text-align: center;">75</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1634" id="b93025"><td style="text-align: center;">−1</td><td style="text-align: center;">32</td><td style="text-align: center;">48</td><td style="text-align: center;">84</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1634" id="b93026"><td style="text-align: center;">0</td><td style="text-align: center;">36</td><td style="text-align: center;">54</td><td style="text-align: center;">93</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1634" id="b93027"><td style="text-align: center;">+1</td><td style="text-align: center;">40</td><td style="text-align: center;">60</td><td style="text-align: center;">102</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1634" id="b93028"><td style="text-align: center;">+2</td><td style="text-align: center;">44</td><td style="text-align: center;">66</td><td style="text-align: center;">111</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1634" id="b93029"><td style="text-align: center;">+3</td><td style="text-align: center;">48</td><td style="text-align: center;">72</td><td style="text-align: center;">120</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1634" id="b93030"><td style="text-align: center;">+4</td><td style="text-align: center;">52</td><td style="text-align: center;">78</td><td style="text-align: center;">129</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1634" id="b93031"><td style="text-align: center;">+5</td><td style="text-align: center;">56</td><td style="text-align: center;">84</td><td style="text-align: center;">138</td></tr>
+</tbody>
+</table></div>
 <p data-blk="1" data-part="hrac" data-sec="h1634" id="b10869"><strong>Vytrvalost a únava</strong> — vytrvalost = odolnost. Únava: 2 h procházky = 1 bod, 1 h chůze = 1 bod, ⅓ h spěchu = 1 bod, 20 kol poklusu = 1 bod (stínová), 1 směna poklusu = 3 body (stínové), 6 kol běhu = 1 bod (stínová), 1 směna běhu = 10 bodů (stínové), 1 kolo sprintu = 1 bod (stínová), ¼ h šplhu = 1 bod, 1 směna boje = 1 bod (stínová), 1 h fyzické/psychické práce = 1–3 body (psychická stínová), 1 h průzkumu = 2 body, 2 h hlídky = 1–2 body, jízda na zvířeti = zpravidla třetina bodů únavy zvířete. Stínová únava po směně nečinnosti mizí na čtvrtinu.</p>
-<p data-blk="1" data-part="hrac" data-sec="h1634" id="b10870">Nad vytrvalost je postava <strong>unavená</strong> (Tabulka únavy: postih −1 k síle/obratnosti, žádný sprint), nad dvojnásobek <strong>vyčerpaná</strong> (postih −2, bez běhu/sprintu/kouzel/meditace/zaostření vůle u kouzelníka/hraničáře), nad trojnásobek <strong>úplně vyčerpaná</strong> (postih −3, stupeň inteligence −4, stupeň charismy −2, jen plazení s postihem −1), nad čtyřnásobek <strong>vysílená</strong> (postava omdlévá, bez pomoci umírá během 1k6 hodin).</p>
+<p data-blk="1" data-part="hrac" data-sec="h1634" id="b10870">Nad vytrvalost je postava <strong>unavená</strong>, nad dvojnásobek <strong>vyčerpaná</strong>, nad trojnásobek <strong>úplně vyčerpaná</strong>, nad čtyřnásobek <strong>vysílená</strong> (postava omdlévá, bez pomoci umírá během 1k6 hodin). Postihy a omezení v jednotlivých stupních udává Tabulka únavy.</p>
+<p data-blk="1" data-part="hrac" data-sec="h1634" id="b93032"><strong>TABULKA ÚNAVY</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr data-part="hrac">
+<th style="text-align: center;">únava (násobky vytrvalosti)</th>
+<th style="text-align: center;">stav</th>
+<th style="text-align: center;">důsledek</th>
+</tr>
+</thead>
+<tbody>
+<tr data-blk="1" data-part="hrac" data-sec="h1634" id="b93033"><td style="text-align: center;">více než 1 – 2</td><td style="text-align: center;">unavená</td><td style="text-align: left; white-space: normal; min-width: 22em;">Bonus za sílu a obratnost klesá o 1*<br>Nesmí používat sprint</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1634" id="b93034"><td style="text-align: center;">více než 2 – 3</td><td style="text-align: center;">vyčerpaná</td><td style="text-align: left; white-space: normal; min-width: 22em;">Bonus za sílu a obratnost klesá o 2*<br>Stupeň inteligence se snižuje o 2<sup>†</sup><br>Nesmí používat běh ani sprint (ale smí poklus)<br>Nemůže sesílat kouzla (ani z předmětů)<br>Kouzelník nedokáže zaostřit vůli, hraničář nemůže meditovat ani používat mimosmyslové schopnosti</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1634" id="b93035"><td style="text-align: center;">více než 3 – 4</td><td style="text-align: center;">úplně vyčerpaná</td><td style="text-align: left; white-space: normal; min-width: 22em;">Bonus za sílu a obratnost klesá o 3*<br>Stupeň inteligence se snižuje o 4<sup>†</sup><br>Stupeň charismy se snižuje o 2<br>Může se jen plazit (procházka s postihem −1)</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1634" id="b93036"><td style="text-align: center;">více než 4</td><td style="text-align: center;">vysílená</td><td style="text-align: left; white-space: normal; min-width: 22em;">Postava omdlévá, a pokud jí někdo neposkytne pomoc, umírá během 1k6 hodin.</td></tr>
+</tbody>
+</table></div>
+<p data-blk="1" data-part="hrac" data-sec="h1634" id="b93037">* postih může být i horší než −5. Například úplně vyčerpaná postava se silou 4 má bonus (vlastně postih) k síle −6.<br><sup>†</sup> inteligence nemůže nikdy být nižší než 2.</p>
 <p class="cb cb-example" data-blk="1" data-part="hrac" data-sec="h1634" id="b10871"><em>PŘÍKLAD:</em> Obři (bonus k pohyblivosti +3, vytrvalost 21) pronásledují Hruna (bonus +4, vytrvalost 15) — Hrun běží 90 kol než je unavený (pohyblivost klesá na 16/+2), dalších 90 kol než vyčerpaný, pak musí zvolnit do klusu; ubíhá 7+6=13 mil za 3 směny, obři ho dostihnou.</p>
 <p data-blk="1" data-part="hrac" data-sec="h1634" id="b10872"><strong>Odpočinek a spánek</strong> — hodiny spánku ke snížení o stupeň únavy = 8 − polovina bonusu za odolnost (zaokrouhleno nahoru, přičti polovinu postihu); po tomto spánku zmizí tolik bodů únavy, kolik je odolnost. Poloviční spánek dá poloviční efekt (jen o stupeň, ne dva). Postavy mohou spát max. 2× denně. Odpočinek bez spánku (vyšívání, karty, povalování) má poloviční účinek, nelze při něm meditovat ani zaostřovat vůli. Bez spánku 24 h postava sice nedostává žádný postih z hlediska únavy, ale stává se z ní "procházka" (podrobnosti PJ).</p>
 <p class="cb cb-example" data-blk="1" data-part="hrac" data-sec="h1634" id="b10873"><em>PŘÍKLAD:</em> Obr Bonifác s odolností 21 (bonus +5) se z vyčerpání vyspí za 5 hodin (8−⁵⁄₂≈5).</p>
@@ -28617,7 +28681,7 @@ Roj může v jednom celém kole 4x zaútočit nebo 4x bránit či libovolně kom
 <li data-blk="1" data-part="hrac" data-sec="h1646" id="b10955"><strong>Veslice</strong> — lodice sloužící především přepravě osob a nákladu z přístavu, může sloužit i jako záchranný člun. Lze ji vybavit malou plachtou, na jejíž ovládání stačí jeden až dva námořníci.</li>
 </ol>
 <p class="cb cb-note" data-blk="1" data-part="hrac" data-sec="h1646" id="b10956"><em>(Pozn.: doplněno 2026-10 z fotografie PPP str. 82 — "Vlastnosti lodí jsou shrnuty v Tabulce lodí na předchozí straně", na kterou text opakovaně odkazuje.)</em></p>
-<p data-blk="1" data-part="hrac" data-sec="h1646"><strong>TABULKA LODÍ</strong></p>
+<p data-blk="1" data-part="hrac" data-sec="h1646" id="b93038"><strong>TABULKA LODÍ</strong></p>
 <div class="table-wrap"><table>
 <thead>
 <tr data-part="hrac">
@@ -28637,34 +28701,34 @@ Roj může v jednom celém kole 4x zaútočit nebo 4x bránit či libovolně kom
 </tr>
 </thead>
 <tbody>
-<tr data-blk="1" data-part="hrac" data-sec="h1646">
+<tr data-blk="1" data-part="hrac" data-sec="h1646" id="b93039">
 <td style="text-align: center;">Brigantina</td><td style="text-align: center;">20–30</td><td style="text-align: center;">3–5</td><td style="text-align: center;">12–16</td><td style="text-align: center;">5–20</td><td style="text-align: center;">24–32</td><td style="text-align: center;">10–30</td><td style="text-align: center;">1 200–3 000</td><td style="text-align: center;">20–80</td><td style="text-align: center;">0.8–1.5</td><td style="text-align: center;">2 bal.</td><td style="text-align: center;">2</td><td style="text-align: center;">3 000–7 500</td>
 </tr>
-<tr data-blk="1" data-part="hrac" data-sec="h1646">
+<tr data-blk="1" data-part="hrac" data-sec="h1646" id="b93040">
 <td style="text-align: center;">Galéra</td><td style="text-align: center;">40–50</td><td style="text-align: center;">5–8</td><td style="text-align: center;">20–25</td><td style="text-align: center;">30–100</td><td style="text-align: center;">200–250</td><td style="text-align: center;">100–150</td><td style="text-align: center;">4 000–8 000</td><td style="text-align: center;">150–350</td><td style="text-align: center;">1.2–2.5</td><td style="text-align: center;">2–6 bal., 0–2 pal., 0–1 mon.</td><td style="text-align: center;">3</td><td style="text-align: center;">10 000–20 000</td>
 </tr>
-<tr data-blk="1" data-part="hrac" data-sec="h1646">
+<tr data-blk="1" data-part="hrac" data-sec="h1646" id="b93041">
 <td style="text-align: center;">Galeasa</td><td style="text-align: center;">55–70</td><td style="text-align: center;">8–12</td><td style="text-align: center;">30–50</td><td style="text-align: center;">100–150</td><td style="text-align: center;">300–500</td><td style="text-align: center;">270–450</td><td style="text-align: center;">8 800–16 800</td><td style="text-align: center;">500–2 000</td><td style="text-align: center;">2.5–5</td><td style="text-align: center;">4–8 bal., 2–4 pal., 1–2 mon.</td><td style="text-align: center;">4</td><td style="text-align: center;">22 000–42 000</td>
 </tr>
-<tr data-blk="1" data-part="hrac" data-sec="h1646">
+<tr data-blk="1" data-part="hrac" data-sec="h1646" id="b93042">
 <td style="text-align: center;">Monéra</td><td style="text-align: center;">20–30</td><td style="text-align: center;">4–6</td><td style="text-align: center;">15–25</td><td style="text-align: center;">8–12</td><td style="text-align: center;">30–50</td><td style="text-align: center;">30–50</td><td style="text-align: center;">1 600–3 600</td><td style="text-align: center;">60–100</td><td style="text-align: center;">0.5–1</td><td style="text-align: center;">2–4 bal., 0–2 pal.</td><td style="text-align: center;">1</td><td style="text-align: center;">4 000–9 000</td>
 </tr>
-<tr data-blk="1" data-part="hrac" data-sec="h1646">
+<tr data-blk="1" data-part="hrac" data-sec="h1646" id="b93043">
 <td style="text-align: center;">Diéra</td><td style="text-align: center;">20–35</td><td style="text-align: center;">4–7</td><td style="text-align: center;">20–30</td><td style="text-align: center;">10–12</td><td style="text-align: center;">80–120</td><td style="text-align: center;">30–80</td><td style="text-align: center;">1 600–4 900</td><td style="text-align: center;">60–150</td><td style="text-align: center;">0.7–1.5</td><td style="text-align: center;">2–4 bal., 0–2 pal.</td><td style="text-align: center;">2</td><td style="text-align: center;">4 000–12 250</td>
 </tr>
-<tr data-blk="1" data-part="hrac" data-sec="h1646">
+<tr data-blk="1" data-part="hrac" data-sec="h1646" id="b93044">
 <td style="text-align: center;">Triéra</td><td style="text-align: center;">25–40</td><td style="text-align: center;">4–7</td><td style="text-align: center;">20–30</td><td style="text-align: center;">10–25</td><td style="text-align: center;">120–180</td><td style="text-align: center;">40–100</td><td style="text-align: center;">2 000–5 600</td><td style="text-align: center;">80–200</td><td style="text-align: center;">0.9–1.5</td><td style="text-align: center;">2–6 bal., 0–2 pal., 0–1 mon.</td><td style="text-align: center;">3</td><td style="text-align: center;">5 000–14 000</td>
 </tr>
-<tr data-blk="1" data-part="hrac" data-sec="h1646">
+<tr data-blk="1" data-part="hrac" data-sec="h1646" id="b93045">
 <td style="text-align: center;">Koga</td><td style="text-align: center;">25–40</td><td style="text-align: center;">5–8</td><td style="text-align: center;">ne</td><td style="text-align: center;">28–40</td><td style="text-align: center;">ne</td><td style="text-align: center;">80–120</td><td style="text-align: center;">2 500–6 400</td><td style="text-align: center;">130–570</td><td style="text-align: center;">2.9–3.2</td><td style="text-align: center;">0–4 bal.</td><td style="text-align: center;">5</td><td style="text-align: center;">6 250–16 000</td>
 </tr>
-<tr data-blk="1" data-part="hrac" data-sec="h1646">
+<tr data-blk="1" data-part="hrac" data-sec="h1646" id="b93046">
 <td style="text-align: center;">Karaka</td><td style="text-align: center;">25–40</td><td style="text-align: center;">5–14</td><td style="text-align: center;">ne</td><td style="text-align: center;">43–80</td><td style="text-align: center;">ne</td><td style="text-align: center;">80–120</td><td style="text-align: center;">2 500–11 200</td><td style="text-align: center;">85–600</td><td style="text-align: center;">2.4–6</td><td style="text-align: center;">0–6 bal.</td><td style="text-align: center;">6</td><td style="text-align: center;">6 250–28 000</td>
 </tr>
-<tr data-blk="1" data-part="hrac" data-sec="h1646">
+<tr data-blk="1" data-part="hrac" data-sec="h1646" id="b93047">
 <td style="text-align: center;">Karavela</td><td style="text-align: center;">15–55</td><td style="text-align: center;">6–12</td><td style="text-align: center;">max. 2</td><td style="text-align: center;">1–4</td><td style="text-align: center;">0</td><td style="text-align: center;">80–150</td><td style="text-align: center;">1 800–13 200</td><td style="text-align: center;">85–800</td><td style="text-align: center;">1.7–5.15</td><td style="text-align: center;">2–8 bal.</td><td style="text-align: center;">7</td><td style="text-align: center;">4 500–33 000</td>
 </tr>
-<tr data-blk="1" data-part="hrac" data-sec="h1646">
+<tr data-blk="1" data-part="hrac" data-sec="h1646" id="b93048">
 <td style="text-align: center;">Veslice</td><td style="text-align: center;">2–8</td><td style="text-align: center;">max. 2</td><td style="text-align: center;">1–4</td><td style="text-align: center;">0</td><td style="text-align: center;">1–8</td><td style="text-align: center;">0–8</td><td style="text-align: center;">100–400</td><td style="text-align: center;">1–3</td><td style="text-align: center;">0.1–0.5</td><td style="text-align: center;">—</td><td style="text-align: center;">1</td><td style="text-align: center;">50–300</td>
 </tr>
 </tbody>
@@ -28681,7 +28745,7 @@ Roj může v jednom celém kole 4x zaútočit nebo 4x bránit či libovolně kom
 <p data-blk="1" data-part="hrac" data-sec="h1651" id="b10961">Rychlost lodí je jedním z nejdůležitějších údajů pro námořní souboj. Pro plachetnice se rychlost v sázích za mořské kolo získá tak, že se rychlost lodi v mílích za den vynásobí sedmi a výsledek se vydělí deseti.</p>
 <p data-blk="1" data-part="hrac" data-sec="h1651" id="b10962">Rychlost lodi závisí také na její poloze vůči směru větru — provádí-li loď obrat, počítá se vždy rychlostí odpovídající její výchozí poloze.</p>
 <p class="cb cb-note" data-blk="1" data-part="hrac" data-sec="h1651" id="b10963"><em>(Pozn.: doplněno 2026-10 z fotografie PPP — Tabulka rychlostí lodí, Tabulka veslování a Tabulka bouří, na které text výše opakovaně odkazuje.)</em></p>
-<p data-blk="1" data-part="hrac" data-sec="h1651"><strong>TABULKA RYCHLOSTI LODÍ</strong> (mil za den)</p>
+<p data-blk="1" data-part="hrac" data-sec="h1651" id="b93049"><strong>TABULKA RYCHLOSTI LODÍ</strong> (mil za den)</p>
 <div class="table-wrap"><table>
 <thead>
 <tr data-part="hrac">
@@ -28693,18 +28757,18 @@ Roj může v jednom celém kole 4x zaútočit nebo 4x bránit či libovolně kom
 </tr>
 </thead>
 <tbody>
-<tr data-blk="1" data-part="hrac" data-sec="h1651"><td style="text-align: center;">Brigantina</td><td style="text-align: center;">50</td><td style="text-align: center;">70</td><td style="text-align: center;">60</td><td style="text-align: center;">80</td></tr>
-<tr data-blk="1" data-part="hrac" data-sec="h1651"><td style="text-align: center;">Galéra</td><td style="text-align: center;">30</td><td style="text-align: center;">50</td><td style="text-align: center;">40</td><td style="text-align: center;">60</td></tr>
-<tr data-blk="1" data-part="hrac" data-sec="h1651"><td style="text-align: center;">Galeasa</td><td style="text-align: center;">10</td><td style="text-align: center;">30</td><td style="text-align: center;">20</td><td style="text-align: center;">40</td></tr>
-<tr data-blk="1" data-part="hrac" data-sec="h1651"><td style="text-align: center;">Monéra</td><td style="text-align: center;">40</td><td style="text-align: center;">60</td><td style="text-align: center;">50</td><td style="text-align: center;">70</td></tr>
-<tr data-blk="1" data-part="hrac" data-sec="h1651"><td style="text-align: center;">Diéra</td><td style="text-align: center;">30</td><td style="text-align: center;">50</td><td style="text-align: center;">40</td><td style="text-align: center;">60</td></tr>
-<tr data-blk="1" data-part="hrac" data-sec="h1651"><td style="text-align: center;">Triéra</td><td style="text-align: center;">20</td><td style="text-align: center;">40</td><td style="text-align: center;">30</td><td style="text-align: center;">50</td></tr>
-<tr data-blk="1" data-part="hrac" data-sec="h1651"><td style="text-align: center;">Koga</td><td style="text-align: center;">60–30</td><td style="text-align: center;">80–50</td><td style="text-align: center;">70–40</td><td style="text-align: center;">110–95</td></tr>
-<tr data-blk="1" data-part="hrac" data-sec="h1651"><td style="text-align: center;">Karaka</td><td style="text-align: center;">65–20</td><td style="text-align: center;">90–45</td><td style="text-align: center;">75–30</td><td style="text-align: center;">110–80</td></tr>
-<tr data-blk="1" data-part="hrac" data-sec="h1651"><td style="text-align: center;">Karavela</td><td style="text-align: center;">80–20</td><td style="text-align: center;">110–50</td><td style="text-align: center;">80–40</td><td style="text-align: center;">110–90</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1651" id="b93050"><td style="text-align: center;">Brigantina</td><td style="text-align: center;">50</td><td style="text-align: center;">70</td><td style="text-align: center;">60</td><td style="text-align: center;">80</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1651" id="b93051"><td style="text-align: center;">Galéra</td><td style="text-align: center;">30</td><td style="text-align: center;">50</td><td style="text-align: center;">40</td><td style="text-align: center;">60</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1651" id="b93052"><td style="text-align: center;">Galeasa</td><td style="text-align: center;">10</td><td style="text-align: center;">30</td><td style="text-align: center;">20</td><td style="text-align: center;">40</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1651" id="b93053"><td style="text-align: center;">Monéra</td><td style="text-align: center;">40</td><td style="text-align: center;">60</td><td style="text-align: center;">50</td><td style="text-align: center;">70</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1651" id="b93054"><td style="text-align: center;">Diéra</td><td style="text-align: center;">30</td><td style="text-align: center;">50</td><td style="text-align: center;">40</td><td style="text-align: center;">60</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1651" id="b93055"><td style="text-align: center;">Triéra</td><td style="text-align: center;">20</td><td style="text-align: center;">40</td><td style="text-align: center;">30</td><td style="text-align: center;">50</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1651" id="b93056"><td style="text-align: center;">Koga</td><td style="text-align: center;">60–30</td><td style="text-align: center;">80–50</td><td style="text-align: center;">70–40</td><td style="text-align: center;">110–95</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1651" id="b93057"><td style="text-align: center;">Karaka</td><td style="text-align: center;">65–20</td><td style="text-align: center;">90–45</td><td style="text-align: center;">75–30</td><td style="text-align: center;">110–80</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1651" id="b93058"><td style="text-align: center;">Karavela</td><td style="text-align: center;">80–20</td><td style="text-align: center;">110–50</td><td style="text-align: center;">80–40</td><td style="text-align: center;">110–90</td></tr>
 </tbody>
 </table></div>
-<p data-blk="1" data-part="hrac" data-sec="h1651"><strong>TABULKA VESLOVÁNÍ</strong> (mil za den při daném tempu; sloupec "za den" = celkový dosah při střídání veslařů)</p>
+<p data-blk="1" data-part="hrac" data-sec="h1651" id="b93059"><strong>TABULKA VESLOVÁNÍ</strong> (mil za den při daném tempu; sloupec "za den" = celkový dosah při střídání veslařů)</p>
 <div class="table-wrap"><table>
 <thead>
 <tr data-part="hrac">
@@ -28717,23 +28781,23 @@ Roj může v jednom celém kole 4x zaútočit nebo 4x bránit či libovolně kom
 </tr>
 </thead>
 <tbody>
-<tr data-blk="1" data-part="hrac" data-sec="h1651"><td style="text-align: center;">Brigantina</td><td style="text-align: center;">2–3</td><td style="text-align: center;">3–4</td><td style="text-align: center;">4–5</td><td style="text-align: center;">7</td><td style="text-align: center;">14–21</td></tr>
-<tr data-blk="1" data-part="hrac" data-sec="h1651"><td style="text-align: center;">Galéra</td><td style="text-align: center;">2–4</td><td style="text-align: center;">4–5</td><td style="text-align: center;">5–6</td><td style="text-align: center;">8</td><td style="text-align: center;">16–32</td></tr>
-<tr data-blk="1" data-part="hrac" data-sec="h1651"><td style="text-align: center;">Galeasa</td><td style="text-align: center;">3–5</td><td style="text-align: center;">4–7</td><td style="text-align: center;">5–8</td><td style="text-align: center;">9</td><td style="text-align: center;">27–45</td></tr>
-<tr data-blk="1" data-part="hrac" data-sec="h1651"><td style="text-align: center;">Monéra</td><td style="text-align: center;">3–5</td><td style="text-align: center;">4–7</td><td style="text-align: center;">5–8</td><td style="text-align: center;">7</td><td style="text-align: center;">21–35</td></tr>
-<tr data-blk="1" data-part="hrac" data-sec="h1651"><td style="text-align: center;">Diéra</td><td style="text-align: center;">4–6</td><td style="text-align: center;">5–7</td><td style="text-align: center;">6–9</td><td style="text-align: center;">7.5</td><td style="text-align: center;">30–45</td></tr>
-<tr data-blk="1" data-part="hrac" data-sec="h1651"><td style="text-align: center;">Triéra</td><td style="text-align: center;">6–9</td><td style="text-align: center;">7–10</td><td style="text-align: center;">8–12</td><td style="text-align: center;">8</td><td style="text-align: center;">48–72</td></tr>
-<tr data-blk="1" data-part="hrac" data-sec="h1651"><td style="text-align: center;">Veslice</td><td style="text-align: center;">1–4</td><td style="text-align: center;">2–8</td><td style="text-align: center;">3–9</td><td style="text-align: center;">9</td><td style="text-align: center;">9–36</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1651" id="b93060"><td style="text-align: center;">Brigantina</td><td style="text-align: center;">2–3</td><td style="text-align: center;">3–4</td><td style="text-align: center;">4–5</td><td style="text-align: center;">7</td><td style="text-align: center;">14–21</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1651" id="b93061"><td style="text-align: center;">Galéra</td><td style="text-align: center;">2–4</td><td style="text-align: center;">4–5</td><td style="text-align: center;">5–6</td><td style="text-align: center;">8</td><td style="text-align: center;">16–32</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1651" id="b93062"><td style="text-align: center;">Galeasa</td><td style="text-align: center;">3–5</td><td style="text-align: center;">4–7</td><td style="text-align: center;">5–8</td><td style="text-align: center;">9</td><td style="text-align: center;">27–45</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1651" id="b93063"><td style="text-align: center;">Monéra</td><td style="text-align: center;">3–5</td><td style="text-align: center;">4–7</td><td style="text-align: center;">5–8</td><td style="text-align: center;">7</td><td style="text-align: center;">21–35</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1651" id="b93064"><td style="text-align: center;">Diéra</td><td style="text-align: center;">4–6</td><td style="text-align: center;">5–7</td><td style="text-align: center;">6–9</td><td style="text-align: center;">7.5</td><td style="text-align: center;">30–45</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1651" id="b93065"><td style="text-align: center;">Triéra</td><td style="text-align: center;">6–9</td><td style="text-align: center;">7–10</td><td style="text-align: center;">8–12</td><td style="text-align: center;">8</td><td style="text-align: center;">48–72</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1651" id="b93066"><td style="text-align: center;">Veslice</td><td style="text-align: center;">1–4</td><td style="text-align: center;">2–8</td><td style="text-align: center;">3–9</td><td style="text-align: center;">9</td><td style="text-align: center;">9–36</td></tr>
 </tbody>
 </table></div>
-<p data-blk="1" data-part="hrac" data-sec="h1651"><strong>TABULKA BOUŘÍ</strong></p>
+<p data-blk="1" data-part="hrac" data-sec="h1651" id="b93067"><strong>TABULKA BOUŘÍ</strong></p>
 <div class="table-wrap"><table>
 <thead>
 <tr data-part="hrac"><th></th><th style="text-align: center;">bouře</th><th style="text-align: center;">hurikán</th></tr>
 </thead>
 <tbody>
-<tr data-blk="1" data-part="hrac" data-sec="h1651"><td><strong>nebezpečnost</strong></td><td style="text-align: center;">7</td><td style="text-align: center;">12</td></tr>
-<tr data-blk="1" data-part="hrac" data-sec="h1651"><td><strong>síla</strong></td><td style="text-align: center;">0/50</td><td style="text-align: center;">50/100</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1651" id="b93068"><td><strong>nebezpečnost</strong></td><td style="text-align: center;">7</td><td style="text-align: center;">12</td></tr>
+<tr data-blk="1" data-part="hrac" data-sec="h1651" id="b93069"><td><strong>síla</strong></td><td style="text-align: center;">0/50</td><td style="text-align: center;">50/100</td></tr>
 </tbody>
 </table></div>
 <h4 id="h1652">Manévrovací schopnost</h4>

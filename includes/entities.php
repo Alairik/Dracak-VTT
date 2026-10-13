@@ -336,9 +336,13 @@ return [
     'vlastnosti' => ['label' => 'Vlastnosti', 'group' => 'ciselniky', 'hidden_from_players' => false, 'order_by' => 'id'],
     'opravy_za_atribut' => ['label' => 'Opravy za atribut', 'group' => 'ciselniky', 'hidden_from_players' => false, 'order_by' => 'stupen_od'],
     'nosnost_podle_sily' => ['label' => 'Nosnost podle Síly', 'group' => 'ciselniky', 'hidden_from_players' => false, 'order_by' => 'oprava_sil'],
-    'narocnost_akci_unava' => ['label' => 'Náročnost akcí (únava)', 'group' => 'ciselniky', 'hidden_from_players' => false, 'order_by' => 'id'],
+    // narocnost_akci_unava, odstraneni_unavy a stupne_unavy (migrace 0008) tu
+    // záměrně nejsou: jsou to jiný model únavy než v pravidlech (hranice 10 +
+    // odolnost, "spánek −10 bodů"…; skutečná pravidla: content/pravidla-hrac.html
+    // h1634, vytrvalost = odolnost, 4 stupně) a nic je nepoužívá.
     'jizdni_zvirata' => ['label' => 'Jízdní zvířata', 'group' => 'ciselniky', 'hidden_from_players' => false, 'order_by' => 'id'],
-    'odstraneni_unavy' => ['label' => 'Odstranění únavy', 'group' => 'ciselniky', 'hidden_from_players' => false, 'order_by' => 'id'],
+    'rychlost_chuze' => ['label' => 'Rychlost při chůzi', 'group' => 'ciselniky', 'hidden_from_players' => false, 'order_by' => 'bonus_pohyblivosti'],
+    'rychlost_behu' => ['label' => 'Rychlost při běhu', 'group' => 'ciselniky', 'hidden_from_players' => false, 'order_by' => 'bonus_pohyblivosti'],
     'vysledky_testu' => ['label' => 'Výsledky testu (škála)', 'group' => 'ciselniky', 'hidden_from_players' => false, 'order_by' => 'poradi'],
     // 'velikosti' vynechané záměrně — primární klíč je `kod`, ne `id`,
     // generický editor v1 počítá jen s `id`. Uprav přes phpMyAdmin.

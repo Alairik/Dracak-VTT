@@ -34,9 +34,12 @@ ním čeká, dokud se to neprovede ručně.
 **Ruční DDL blok je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný soubor, ve
 kterém jsou všechny dosud neprovedené DDL příkazy v pořadí; uživatel ho
 dostává jako text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav:
-prázdný** — poslední blok (`0065`, `0067`, `0068`, `0070`, `0071`) uživatel
-provedl a deploy ho potvrdil (migrate.php: `0066`, `0069`, `0072`, `0073`
-proběhly samy, smoke test zelený). `DROP TABLE stupne_unavy;` (stará
+čeká blok pro `0074` (tabulky `rychlost_chuze`, `rychlost_behu`) a `0075`
+(`jizdni_zvirata.nosnost_tah_mn`)** — ověřeno na kopii produkčního stavu
+(dvakrát za sebou, pak `migrate.php` pod DML-only účtem: 0074–0076 doběhly).
+Do spuštění deploy v posledním kroku skončí HTTP 500 (FTP část proběhne,
+kód je nasazený a bez tabulek funguje v degradovaném režimu). Předchozí
+blok (`0065`–`0071`) je na produkci hotový. `DROP TABLE stupne_unavy;` (stará
 nepoužívaná tabulka z 0008) uživatel zatím nechtěl/neprovedl — jako
 migrace jít nemůže (`migrate.php` odmítne DROP).
 
@@ -208,26 +211,36 @@ které se bude pokračovat.
   (násobek nosnosti) snižuje na ¾/½/¼.
 - **TABULKA RYCHLOSTI PŘI CHŮZI** a **PŘI BĚHU** — jednotka: body pohybu
   za hodinu (chůze) / za kolo (běh), podle bonusu za pohyblivost a tempa
-  (procházka/chůze/spěch; poklus/běh/sprint). **POZOR: plná čísla v repu
-  NEJSOU.** Uživatel je dodal foto v dřívější konverzaci, ale do
-  `content/` se nikdy nepřepsala — h1634 b10868 pořád říká, že se
-  nedochovala, a b10867 uvádí jen rozsahy (bonus −5 až +5 →
-  12–42/20–70/28–98 bodů za hodinu a 16–56/24–84/48–138 bodů za kolo).
-  Před Fází 4 je potřeba foto dodat znovu a přepsat do
-  `content/pravidla-hrac.html` (stejně jako Tabulka lodí v a0915fc).
-- **TABULKA ÚNAVY** — stejný případ: 4 stupně (unavená/vyčerpaná/úplně
-  vyčerpaná/vysílená) s prahy 1×/2×/3×/4× vytrvalosti (= Odolnost) jsou
-  v h1634 b10870, ale **plná tabulka postihů k síle/obratnosti/
-  inteligenci/charismě u každého stupně v repu není** (jen slovní
-  shrnutí). Fáze 1 proto počítá stupeň a ukazuje doslovný text shrnutí,
-  žádné strukturované postihy.
-- **Náročnost terénu — NALEZENO, ne chybí**: sloupec "náročnost" v
-  TABULCE NALOŽENÍ POVOZU (h1641) je explicitně **ve stejných
-  jednotkách** ("v bodech pohybu, viz 'Rychlost a body pohybu' výše") —
-  tohle JE ta hledaná tabulka, jen schovaná pod jinou hlavičkou:
-  rovina/velmi dobrá cesta=10, mírné zvlnění=12, pahorkatina=15,
-  vrchovina=20, hory=30, velehory=>30. Potvrzeno zpětně i příkladem
-  "hustý les = 20 bodů" z h1634 (sedí na vrchovinu).
+  (procházka/chůze/spěch; poklus/běh/sprint). **Hotovo (2026-10-13):**
+  uživatel dodal foto, přepsáno do `content/pravidla-hrac.html` (h1634) a
+  do DB (`rychlost_chuze`, `rychlost_behu`, migrace 0074; bonus −5…+5 z
+  fota, +6…+10 z Bestiáře h2393). Ověřeno křížově: řady na sebe navazují
+  (chůze +3/+5/+7, běh +4/+6/+9 na bod bonusu) a zjednodušené tabulky
+  PPZ "Cestování pěšky/na koních" (h1681, mil za den) z nich vycházejí
+  přesně (např. spěch 7 h po cestě = 7 × 70/10 = 49 mil = bonus +1;
+  jezdecký kůň 750 mn: 8 h × 98/10 = 78 mil). Pozor na terminologii:
+  "procházka (14 h)" v PPZ tabulkách odpovídá PPP **chůzi**, ne procházce.
+- **TABULKA ÚNAVY** — **hotovo (2026-10-13):** přepsána z fota do
+  `content/pravidla-hrac.html` (h1634) a do kódu jako strukturovaná
+  konstanta `DRACAK_VTT_UNAVA_STUPNE` (postih k bonusu za sílu/obratnost,
+  stupeň INT/CHA, zákazy, plazení, omdlévání). Starý souhrn b10870 byl
+  neúplný (chyběl postih inteligence u "vyčerpaná" a "poklus smí") —
+  opraveno. Engine ji **aplikuje**: pohyblivost (ověřeno příkladem Hruna
+  b10871: unavený 19 → 16/+2), ÚČ, OČ, postřeh (INT), v deníku přeškrtnuté
+  hodnoty "bez únavy" a varování při sesílání. **Záměrně neaplikováno:**
+  nosnost (tabulka nosnosti zná jen bonus −5…+5, kniha o vlivu únavy
+  na nosnost mlčí) — otevřená otázka pro uživatele.
+- **Náročnost terénu — NALEZENO, ne chybí:** plná sada je v **pravidlech PJ
+  h2366** (`content/pravidla-pj.html`): TABULKA POVRCHŮ (dobrá cesta 10,
+  les 13–17, hustý les 15–25, bažina 30–80… — rozsahy, PJ volí), TABULKA
+  TERÉNŮ (násobek: rovina/mírné zvlnění 1×, pahorkatina 1,5×, vrchovina
+  2×, hory 3–4×, velehory 5×+) a TABULKA OSTATNÍCH VLIVŮ (zima, vedro,
+  tma, mlha, déšť, bouře, hluboký sníh… — také násobky/rozsahy).
+  Výsledná náročnost = povrch × terén × vliv; bodů/míli. Číselně sedí i
+  sloupec "náročnost" v TABULCE NALOŽENÍ POVOZU (h1641: rovina 10,
+  mírné zvlnění 12, pahorkatina 15, vrchovina 20, hory 30) a PPZ tabulky
+  cestování (cesta 10, savana ~15, les ~20, hory ~40). Kniha výslovně říká,
+  že čísla jsou orientační a volí je PJ.
 - **TABULKA JEZDECKÝCH ZVÍŘAT** (h1635) — 7 zvířat (osel/mezek/mula/pony/
   tažný kůň/klasický kůň/jezdecký kůň), každé s pohyblivostí, nosností,
   vytrvalostí, "ujede (mil)" a "čas na 10 mil".
@@ -325,13 +338,9 @@ pořadí — každá staví na předchozí.
     (h3 "Míry a váhy"). Skutečné mezery jsou jiné — viz "Fáze 1b".
     Položka bez váhy se nepočítá jako 0, ale hlásí se jako "neúplný
     součet".
-  - **Strukturované postihy za únavu chybí.** Plná Tabulka únavy (foto
-    od uživatele) v repu není — v `content/` je jen slovní shrnutí
-    h1634 b10870, které cíl postihu uvádí výslovně jen u "unavená"
-    (síla/obratnost) a int/chr jen u "úplně vyčerpaná". Helper proto
-    vrací stupeň + doslovný text shrnutí, žádná čísla k atributům.
-    Než je engine bude aplikovat automaticky, je potřeba tabulku
-    přepsat do `content/pravidla-hrac.html` (foto znovu).
+  - ~~Strukturované postihy za únavu chybí~~ — **vyřešeno 2026-10-13**
+    (foto Tabulky únavy přepsáno do `content/` i do kódu, engine postihy
+    aplikuje; viz "Co je podložené" výš).
   - **Stínová únava** (h1634 b10869) se nerozlišuje — jeden součet bodů.
   - **Stará tabulka `stupne_unavy` (migrace 0008) nesedí s pravidly a
     nic ji nepoužívá** (model "hranice 10 + oprava za ODO", 3 stupně,
@@ -403,9 +412,17 @@ kontejnery** (vaky, truhly apod.).
   HTML a layout jsem neměl jak vizuálně ověřit); ve `svet.php` na kartě
   postavy řádek "Doprava". Obojí se zobrazí jen když sloupce na DB
   existují.
-- Otevřené: **tažný kůň** má v obou tabulkách nosnost 800 mn, ale slovní
-  popis nad tabulkou říká "o čtvrtinu vyšší než klasický, 1000 mn v
-  zápřahu" — uloženo to, co říkají tabulky, ověřit proti knize.
+- **Tažný kůň — vyřešeno (uživatel potvrdil 2026-10-13):** na hřbetě
+  unese 800 mn (jako klasický kůň, Bestiář h2516: "unese stejně jako
+  klasický kůň, v tahu je však jeho nosnost o čtvrtinu vyšší, tj. 1 000
+  mn"), v tahu 1000 mn. Uloženo ve sloupci `jizdni_zvirata.nosnost_tah_mn`
+  (migrace 0075 DDL + 0076 DML; NULL = v tahu stejná jako na hřbetě).
+  Pozor pro Fázi 3: zápřah má vlastní pravidlo — nosnost v zápřahu je
+  čtyřnásobek nosnosti z Tabulky jezdeckých zvířat (klasický kůň 4 × 800 =
+  3 200, jezdecký 4 × 750 = 3 000; Tabulka nosnosti spřežení, h1639–h1641).
+  1000 mn tažného koně beru jako tu základní hodnotu "v tahu" (tj. 4 ×
+  1000 = 4 000 v zápřahu = 3 200 × 1,25), ne jako konečnou nosnost
+  zápřahu — to je moje čtení, kniha to doslova neříká; k potvrzení.
   Rozšíření na ostatní tvory z h2057 (~40 řádků: válečný kůň, vůl,
   velbloud, letci s řádky "na zemi", ceny…) čeká na rozhodnutí, jak
   značit letecké/pozemní varianty a co znamená sloupec "Ujede (číslo :
@@ -525,17 +542,26 @@ přístupný.
   bez DROP: nová tabulka inventáře + kopie dat (větší refactor).
 - Rozsah importu ceníku h2055 (doporučeno: nejdřív jen kontejnery) a
   kapacita kontejneru jako tvrdý limit s přepsáním PJ (doporučeno).
-- **Foto Tabulky rychlosti při chůzi a při běhu a Tabulky únavy** (v repu
-  nejsou, jen rozsahy) — bez nich nejde Fáze 4 (simulace cestování).
-- Tažný kůň: nosnost 800 (obě tabulky) vs. "o čtvrtinu vyšší než klasický,
-  1000 mn v zápřahu" (slovní popis) — ověřit v knize.
 - Povozy (Fáze 3): sloučit PPP typy (vůz/kočár/dostavník) s homebrew
   tabulkou POVOZY (h2057, 8 modelů)? Katalog zatím nemá žádného
-  spotřebitele (čeká na Fázi 4), proto nezačato.
-- `DROP TABLE stupne_unavy;` — schválit, a pak ho přidat do
-  `docs/sql-k-rucnimu-spusteni.sql`.
-- Zkontrolovat proti pravidlům `narocnost_akci_unava` a `odstraneni_unavy`
-  (podezření na stejný starý model jako `stupne_unavy`).
+  spotřebitele, proto nezačato.
+- **`DROP TABLE` tří mrtvých tabulek z migrace 0008:** `stupne_unavy`,
+  `narocnost_akci_unava`, `odstraneni_unavy`. Všechny jsou jiný model
+  únavy než v pravidlech (hranice 10 + odolnost, "spánek −10 bodů",
+  "boj tři kola = 2 body"…; pravidla: h1634 — vytrvalost = odolnost,
+  1 směna boje = 1 bod, spánek odstraní tolik bodů, kolik je odolnost)
+  a nic je nepoužívá; z editoru jsou pryč. DROP smí jen schválit
+  uživatel, pak se přidá do `docs/sql-k-rucnimu-spusteni.sql`.
+- **Vliv únavy na nosnost:** únava snižuje bonus za sílu, ale tabulka
+  nosnosti zná jen bonus −5…+5 a kniha o vlivu na nosnost mlčí — nosnost
+  se proto z únavy nepočítá (viz "Co je podložené"). Potvrdit/upřesnit.
+- Tažný kůň: 1000 mn beru jako základ "v tahu" (4× v zápřahu = 4000);
+  potvrdit čtení (viz Fáze 2).
+- **Texty přepsané v `pravidla_texty`:** pravidla.php zobrazuje text z
+  `content/*.html`, ale uživatelská úprava přes tužku (tabulka
+  `pravidla_texty`, klíč = id bloku) má přednost. Odstavec b10870 (únava)
+  jsem v souboru přepsal pod stejným id — pokud ho někdo na produkci
+  upravil tužkou, uvidí se pořád ta úprava, ne nový text.
 
 ---
 
