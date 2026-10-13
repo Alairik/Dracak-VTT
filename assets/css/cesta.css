@@ -1,0 +1,19 @@
+/* Kalkulačka cesty (hra/cesta.php) — doplňky k denik.css */
+.cs-wrap .field { margin-bottom: 14px; }
+.cs-wrap .field select { width: 100%; margin-bottom: 6px; }
+.cs-wrap .field input[type=number] { width: 100%; }
+.cs-radia { display: flex; flex-direction: column; gap: 6px; }
+.cs-radia label { display: flex; gap: 8px; align-items: baseline; font-weight: 500; text-transform: none; letter-spacing: 0; }
+.cs-radia small { color: var(--color-neutral-600); font-weight: 400; }
+.cs-nelze { opacity: .55; }
+.cs-zvire { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+.cs-zvire select { max-width: 320px; }
+.cs-zvire input[type=number] { width: 90px; }
+.dn-akce-cesta { display: flex; align-items: center; gap: 14px; margin: 18px 0 8px; }
+.cs-stav { color: var(--color-neutral-600); font-size: 13px; }
+.cs-titul { font-size: 16px; margin: 4px 0 14px; }
+.cs-chyby { margin: 8px 0 12px; padding-left: 18px; color: var(--color-danger, #8d2a1b); font-size: 13px; }
+.cs-ulozeno { color: var(--color-success, #4b6b3a); font-weight: 600; }
+#cs-vysledek { margin-top: 10px; }
+#cs-vysledek .dn-tab-wrap { margin-bottom: 14px; }
+.cs-wrap .dn-pas { position: static; }

@@ -70,6 +70,7 @@ if (!$fragment) {
       <div class="dn-id">
         <div class="dn-nav-horni">
           <a class="svet-pill svet-pill-ghost" href="svet.php?id=<?= $svetId ?>">← <?= $e($svet['nazev']) ?></a>
+          <?php if ($jePj): ?><a class="svet-pill svet-pill-ghost" href="cesta.php?id=<?= $svetId ?>">Cesta</a><?php endif; ?>
         </div>
         <h1 class="dn-jmeno">Družina</h1>
         <div class="dn-pod">Stav všech postav světa na jednom místě.</div>

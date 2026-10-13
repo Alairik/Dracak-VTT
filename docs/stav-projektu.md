@@ -18,7 +18,8 @@ Přečti celý tenhle soubor, pak `CLAUDE.md` (hlavně pravidla o tom, že
 zdroj pravdy o hře jsou pravidla v `content/`, ne repo/DB, a o
 neodhadování mechaniky). **Fáze 1 a 2 ze sekce "Rozpracováno:
 cestování..." jsou v kódu hotové**; **Fáze 1b (váha/kontejnery) je
-částečně hotová, další je Fáze 3 (povozy)** — viz níž. Stav předchozí
+částečně hotová, Fáze 4 (kalkulačka cesty) je v kódu, další je Fáze 3
+(povozy) a Fáze 5 (přepínače)** — viz níž. Stav předchozí
 konverzace je zapsaný přesně proto, aby ses nemusel/a ptát na věci, co
 už byly rozhodnuté (viz "Architektonická rozhodnutí" a celá sekce
 "Rozpracováno" níže — všechno v ní je buď přímo citovaný text pravidel,
@@ -200,8 +201,8 @@ MariaDB.** Postup, který v session fungoval:
 
 ## Rozpracováno: cestování, pohyblivost, únava, naložení
 
-**Stav: Fáze 1 hotová v kódu (čeká na ruční ALTER 0065), Fáze 2–5 zatím
-v kódu nejsou.** Tohle je aktuálně otevřený úkol a nejspíš další věc, na
+**Stav: Fáze 1, 2 a 4 jsou v kódu (DDL k nim je provedené až na 0074/0075,
+viz "Čeká na ruční spuštění"), Fáze 3 a 5 zatím ne.** Tohle je aktuálně otevřený úkol a nejspíš další věc, na
 které se bude pokračovat.
 
 ### Co je podložené přímo v `content/pravidla-hrac.html` (ne odhad)
@@ -307,8 +308,9 @@ domácí rozšíření" vlastní hodnotu nemají, dědí ji za běhu od rodiče
 
 ### Další krok — SCHVÁLENÝ fázový plán (2026-10, čeká na realizaci)
 
-Fáze 1 a 2 jsou v kódu (viz níž), Fáze 3–5 ne. Pokračovat Fází 3, v
-pořadí — každá staví na předchozí.
+Fáze 1, 2 a 4 jsou v kódu (viz níž), Fáze 3 a 5 ne. Fáze 4 se předběhla
+kvůli tomu, že byla odblokovaná fotkami tabulek, a povozy (Fáze 3) čekají
+na rozhodnutí o zdroji dat; Fáze 4 v1 počítá jen pěší, jezdce a nosiče.
 
 **Fáze 1 — Oprava dat + živá Pohyblivost/Únava na postavě — HOTOVO V KÓDU**
 - `0064_oprava_rasy_pohyblivost_zaklad.sql` (čisté UPDATE, proběhne sama
@@ -442,16 +444,42 @@ kontejnery** (vaky, truhly apod.).
   nekryjí 1:1 — před stavbou číselníku rozhodnout, ze které tabulky se
   bere, nebo ji slít.
 
-**Fáze 4 — Jádro: hodinová simulace cestování**
-- U "Cestovat sem" PJ zadá vzdálenost (míle) a vybere terén (6
-  kategorií z Tabulky náročnosti terénu/naložení povozu).
-- Simulace po hodinách: tempo družiny = nejpomalejší člen (pravidlo
-  h2355), body/hodinu podle terénu a tempa, akumuluje únavu, zastaví se
-  při nutnosti odpočinku NEBO dojetí cíle.
-- V1 = jedna etapa (do prvního odpočinku), ne plně automatický
-  multi-day běh — PJ dostane výsledek a rozhodne, co dál. Žádná "kolik
-  hodin denně se chodí" konstanta (ta v textu není) — proto hodinová
-  smyčka, ne denní paušál.
+**Fáze 4 — Jádro: hodinová simulace cestování — HOTOVO V KÓDU (v1, 2026-10-13)**
+- Odblokováno fotkami tabulek (viz "Co je podložené"). Zdroj pravidel:
+  PPP "Pohyb pod širým nebem" (h1634/h1635) + PJ "Náročnost cesty" (h2366).
+- `includes/vtt_cestovani.php`: čistá simulace `dracak_vtt_cesta_simulace()`
+  (souvislý čas; rychlost družiny = nejpomalejší, h2355; přepočet při každé
+  změně stupně únavy někoho z pěších, protože únava ubírá bonus za
+  sílu/obratnost a tím zpomaluje; úsek končí v dosažení cíle nebo těsně
+  před zvoleným stupněm únavy, který by někdo (i zvíře) překročil) a
+  `dracak_vtt_cesta_vypocet()` (sestaví pěší, jezdce + zvíře a doprovodná
+  zvířata s nákladem; zvíře nese váhu jezdce + jeho náklad, pohyblivost po
+  naložení stejnou tabulkou, jezdec dostane ⅓ bodů únavy zvířete).
+  Únava za hodinu: procházka 0,5, chůze 1, spěch 3 (b10869). Konstanty
+  povrchů/terénů/vlivů z PJ h2366 jsou jen nápověda ve formuláři.
+- **Ověřeno proti knize** (viz skript v historii konverzace, výsledky
+  zapsané tady): zjednodušené tabulky PPZ "Cestování na koních" (h1681)
+  vychází přesně — jezdecký kůň 750/1500/2250 mn: spěch 8 h po cestě
+  78/62/50 mil, "procházka 16 h" (= PPP chůze) 112/88/72; terény
+  savana/les/hory = náročnost 15/20/40 dávají 52/39/20; pěšky (pohyblivost
+  14 = bonus +1): spěch 7 h 49 mil, chůze 14 h 70 mil, hory 12. Kniha
+  v PJ h2355 sama říká, že tabulky PPZ odpovídají pohyblivosti 14 a
+  odolnosti 14. PPZ tabulky ignorují zpomalení únavou, simulace ne —
+  proto spěch 7 h vyjde o něco méně než 49 mil.
+- `hra/api/cesta_vypocet.php` (jen PJ/admin světa; volitelně `zapsat` =
+  zapíše postavám přepočtenou únavu v celých bodech, `floor`) a
+  `hra/cesta.php` (+ `assets/js/cesta.js`, `assets/css/cesta.css`):
+  vzdálenost, povrch × terén × vlivy (předvyplněný střed rozsahu, číslo
+  přepíše PJ), tempo (procházka/chůze/spěch), stupeň únavy, kde se úsek
+  zastaví, výběr postav, váha jezdce (ručně — pravidla ji nemají jako
+  jedno číslo, rasa má rozsah) a doprovodná zvířata. Odkazy: "Cesta" na
+  `svet.php` a `druzina.php` (jen PJ).
+- **Záměrně v1 NENÍ:** poklus/běh/sprint (počítají se na kola), polovina
+  únavy koní při cvalu, odpočinek a spánek (h1634 b10872: 8 − ½ bonusu
+  odolnosti hodin, zmizí tolik bodů, kolik je odolnost), posun světového
+  času (svět eviduje jen celé dny: `aktualni_den_offset`), povozy (Fáze 3),
+  vliv únavy na rychlost zvířat (kniha neříká), vliv dovedností Nosič /
+  Jízda na koni / Kočí.
 
 **Fáze 5 — Administrace světa**
 - `auto_naklad`/`auto_pohyblivost`/`auto_unava` přepínače (stejný vzor

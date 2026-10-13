@@ -433,6 +433,7 @@ dracak_vtt_page_start($svet['nazev'], $user, true);
       </div>
     </div>
     <a class="svet-pill svet-pill-ghost" href="druzina.php?id=<?= $svetId ?>">Družina</a>
+    <?php if ($isPjOrAdmin): ?><a class="svet-pill svet-pill-ghost" href="cesta.php?id=<?= $svetId ?>">Cesta</a><?php endif; ?>
     <?php if ($isPjOrAdmin): ?>
       <a class="svet-pill svet-pill-ghost" href="svet_administrace.php?id=<?= $svetId ?>">⚙ Administrace</a>
     <?php endif; ?>

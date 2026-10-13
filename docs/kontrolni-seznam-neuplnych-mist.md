@@ -72,7 +72,7 @@ Zdroj: kompletní sweep artefaktu "Pravidla DrD + domácí pravidla" (68 459 ř�
 
 - [ ] Určení hodnoty pokladů (PPP) — Tabulka odhadu ceny se nedochovala vůbec, jen odkaz
 - [ ] Druid — tabulka Druidovy magenergie pro úrovně 16.–36. (PPP nejasně čitelná, PPE jen vzorek)
-- [ ] Pohyb pod širým nebem (PPP) — Tabulky rychlosti chůze/běhu a Tabulka únavy (náročnost terénu už je vyřešená) — NÁROČNOST TERÉNU vyřešena: nikdy nechyběla — je to sloupec "náročnost" v Tabulce naložení povozu (h1641), text to sám prohlašuje za stejné jednotky ("v bodech pohybu, viz výše"). **Tabulky rychlosti při chůzi/běhu a Tabulka únavy ale STÁLE CHYBÍ v `content/pravidla-hrac.html`** — foto je uživatel dodal jen v konverzaci, nikdy se nepřepsaly (h1634 b10868 to pořád říká; v `docs/stav-projektu.md` jsou jen rozsahy). Přepsat znovu z foto, než se na nich postaví Fáze 4.
+- [x] Pohyb pod širým nebem (PPP) — Tabulka rychlosti při chůzi, při běhu a Tabulka únavy: **doplněno 2026-10-13 z fotografií** do `content/pravidla-hrac.html` (h1634) a do DB (`rychlost_chuze`, `rychlost_behu`, migrace 0074; bonus +6…+10 z Bestiáře h2393); Tabulka únavy je strukturovaně v kódu (`DRACAK_VTT_UNAVA_STUPNE`). Náročnost terénu: Tabulka povrchů/terénů/ostatních vlivů je v pravidlech PJ h2366 (a číselně sedí i sloupec "náročnost" v Tabulce naložení povozu, h1641).
 - [x] ~~Rychlost lodí (PPP) — Tabulka rychlostí lodí a Tabulka veslování~~ — vyřešeno 2026-10, foto od uživatele
 - [x] ~~Poškození lodí (PPP) — Tabulka bouří (odolnost lodí)~~ — vyřešeno 2026-10, foto od uživatele (Tabulka bouří — nebezpečnost/síla pro bouři a hurikán)
 - [ ] Vlastní boj / potápění (PPP) — tabulka postihů podle hloubky
