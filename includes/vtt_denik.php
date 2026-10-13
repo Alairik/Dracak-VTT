@@ -8,6 +8,7 @@ declare(strict_types=1);
 // h1609, zkušenost a úroveň h109/h110, nosnost a naložení h1681.
 // Kde pravidla (nebo data) něco neurčují, funkce vrací null — nedomýšlí.
 require_once __DIR__ . '/vtt_pohyblivost.php';
+require_once __DIR__ . '/vtt_predmety.php';
 
 // TABULKA RODOVÝCH ZBRANÍ (h1609, b: "rodová zbraň dává postavě +1 k
 // útočnému číslu, pokud ji používá"). Klíč = základní rasa; trpasličí
@@ -54,6 +55,21 @@ function dracak_vtt_ma_sloupec(PDO $pdo, string $tabulka, string $sloupec): bool
         $cache[$klic] = (int)$stmt->fetchColumn() > 0;
     }
     return $cache[$klic];
+}
+
+// Hod "1k6+" — šestistěnná kostka s opakováním po šestce, výsledky se
+// sčítají (content/pravidla-hrac.html, kap. Kostky: "1k6+ – hod šestistěnnou
+// kostkou s opakováním po šestce"; používá se pro hod na útok i obranu,
+// h1610/h1611). Vrací jednotlivé hody; pojistka na 30 hodů je jen proti
+// nekonečné smyčce, ne pravidlo.
+function dracak_vtt_hod_k6_plus(): array
+{
+    $hody = [];
+    do {
+        $h = random_int(1, 6);
+        $hody[] = $h;
+    } while ($h === 6 && count($hody) < 30);
+    return $hody;
 }
 
 // Základní rasa postavy — projde rodic_rasa_id nahoru (klany -> trpaslík).
@@ -324,6 +340,44 @@ function dracak_vtt_schopnosti_postavy(PDO $pdo, array $postava): array
     return $stmt->fetchAll();
 }
 
+// Zraňuje položka (kouzlo/lektvar) — má efekt "Poškození" na životy? Podle
+// toho deník při použití "na sebe" žádá potvrzení (bez zadaného cíle by
+// zranění dopadlo na toho, kdo položku použil).
+function dracak_vtt_polozka_skodi(string $typPolozky, int $polozkaId): bool
+{
+    foreach (dracak_vtt_polozka_efekty($typPolozky, $polozkaId) as $efekt) {
+        if (dracak_vtt_hp_znamenko($efekt) === -1) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Možné cíle kouzel a lektvarů: ostatní postavy světa a nestvůry na aktivní
+// mapě světa (hra/api/pouzij_predmet.php bere cil_typ_entity + cil_entita_id).
+function dracak_vtt_mozne_cile(PDO $pdo, array $postava): array
+{
+    $svetId = (int)($postava['svet_id'] ?? 0);
+    if ($svetId <= 0) {
+        return [];
+    }
+    $cile = [];
+    $stmt = $pdo->prepare('SELECT id, nazev FROM postavy WHERE svet_id = ? AND id <> ? ORDER BY nazev');
+    $stmt->execute([$svetId, (int)$postava['id']]);
+    foreach ($stmt->fetchAll() as $r) {
+        $cile[] = ['hodnota' => 'postava:' . $r['id'], 'nazev' => $r['nazev'] . ' (postava)'];
+    }
+    $stmt = $pdo->prepare(
+        'SELECT ni.id, ni.nazev_instance FROM nestvura_instance ni
+         WHERE ni.mapa_id = (SELECT aktivni_mapa_id FROM svet WHERE id = ?) ORDER BY ni.nazev_instance'
+    );
+    $stmt->execute([$svetId]);
+    foreach ($stmt->fetchAll() as $r) {
+        $cile[] = ['hodnota' => 'nestvura_instance:' . $r['id'], 'nazev' => $r['nazev_instance'] . ' (nestvůra)'];
+    }
+    return $cile;
+}
+
 function dracak_vtt_kouzla_postavy(PDO $pdo, int $postavaId): array
 {
     $stmt = $pdo->prepare(
@@ -334,7 +388,12 @@ function dracak_vtt_kouzla_postavy(PDO $pdo, int $postavaId): array
          WHERE pk.postava_id = ? ORDER BY k.uroven_kouzla, k.nazev'
     );
     $stmt->execute([$postavaId]);
-    return $stmt->fetchAll();
+    $kouzla = $stmt->fetchAll();
+    foreach ($kouzla as &$k) {
+        $k['skodi'] = dracak_vtt_polozka_skodi('kouzlo', (int)$k['id']);
+    }
+    unset($k);
+    return $kouzla;
 }
 
 function dracak_vtt_jazyky_postavy(PDO $pdo, array $postava): array
@@ -388,6 +447,7 @@ function dracak_vtt_inventar_s_vahou(PDO $pdo, int $postavaId): array
         $vysledek[] = [
             'kategorie' => 'lektvar', 'id' => (int)$r['id'], 'nazev' => $r['nazev'], 'typ' => 'lektvar',
             'mnozstvi' => (int)$r['mnozstvi'], 'vaha_ks' => null, 'vaha_celkem' => null,
+            'skodi' => dracak_vtt_polozka_skodi('lektvar', (int)$r['id']),
         ];
     }
     return $vysledek;
@@ -448,5 +508,6 @@ function dracak_vtt_denik_data(PDO $pdo, array $postava): array
         'efekty' => dracak_vtt_aktivni_efekty_postavy($pdo, (int)$postava['id']),
         'inventar' => dracak_vtt_inventar_s_vahou($pdo, (int)$postava['id']),
         'doprava' => dracak_vtt_postava_doprava($pdo, $postava),
+        'cile' => dracak_vtt_mozne_cile($pdo, $postava),
     ];
 }

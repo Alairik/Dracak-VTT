@@ -122,7 +122,7 @@ if (!$fragment) {
 $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' => 'Odolnost', 'inteligence' => 'Inteligence', 'charisma' => 'Charisma'];
 ?>
 <?php if (!$fragment): ?>
-<div class="dn-wrap" data-postava-id="<?= $postavaId ?>">
+<div class="dn-wrap" data-postava-id="<?= $postavaId ?>" data-svet-id="<?= $svetId ?>">
 <?php endif; ?>
 <div class="dn" id="denik">
 
@@ -329,6 +329,7 @@ $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' =>
             <span class="dn-vz dn-vysledek"><small>OČ</small><b><?= (int)$ob['oc'] ?></b></span>
           </div>
           <p class="note">Obranné číslo = kvalita zbroje + bonus za obratnost, nikdy méně než 0. Bez zbroje je KZ 1 (šaty). Štít: +1 k hodu na obranu.</p>
+          <div class="dn-hod-akce"><button type="button" class="btn btn-primary" data-hod="obrana">Hod na obranu (1k6+ + OČ)</button></div>
           <?php if ($ma('zbroj_id')): ?>
             <div class="field"><label for="zbroj_id">Zbroj na těle</label>
               <select id="zbroj_id" data-zmena="vyber" data-pole="zbroj_id">
@@ -361,13 +362,15 @@ $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' =>
       </div>
 
       <div class="dn-karta dn-sirka-cela">
-        <h3 class="dn-h3">Zbraně</h3>
+        <h3 class="dn-h3">Zbraně
+          <label class="dn-mod" for="dn-mod">ruční oprava k hodu <input type="number" id="dn-mod" value="0" step="1" min="-30" max="30" title="Rozdíl velikostí, dostřel (malý +1, velký −1), úkryt… podle situace"></label>
+        </h3>
         <?php if (!$d['zbrane']): ?>
           <p class="note">Žádná zbraň v inventáři.</p>
         <?php else: ?>
           <div class="dn-tab-wrap">
             <table class="dn-tab">
-              <thead><tr><th></th><th>Zbraň</th><th class="c">SZ</th><th class="c">Útočnost</th><th class="c">OZ</th><th class="c">Délka</th><th class="c">ÚČ tváří v tvář</th><th class="c">ÚČ střelecký</th><th class="c">Dostřel</th></tr></thead>
+              <thead><tr><th></th><th>Zbraň</th><th class="c">SZ</th><th class="c">Útočnost</th><th class="c">OZ</th><th class="c">Délka</th><th class="c">ÚČ tváří v tvář</th><th class="c">ÚČ střelecký</th><th class="c">Dostřel</th><th class="c">Hod</th></tr></thead>
               <tbody>
               <?php foreach ($d['zbrane'] as $z): ?>
                 <tr class="<?= $z['drzena'] ? 'drzena' : '' ?>">
@@ -380,12 +383,16 @@ $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' =>
                   <td class="c uc"><?= $z['uc_tvar_v_tvar'] ?? '—' ?></td>
                   <td class="c uc"><?= $z['uc_strelecky'] ?? '—' ?></td>
                   <td class="c"><?= $z['dostrel'] ? implode(' / ', $z['dostrel']) : '—' ?></td>
+                  <td class="c dn-hod-bunka">
+                    <?php if ($z['uc_tvar_v_tvar'] !== null): ?><button type="button" class="dn-pm" data-hod="utok" data-zbran="<?= $z['id'] ?>">Útok</button><?php endif; ?>
+                    <?php if ($z['uc_strelecky'] !== null): ?><button type="button" class="dn-pm" data-hod="strelba" data-zbran="<?= $z['id'] ?>">Střelba</button><?php endif; ?>
+                  </td>
                 </tr>
               <?php endforeach; ?>
               </tbody>
             </table>
           </div>
-          <p class="note">ÚČ tváří v tvář = síla zbraně + bonus za sílu (+1 rodová zbraň), střelecký = síla zbraně + bonus za obratnost, nikdy méně než 0. Dostřel malý / střední / velký v sázích: ≤ malý +1 k útoku, > střední −1. Kouzelné a artefaktové zbraně bez síly zbraně v katalogu mají ÚČ „—“.</p>
+          <p class="note">ÚČ tváří v tvář = síla zbraně + bonus za sílu (+1 rodová zbraň), střelecký = síla zbraně + bonus za obratnost, nikdy méně než 0. Dostřel malý / střední / velký v sázích: ≤ malý +1 k útoku, > střední −1. Kouzelné a artefaktové zbraně bez síly zbraně v katalogu mají ÚČ „—“. Hod = 1k6 s opakováním po šestce + ÚČ, s opravami za málo životů a velké naložení (rozdíl velikostí a dostřel zadej do ruční opravy).</p>
         <?php endif; ?>
       </div>
     </div>
@@ -393,7 +400,16 @@ $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' =>
 
   <!-- ===================== SCHOPNOSTI A KOUZLA ===================== -->
   <section class="dn-sekce" id="schopnosti">
-    <h2 class="dn-h2">Schopnosti a kouzla</h2>
+    <h2 class="dn-h2">Schopnosti a kouzla
+      <?php if ($svetId > 0): ?>
+      <label class="dn-mod dn-cil" for="dn-cil">cíl kouzla / lektvaru
+        <select id="dn-cil">
+          <option value="">na sebe</option>
+          <?php foreach ($d['cile'] as $c): ?><option value="<?= $e($c['hodnota']) ?>"><?= $e($c['nazev']) ?></option><?php endforeach; ?>
+        </select>
+      </label>
+      <?php endif; ?>
+    </h2>
     <div class="dn-grid">
       <div class="dn-karta dn-sirka-cela">
         <h3 class="dn-h3">Zvláštní schopnosti a dovednosti <span class="dn-pocet"><?= count($d['schopnosti']) ?></span></h3>
@@ -407,7 +423,10 @@ $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' =>
                   <span class="dn-stitek"><?= $e($s['druh']) ?></span>
                   <span class="dn-stitek"><?= $e($s['zdroj']) ?></span>
                   <?php if ($s['uroven_od']): ?><span class="dn-stitek">od <?= (int)$s['uroven_od'] ?>. úrovně</span><?php endif; ?>
-                  <?php if ($s['pocet_kostek']): ?><span class="dn-stitek varovani"><?= (int)$s['pocet_kostek'] . substr((string)$s['typ_kostky'], 0) ?><?= (int)$s['pevny_bonus'] ? ($s['pevny_bonus'] > 0 ? '+' : '') . (int)$s['pevny_bonus'] : '' ?></span><?php endif; ?>
+                  <?php if ($s['pocet_kostek'] && $s['typ_kostky']): $notaceSch = (int)$s['pocet_kostek'] . $s['typ_kostky'] . ((int)$s['pevny_bonus'] ? ((int)$s['pevny_bonus'] > 0 ? '+' : '') . (int)$s['pevny_bonus'] : ''); ?>
+                    <span class="dn-stitek varovani"><?= $e($notaceSch) ?></span>
+                    <?php if ($svetId > 0): ?><button type="button" class="dn-pm dn-pm-mini" data-kostka="<?= $e($notaceSch) ?>" data-nazev="<?= $e($s['nazev']) ?>">Hodit</button><?php endif; ?>
+                  <?php endif; ?>
                   <?php if ($s['max_pouziti']): ?><span class="dn-stitek"><?= $e($s['max_pouziti']) ?></span><?php endif; ?>
                 </summary>
                 <div class="dn-pol-telo"><?= nl2br($e($s['popis'] ?? '')) ?><?php if ($s['mechanika']): ?><p class="note">Mechanika: <?= $e($s['mechanika']) ?></p><?php endif; ?></div>
@@ -433,6 +452,7 @@ $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' =>
                   <?php if ($k['typ_unavy']): ?><span class="dn-stitek"><?= $e($k['typ_unavy']) ?></span><?php endif; ?>
                 </summary>
                 <div class="dn-pol-telo">
+                  <?php if ($svetId > 0): ?><div class="dn-hod-akce"><button type="button" class="btn btn-primary" data-pouzij="kouzlo" data-polozka="<?= (int)$k['id'] ?>" data-nazev="<?= $e($k['nazev']) ?>"<?= $k['skodi'] ? ' data-skodi="1"' : '' ?>>Seslat<?= $k['cena_magenergie'] ? ' (' . $e($k['cena_magenergie']) . ')' : '' ?></button></div><?php endif; ?>
                   <p class="note"><?= $e(implode(' · ', array_filter([$k['seznam'], $k['rozsah'] ? 'rozsah ' . $k['rozsah'] : null, $k['doba_seslani'] ? 'sesílání ' . $k['doba_seslani'] : null]))) ?></p>
                   <?= nl2br($e($k['popis'] ?? '')) ?>
                 </div>
@@ -462,7 +482,7 @@ $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' =>
                   <td><span class="dn-stitek"><?= $e($i['typ']) ?></span></td>
                   <td class="c"><?= (int)$i['mnozstvi'] ?></td>
                   <td class="c"><?= $i['vaha_ks'] !== null ? $mn($i['vaha_ks']) : '<span class="dn-stitek neuplne" title="Váha v katalogu chybí">bez váhy</span>' ?></td>
-                  <td class="c"><?= $i['vaha_celkem'] !== null ? $mn($i['vaha_celkem']) : '—' ?></td>
+                  <td class="c"><?= $i['vaha_celkem'] !== null ? $mn($i['vaha_celkem']) : '—' ?><?php if ($i['kategorie'] === 'lektvar' && $svetId > 0): ?> <button type="button" class="dn-pm dn-pm-mini" data-pouzij="lektvar" data-polozka="<?= (int)$i['id'] ?>" data-nazev="<?= $e($i['nazev']) ?>"<?= !empty($i['skodi']) ? ' data-skodi="1"' : '' ?>>Vypít</button><?php endif; ?></td>
                 </tr>
               <?php endforeach; ?>
               </tbody>

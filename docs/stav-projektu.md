@@ -463,6 +463,16 @@ Soubory:
 - **`hra/api/postava_stav.php`** — rychlé zápisy (±životy, ±magy, ±únava,
   zkušenost [jen PJ], peníze, zbroj/štít/držená zbraň, texty, velikost);
   životy a magenergie se logují do `svet_udalosti` jako na mapě.
+- **`hra/api/hod_postavy.php`** — hod na útok / střelbu / obranu z deníku:
+  server sám spočítá základ (ÚČ/OČ) a opravy (méně než 1/3 životů, velké
+  naložení −1, štít +1 k obraně) a hodí **1k6+** (kostka s opakováním po
+  šestce, kap. Kostky b58 — `dracak_vtt_hod_k6_plus()`); rozdíl velikostí,
+  dostřel a úkryt zadá hráč do "ruční opravy". Loguje se jako `kostka_hod`.
+- Z deníku jde také **seslat kouzlo / vypít lektvar** (existující
+  `hra/api/pouzij_predmet.php`, tedy včetně odečtu magenergie, efektů a
+  pořadí tahů) s výběrem **cíle** (jiná postava světa / nestvůra na aktivní
+  mapě); zraňující kouzlo "na sebe" žádá potvrzení. Kostky schopnosti: tlačítko
+  Hodit (`kostka_hod.php`, jen ve světě).
 - **`hra/denik_tisk.php`** — tisková A4 verze papírového deníku podle
   kolonek h1690 (předvyplněná, `?id=`) a prázdný formulář (bez `id`).
 - **`includes/vtt_denik.php`** — výpočty podle pravidel (bonusy, bojeschopnost,
