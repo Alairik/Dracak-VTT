@@ -14,18 +14,36 @@ mění) se sem zapíše update ve stejném kroku, ne až "až bude čas".
 
 ## Pro novou session, co začíná tady
 
-Přečti celý tenhle soubor, pak `CLAUDE.md` (hlavně sekci o nejistotě v
-herní mechanice a pravidlo o neodhadování). **Fáze 1 ze sekce
-"Rozpracováno: cestování..." je v kódu hotová** (oprava
-`rasy.pohyblivost_zaklad`, `postavy.unava`, helpery v
-`includes/vtt_pohyblivost.php`, read-only zobrazení v `hra/postava.php`) —
-čeká jen na **ruční spuštění `0065_postava_unava.sql` přes phpMyAdmin
-(admin účet)**, viz "Fáze 1" níže. **Schválený další krok je Fáze 2
-(jízdní zvířata)**. Je to odsouhlasené, ne návrh k debatě — stav
-předchozí konverzace je zapsaný přesně proto, aby ses nemusel/a ptát na
-věci, co už byly rozhodnuté (viz "Architektonická rozhodnutí" a celá
-sekce "Rozpracováno" níže — všechno v ní je buď přímo citovaný text
-pravidel, nebo odsouhlasené uživatelem, ne můj odhad).
+Přečti celý tenhle soubor, pak `CLAUDE.md` (hlavně pravidla o tom, že
+zdroj pravdy o hře jsou pravidla v `content/`, ne repo/DB, a o
+neodhadování mechaniky). **Fáze 1 a 2 ze sekce "Rozpracováno:
+cestování..." jsou v kódu hotové**; **Fáze 1b (váha/kontejnery) je
+částečně hotová, další je Fáze 3 (povozy)** — viz níž. Stav předchozí
+konverzace je zapsaný přesně proto, aby ses nemusel/a ptát na věci, co
+už byly rozhodnuté (viz "Architektonická rozhodnutí" a celá sekce
+"Rozpracováno" níže — všechno v ní je buď přímo citovaný text pravidel,
+nebo odsouhlasené uživatelem, ne můj odhad).
+
+### Čeká na ruční spuštění přes phpMyAdmin (admin účet)
+
+`migrate.php` běží pod DML-only účtem, takže DDL nikdy neprovede a **na
+prvním takovém souboru deploy zastaví** (HTTP 500 v posledním kroku
+`deploy.yml`; FTP část proběhne normálně, kód je nasazený). Všechno za
+ním čeká, dokud se to neprovede ručně. Pořadí:
+
+1. `0065_postava_unava.sql` — `ALTER TABLE postavy ADD COLUMN unava`.
+   (Aktuálně zastavuje deploy; 0064 už proběhla sama.)
+2. `0067_jizdni_zvirata.sql` — **jen příkaz `CREATE TABLE`**; `INSERT
+   IGNORE` pod ním doběhne sám při dalším deployi.
+3. `0068_postava_doprava.sql` — `ALTER TABLE postavy ADD ...` (až po
+   bodu 2, je tam cizí klíč).
+4. `DROP TABLE stupne_unavy;` — bez souboru (migrace s DROP se nespustí);
+   tabulka je z editoru pryč a nic ji nepoužívá, viz Fáze 1.
+
+`0066_nulovat_nedolozene_vahy_surovin.sql` je čisté UPDATE a proběhne
+automaticky, jakmile je odblokovaný bod 1. Kód je napsaný tak, že
+funguje i před ručními kroky (chybějící sloupce `unava`/`doprava_*` se
+berou jako "není"), jen se nic z toho nedá ukládat.
 
 ---
 
@@ -261,8 +279,8 @@ domácí rozšíření" vlastní hodnotu nemají, dědí ji za běhu od rodiče
 
 ### Další krok — SCHVÁLENÝ fázový plán (2026-10, čeká na realizaci)
 
-Fáze 1 je v kódu (viz níž), Fáze 2–5 ne. Pokračovat Fází 2, v pořadí —
-každá staví na předchozí.
+Fáze 1 a 2 jsou v kódu (viz níž), Fáze 3–5 ne. Pokračovat Fází 3, v
+pořadí — každá staví na předchozí.
 
 **Fáze 1 — Oprava dat + živá Pohyblivost/Únava na postavě — HOTOVO V KÓDU**
 - `0064_oprava_rasy_pohyblivost_zaklad.sql` (čisté UPDATE, proběhne sama
@@ -338,9 +356,10 @@ kontejnery** (vaky, truhly apod.).
 - Stav dat: `predmety.vaha` je NULL u části řádků (např. Pavéza, Voda,
   Ocet…), **lektvary váhu nemají vůbec** (jen občas v textu `popis`,
   např. "Váha: 5mn"), ceníkové vybavení v DB není. Hodnoty `vaha` ve
-  migracích 0035/0036 (suroviny pro Chodce a lektvary, 0,01–1,0) nemají
-  doložený zdroj — **neověřeno proti pravidlům, nespoléhat** (může být
-  cena v zl zapsaná do špatného sloupce).
+  migracích 0035/0036 (42 surovin pro Chodce a lektvary, 0,01–1,0) neměly
+  žádný zdroj v pravidlech (ověřeno hledáním názvů ve všech třech
+  souborech) — **migrace 0066 je vrací na NULL**, položky se v součtu
+  nákladu hlásí jako "bez uvedené váhy". Doplnit, až bude váha v knize.
 - Zbývá: (1) import ceníku h2055 do DB — `predmety.typ` ENUM nemá
   hodnotu pro běžné vybavení a chybí sloupec kapacity (DDL, ruční
   spuštění); (2) váha lektvarů; (3) model kontejnerů — předmět uložený
@@ -349,19 +368,46 @@ kontejnery** (vaky, truhly apod.).
   jezdce do nákladu zvířete. Dělat po částech, až po odsouhlasení
   návrhu modelu.
 
-**Fáze 2 — Jízdní zvířata**
-- Nová tabulka `jizdni_zvirata` (7 řádků z Tabulky jezdeckých zvířat
-  výše).
-- `postavy.doprava_typ` ENUM(chůze/zvíře) + `doprava_zvire_id` nullable
-  FK — **žádné vynucené vlastnictví** (uživatel: "jedu na zvířeti, co
-  si vyberu z číselníku" i když je půjčené/ukradené). Integrace s
-  inventářem (nabídnout vlastněné zvíře jako první volbu) je pozdější
-  rozšíření, ne podmínka v1.
-- UI volby přímo u sedadla postavy na `svet.php`.
+**Fáze 2 — Jízdní zvířata — HOTOVO V KÓDU (čeká na ruční DDL výše)**
+- `0067_jizdni_zvirata.sql`: tabulka `jizdni_zvirata` se 7 řádky z
+  TABULKY JEZDECKÝCH ZVÍŘAT (h1635); čísla ověřená proti nezávislé
+  homebrew tabulce "Jezdečtí tvorové" (h2057), shodují se do jednoho.
+  `čas na 10 mil` uložen v minutách (v pravidlech h:mm). Zobrazuje se i
+  v editoru (číselník "Jízdní zvířata").
+- `0068_postava_doprava.sql`: `postavy.doprava_typ` ENUM(chuze/zvire) +
+  `doprava_zvire_id` FK, **bez vynuceného vlastnictví**. Konzistenci
+  dvojice drží `hra/postava.php`, ne DB (typ se odvozuje z toho, jestli
+  je vybrané platné zvíře). Pozn.: ENUM je vůči FK redundantní (NULL v
+  FK = chůze); nechal jsem ho podle schváleného plánu, dá se později
+  zahodit nebo využít pro další druh dopravy.
+- `includes/vtt_pohyblivost.php`: `dracak_vtt_jizdni_zvirata()`,
+  `dracak_vtt_postava_doprava()`.
+- UI: výběr "Doprava" v `hra/postava.php` (ne přímo na sedadle v
+  `svet.php` — sedadlo je odkaz `<a>`, select uvnitř by byl neplatný
+  HTML a layout jsem neměl jak vizuálně ověřit); ve `svet.php` na kartě
+  postavy řádek "Doprava". Obojí se zobrazí jen když sloupce na DB
+  existují.
+- Otevřené: **tažný kůň** má v obou tabulkách nosnost 800 mn, ale slovní
+  popis nad tabulkou říká "o čtvrtinu vyšší než klasický, 1000 mn v
+  zápřahu" — uloženo to, co říkají tabulky, ověřit proti knize.
+  Rozšíření na ostatní tvory z h2057 (~40 řádků: válečný kůň, vůl,
+  velbloud, letci s řádky "na zemi", ceny…) čeká na rozhodnutí, jak
+  značit letecké/pozemní varianty a co znamená sloupec "Ujede (číslo :
+  10)" a poznámky `*`/`**`, které tabulka nevysvětluje.
+- Zatím se z dopravy nic nepočítá (rychlost družiny, únava zvířete,
+  váha jezdce v nákladu zvířete) — to je Fáze 4 / 1b.
 
 **Fáze 3 — Povozy**
 - Žádná trvalá entita "svět vlastní povoz" — typ vozu + zápřah se volí
   ad-hoc přímo při cestování, stejně jednoduché jako dnešní "zadej dny".
+- **Zdroje už v repu jsou** (zjištěno při Fázi 2): PPP h1639–h1641 (typy,
+  nosnost spřežení, naložení podle terénu) + homebrew tabulka POVOZY v
+  h2057: žebřiňák, valník, krytý vůz, maringotka, malý/velký kočár,
+  malý/velký dostavník — cena ve stříbru, váha vozu (mn), nosnost
+  (násobek váhy vozu), únava řidiče (1 bod za N bodů zvířete), kapacita
+  osob. Pozor: typy v PPP (vůz/kočár/dostavník) a v h2057 (8 modelů) se
+  nekryjí 1:1 — před stavbou číselníku rozhodnout, ze které tabulky se
+  bere, nebo ji slít.
 
 **Fáze 4 — Jádro: hodinová simulace cestování**
 - U "Cestovat sem" PJ zadá vzdálenost (míle) a vybere terén (6

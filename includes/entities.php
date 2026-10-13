@@ -337,6 +337,7 @@ return [
     'opravy_za_atribut' => ['label' => 'Opravy za atribut', 'group' => 'ciselniky', 'hidden_from_players' => false, 'order_by' => 'stupen_od'],
     'nosnost_podle_sily' => ['label' => 'Nosnost podle Síly', 'group' => 'ciselniky', 'hidden_from_players' => false, 'order_by' => 'oprava_sil'],
     'narocnost_akci_unava' => ['label' => 'Náročnost akcí (únava)', 'group' => 'ciselniky', 'hidden_from_players' => false, 'order_by' => 'id'],
+    'jizdni_zvirata' => ['label' => 'Jízdní zvířata', 'group' => 'ciselniky', 'hidden_from_players' => false, 'order_by' => 'id'],
     'odstraneni_unavy' => ['label' => 'Odstranění únavy', 'group' => 'ciselniky', 'hidden_from_players' => false, 'order_by' => 'id'],
     'vysledky_testu' => ['label' => 'Výsledky testu (škála)', 'group' => 'ciselniky', 'hidden_from_players' => false, 'order_by' => 'poradi'],
     // 'velikosti' vynechané záměrně — primární klíč je `kod`, ne `id`,

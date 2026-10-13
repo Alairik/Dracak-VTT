@@ -290,6 +290,16 @@ $postavy = dracak_db()->prepare(
 $postavy->execute([$svetId]);
 $postavy = $postavy->fetchAll();
 
+// Doprava postav (migrace 0067/0068) — jen když sloupce na DB už jsou.
+// Samostatný dotaz na názvy zvířat místo JOINu do výše, ať svet.php
+// funguje i před ruční migrací.
+$jizdniZvirataNazvy = [];
+if ($postavy && array_key_exists('doprava_zvire_id', $postavy[0])) {
+    foreach (dracak_db()->query('SELECT id, nazev FROM jizdni_zvirata')->fetchAll() as $z) {
+        $jizdniZvirataNazvy[(int)$z['id']] = $z['nazev'];
+    }
+}
+
 // Vlastní zatím nepřiřazené postavy (viz hra/postavy_moje.php) — nabídka
 // "připojit existující" místo zakládání nové od nuly.
 $mojeVolnePostavy = dracak_db()->prepare('SELECT id, nazev FROM postavy WHERE vlastnik_ucet_id = ? AND svet_id IS NULL ORDER BY nazev');
@@ -540,6 +550,9 @@ dracak_vtt_page_start($svet['nazev'], $user, true);
                   <div class="k">Hráč:</div><div><?= htmlspecialchars($p['vlastnik_jmeno']) ?></div>
                   <div class="k">Rasa/Povolání:</div><div><?= htmlspecialchars(($p['rasa_nazev'] ?? '—') . ' / ' . ($p['povolani_nazev'] ?? '—')) ?></div>
                   <div class="k">Život:</div><div><?= (int)$p['aktualni_hp'] ?> / <?= (int)$p['max_hp'] ?></div>
+                  <?php if (array_key_exists('doprava_typ', $p)): ?>
+                  <div class="k">Doprava:</div><div><?= $p['doprava_typ'] === 'zvire' && isset($jizdniZvirataNazvy[(int)$p['doprava_zvire_id']]) ? htmlspecialchars($jizdniZvirataNazvy[(int)$p['doprava_zvire_id']]) : 'pěšky' ?></div>
+                  <?php endif; ?>
                   <?php if ($p['sila'] !== null): ?>
                   <div class="k">Atributy:</div><div>
                     S <?= (int)$p['sila'] ?> · Obr <?= (int)$p['obratnost'] ?> · Odl <?= (int)$p['odolnost'] ?> · Int <?= (int)$p['inteligence'] ?> · Cha <?= (int)$p['charisma'] ?>

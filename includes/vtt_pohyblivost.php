@@ -190,6 +190,38 @@ function dracak_vtt_postava_naklad_mn(PDO $pdo, int $postavaId): array
 }
 
 // =====================================================================
+// Doprava (jízdní zvířata)
+// =====================================================================
+
+// Číselník jízdních zvířat (jizdni_zvirata, migrace 0067 — TABULKA
+// JEZDECKÝCH ZVÍŘAT, h1635), v pořadí tabulky.
+function dracak_vtt_jizdni_zvirata(PDO $pdo): array
+{
+    return $pdo->query('SELECT * FROM jizdni_zvirata ORDER BY id')->fetchAll();
+}
+
+// Dopravní prostředek postavy: ['typ' => 'chuze'|'zvire', 'zvire' => řádek
+// z jizdni_zvirata|null]. null = migrace 0068 ještě není na DB (sloupce
+// doprava_* v řádku postavy nejsou) — volající pak dopravu vůbec
+// nenabízí. Zvíře si postava vybírá z číselníku, vlastnictví se
+// nevynucuje (půjčené/ukradené zvíře je v pořádku).
+function dracak_vtt_postava_doprava(PDO $pdo, array $postava): ?array
+{
+    if (!array_key_exists('doprava_typ', $postava)) {
+        return null;
+    }
+    if ($postava['doprava_typ'] === 'zvire' && !empty($postava['doprava_zvire_id'])) {
+        $stmt = $pdo->prepare('SELECT * FROM jizdni_zvirata WHERE id = ?');
+        $stmt->execute([(int)$postava['doprava_zvire_id']]);
+        $zvire = $stmt->fetch();
+        if ($zvire) {
+            return ['typ' => 'zvire', 'zvire' => $zvire];
+        }
+    }
+    return ['typ' => 'chuze', 'zvire' => null];
+}
+
+// =====================================================================
 // Únava
 // =====================================================================
 

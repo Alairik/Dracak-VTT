@@ -67,6 +67,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $atributy['sila'], $atributy['obratnost'], $atributy['odolnost'], $atributy['inteligence'], $atributy['charisma'],
         $aktualniHp, $maxHp, $aktualniMagenergie, $maxMagenergie, $poznamky, $postavaId,
     ]);
+
+    // Doprava (migrace 0068) — jen když sloupce na DB už jsou, jinak by
+    // celý UPDATE výš (a s ním úprava postavy) neměl jak projít. Zvíře
+    // se bere z číselníku, žádné vynucené vlastnictví; neplatné id =
+    // chůze. Dvojice typ/zvíře se drží konzistentní tady, ne v DB.
+    if (array_key_exists('doprava_typ', $postava)) {
+        $zvireId = (int)($_POST['doprava_zvire_id'] ?? 0);
+        $stmt = dracak_db()->prepare('SELECT 1 FROM jizdni_zvirata WHERE id = ?');
+        $stmt->execute([$zvireId]);
+        $platne = $zvireId > 0 && $stmt->fetchColumn() !== false;
+        dracak_db()->prepare('UPDATE postavy SET doprava_typ = ?, doprava_zvire_id = ? WHERE id = ?')
+            ->execute([$platne ? 'zvire' : 'chuze', $platne ? $zvireId : null, $postavaId]);
+    }
     header($svetId > 0 ? "Location: svet.php?id=$svetId" : 'Location: postavy_moje.php');
     exit;
 }
@@ -79,6 +92,8 @@ $naklad = dracak_vtt_postava_naklad_mn(dracak_db(), $postavaId);
 $pohyblivost = dracak_vtt_postava_pohyblivost(dracak_db(), $postava, $naklad['naklad_mn']);
 $nalozeniNazvy = ['zadne' => 'žádné', 'mirne' => 'mírné', 'stredni' => 'střední', 'velke' => 'velké', 'prilis_velke' => 'nad 4× nosnost'];
 $unava = dracak_vtt_postava_unava_stupen($postava);
+$doprava = dracak_vtt_postava_doprava(dracak_db(), $postava);
+$jizdniZvirata = $doprava !== null ? dracak_vtt_jizdni_zvirata(dracak_db()) : [];
 $znamenko = static fn(int $n): string => ($n > 0 ? '+' : '') . $n;
 
 dracak_vtt_page_start($postava['nazev'], $user);
@@ -165,6 +180,19 @@ dracak_vtt_page_start($postava['nazev'], $user);
           Únava: doplň odolnost (vytrvalost = odolnost).
         <?php endif; ?>
       </p>
+      <?php if ($doprava !== null): ?>
+      <div class="field"><label for="doprava_zvire_id">Doprava</label>
+        <select id="doprava_zvire_id" name="doprava_zvire_id">
+          <option value="">Pěšky</option>
+          <?php foreach ($jizdniZvirata as $z): ?>
+            <option value="<?= (int)$z['id'] ?>" <?= $doprava['zvire'] && (int)$doprava['zvire']['id'] === (int)$z['id'] ? 'selected' : '' ?>>
+              <?= htmlspecialchars($z['nazev']) ?> (pohyblivost <?= (int)$z['pohyblivost'] ?>, nosnost <?= (int)$z['nosnost_mn'] ?> mn, vytrvalost <?= (int)$z['vytrvalost'] ?>)
+            </option>
+          <?php endforeach; ?>
+        </select>
+        <span class="note">Zvíře se vybírá z číselníku, nemusí patřit postavě (půjčené, ukradené…).</span>
+      </div>
+      <?php endif; ?>
       <div class="field"><label for="poznamky">Poznámky</label>
         <textarea id="poznamky" name="poznamky"><?= htmlspecialchars((string)($postava['poznamky'] ?? '')) ?></textarea>
       </div>
