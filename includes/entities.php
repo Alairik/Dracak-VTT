@@ -211,10 +211,10 @@ return [
         'hidden_from_players' => false,
         'row_owned' => true,
         'order_by' => 'nazev',
-        'summary_fields' => ['pohyblivost_zaklad' => 'Pohyblivost (+OBR)'],
+        'summary_fields' => ['pohyblivost_zaklad' => 'Pohyblivost (rasový základ)'],
         'fields' => [
             ['name' => 'nazev', 'label' => 'Název', 'type' => 'text', 'required' => true, 'quick' => true],
-            ['name' => 'pohyblivost_zaklad', 'label' => 'Pohyblivost — základ (finální = tohle + oprava za OBR)', 'type' => 'number', 'quick' => true, 'filter' => 'range'],
+            ['name' => 'pohyblivost_zaklad', 'label' => 'Pohyblivost — rasový základ (základní pohyblivost = tohle + bonus za OBR + 2× bonus za SIL)', 'type' => 'number', 'quick' => true, 'filter' => 'range'],
             ['name' => 'popis', 'label' => 'Popis', 'type' => 'textarea', 'quick' => true],
             ['name' => 'rodic_rasa_id', 'label' => 'Rodičovská rasa (klan/varianta od)', 'type' => 'select_fk', 'ref_table' => 'rasy', 'ref_label' => 'nazev'],
         ],

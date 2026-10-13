@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/../includes/vtt.php';
+require_once __DIR__ . '/../includes/vtt_pohyblivost.php';
 
 $user = dracak_require_login();
 $postavaId = (int)($_GET['id'] ?? 0);
@@ -73,6 +74,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $rasyOptions = dracak_db()->query('SELECT id, nazev FROM rasy ORDER BY nazev')->fetchAll();
 $povolaniOptions = dracak_db()->query('SELECT id, nazev FROM povolani ORDER BY nazev')->fetchAll();
 
+// Jen ke čtení, podle uložených hodnot (ne podle rozepsaného formuláře).
+// Náklad se zatím nevyhodnocuje, viz dracak_vtt_postava_pohyblivost().
+$pohyblivost = dracak_vtt_postava_pohyblivost(dracak_db(), $postava);
+$unava = dracak_vtt_postava_unava_stupen($postava);
+$znamenko = static fn(int $n): string => ($n > 0 ? '+' : '') . $n;
+
 dracak_vtt_page_start($postava['nazev'], $user);
 ?>
   <main class="main" style="padding:24px;">
@@ -129,6 +136,26 @@ dracak_vtt_page_start($postava['nazev'], $user);
         <div class="field"><label for="charisma">Charisma</label>
           <input class="input" type="number" id="charisma" name="charisma" min="1" max="30" value="<?= htmlspecialchars((string)($postava['charisma'] ?? '')) ?>"></div>
       </div>
+      <h3 class="rel-label">Pohyb a únava</h3>
+      <p class="note" style="margin:0 0 4px;">
+        <?php if ($pohyblivost): ?>
+          <strong>Základní pohyblivost (bez naložení): <?= $pohyblivost['zakladni'] ?></strong>
+          (bonus <?= $znamenko($pohyblivost['bonus_pohyblivosti']) ?>)
+          — rasa <?= $pohyblivost['rasovy_zaklad'] ?>,
+          obratnost <?= $znamenko($pohyblivost['bonus_obratnost']) ?>,
+          2× síla (<?= $znamenko($pohyblivost['bonus_sila']) ?>)
+        <?php else: ?>
+          Pohyblivost: doplň rasu, sílu a obratnost (a rasa musí mít pohyblivost v číselníku).
+        <?php endif; ?>
+      </p>
+      <p class="note" style="margin:0 0 4px;">
+        <?php if ($unava): ?>
+          <strong>Únava: <?= $unava['body'] ?> / vytrvalost <?= $unava['vytrvalost'] ?></strong>
+          — <?= htmlspecialchars($unava['nazev']) ?><?= $unava['popis'] ? ' (' . htmlspecialchars($unava['popis']) . ')' : '' ?>
+        <?php else: ?>
+          Únava: doplň odolnost (vytrvalost = odolnost).
+        <?php endif; ?>
+      </p>
       <div class="field"><label for="poznamky">Poznámky</label>
         <textarea id="poznamky" name="poznamky"><?= htmlspecialchars((string)($postava['poznamky'] ?? '')) ?></textarea>
       </div>

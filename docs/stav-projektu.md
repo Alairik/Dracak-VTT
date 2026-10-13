@@ -15,10 +15,13 @@ mění) se sem zapíše update ve stejném kroku, ne až "až bude čas".
 ## Pro novou session, co začíná tady
 
 Přečti celý tenhle soubor, pak `CLAUDE.md` (hlavně sekci o nejistotě v
-herní mechanice a pravidlo o neodhadování). **Schválený další krok je
-Fáze 1 ze sekce "Rozpracováno: cestování..." níže** — oprava
-`rasy.pohyblivost_zaklad` + nový sloupec `postavy.unava` + computed
-helper na Pohyblivost. Je to odsouhlasené, ne návrh k debatě — stav
+herní mechanice a pravidlo o neodhadování). **Fáze 1 ze sekce
+"Rozpracováno: cestování..." je v kódu hotová** (oprava
+`rasy.pohyblivost_zaklad`, `postavy.unava`, helpery v
+`includes/vtt_pohyblivost.php`, read-only zobrazení v `hra/postava.php`) —
+čeká jen na **ruční spuštění `0065_postava_unava.sql` přes phpMyAdmin
+(admin účet)**, viz "Fáze 1" níže. **Schválený další krok je Fáze 2
+(jízdní zvířata)**. Je to odsouhlasené, ne návrh k debatě — stav
 předchozí konverzace je zapsaný přesně proto, aby ses nemusel/a ptát na
 věci, co už byly rozhodnuté (viz "Architektonická rozhodnutí" a celá
 sekce "Rozpracováno" níže — všechno v ní je buď přímo citovaný text
@@ -92,9 +95,9 @@ sekce "Proč DB vůbec existuje".
   h1615), ne 2 jako původně (migrace 0059).
 
 ### Postava
-- Tvorba podle pravidel — atributy jako "stupeň" (h104, ne bonus),
-  nosnost/pohyblivost **zatím jen jako zobrazovací pole** (viz sekce
-  "Rozpracováno" níže — tohle se teď řeší).
+- Tvorba podle pravidel — atributy jako "stupeň" (h104, ne bonus).
+- Pohyblivost a únava na kartě postavy (`hra/postava.php`, jen ke čtení)
+  — viz "Fáze 1" v sekci "Rozpracováno" níže.
 - Postava nezávislá na světě dokud není přiřazená (`postavy.svet_id`
   nullable), hráč si může připravit víc postav předem.
 
@@ -161,21 +164,30 @@ sekce "Proč DB vůbec existuje".
 
 ## Rozpracováno: cestování, pohyblivost, únava, naložení
 
-**Stav: čistě výzkumná fáze, v kódu zatím NIC z tohohle není.** Tohle je
-aktuálně otevřený úkol a nejspíš další věc, na které se bude pokračovat.
+**Stav: Fáze 1 hotová v kódu (čeká na ruční ALTER 0065), Fáze 2–5 zatím
+v kódu nejsou.** Tohle je aktuálně otevřený úkol a nejspíš další věc, na
+které se bude pokračovat.
 
 ### Co je podložené přímo v `content/pravidla-hrac.html` (ne odhad)
 
 - **Vzorec finální Pohyblivosti** (h1634): `rasový základ + bonus za OBR +
   2× bonus za SÍLU` (bonusy ze stávající `opravy_za_atribut`). Naložení
   (násobek nosnosti) snižuje na ¾/½/¼.
-- **TABULKA RYCHLOSTI PŘI CHŮZI** a **PŘI BĚHU** — plná čísla, dodal
-  uživatel foto (nebyly v HTML přepisu, jen slovní rozsah). Jednotka:
-  body pohybu za hodinu (chůze) / za kolo (běh), podle bonusu za
-  pohyblivost a tempa (procházka/chůze/spěch; poklus/běh/sprint).
-- **TABULKA ÚNAVY** — plná čísla, dodal uživatel foto. 4 stupně
-  (unavená/vyčerpaná/úplně vyčerpaná/vysílená), přesné postihy k
-  síle/obratnosti/inteligenci/charismě u každého stupně.
+- **TABULKA RYCHLOSTI PŘI CHŮZI** a **PŘI BĚHU** — jednotka: body pohybu
+  za hodinu (chůze) / za kolo (běh), podle bonusu za pohyblivost a tempa
+  (procházka/chůze/spěch; poklus/běh/sprint). **POZOR: plná čísla v repu
+  NEJSOU.** Uživatel je dodal foto v dřívější konverzaci, ale do
+  `content/` se nikdy nepřepsala — h1634 b10868 pořád říká, že se
+  nedochovala, a b10867 uvádí jen rozsahy (bonus −5 až +5 →
+  12–42/20–70/28–98 bodů za hodinu a 16–56/24–84/48–138 bodů za kolo).
+  Před Fází 4 je potřeba foto dodat znovu a přepsat do
+  `content/pravidla-hrac.html` (stejně jako Tabulka lodí v a0915fc).
+- **TABULKA ÚNAVY** — stejný případ: 4 stupně (unavená/vyčerpaná/úplně
+  vyčerpaná/vysílená) s prahy 1×/2×/3×/4× vytrvalosti (= Odolnost) jsou
+  v h1634 b10870, ale **plná tabulka postihů k síle/obratnosti/
+  inteligenci/charismě u každého stupně v repu není** (jen slovní
+  shrnutí). Fáze 1 proto počítá stupeň a ukazuje doslovný text shrnutí,
+  žádné strukturované postihy.
 - **Náročnost terénu — NALEZENO, ne chybí**: sloupec "náročnost" v
   TABULCE NALOŽENÍ POVOZU (h1641) je explicitně **ve stejných
   jednotkách** ("v bodech pohybu, viz 'Rychlost a body pohybu' výše") —
@@ -213,12 +225,17 @@ aktuálně otevřený úkol a nejspíš další věc, na které se bude pokračo
   se ptal, jestli jsou zohledněné VŠECHNY dovednosti — zatím prošité jen
   tyhle 4 nejrelevantnější, ne celá kapitola řádek po řádku).
 
-### Zjištěná chyba ve stávajících datech (čeká na opravu)
-`rasy.pohyblivost_zaklad` (migrace 0007) je pravděpodobně špatně —
-Člověk/Elf/Barbar mají shodně 30, ale ověřený příklad v textu počítá s
-Barbarem jako se základem **12** (stejný vzorec chyby jako `nosnost_podle_sily`,
-co opravila migrace 0055 — neověřeno proti textu při zavedení). Potřeba
-dohledat/ověřit hodnoty pro všechny rasy před opravou.
+### ~~Zjištěná chyba ve stávajících datech~~ — OPRAVENO (migrace 0064)
+`rasy.pohyblivost_zaklad` (migrace 0007) byla celá špatně (Trpaslík 20,
+Člověk/Elf/Barbar 30, ostatní NULL). Skutečná **TABULKA POHYBLIVOSTI RAS**
+je v h1681 (b11140–b11146) a hodnoty se shodují s příkladem Hruna v
+h1634: hobit 10, kudůk 9, trpaslík 8, elf 12, člověk 11, barbar 12,
+kroll 11. Homebrew rasy mají vlastní řádek "Pohyblivost:" ve svém bloku
+"Vlastnosti" (Barnové/Caelové/Kobold/Naro´shai/Skaven/Tauren 12,
+Furan/Gnollové/Tiefling 11, Magiliw 13) — citace b-id jsou v hlavičce
+`0064_oprava_rasy_pohyblivost_zaklad.sql`. Trpasličí klany a "Kroll —
+domácí rozšíření" vlastní hodnotu nemají, dědí ji za běhu od rodiče
+(`rodic_rasa_id`) v `dracak_vtt_rasovy_zaklad_pohyblivosti()`.
 
 ### Architektonická rozhodnutí z konverzace (čekají na potvrzení/stavbu)
 - **Zvíře vs. povoz mají jinou kardinalitu** — zvíře 1:1 (vlastnost
@@ -244,22 +261,48 @@ dohledat/ověřit hodnoty pro všechny rasy před opravou.
 
 ### Další krok — SCHVÁLENÝ fázový plán (2026-10, čeká na realizaci)
 
-Žádná z fází níže není v kódu. Začít Fází 1, v pořadí — každá staví na
-předchozí.
+Fáze 1 je v kódu (viz níž), Fáze 2–5 ne. Pokračovat Fází 2, v pořadí —
+každá staví na předchozí.
 
-**Fáze 1 — Oprava dat + živá Pohyblivost/Únava na postavě**
-- Oprava `rasy.pohyblivost_zaklad` pro VŠECHNY rasy (dnes podezřelé —
-  Barbar měl být 12, ne 20/30 jako teď; potřeba dohledat/ověřit zbytek,
-  možná další foto z fyzické knihy).
-- `postavy.pohyblivost` se **neukládá jako sloupec** — je to vždycky
-  odvoditelné (rasa + OBR + SIL + aktuální naložení z inventáře),
-  uložená hodnota by šla snadno do nesouladu. Počítat na požádání přes
-  novou `dracak_vtt_postava_pohyblivost()`.
-- `postavy.unava` (nový sloupec) **se ukládat musí** — nahromaděný stav
-  v čase, ne odvoditelná hodnota (stejně jako `aktualni_hp`). Nová
-  `dracak_vtt_postava_unava_stupen()` (body → stupeň/postih podle
-  vytrvalosti = Odolnost, viz Tabulka únavy výše).
-- UI: zobrazit obojí na kartě postavy, zatím jen ke čtení.
+**Fáze 1 — Oprava dat + živá Pohyblivost/Únava na postavě — HOTOVO V KÓDU**
+- `0064_oprava_rasy_pohyblivost_zaklad.sql` (čisté UPDATE, proběhne sama
+  přes `migrate.php`) — opraveno pro všech 17 ras s hodnotou v textu,
+  viz výš.
+- `0065_postava_unava.sql` — `postavy.unava SMALLINT UNSIGNED NOT NULL
+  DEFAULT 0`. **DDL: MUSÍ se ručně spustit přes phpMyAdmin (admin účet)**;
+  `migrate.php` ho pak při dalším deployi sám zapíše do `migrace_log`
+  (pozná, že sloupec už existuje). Do té doby kód funguje (chybějící
+  sloupec = únava 0), jen není co ukládat.
+- `includes/vtt_pohyblivost.php`: `dracak_vtt_postava_pohyblivost()`
+  (rasa + bonus OBR + 2× bonus SIL, volitelně náklad -> Tabulka
+  naložení ¾/½/¼ se zaokrouhlením nahoru, ověřeno na celém příkladu
+  Hruna z h1634: 19 → 5 → 15 → 19), `dracak_vtt_postava_unava_stupen()`
+  (body vs. vytrvalost = Odolnost, prahy 1×/2×/3×/4× "nad").
+  `postavy.pohyblivost` se neukládá (odvozená hodnota).
+- UI: `hra/postava.php`, blok "Pohyb a únava", jen ke čtení.
+- **Odchylky od původního plánu a otevřené body (rozhodnout):**
+  - **Náklad se NEsčítá z inventáře.** `predmety.vaha` nemá ověřené
+    jednotky pro všechny typy (zbraně v mn, suroviny zlomky bez jednotky),
+    lektvary váhu nemají vůbec — součet by byl odhad. Helper bere náklad
+    jako volitelný parametr (`null` = nevyhodnocuje se, UI ukazuje
+    "základní pohyblivost bez naložení"). Cesta dál: ověřit/sjednotit
+    jednotky `vaha`, nebo nechat PJ zadat náklad ručně.
+  - **Strukturované postihy za únavu chybí.** Plná Tabulka únavy (foto
+    od uživatele) v repu není — v `content/` je jen slovní shrnutí
+    h1634 b10870, které cíl postihu uvádí výslovně jen u "unavená"
+    (síla/obratnost) a int/chr jen u "úplně vyčerpaná". Helper proto
+    vrací stupeň + doslovný text shrnutí, žádná čísla k atributům.
+    Než je engine bude aplikovat automaticky, je potřeba tabulku
+    přepsat do `content/pravidla-hrac.html` (foto znovu).
+  - **Stínová únava** (h1634 b10869) se nerozlišuje — jeden součet bodů.
+  - **Stará tabulka `stupne_unavy` (migrace 0008) je nepoužitá a
+    nesedí s pravidly** (model "hranice 10 + oprava za ODO", 3 stupně,
+    jeden postih −3/−6; v textu pravidel ani "hranice únavy" nenajdu).
+    Stejný druh chyby jako 0007 u pohyblivosti. Nic na ni nesahá, ale
+    je v editoru jako číselník — rozhodnout, jestli ji nahradit
+    správným modelem.
+  - Tabulka výcviků (h1603, b10603): "základní pohyblivost postavy se
+    zvýší o 1" — bonus k pohyblivosti z výcviku se nepočítá.
 
 **Fáze 2 — Jízdní zvířata**
 - Nová tabulka `jizdni_zvirata` (7 řádků z Tabulky jezdeckých zvířat
