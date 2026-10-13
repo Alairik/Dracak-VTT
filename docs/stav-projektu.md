@@ -281,12 +281,16 @@ každá staví na předchozí.
   `postavy.pohyblivost` se neukládá (odvozená hodnota).
 - UI: `hra/postava.php`, blok "Pohyb a únava", jen ke čtení.
 - **Odchylky od původního plánu a otevřené body (rozhodnout):**
-  - **Náklad se NEsčítá z inventáře.** `predmety.vaha` nemá ověřené
-    jednotky pro všechny typy (zbraně v mn, suroviny zlomky bez jednotky),
-    lektvary váhu nemají vůbec — součet by byl odhad. Helper bere náklad
-    jako volitelný parametr (`null` = nevyhodnocuje se, UI ukazuje
-    "základní pohyblivost bez naložení"). Cesta dál: ověřit/sjednotit
-    jednotky `vaha`, nebo nechat PJ zadat náklad ručně.
+  - **Náklad z inventáře se počítá automaticky**
+    (`dracak_vtt_postava_naklad_mn()`: `postava_predmety` ×
+    `predmety.vaha`, desetinné mn; zobrazeno na `hra/postava.php`).
+    První verze jsem napsal s tvrzením, že jednotky `vaha` nejsou
+    ověřené — **to bylo špatně**: seed (`drd-db-full-v1.sql`, konvence
+    nad INSERTem predmety) výslovně říká, že `predmety.vaha` je v mn,
+    a ceník v pravidlech (h2055) je ve stejných jednotkách; 1 mn ≈ 50 g
+    (h3 "Míry a váhy"). Skutečné mezery jsou jiné — viz "Fáze 1b".
+    Položka bez váhy se nepočítá jako 0, ale hlásí se jako "neúplný
+    součet".
   - **Strukturované postihy za únavu chybí.** Plná Tabulka únavy (foto
     od uživatele) v repu není — v `content/` je jen slovní shrnutí
     h1634 b10870, které cíl postihu uvádí výslovně jen u "unavená"
@@ -309,6 +313,41 @@ každá staví na předchozí.
     zatím nezkontrolované proti pravidlům, nesahat dokud se neověří.
   - Tabulka výcviků (h1603, b10603): "základní pohyblivost postavy se
     zvýší o 1" — bonus k pohyblivosti z výcviku se nepočítá.
+
+**Fáze 1b — Váha, kontejnery a nosiče (rozhodnuto uživatelem, ČÁSTEČNĚ HOTOVO)**
+Rozhodnutí: váha se musí počítat automaticky (hotovo pro plochý
+inventář postavy); jednotky sjednotit na mn (seed už je mn — viz výš);
+**zvířata a povozy mohou mít vlastní náklad, pokud na nich existují
+kontejnery** (vaky, truhly apod.).
+- Co dává text pravidel (vše ověřeno v `content/pravidla-hrac.html`):
+  - Hmotnost = mince `mn`, ≈ 50 g, mince ze všech kovů váží stejně,
+    **peníze se tedy váží (1 mince = 1 mn)** (h3).
+  - Ceník h2055 ("Nový ceník", homebrew): sloupce název | kapacita/
+    poznámka | cena | **váha**; kontejnery mají **kapacitu v mn a
+    vlastní váhu** — torna kožená 800/30 mn, vaky (malý 140/9 … nákladní
+    velký 2000/80), sedlové vaky (250/12, 500/24, 750/36), soudky
+    (5 l … 50 l, sud 225 l), truhly (malá/střední/velká dřevěná i
+    železná: kapacita 200/500/1500 mn, váha 60–500 mn), trakař 2000/750,
+    toulec, pochvy… Dále oblečení, stany, deky, provazy, jídlo atd. —
+    **nic z toho není v `predmety`** (DB má jen zbraně, zbroje,
+    suroviny, artefakty).
+  - Nosnost zvířat: Tabulka jezdeckých zvířat (h1635). **Do nákladu
+    na koních se započítává i váha jezdce** (h1681 b11168).
+  - Povozy: do váhy nákladu z hlediska zvířete se počítá i váha
+    povozu a posádky (h1640); "procento nákladu" podle terénu (h1641).
+- Stav dat: `predmety.vaha` je NULL u části řádků (např. Pavéza, Voda,
+  Ocet…), **lektvary váhu nemají vůbec** (jen občas v textu `popis`,
+  např. "Váha: 5mn"), ceníkové vybavení v DB není. Hodnoty `vaha` ve
+  migracích 0035/0036 (suroviny pro Chodce a lektvary, 0,01–1,0) nemají
+  doložený zdroj — **neověřeno proti pravidlům, nespoléhat** (může být
+  cena v zl zapsaná do špatného sloupce).
+- Zbývá: (1) import ceníku h2055 do DB — `predmety.typ` ENUM nemá
+  hodnotu pro běžné vybavení a chybí sloupec kapacity (DDL, ruční
+  spuštění); (2) váha lektvarů; (3) model kontejnerů — předmět uložený
+  "v" kontejneru (self-FK v inventáři), nosič = postava / zvíře /
+  povoz, součet váhy po stromu; (4) peníze na postavě; (5) váha
+  jezdce do nákladu zvířete. Dělat po částech, až po odsouhlasení
+  návrhu modelu.
 
 **Fáze 2 — Jízdní zvířata**
 - Nová tabulka `jizdni_zvirata` (7 řádků z Tabulky jezdeckých zvířat

@@ -75,8 +75,9 @@ $rasyOptions = dracak_db()->query('SELECT id, nazev FROM rasy ORDER BY nazev')->
 $povolaniOptions = dracak_db()->query('SELECT id, nazev FROM povolani ORDER BY nazev')->fetchAll();
 
 // Jen ke čtení, podle uložených hodnot (ne podle rozepsaného formuláře).
-// Náklad se zatím nevyhodnocuje, viz dracak_vtt_postava_pohyblivost().
-$pohyblivost = dracak_vtt_postava_pohyblivost(dracak_db(), $postava);
+$naklad = dracak_vtt_postava_naklad_mn(dracak_db(), $postavaId);
+$pohyblivost = dracak_vtt_postava_pohyblivost(dracak_db(), $postava, $naklad['naklad_mn']);
+$nalozeniNazvy = ['zadne' => 'žádné', 'mirne' => 'mírné', 'stredni' => 'střední', 'velke' => 'velké', 'prilis_velke' => 'nad 4× nosnost'];
 $unava = dracak_vtt_postava_unava_stupen($postava);
 $znamenko = static fn(int $n): string => ($n > 0 ? '+' : '') . $n;
 
@@ -140,10 +141,18 @@ dracak_vtt_page_start($postava['nazev'], $user);
       <p class="note" style="margin:0 0 4px;">
         <?php if ($pohyblivost): ?>
           <strong>Základní pohyblivost (bez naložení): <?= $pohyblivost['zakladni'] ?></strong>
-          (bonus <?= $znamenko($pohyblivost['bonus_pohyblivosti']) ?>)
           — rasa <?= $pohyblivost['rasovy_zaklad'] ?>,
           obratnost <?= $znamenko($pohyblivost['bonus_obratnost']) ?>,
-          2× síla (<?= $znamenko($pohyblivost['bonus_sila']) ?>)
+          2× síla (<?= $znamenko($pohyblivost['bonus_sila']) ?>)<br>
+          <?php if ($pohyblivost['nosnost_mn'] !== null && $pohyblivost['nalozeni']): ?>
+            Náklad z inventáře: <?= round($naklad['naklad_mn'], 1) ?> mn z nosnosti <?= $pohyblivost['nosnost_mn'] ?> mn
+            — naložení <?= $nalozeniNazvy[$pohyblivost['nalozeni']['kod']] ?>.
+            <strong>Pohyblivost <?= $pohyblivost['pohyblivost'] ?? '—' ?></strong><?= $pohyblivost['bonus_pohyblivosti'] !== null ? ' (bonus ' . $znamenko($pohyblivost['bonus_pohyblivosti']) . ')' : '' ?>.
+            <?php if ($naklad['neuplny']): ?>
+              <em>Součet je neúplný — bez váhy: <?= htmlspecialchars(implode(', ', $naklad['bez_vahy'])) ?>.</em>
+            <?php endif; ?>
+            Nepočítá se oblečení, jídlo a peníze (1 mince = 1 mn), nejsou v inventáři.
+          <?php endif; ?>
         <?php else: ?>
           Pohyblivost: doplň rasu, sílu a obratnost (a rasa musí mít pohyblivost v číselníku).
         <?php endif; ?>

@@ -60,7 +60,7 @@ function dracak_vtt_nosnost_mn(PDO $pdo, int $silaBonus): ?int
 // Horní hranice jsou včetně ("více než 1–2" = nad 1×, nejvýš 2×). Nad
 // 4× nosnosti tabulka nic neříká — vrací se 'ctvrtiny' = null a kód
 // 'prilis_velke', žádná vymyšlená hodnota.
-function dracak_vtt_nalozeni(int $nakladMn, int $nosnostMn): array
+function dracak_vtt_nalozeni(int|float $nakladMn, int $nosnostMn): array
 {
     foreach ([
         1 => ['zadne', 4],
@@ -92,12 +92,10 @@ function dracak_vtt_pohyblivost_po_nalozeni(int $zakladni, int $ctvrtiny): int
 // Vrací null, když chybí rasa, síla nebo obratnost (atributy jsou
 // nullable) nebo rasa nemá pohyblivost (ani po rodiči) — nedopočítává se.
 //
-// $nakladMn = aktuální náklad v mincích; null = náklad se nevyhodnocuje
-// (výsledek je základní pohyblivost "bez naložení", 'nalozeni' = null).
-// Náklad se ZÁMĚRNĚ nesčítá z inventáře: postava_predmety -> predmety.vaha
-// nemá ověřené jednotky pro všechny typy (zbraně mn, suroviny zlomky),
-// lektvary váhu nemají vůbec, takže by součet byl odhad. Volající, který
-// náklad ví jistě (PJ zadá ručně), ho předá.
+// $nakladMn = aktuální náklad v mincích (mn; může být desetinný, váha
+// předmětů jde pod 1 mn); null = náklad se nevyhodnocuje (výsledek je
+// základní pohyblivost "bez naložení", 'nalozeni' = null). Náklad
+// postavy z inventáře dává dracak_vtt_postava_naklad_mn() níž.
 //
 // 'bonus_pohyblivosti' = bonus za (okamžitou) pohyblivost. Pravidla:
 // "Nabývá hodnot od 1 do 21, bonusy a postihy se určují stejným způsobem
@@ -106,7 +104,7 @@ function dracak_vtt_pohyblivost_po_nalozeni(int $zakladni, int $ctvrtiny): int
 // neořezává (vzorec dává běžně i víc než 21 u silných postav).
 // Nad 4× nosnosti tabulka naložení nic neříká: 'pohyblivost' i
 // 'bonus_pohyblivosti' jsou pak null (postava to neunese / PJ rozhodne).
-function dracak_vtt_postava_pohyblivost(PDO $pdo, array $postava, ?int $nakladMn = null): ?array
+function dracak_vtt_postava_pohyblivost(PDO $pdo, array $postava, int|float|null $nakladMn = null): ?array
 {
     if (empty($postava['rasa_id']) || ($postava['sila'] ?? null) === null || ($postava['obratnost'] ?? null) === null) {
         return null;
@@ -144,6 +142,51 @@ function dracak_vtt_postava_pohyblivost(PDO $pdo, array $postava, ?int $nakladMn
             ? dracak_vtt_obratnost_bonus($pdo, max(1, $pohyblivost))
             : null,
     ];
+}
+
+// Náklad postavy z inventáře (postava_predmety x predmety.vaha). Váha je
+// v mincích (mn) — oficiální jednotka hmotnosti, h3 "Míry a váhy"; seed
+// to má jako konvenci sloupce predmety.vaha. Automatický součet, žádný
+// ruční vstup.
+//
+// Položka bez uvedené váhy (vaha NULL, a všechny lektvary — ty váhu ve
+// schématu nemají vůbec) se NEPOČÍTÁ jako 0 mn: skončí v 'bez_vahy' a
+// výsledek je 'neuplny' = true. Volající to musí dát najevo (součet je
+// pak jen dolní odhad). Kouzla nic nevážijí, nepočítají se.
+//
+// Zatím plochý součet = všechno, co postava má, nese sama. Kontejnery
+// (vaky, truhly) a nosiče (zvíře, povoz) jsou další krok, viz
+// docs/stav-projektu.md. Do nákladu zatím nepatří peníze (1 mince = 1 mn,
+// h3), oblečení ani jídlo — nejsou v modelu inventáře.
+function dracak_vtt_postava_naklad_mn(PDO $pdo, int $postavaId): array
+{
+    $naklad = 0.0;
+    $bezVahy = [];
+
+    $stmt = $pdo->prepare(
+        'SELECT p.nazev, p.vaha, pp.mnozstvi
+         FROM postava_predmety pp JOIN predmety p ON p.id = pp.predmet_id
+         WHERE pp.postava_id = ? ORDER BY p.nazev'
+    );
+    $stmt->execute([$postavaId]);
+    foreach ($stmt->fetchAll() as $row) {
+        if ($row['vaha'] === null) {
+            $bezVahy[] = $row['nazev'];
+        } else {
+            $naklad += (float)$row['vaha'] * (int)$row['mnozstvi'];
+        }
+    }
+
+    $stmt = $pdo->prepare(
+        'SELECT l.nazev FROM postava_lektvary pl JOIN lektvary l ON l.id = pl.lektvar_id
+         WHERE pl.postava_id = ? ORDER BY l.nazev'
+    );
+    $stmt->execute([$postavaId]);
+    foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $nazev) {
+        $bezVahy[] = $nazev;
+    }
+
+    return ['naklad_mn' => $naklad, 'neuplny' => $bezVahy !== [], 'bez_vahy' => $bezVahy];
 }
 
 // =====================================================================
