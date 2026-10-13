@@ -1098,13 +1098,28 @@ function ukoncitEditaciPinu() {
   if (el) el.classList.remove('pin-editing');
   pinEditujiId = null;
 }
+// Umístí popover tak, aby byl celý vidět ve viewportu — zkusí ho otevřít
+// "dolů" od bodu (horní okraj popoveru = horní okraj bodu, jako dřív),
+// a pokud by se tam nevešel celý (bod hodně dole na obrazovce), otevře
+// ho "nahoru" (dolní okraj popoveru = horní okraj bodu) místo toho. Bez
+// týhle logiky popover u pinu blízko dolního okraje mizel mimo obrazovku.
+function umistitPopoverKBodu(pop, rect) {
+  pop.classList.add('open'); // musí být viditelný, aby šlo změřit výšku
+  const vyska = pop.offsetHeight;
+  const mezera = 10;
+  let top = rect.top;
+  if (rect.top + vyska + mezera > window.innerHeight) {
+    top = rect.bottom - vyska;
+  }
+  top = Math.max(mezera, Math.min(top, window.innerHeight - vyska - mezera));
+  pop.style.top = top + 'px';
+}
 function togglePopover(id, btn) {
   const wasOpen = document.getElementById(id).classList.contains('open');
   closeAllPopovers();
   if (!wasOpen) {
     const pop = document.getElementById(id);
-    pop.style.top = btn.getBoundingClientRect().top + 'px';
-    pop.classList.add('open');
+    umistitPopoverKBodu(pop, btn.getBoundingClientRect());
     btn.classList.add('active');
   }
 }
@@ -1161,8 +1176,7 @@ function setTool(tool) {
   const popZed = document.getElementById('popover-zed');
   if (popZed) {
     if (tool === 'zed') {
-      popZed.style.top = toolButtons.zed.getBoundingClientRect().top + 'px';
-      popZed.classList.add('open');
+      umistitPopoverKBodu(popZed, toolButtons.zed.getBoundingClientRect());
       toolButtons.zed.classList.add('active');
       aktualizovatZedJednotky();
     } else {
@@ -1665,8 +1679,7 @@ if (mapWrap) {
       closeAllPopovers();
       const pop = document.getElementById('popover-pin-novy');
       if (pop && toolButtons.pin) {
-        pop.style.top = toolButtons.pin.getBoundingClientRect().top + 'px';
-        pop.classList.add('open');
+        umistitPopoverKBodu(pop, toolButtons.pin.getBoundingClientRect());
         toolButtons.pin.classList.add('active');
       }
       return;
@@ -1732,8 +1745,7 @@ function otevriPinInfo(bod) {
   const pop = document.getElementById('popover-pin-info');
   if (pop && btn) {
     closeAllPopovers();
-    pop.style.top = btn.getBoundingClientRect().top + 'px';
-    pop.classList.add('open');
+    umistitPopoverKBodu(pop, btn.getBoundingClientRect());
   }
 }
 document.querySelectorAll('.mapa-bod-marker').forEach(btn => {
@@ -1789,8 +1801,7 @@ if (pinInfoUpravitBtn) {
     const pop = document.getElementById('popover-pin-upravit');
     const zdroj = document.querySelector('.mapa-bod-marker[data-bod-id="' + bod.id + '"]');
     if (pop && zdroj) {
-      pop.style.top = zdroj.getBoundingClientRect().top + 'px';
-      pop.classList.add('open');
+      umistitPopoverKBodu(pop, zdroj.getBoundingClientRect());
       pinEditujiId = bod.id;
       zdroj.classList.add('pin-editing');
     }
