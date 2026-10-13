@@ -516,6 +516,29 @@ přístupný.
 
 ---
 
+## Čeká na rozhodnutí / podklady od uživatele
+
+- **Schválení `DROP INDEX postava_predmet` na `postava_predmety`** (jediná
+  věc, co blokuje kontejnery — vaky/truhly/nosiče — z Fáze 1b): UNIQUE
+  (postava, předmět) dovolí jen jeden řádek na typ předmětu, takže dva
+  stejné vaky ani stejný předmět ve dvou kontejnerech nejdou. Alternativa
+  bez DROP: nová tabulka inventáře + kopie dat (větší refactor).
+- Rozsah importu ceníku h2055 (doporučeno: nejdřív jen kontejnery) a
+  kapacita kontejneru jako tvrdý limit s přepsáním PJ (doporučeno).
+- **Foto Tabulky rychlosti při chůzi a při běhu a Tabulky únavy** (v repu
+  nejsou, jen rozsahy) — bez nich nejde Fáze 4 (simulace cestování).
+- Tažný kůň: nosnost 800 (obě tabulky) vs. "o čtvrtinu vyšší než klasický,
+  1000 mn v zápřahu" (slovní popis) — ověřit v knize.
+- Povozy (Fáze 3): sloučit PPP typy (vůz/kočár/dostavník) s homebrew
+  tabulkou POVOZY (h2057, 8 modelů)? Katalog zatím nemá žádného
+  spotřebitele (čeká na Fázi 4), proto nezačato.
+- `DROP TABLE stupne_unavy;` — schválit, a pak ho přidat do
+  `docs/sql-k-rucnimu-spusteni.sql`.
+- Zkontrolovat proti pravidlům `narocnost_akci_unava` a `odstraneni_unavy`
+  (podezření na stejný starý model jako `stupne_unavy`).
+
+---
+
 ## Standing pravidla relevantní pro orientaci (plné znění v CLAUDE.md)
 
 - Nejistota v herní mechanice se neřeší odhadem — nikdy. Žádá-li se
