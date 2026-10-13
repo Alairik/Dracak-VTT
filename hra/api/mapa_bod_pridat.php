@@ -35,26 +35,14 @@ if ($nazev === '') {
     echo json_encode(['error' => 'Pin musí mít název.']);
     exit;
 }
-// Cílová mapa (pokud zadaná) musí patřit do stejného světa — jinak by
-// šlo pinem na jednom světě otevřít mapu z úplně cizí kampaně. Sama na
-// sebe taky nesmí (pin na mapě, co vede zpátky na tu samou mapu, by
-// byl nekonečná smyčka pro strom/breadcrumb z další fáze).
-if ($cilovaMapaId !== null) {
-    if ($cilovaMapaId === $mapaId) {
-        http_response_code(422);
-        echo json_encode(['error' => 'Pin nemůže vést na mapu, na které sám je.']);
-        exit;
-    }
-    $stmt = $pdo->prepare('SELECT 1 FROM mapy WHERE id = ? AND svet_id = ?');
-    $stmt->execute([$cilovaMapaId, (int)$mapa['svet_id']]);
-    if (!$stmt->fetchColumn()) {
-        http_response_code(422);
-        echo json_encode(['error' => 'Cílová mapa nepatří do tohohle světa.']);
-        exit;
-    }
+$chybaCile = dracak_vtt_mapa_bod_validuj_cil($pdo, (int)$mapa['svet_id'], $mapaId, $cilovaMapaId);
+if ($chybaCile !== null) {
+    http_response_code(422);
+    echo json_encode(['error' => $chybaCile]);
+    exit;
 }
 
-$bodId = dracak_vtt_mapa_bod_pridat($pdo, $mapaId, $nazev, $typ, $x, $y, $cilovaMapaId, $popis, $viditelnyHracum);
+$bodId = dracak_vtt_mapa_bod_pridat($pdo, (int)$mapa['svet_id'], $mapaId, $nazev, $typ, $x, $y, $cilovaMapaId, $popis, $viditelnyHracum);
 
 $eventId = dracak_vtt_log_event((int)$mapa['svet_id'], $mapaId, 'mapa_bod_pridan', [
     'id' => $bodId, 'nazev' => $nazev, 'typ' => $typ, 'x' => $x, 'y' => $y,

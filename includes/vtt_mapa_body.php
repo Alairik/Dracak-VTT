@@ -63,14 +63,46 @@ function dracak_vtt_mapa_bod_ikona(string $typ): string
     };
 }
 
-function dracak_vtt_mapa_bod_pridat(PDO $pdo, int $mapaId, string $nazev, string $typ, int $x, int $y, ?int $cilovaMapaId, ?string $popis, bool $viditelnyHracum): int
+// Sdílená validace cílové mapy pinu — stejná pro založení i editaci
+// (hra/api/mapa_bod_pridat.php, mapa_bod_upravit.php), ať se nerozjede
+// mezi oběma endpointy. Vrací chybovou hlášku, nebo null když je vše OK.
+function dracak_vtt_mapa_bod_validuj_cil(PDO $pdo, int $svetId, int $mapaId, ?int $cilovaMapaId): ?string
+{
+    if ($cilovaMapaId === null) {
+        return null;
+    }
+    if ($cilovaMapaId === $mapaId) {
+        return 'Pin nemůže vést na mapu, na které sám je.';
+    }
+    $stmt = $pdo->prepare('SELECT 1 FROM mapy WHERE id = ? AND svet_id = ?');
+    $stmt->execute([$cilovaMapaId, $svetId]);
+    if (!$stmt->fetchColumn()) {
+        return 'Cílová mapa nepatří do tohohle světa.';
+    }
+    return null;
+}
+
+function dracak_vtt_mapa_bod_pridat(PDO $pdo, int $svetId, int $mapaId, string $nazev, string $typ, int $x, int $y, ?int $cilovaMapaId, ?string $popis, bool $viditelnyHracum): int
 {
     $stmt = $pdo->prepare(
-        'INSERT INTO mapa_body (mapa_id, cilova_mapa_id, nazev, typ, x, y, popis, viditelny_hracum)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO mapa_body (svet_id, mapa_id, cilova_mapa_id, nazev, typ, x, y, popis, viditelny_hracum)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
-    $stmt->execute([$mapaId, $cilovaMapaId, $nazev, $typ, $x, $y, $popis, $viditelnyHracum ? 1 : 0]);
+    $stmt->execute([$svetId, $mapaId, $cilovaMapaId, $nazev, $typ, $x, $y, $popis, $viditelnyHracum ? 1 : 0]);
     return (int)$pdo->lastInsertId();
+}
+
+// Upravitelné je jen popisné (název/typ/popis/viditelnost) + kam pin
+// vede — ne mapa_id ani x/y (to je POZICE pinu, přesun na jinou mapu
+// nebo jinam na stejné mapě tahle funkce neřeší, nikdo o to nepožádal).
+function dracak_vtt_mapa_bod_upravit(PDO $pdo, int $bodId, int $svetId, string $nazev, string $typ, ?int $cilovaMapaId, ?string $popis, bool $viditelnyHracum): bool
+{
+    $stmt = $pdo->prepare(
+        'UPDATE mapa_body SET nazev = ?, typ = ?, cilova_mapa_id = ?, popis = ?, viditelny_hracum = ?
+         WHERE id = ? AND svet_id = ?'
+    );
+    $stmt->execute([$nazev, $typ, $cilovaMapaId, $popis, $viditelnyHracum ? 1 : 0, $bodId, $svetId]);
+    return $stmt->rowCount() > 0;
 }
 
 function dracak_vtt_mapa_bod_smazat(PDO $pdo, int $bodId, int $mapaId): bool

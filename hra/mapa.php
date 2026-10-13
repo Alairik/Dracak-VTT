@@ -466,6 +466,38 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
     <button class="btn btn-primary" type="button" id="pinNovyUlozitBtn" style="width:100%;margin-top:10px;">Založit pin</button>
   </div>
 
+  <div class="popover" id="popover-pin-upravit">
+    <button class="close-x" data-close-popover><?php dracak_icon('x', 14); ?></button>
+    <h3>Upravit pin</h3>
+    <input type="hidden" id="pinUpravitId">
+    <label for="pinUpravitNazev">Název *</label>
+    <input class="input" type="text" id="pinUpravitNazev" required>
+    <label for="pinUpravitTyp">Typ</label>
+    <select class="input" id="pinUpravitTyp">
+      <option value="mesto">Město</option>
+      <option value="vesnice">Vesnice</option>
+      <option value="tajne_misto">Tajné místo</option>
+      <option value="budova">Budova</option>
+      <option value="mistnost">Místnost</option>
+      <option value="sklep">Sklep / dungeon</option>
+      <option value="prechod">Přechod</option>
+      <option value="jine">Jiné</option>
+    </select>
+    <label for="pinUpravitCilovaMapa">Cílová mapa (nepovinné)</label>
+    <select class="input" id="pinUpravitCilovaMapa">
+      <option value="">— bez cílové mapy —</option>
+      <?php foreach ($zonoveMapyVeSvete as $zm): ?>
+        <option value="<?= (int)$zm['id'] ?>"><?= htmlspecialchars($zm['nazev']) ?></option>
+      <?php endforeach; ?>
+    </select>
+    <label for="pinUpravitPopis">Popis</label>
+    <textarea id="pinUpravitPopis"></textarea>
+    <label style="display:flex;align-items:center;gap:6px;font-weight:400;">
+      <input type="checkbox" id="pinUpravitViditelny"> Viditelný hráčům
+    </label>
+    <button class="btn btn-primary" type="button" id="pinUpravitUlozitBtn" style="width:100%;margin-top:10px;">Uložit změny</button>
+  </div>
+
   <div class="popover" id="popover-pin-info">
     <button class="close-x" data-close-popover><?php dracak_icon('x', 14); ?></button>
     <h3 id="pinInfoNazev">Pin</h3>
@@ -480,6 +512,7 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
       <button class="btn btn-secondary" type="button" id="pinInfoAktivniBtn" style="flex:1;display:none;">Nastavit jako aktivní</button>
     </div>
     <button class="btn btn-secondary" type="button" id="pinInfoCestovatBtn" style="width:100%;margin-top:8px;display:none;">Cestovat sem</button>
+    <button class="btn btn-secondary" type="button" id="pinInfoUpravitBtn" style="width:100%;margin-top:8px;display:none;">Upravit pin</button>
     <button class="btn btn-ghost" type="button" id="pinInfoSmazatBtn" style="width:100%;margin-top:8px;display:none;">Smazat pin</button>
   </div>
 
@@ -1630,6 +1663,7 @@ function otevriPinInfo(bod) {
   const otevritBtn = document.getElementById('pinInfoOtevritBtn');
   const aktivniBtn = document.getElementById('pinInfoAktivniBtn');
   const cestovatBtn = document.getElementById('pinInfoCestovatBtn');
+  const upravitBtn = document.getElementById('pinInfoUpravitBtn');
   const smazatBtn = document.getElementById('pinInfoSmazatBtn');
   if (bod.cilova_mapa_id) {
     otevritBtn.style.display = '';
@@ -1640,6 +1674,7 @@ function otevriPinInfo(bod) {
     aktivniBtn.style.display = 'none';
   }
   cestovatBtn.style.display = IS_PJ_OR_ADMIN ? '' : 'none';
+  upravitBtn.style.display = IS_PJ_OR_ADMIN ? '' : 'none';
   smazatBtn.style.display = IS_PJ_OR_ADMIN ? '' : 'none';
   const btn = document.querySelector('.mapa-bod-marker[data-bod-id="' + bod.id + '"]');
   const pop = document.getElementById('popover-pin-info');
@@ -1678,6 +1713,56 @@ if (pinInfoCestovatBtn) {
       .then(d => {
         if (d.error) { logLine('Chyba: ' + d.error); return; }
         logLine('Cesta na „' + bod.nazev + '“ — herní čas posunut o ' + dny + ' ' + (dny === 1 ? 'den' : (dny < 5 ? 'dny' : 'dní')) + '.');
+      });
+  });
+}
+const pinInfoUpravitBtn = document.getElementById('pinInfoUpravitBtn');
+if (pinInfoUpravitBtn) {
+  pinInfoUpravitBtn.addEventListener('click', () => {
+    const bod = MAPA_BODY.find(b => b.id === pinVybranyId);
+    if (!bod) return;
+    document.getElementById('pinUpravitId').value = bod.id;
+    document.getElementById('pinUpravitNazev').value = bod.nazev;
+    document.getElementById('pinUpravitTyp').value = bod.typ;
+    document.getElementById('pinUpravitCilovaMapa').value = bod.cilova_mapa_id || '';
+    document.getElementById('pinUpravitPopis').value = bod.popis || '';
+    document.getElementById('pinUpravitViditelny').checked = !!bod.viditelny_hracum;
+    closeAllPopovers();
+    const pop = document.getElementById('popover-pin-upravit');
+    const zdroj = document.querySelector('.mapa-bod-marker[data-bod-id="' + bod.id + '"]');
+    if (pop && zdroj) {
+      pop.style.top = zdroj.getBoundingClientRect().top + 'px';
+      pop.classList.add('open');
+    }
+  });
+}
+const pinUpravitUlozitBtn = document.getElementById('pinUpravitUlozitBtn');
+if (pinUpravitUlozitBtn) {
+  pinUpravitUlozitBtn.addEventListener('click', () => {
+    const id = parseInt(document.getElementById('pinUpravitId').value, 10);
+    const nazev = document.getElementById('pinUpravitNazev').value.trim();
+    if (!nazev) { logLine('Pin musí mít název.'); return; }
+    const typ = document.getElementById('pinUpravitTyp').value;
+    const cilovaMapaEl = document.getElementById('pinUpravitCilovaMapa');
+    const cilovaMapaId = cilovaMapaEl.value ? parseInt(cilovaMapaEl.value, 10) : null;
+    const popis = document.getElementById('pinUpravitPopis').value.trim();
+    const viditelnyHracum = document.getElementById('pinUpravitViditelny').checked;
+    postJson('api/mapa_bod_upravit.php', {id, nazev, typ, cilova_mapa_id: cilovaMapaId, popis, viditelny_hracum: viditelnyHracum})
+      .then(d => {
+        if (d.error) { logLine('Chyba: ' + d.error); return; }
+        const bod = MAPA_BODY.find(b => b.id === id);
+        if (bod) {
+          Object.assign(bod, {nazev, typ, cilova_mapa_id: cilovaMapaId, popis, viditelny_hracum: viditelnyHracum});
+        }
+        const btn = document.querySelector('.mapa-bod-marker[data-bod-id="' + id + '"]');
+        if (btn) {
+          btn.title = nazev;
+          btn.style.opacity = viditelnyHracum ? '' : '.6';
+          const tmpl = document.querySelector('#pinIconTemplates [data-typ="' + typ + '"]');
+          btn.innerHTML = tmpl ? tmpl.innerHTML : '';
+        }
+        closeAllPopovers();
+        logLine('Pin „' + nazev + '“ upraven.');
       });
   });
 }
