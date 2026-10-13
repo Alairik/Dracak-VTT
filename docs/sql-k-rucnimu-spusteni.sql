@@ -1,15 +1,18 @@
--- Dračák VTT — SQL k ručnímu spuštění (phpMyAdmin, admin účet, databáze Dračáku).
--- Vlož CELÝ obsah najednou do karty SQL a spusť. Pořadí je důležité.
--- Ověřeno na kopii produkčního stavu (migrace 0001–0064) s DML-only účtem:
--- po tomhle bloku doběhne migrate.php v dalším deployi bez chyby.
--- Jestli některý příkaz spadne na "Duplicate column" / "already exists", ta část
--- už je provedená — stačí ji vynechat a spustit zbytek.
+-- Dračák VTT — SQL k ručnímu spuštění (phpMyAdmin, admin účet, vybraná databáze Dračáku).
+-- Vlož CELÝ obsah najednou do karty SQL a spusť. Lze spustit opakovaně — každá část
+-- se provede jen tehdy, když ještě není provedená (jinak vypíše "už bylo provedeno").
+-- Na konci je kontrola: má vyjít  postavy_sloupcu = 13, predmety_sloupcu = 2, zvirat = 7.
 
 -- 1) 0065: únava postavy
-ALTER TABLE postavy
-    ADD COLUMN unava SMALLINT UNSIGNED NOT NULL DEFAULT 0 AFTER max_magenergie;
+SET @sql = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE postavy ADD COLUMN unava SMALLINT UNSIGNED NOT NULL DEFAULT 0 AFTER max_magenergie',
+  'SELECT ''0065 už bylo provedeno'' AS info')
+  FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'postavy' AND COLUMN_NAME = 'unava');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
--- 2) 0067: číselník jízdních zvířat (tabulka + 7 řádků)
+-- 2) 0067: číselník jízdních zvířat (tabulka + 7 řádků; opakované spuštění nic nezmění)
 CREATE TABLE IF NOT EXISTS jizdni_zvirata (
     id                 TINYINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     nazev              VARCHAR(50) NOT NULL UNIQUE,
@@ -30,29 +33,37 @@ INSERT IGNORE INTO jizdni_zvirata (nazev, pohyblivost, nosnost_mn, vytrvalost, u
 ('klasický kůň', 18, 800, 14, 39, 105, 'běžný, krokem, nízká inteligence'),
 ('jezdecký kůň', 21, 750, 16, 50,  90, 'klus/cval, dobrodruzi');
 
--- 3) 0068: doprava postavy (musí po bodu 2)
-ALTER TABLE postavy
-    ADD COLUMN doprava_typ ENUM('chuze','zvire') NOT NULL DEFAULT 'chuze',
-    ADD COLUMN doprava_zvire_id TINYINT UNSIGNED NULL,
-    ADD CONSTRAINT fk_postavy_doprava_zvire FOREIGN KEY (doprava_zvire_id) REFERENCES jizdni_zvirata (id);
+-- 3) 0068: doprava postavy (až po bodu 2)
+SET @sql = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE postavy ADD COLUMN doprava_typ ENUM(''chuze'',''zvire'') NOT NULL DEFAULT ''chuze'', ADD COLUMN doprava_zvire_id TINYINT UNSIGNED NULL, ADD CONSTRAINT fk_postavy_doprava_zvire FOREIGN KEY (doprava_zvire_id) REFERENCES jizdni_zvirata (id)',
+  'SELECT ''0068 už bylo provedeno'' AS info')
+  FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'postavy' AND COLUMN_NAME = 'doprava_typ');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- 4) 0070: pole pro Osobní deník (zkušenost, peníze, zbroj, štít, texty)
-ALTER TABLE postavy
-    ADD COLUMN zkusenost INT UNSIGNED NOT NULL DEFAULT 0,
-    ADD COLUMN penize_zl INT UNSIGNED NOT NULL DEFAULT 0,
-    ADD COLUMN penize_st INT UNSIGNED NOT NULL DEFAULT 0,
-    ADD COLUMN penize_md INT UNSIGNED NOT NULL DEFAULT 0,
-    ADD COLUMN velikost VARCHAR(2) NULL,
-    ADD COLUMN zbroj_id INT UNSIGNED NULL,
-    ADD COLUMN stit_id INT UNSIGNED NULL,
-    ADD COLUMN drzena_zbran_id INT UNSIGNED NULL,
-    ADD COLUMN puvod TEXT NULL,
-    ADD COLUMN osobnost TEXT NULL,
-    ADD CONSTRAINT fk_postavy_zbroj FOREIGN KEY (zbroj_id) REFERENCES predmety (id) ON DELETE SET NULL,
-    ADD CONSTRAINT fk_postavy_stit FOREIGN KEY (stit_id) REFERENCES predmety (id) ON DELETE SET NULL,
-    ADD CONSTRAINT fk_postavy_drzena_zbran FOREIGN KEY (drzena_zbran_id) REFERENCES predmety (id) ON DELETE SET NULL;
+SET @sql = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE postavy ADD COLUMN zkusenost INT UNSIGNED NOT NULL DEFAULT 0, ADD COLUMN penize_zl INT UNSIGNED NOT NULL DEFAULT 0, ADD COLUMN penize_st INT UNSIGNED NOT NULL DEFAULT 0, ADD COLUMN penize_md INT UNSIGNED NOT NULL DEFAULT 0, ADD COLUMN velikost VARCHAR(2) NULL, ADD COLUMN zbroj_id INT UNSIGNED NULL, ADD COLUMN stit_id INT UNSIGNED NULL, ADD COLUMN drzena_zbran_id INT UNSIGNED NULL, ADD COLUMN puvod TEXT NULL, ADD COLUMN osobnost TEXT NULL, ADD CONSTRAINT fk_postavy_zbroj FOREIGN KEY (zbroj_id) REFERENCES predmety (id) ON DELETE SET NULL, ADD CONSTRAINT fk_postavy_stit FOREIGN KEY (stit_id) REFERENCES predmety (id) ON DELETE SET NULL, ADD CONSTRAINT fk_postavy_drzena_zbran FOREIGN KEY (drzena_zbran_id) REFERENCES predmety (id) ON DELETE SET NULL',
+  'SELECT ''0070 už bylo provedeno'' AS info')
+  FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'postavy' AND COLUMN_NAME = 'zkusenost');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- 5) 0071: síla a délka zbraně
-ALTER TABLE predmety
-    ADD COLUMN sila_zbrane TINYINT UNSIGNED NULL,
-    ADD COLUMN delka_zbrane VARCHAR(10) NULL;
+SET @sql = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE predmety ADD COLUMN sila_zbrane TINYINT UNSIGNED NULL, ADD COLUMN delka_zbrane VARCHAR(10) NULL',
+  'SELECT ''0071 už bylo provedeno'' AS info')
+  FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'predmety' AND COLUMN_NAME = 'sila_zbrane');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Kontrola
+SELECT
+  (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'postavy'
+     AND COLUMN_NAME IN ('unava','doprava_typ','doprava_zvire_id','zkusenost','penize_zl','penize_st','penize_md','velikost','zbroj_id','stit_id','drzena_zbran_id','puvod','osobnost')) AS postavy_sloupcu,
+  (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'predmety'
+     AND COLUMN_NAME IN ('sila_zbrane','delka_zbrane')) AS predmety_sloupcu,
+  (SELECT COUNT(*) FROM jizdni_zvirata) AS zvirat;

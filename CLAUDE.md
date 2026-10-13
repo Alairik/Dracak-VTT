@@ -68,11 +68,18 @@
   2. V odpovědi uživateli vlož jeho **celý obsah** do code blocku
      (SQL, bez vynechávek a "…"), i když jsi ho posílal už dřív a i
      když se nic nezměnilo — dokud nepotvrdí, že ho provedl.
-  3. Než ho pošleš, ověř na lokální MariaDB (postup v
+  3. **Blok musí jít spustit opakovaně a v libovolném stavu DB** —
+     phpMyAdmin se na první chybě zastaví a zbytek neprovede, takže
+     holé `ALTER TABLE ... ADD COLUMN` spadne na "Duplicate column",
+     jakmile je část už hotová (stalo se). Každý ALTER proto obal
+     kontrolou přes `information_schema` + `PREPARE`/`EXECUTE` (vzor v
+     `docs/sql-k-rucnimu-spusteni.sql`), `CREATE TABLE IF NOT EXISTS`,
+     `INSERT IGNORE`; na konec dej kontrolní SELECT s očekávanými čísly.
+  4. Než ho pošleš, ověř na lokální MariaDB (postup v
      `docs/stav-projektu.md`), že blok projde na kopii produkčního
-     stavu a že po něm `migrate.php` pod DML-only účtem doběhne
-     bez chyby.
-  4. Po potvrzení, že ho provedl, soubor přepiš na aktuální stav
+     stavu (i po částečném provedení a po druhém spuštění) a že po něm
+     `migrate.php` pod DML-only účtem doběhne bez chyby.
+  5. Po potvrzení, že ho provedl, soubor přepiš na aktuální stav
      (prázdný, nebo jen nové příkazy od té doby).
 - **`scripts/` smí na serveru obsahovat JEN `migrate.php`.** Nic jiného
   se tam nepřidává, aniž by se zároveň upravil `exclude` v `deploy.yml`
