@@ -478,6 +478,11 @@ Soubory:
   a přidání jedním klikem, ± kus, odebrat, "zapomenout" kouzlo — akce
   `inventar_*` v `postava_stav.php` (vlastník i PJ/admin; odebraná zbroj/
   štít/zbraň se zároveň přestane nosit/držet).
+- **`hra/druzina.php`** — přehled všech postav světa v jedné tabulce (životy,
+  magy, únava, naložení, pohyblivost po naložení, OČ, ÚČ držené zbraně,
+  doprava, efekty) s překreslením po 5 s; dole **tempo družiny = nejnižší
+  pohyblivost** (pravidla-pj h2355: "Družina se pohybuje rychlostí
+  nejpomalejší postavy" — základ pro Fázi 4). Odkaz v hlavičce `svet.php`.
 - **`hra/denik_tisk.php`** — tisková A4 verze papírového deníku podle
   kolonek h1690 (předvyplněná, `?id=`) a prázdný formulář (bez `id`).
 - **`includes/vtt_denik.php`** — výpočty podle pravidel (bonusy, bojeschopnost,

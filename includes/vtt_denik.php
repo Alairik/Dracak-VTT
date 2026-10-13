@@ -466,7 +466,11 @@ function dracak_vtt_inventar_s_vahou(PDO $pdo, int $postavaId): array
 }
 
 // Všechno pro deník na jedno volání. $postava = řádek z `postavy` (SELECT *).
-function dracak_vtt_denik_data(PDO $pdo, array $postava): array
+//
+// $plne = false vynechá drahé části (schopnosti, kouzla, jazyky, efekty,
+// inventář, cíle) — stačí pro přehledy více postav najednou
+// (hra/druzina.php).
+function dracak_vtt_denik_data(PDO $pdo, array $postava, bool $plne = true): array
 {
     $stupne = [];
     $bonusy = [];
@@ -514,12 +518,12 @@ function dracak_vtt_denik_data(PDO $pdo, array $postava): array
         'obrana' => $obrana,
         'zkusenost' => dracak_vtt_zkusenost($pdo, $postava),
         'penize' => dracak_vtt_penize($postava),
-        'schopnosti' => dracak_vtt_schopnosti_postavy($pdo, $postava),
-        'kouzla' => dracak_vtt_kouzla_postavy($pdo, (int)$postava['id']),
-        'jazyky' => dracak_vtt_jazyky_postavy($pdo, $postava),
-        'efekty' => dracak_vtt_aktivni_efekty_postavy($pdo, (int)$postava['id']),
-        'inventar' => dracak_vtt_inventar_s_vahou($pdo, (int)$postava['id']),
+        'schopnosti' => $plne ? dracak_vtt_schopnosti_postavy($pdo, $postava) : [],
+        'kouzla' => $plne ? dracak_vtt_kouzla_postavy($pdo, (int)$postava['id']) : [],
+        'jazyky' => $plne ? dracak_vtt_jazyky_postavy($pdo, $postava) : [],
+        'efekty' => $plne ? dracak_vtt_aktivni_efekty_postavy($pdo, (int)$postava['id']) : [],
+        'inventar' => $plne ? dracak_vtt_inventar_s_vahou($pdo, (int)$postava['id']) : [],
         'doprava' => dracak_vtt_postava_doprava($pdo, $postava),
-        'cile' => dracak_vtt_mozne_cile($pdo, $postava),
+        'cile' => $plne ? dracak_vtt_mozne_cile($pdo, $postava) : [],
     ];
 }
