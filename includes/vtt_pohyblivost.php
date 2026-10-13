@@ -144,10 +144,15 @@ function dracak_vtt_postava_pohyblivost(PDO $pdo, array $postava, int|float|null
     ];
 }
 
-// Náklad postavy z inventáře (postava_predmety x predmety.vaha). Váha je
-// v mincích (mn) — oficiální jednotka hmotnosti, h3 "Míry a váhy"; seed
-// to má jako konvenci sloupce predmety.vaha. Automatický součet, žádný
+// Náklad postavy z inventáře (postava_predmety x predmety.vaha) a z peněz.
+// Váha je v mincích (mn) — oficiální jednotka hmotnosti, h3 "Míry a váhy";
+// seed to má jako konvenci sloupce predmety.vaha. Automatický součet, žádný
 // ruční vstup.
+//
+// Peníze: každá mince váží 1 mn bez ohledu na kov (h3), takže zl + st + md
+// (postavy.penize_*, migrace 0070) se přičítají k nákladu. Aby šly peníze
+// započítat, musí volající předat řádek postavy ($postava) — bez něj
+// (nebo před migrací 0070) se peníze nepočítají a 'penize_pocitany' je false.
 //
 // Položka bez uvedené váhy (vaha NULL, a všechny lektvary — ty váhu ve
 // schématu nemají vůbec) se NEPOČÍTÁ jako 0 mn: skončí v 'bez_vahy' a
@@ -156,9 +161,9 @@ function dracak_vtt_postava_pohyblivost(PDO $pdo, array $postava, int|float|null
 //
 // Zatím plochý součet = všechno, co postava má, nese sama. Kontejnery
 // (vaky, truhly) a nosiče (zvíře, povoz) jsou další krok, viz
-// docs/stav-projektu.md. Do nákladu zatím nepatří peníze (1 mince = 1 mn,
-// h3), oblečení ani jídlo — nejsou v modelu inventáře.
-function dracak_vtt_postava_naklad_mn(PDO $pdo, int $postavaId): array
+// docs/stav-projektu.md. Do nákladu zatím nepatří oblečení ani jídlo —
+// nejsou v modelu inventáře.
+function dracak_vtt_postava_naklad_mn(PDO $pdo, int $postavaId, ?array $postava = null): array
 {
     $naklad = 0.0;
     $bezVahy = [];
@@ -186,7 +191,17 @@ function dracak_vtt_postava_naklad_mn(PDO $pdo, int $postavaId): array
         $bezVahy[] = $nazev;
     }
 
-    return ['naklad_mn' => $naklad, 'neuplny' => $bezVahy !== [], 'bez_vahy' => $bezVahy];
+    $penizeMn = 0;
+    $penizePocitany = $postava !== null && array_key_exists('penize_zl', $postava);
+    if ($penizePocitany) {
+        $penizeMn = (int)$postava['penize_zl'] + (int)$postava['penize_st'] + (int)$postava['penize_md'];
+        $naklad += $penizeMn;
+    }
+
+    return [
+        'naklad_mn' => $naklad, 'neuplny' => $bezVahy !== [], 'bez_vahy' => $bezVahy,
+        'penize_mn' => $penizeMn, 'penize_pocitany' => $penizePocitany,
+    ];
 }
 
 // =====================================================================

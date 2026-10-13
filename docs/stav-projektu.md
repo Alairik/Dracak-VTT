@@ -37,7 +37,10 @@ ním čeká, dokud se to neprovede ručně. Pořadí:
    IGNORE` pod ním doběhne sám při dalším deployi.
 3. `0068_postava_doprava.sql` — `ALTER TABLE postavy ADD ...` (až po
    bodu 2, je tam cizí klíč).
-4. `DROP TABLE stupne_unavy;` — bez souboru (migrace s DROP se nespustí);
+4. `0070_postava_denik_pole.sql` a `0071_predmety_sila_delka_zbrane.sql` —
+   `ALTER TABLE` (Osobní deník). `0072` a `0073` (čisté UPDATE) pak
+   proběhnou samy.
+5. `DROP TABLE stupne_unavy;` — bez souboru (migrace s DROP se nespustí);
    tabulka je z editoru pryč a nic ji nepoužívá, viz Fáze 1.
 
 `0066_nulovat_nedolozene_vahy_surovin.sql` je čisté UPDATE a proběhne
@@ -442,6 +445,39 @@ kontejnery** (vaky, truhly apod.).
 - `auto_naklad`/`auto_pohyblivost`/`auto_unava` přepínače (stejný vzor
   jako 4 stávající v `svet_administrace.php`) + možnost hráč/PJ zadá
   pohyblivost ručně místo výpočtu (zjednodušení).
+
+---
+
+---
+
+## Osobní deník postavy (rozpracováno)
+
+Požadavek uživatele: "ultimátní detailní přehled postavy, hráči tam budou
+trávit spoustu času". Podklady: **`docs/zadani-osobni-denik-design.md`**
+(zadání/prompt pro Claude Design — obsah z pravidel h1690, stav dat,
+scénáře, požadavky; rešerše online) a referenční snímky v
+`docs/zadani-osobni-denik-img/`. Vzhled bude navrhovat Claude Design; do
+té doby je v kódu první, funkčně úplná verze.
+
+Hotovo (výpočty, ověřeno na skutečné MariaDB proti příkladům z pravidel
+— Sindor h1690, Krwell/Kram h1610–h1612, Emanuel h1610, Fergo h1683):
+- `includes/vtt_denik.php` — `dracak_vtt_denik_data()`: bonusy vlastností,
+  bojeschopnost (mez vyřazení, postih pod 1/3 životů), ÚČ tváří v tvář i
+  střelecký + rodová zbraň, OČ (KZ zbroje, bez zbroje KZ 1), postřeh,
+  velikost, hranice naložení ×1–×4, zkušenost a další úroveň, peníze,
+  schopnosti/kouzla/jazyky/efekty/inventář.
+- Migrace (DDL = ručně v phpMyAdminu, viz seznam nahoře): `0070`
+  (postavy: zkusenost, penize_zl/st/md, velikost, zbroj_id, stit_id,
+  drzena_zbran_id, puvod, osobnost), `0071` (predmety: sila_zbrane,
+  delka_zbrane). DML: `0072` (SZ ze textu popisu, 87 zbraní), `0073`
+  (kategorie střelná/vrhací podle h2059).
+- Peníze se počítají do nákladu (1 mince = 1 mn, h3).
+
+Známé mezery: rodová zbraň a velikost jen pro 7 základních ras (+ klany
+přes rodiče) — homebrew rasy mají v textu rozsah velikosti a rodovou
+zbraň mimo DB; OČ počítá jen tělovou zbroj + štít +1 (jak se kombinují
+rukavice/přilbice/boty z homebrew ceníku, pravidla v repu neříkají);
+vrhací varianta zbraně se páruje jménem ("Dýka" -> "Dýka (vrhací)").
 
 ---
 

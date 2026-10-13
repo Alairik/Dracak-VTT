@@ -88,7 +88,7 @@ $rasyOptions = dracak_db()->query('SELECT id, nazev FROM rasy ORDER BY nazev')->
 $povolaniOptions = dracak_db()->query('SELECT id, nazev FROM povolani ORDER BY nazev')->fetchAll();
 
 // Jen ke čtení, podle uložených hodnot (ne podle rozepsaného formuláře).
-$naklad = dracak_vtt_postava_naklad_mn(dracak_db(), $postavaId);
+$naklad = dracak_vtt_postava_naklad_mn(dracak_db(), $postavaId, $postava);
 $pohyblivost = dracak_vtt_postava_pohyblivost(dracak_db(), $postava, $naklad['naklad_mn']);
 $nalozeniNazvy = ['zadne' => 'žádné', 'mirne' => 'mírné', 'stredni' => 'střední', 'velke' => 'velké', 'prilis_velke' => 'nad 4× nosnost'];
 $unava = dracak_vtt_postava_unava_stupen($postava);
@@ -166,7 +166,7 @@ dracak_vtt_page_start($postava['nazev'], $user);
             <?php if ($naklad['neuplny']): ?>
               <em>Součet je neúplný — bez váhy: <?= htmlspecialchars(implode(', ', $naklad['bez_vahy'])) ?>.</em>
             <?php endif; ?>
-            Nepočítá se oblečení, jídlo a peníze (1 mince = 1 mn), nejsou v inventáři.
+            Nepočítá se oblečení a jídlo<?= $naklad['penize_pocitany'] ? '' : ' ani peníze' ?> (nejsou v inventáři).
           <?php endif; ?>
         <?php else: ?>
           Pohyblivost: doplň rasu, sílu a obratnost (a rasa musí mít pohyblivost v číselníku).
