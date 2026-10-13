@@ -29,24 +29,19 @@ nebo odsouhlasené uživatelem, ne můj odhad).
 `migrate.php` běží pod DML-only účtem, takže DDL nikdy neprovede a **na
 prvním takovém souboru deploy zastaví** (HTTP 500 v posledním kroku
 `deploy.yml`; FTP část proběhne normálně, kód je nasazený). Všechno za
-ním čeká, dokud se to neprovede ručně. Pořadí:
+ním čeká, dokud se to neprovede ručně.
 
-1. `0065_postava_unava.sql` — `ALTER TABLE postavy ADD COLUMN unava`.
-   (Aktuálně zastavuje deploy; 0064 už proběhla sama.)
-2. `0067_jizdni_zvirata.sql` — **jen příkaz `CREATE TABLE`**; `INSERT
-   IGNORE` pod ním doběhne sám při dalším deployi.
-3. `0068_postava_doprava.sql` — `ALTER TABLE postavy ADD ...` (až po
-   bodu 2, je tam cizí klíč).
-4. `0070_postava_denik_pole.sql` a `0071_predmety_sila_delka_zbrane.sql` —
-   `ALTER TABLE` (Osobní deník). `0072` a `0073` (čisté UPDATE) pak
-   proběhnou samy.
-5. `DROP TABLE stupne_unavy;` — bez souboru (migrace s DROP se nespustí);
-   tabulka je z editoru pryč a nic ji nepoužívá, viz Fáze 1.
+**Aktuální blok k vložení je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný
+soubor, ve kterém jsou všechny dosud neprovedené DDL příkazy v pořadí
+(`0065`, `0067`, `0068`, `0070`, `0071`); uživatel ho dostává jako text ke
+zkopírování (viz pravidlo v `CLAUDE.md`). Ověřeno na kopii produkčního
+stavu: po něm `migrate.php` doběhne a provede i čisté UPDATE migrace
+(`0066`, `0069`, `0072`, `0073`). `DROP TABLE stupne_unavy;` (stará
+nepoužívaná tabulka z 0008) uživatel zatím nechtěl/neprovedl — jako
+migrace jít nemůže (`migrate.php` odmítne DROP).
 
-`0066_nulovat_nedolozene_vahy_surovin.sql` je čisté UPDATE a proběhne
-automaticky, jakmile je odblokovaný bod 1. Kód je napsaný tak, že
-funguje i před ručními kroky (chybějící sloupce `unava`/`doprava_*` se
-berou jako "není"), jen se nic z toho nedá ukládat.
+Kód je napsaný tak, že funguje i před ručními kroky (chybějící sloupce
+se berou jako "není"), jen se nic z toho nedá ukládat.
 
 ---
 
@@ -445,8 +440,6 @@ kontejnery** (vaky, truhly apod.).
 - `auto_naklad`/`auto_pohyblivost`/`auto_unava` přepínače (stejný vzor
   jako 4 stávající v `svet_administrace.php`) + možnost hráč/PJ zadá
   pohyblivost ručně místo výpočtu (zjednodušení).
-
----
 
 ---
 

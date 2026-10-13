@@ -57,6 +57,23 @@
   - `migrate.php` má fallback na `CREATE TABLE IF NOT EXISTS migrace_log`
     (zkusí ho, při zamítnutí ověří dostupnost tabulky přes SELECT) — to
     řeší jen to, že tabulka už existuje, ne založení nové.
+- **Ruční SQL (DDL) vždy pošli jako hotový text ke zkopírování.**
+  Uživatel chce jen Ctrl+C / Ctrl+V do phpMyAdminu — nikdy "spusť
+  soubor X", "otevři migraci Y" ani "uprav si to". Uživatel to už
+  opakoval ve víc konverzacích, takže se na to neptá a nečeká, že
+  si to vyžádá znovu. Vždy:
+  1. Udržuj **`docs/sql-k-rucnimu-spusteni.sql`** — jeden blok se
+     VŠEMI dosud neprovedenými příkazy, co `migrate.php` neumí
+     (CREATE, ALTER, DROP…), v pořadí, s krátkými komentáři.
+  2. V odpovědi uživateli vlož jeho **celý obsah** do code blocku
+     (SQL, bez vynechávek a "…"), i když jsi ho posílal už dřív a i
+     když se nic nezměnilo — dokud nepotvrdí, že ho provedl.
+  3. Než ho pošleš, ověř na lokální MariaDB (postup v
+     `docs/stav-projektu.md`), že blok projde na kopii produkčního
+     stavu a že po něm `migrate.php` pod DML-only účtem doběhne
+     bez chyby.
+  4. Po potvrzení, že ho provedl, soubor přepiš na aktuální stav
+     (prázdný, nebo jen nové příkazy od té doby).
 - **`scripts/` smí na serveru obsahovat JEN `migrate.php`.** Nic jiného
   se tam nepřidává, aniž by se zároveň upravil `exclude` v `deploy.yml`
   — momentálně se `scripts/` nijak nevylučuje (spoléhá se na to, že tam

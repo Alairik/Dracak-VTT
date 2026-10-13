@@ -315,7 +315,9 @@ function dracak_vtt_hod_kostkou(int $pocet, int $typ, int $bonus): array
 // třech místech to samé <head> a horní lišta co dashboard.php.
 // $wide = celoplošná stránka s vlastní hlavičkou (viz hra/svet.php) — bez
 // dash-header a bez 1000px limitu dash-shell.
-function dracak_vtt_page_start(string $title, array $user, bool $wide = false): void
+// $extraCss = další stylesheety stránky (cesty od hra/, např.
+// '../assets/css/denik.css'), načtené až po organic.css.
+function dracak_vtt_page_start(string $title, array $user, bool $wide = false, array $extraCss = []): void
 {
     ?>
 <!doctype html>
@@ -328,6 +330,9 @@ function dracak_vtt_page_start(string $title, array $user, bool $wide = false): 
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/organic.css?v=<?= filemtime(__DIR__ . '/../assets/css/organic.css') ?>">
+<?php foreach ($extraCss as $css): $cssFile = realpath(__DIR__ . '/../hra/' . $css); ?>
+<link rel="stylesheet" href="<?= htmlspecialchars($css) ?>?v=<?= $cssFile ? filemtime($cssFile) : 0 ?>">
+<?php endforeach; ?>
 </head>
 <body>
 <?php if ($wide): ?>

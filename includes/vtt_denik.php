@@ -38,6 +38,24 @@ const DRACAK_VTT_VELIKOST_RASY = [
 const DRACAK_VTT_POSTREH_OBJEKTY_BONUS = ['Kroll', 'Barbar', 'Trpaslík'];
 const DRACAK_VTT_POSTREH_MECHANISMY_BONUS = ['Elf', 'Hobit', 'Kudůk'];
 
+// Existuje sloupec? Část sloupců přibývá ruční migrací (DDL), kterou web
+// účet neprovede — deník proto musí fungovat i bez nich. Výsledek se
+// drží po dobu requestu.
+function dracak_vtt_ma_sloupec(PDO $pdo, string $tabulka, string $sloupec): bool
+{
+    static $cache = [];
+    $klic = $tabulka . '.' . $sloupec;
+    if (!array_key_exists($klic, $cache)) {
+        $stmt = $pdo->prepare(
+            'SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+        );
+        $stmt->execute([$tabulka, $sloupec]);
+        $cache[$klic] = (int)$stmt->fetchColumn() > 0;
+    }
+    return $cache[$klic];
+}
+
 // Základní rasa postavy — projde rodic_rasa_id nahoru (klany -> trpaslík).
 // Vrací název základní rasy, nebo null.
 function dracak_vtt_zakladni_rasa(PDO $pdo, ?int $rasaId): ?string
@@ -148,8 +166,12 @@ function dracak_vtt_utocna_cisla(array $zbran, int $bonusSil, int $bonusObr, boo
 // Zbraně z inventáře postavy s odvozenými čísly.
 function dracak_vtt_zbrane_postavy(PDO $pdo, array $postava, int $bonusSil, int $bonusObr, ?string $zakladniRasa): array
 {
+    // sila_zbrane/delka_zbrane přibyly migrací 0071 (ruční DDL) — bez ní
+    // zbraně fungují, jen bez ÚČ.
+    $maSz = dracak_vtt_ma_sloupec($pdo, 'predmety', 'sila_zbrane');
+    $szSql = $maSz ? 'p.sila_zbrane, p.delka_zbrane' : 'NULL AS sila_zbrane, NULL AS delka_zbrane';
     $stmt = $pdo->prepare(
-        "SELECT p.id, p.nazev, p.sila_zbrane, p.delka_zbrane, p.utocnost, p.oc, p.vaha,
+        "SELECT p.id, p.nazev, $szSql, p.utocnost, p.oc, p.vaha,
                 p.dostrel_maly, p.dostrel_stredni, p.dostrel_velky, p.kategorie_zbrane, pp.mnozstvi
          FROM postava_predmety pp JOIN predmety p ON p.id = pp.predmet_id
          WHERE pp.postava_id = ? AND p.typ = 'zbran' ORDER BY p.nazev"
@@ -157,7 +179,7 @@ function dracak_vtt_zbrane_postavy(PDO $pdo, array $postava, int $bonusSil, int 
     $stmt->execute([(int)$postava['id']]);
     $out = [];
     $varianta = $pdo->prepare(
-        "SELECT sila_zbrane, dostrel_maly, dostrel_stredni, dostrel_velky FROM predmety
+        "SELECT " . ($maSz ? 'sila_zbrane' : 'NULL AS sila_zbrane') . ", dostrel_maly, dostrel_stredni, dostrel_velky FROM predmety
          WHERE typ = 'zbran' AND nazev = ? AND dostrel_maly IS NOT NULL"
     );
     foreach ($stmt->fetchAll() as $z) {
