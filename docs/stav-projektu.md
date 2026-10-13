@@ -603,11 +603,11 @@ přístupný.
 
 ## Čeká na rozhodnutí / podklady od uživatele
 
-- **Schválení `DROP INDEX postava_predmet` na `postava_predmety`** (jediná
-  věc, co blokuje kontejnery — vaky/truhly/nosiče — z Fáze 1b): UNIQUE
-  (postava, předmět) dovolí jen jeden řádek na typ předmětu, takže dva
-  stejné vaky ani stejný předmět ve dvou kontejnerech nejdou. Alternativa
-  bez DROP: nová tabulka inventáře + kopie dat (větší refactor).
+- **Model kontejnerů a nosičů (Fáze 1b) — rozhodnutí A/B:** podrobně a
+  srozumitelně v `docs/navrh-kontejnery-a-nosice.md`. Stručně: A = zrušit
+  unikátní index `postava_predmet` (DROP INDEX, schvaluje uživatel) a
+  upravit stávající inventář; B (doporučeno) = nové tabulky vedle,
+  nic se neruší.
 - Rozsah importu ceníku h2055 (doporučeno: nejdřív jen kontejnery) a
   kapacita kontejneru jako tvrdý limit s přepsáním PJ (doporučeno).
 - Povozy: váhy vozů se v PPP a v homebrew h2057 liší (obě rozmezí jsou v

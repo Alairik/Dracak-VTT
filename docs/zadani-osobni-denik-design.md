@@ -145,10 +145,12 @@ ukázat "kde v rozsahu jsem". Data: ✔ (stupně i bonusy dopočítatelné).
 | Postih za málo životů | O | ◐ | Méně než 1/3 max. životů → postih k útoku i obraně: odolnost 1–5 → −3, 6–11 → −2, 12–16 → −1, 17–21 → 0. |
 | Magenergie aktuální / maximum **[deník]** | S | ✔ | jen povolání, co magenergii používají (jinak pole není) |
 | Únava: body / vytrvalost | S | ✔ | vytrvalost = odolnost; nad ni *unavená*, nad 2× *vyčerpaná*, nad 3× *úplně vyčerpaná*, nad 4× *vysílená* (omdlévá) |
-| Stupeň únavy + jeho důsledky | O | ◐ | unavená: −1 k síle/obratnosti, žádný sprint; vyčerpaná: −2, bez běhu/sprintu/kouzel/meditace; úplně vyčerpaná: −3, inteligence −4, charisma −2, jen plazení; vysílená: omdlévá. **Plná tabulka postihů v datech zatím není** → ukaž stupeň + text, ne vypočtené postihy |
+| Stupeň únavy + jeho důsledky | O | ✔ | Tabulka únavy je v datech úplná: unavená: bonus za sílu a obratnost −1, nesmí sprintovat; vyčerpaná: −2, inteligence −2, bez běhu a sprintu (poklus smí), bez kouzel (i z předmětů), kouzelník nezaostří vůli, hraničář nemeditují; úplně vyčerpaná: −3, inteligence −4, charisma −2, jen plazení; vysílená: omdlévá. Engine postihy **aplikuje** (ÚČ, OČ, pohyblivost, postřeh) — v deníku mají být hodnoty "bez únavy" a "po únavě" vidět vedle sebe (přeškrtnuto), seznam důsledků u únavy, varování před sesláním kouzla. PJ to ve světě může vypnout (přepínač), pak se únava jen eviduje |
 | Aktivní efekty (buff/debuff, zbývá kol) | S | ✔ | tabulka `aktivni_efekty` + katalog `efekty` |
 | Naložení: stupeň | O | ◐ | žádné / mírné / střední / velké podle násobku nosnosti; velké naložení = −1 k útoku i obraně |
-| Pohyblivost (základní, po naložení, bonus) **[deník]** | O | ✔ | základ rasy + bonus za obratnost + 2× bonus za sílu; naložení snižuje na ¾ / ½ / ¼ |
+| Pohyblivost (základní, po naložení a únavě, bonus) **[deník]** | O | ✔ | základ rasy + bonus za obratnost + 2× bonus za sílu; únava ubírá 3× postih, naložení snižuje na ¾ / ½ / ¼; PJ může zapnout ruční zadání |
+| Rychlost pohybu | O | ✔ | z bonusu za pohyblivost: body chůze za hodinu (procházka / chůze / spěch) a body běhu za kolo (poklus / běh / sprint) — Tabulky rychlosti |
+| Spánek | A | ✔ | tlačítko "Prospat N h" (hodin podle odolnosti), sníží únavu o jeden stupeň (o tolik bodů, kolik je odolnost) |
 | Doprava | S | ✔ | pěšky nebo jízdní zvíře (7 zvířat s pohyblivostí, nosností, vytrvalostí) |
 
 ### 3.4 Boj
