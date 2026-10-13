@@ -426,7 +426,44 @@ Zdroje (vyhledávání):
 
 ---
 
-## 11. Poznámka k datům (pro orientaci, ne pro designéra)
+## 11. Co už existuje (první funkční iterace)
+
+Než vznikl tenhle návrh, postavil jsem funkčně úplnou první verzi, aby šly
+ověřit výpočty a data proti pravidlům. **Není to závazný vzor vzhledu** —
+slouží jako přehled chování, které návrh musí pokrýt (a jako výchozí bod,
+co jde zlepšit). Snímky: `docs/zadani-osobni-denik-img/03-denik-prvni-verze.png`
+(deník, desktop), `04-tisk-prvni-verze.png` (tisková A4 verze, předvyplněná
+Sindor z příkladu v pravidlech), `05-druzina-prvni-verze.png` (přehled družiny
+pro PJ).
+
+- **Trvale viditelný stavový pás** (sticky): jméno/rasa/povolání/úroveň, velké
+  **OČ** a **ÚČ** držené zbraně, měřidla Životy (± 1/5), Magenergie (± 1/5),
+  Únava (± 1/5, stupeň štítkem), Naložení (pás s hranicemi ×1/×2/×3,
+  štítek "neúplný součet"), Pohyblivost; pod tím navigace po sekcích.
+- **Sekce:** Přehled (vlastnosti jako dlaždice stupeň + bonus, postřeh,
+  zkušenost, rasa/doprava/jazyky, aktivní efekty) · Boj (OČ rozepsané
+  KZ + obratnost, výběr zbroje a štítu z inventáře, stav v boji, tabulka
+  zbraní s ÚČ tváří v tvář i střeleckým, dostřely, výběr držené zbraně) ·
+  Schopnosti a kouzla (rozbalovací položky) · Vybavení (inventář s váhami,
+  hledání v katalogu, peníze zl/st/md, náklad) · Postava (původ, osobnost,
+  poznámky).
+- **Akce přímo z deníku:** hod na útok / střelbu / obranu (1k6+ s
+  opakováním po šestce + ÚČ/OČ + opravy, výsledek jako toast s rozpisem),
+  seslat kouzlo a vypít lektvar s výběrem cíle, hod kostek schopnosti,
+  přidání/odebrání předmětů a kouzel.
+- **Chování:** rychlé zápisy bez přenačtení stránky, automatické obnovení
+  každých 5 s (nepřepisuje to, co hráč právě píše), neúplná data se
+  přiznávají ("čeká na migraci", "bez váhy").
+- **Přehled družiny** (PJ): tabulka všech postav světa se stavem a tempem
+  družiny (nejnižší pohyblivost).
+
+Co v první verzi **chybí a návrh má řešit**: kontejnery (vaky/truhly) a
+nosiče nákladu (zvíře/povoz), finty, přesvědčení, erb/portrét, historie
+změn, režim "boj", doladění pro tablet/telefon, tisk jednou stranou.
+
+---
+
+## 12. Poznámka k datům (pro orientaci, ne pro designéra)
 
 Co z kap. 3 se bude **doplňovat do datového modelu** souběžně s deníkem
 (sleduje se v `docs/stav-projektu.md`): zkušenost na postavě, peníze

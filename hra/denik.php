@@ -207,7 +207,7 @@ $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' =>
         </div>
         <?php if ($unava): ?>
           <div class="dn-metr-cislo"><strong><?= (int)$unava['body'] ?></strong><span>/ <?= (int)$unava['vytrvalost'] ?> vytrvalost</span></div>
-          <div class="dn-bar <?= $unava['stupen'] === 0 ? 'ok' : ($unava['stupen'] >= 3 ? 'out' : 'low') ?>"><i style="width:<?= max(0, min(100, round($unava['body'] / ($unava['vytrvalost'] * 4) * 100))) ?>%"></i><b style="left:25%"></b><b style="left:50%"></b><b style="left:75%"></b></div>
+          <div class="dn-bar <?= $unava['stupen'] === 0 ? 'ok' : ($unava['stupen'] >= 3 ? 'out' : 'low') ?>"><i style="width:<?= max(0, min(100, round($unava['body'] / (max(1, $unava['vytrvalost']) * 4) * 100))) ?>%"></i><b style="left:25%"></b><b style="left:50%"></b><b style="left:75%"></b></div>
           <div class="dn-metr-pozn"><?= $unava['popis'] ? $e($unava['popis']) : 'bez únavy' ?></div>
         <?php else: ?>
           <div class="dn-metr-pozn">Doplň odolnost (vytrvalost = odolnost).</div>
