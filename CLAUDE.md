@@ -83,7 +83,21 @@
   je v `content/pravidla-hrac.html`, `pravidla-pj.html`,
   `pravidla-bestiar.html` — tam je zdroj pravdy, ne intuice podle jiných
   systémů (D&D apod.). Než se cokoliv počítá nebo staví, nejdřív si
-  najít odpovídající pasáž v těchhle souborech.
+  najít odpovídající pasáž v těchhle souborech. Nejde o jednorázovou
+  volbu "odhad, nebo přesně" — odhad není rovnocenná možnost k nabídnutí,
+  je to jediná cesta, co nikdy nejde vzít.
+  - **"Nenašel jsem to" / "to tu není" se netvrdí po jednom gREPu nebo
+    jedné naražené větě.** Narazit v textu na "viz kapitola X — mimo
+    rozsah tohoto dokumentu" znamená, že mimo rozsah je TA KONKRÉTNÍ
+    PASÁŽ/ÚRYVEK, ne nutně že kapitola X v souboru vůbec chybí — ověř to
+    přes skutečný obsah (`content/toc-hrac.html`, `toc-pj.html`,
+    `toc-bestiar.html` mají kompletní seznam nadpisů/sekcí) dřív, než se
+    řekne "tahle mechanika/kapitola tu není". Platí to i pro propojené
+    kapitoly — když se zdá, že jedna tabulka chybí, zkontroluj, jestli
+    na ni sousední/navazující sekce (jiné zvíře, jiná aktivita, jiné
+    povolání) neodkazuje křížově stejnými jednotkami ("v bodech pohybu,
+    viz výše" apod.) — může to být přesně ta chybějící hodnota, jen pod
+    jinou nadpisem.
 - **"Homebrew" v komentářích `drd-db-full-v1.sql` (Stopař stínů, Panoš,
   Střelec, Divoch, Šaman a další rozšířená povolání/rasy) neznamená
   "nestandardní doplněk, který stojí bokem."** Je to jen odkaz na to, že
