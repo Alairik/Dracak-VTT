@@ -12,6 +12,18 @@ přepisu pravidel (`docs/kontrolni-seznam-neuplnych-mist.md`).
 při každé netriviální práci (nová funkce, oprava dat, rozhodnutí, co něco
 mění) se sem zapíše update ve stejném kroku, ne až "až bude čas".
 
+## Pro novou session, co začíná tady
+
+Přečti celý tenhle soubor, pak `CLAUDE.md` (hlavně sekci o nejistotě v
+herní mechanice a pravidlo o neodhadování). **Schválený další krok je
+Fáze 1 ze sekce "Rozpracováno: cestování..." níže** — oprava
+`rasy.pohyblivost_zaklad` + nový sloupec `postavy.unava` + computed
+helper na Pohyblivost. Je to odsouhlasené, ne návrh k debatě — stav
+předchozí konverzace je zapsaný přesně proto, aby ses nemusel/a ptát na
+věci, co už byly rozhodnuté (viz "Architektonická rozhodnutí" a celá
+sekce "Rozpracováno" níže — všechno v ní je buď přímo citovaný text
+pravidel, nebo odsouhlasené uživatelem, ne můj odhad).
+
 ---
 
 ## Co to je
@@ -133,6 +145,17 @@ sekce "Proč DB vůbec existuje".
 - NPC "co se tam mohou nacházet" = tokeny na cílové mapě vlastněné
   PJ/adminem — žádná zvláštní datová struktura navíc, reuse existujícího
   systému postav/tokenů.
+- **Editace pozice** — v `popover-pin-upravit` (`hra/mapa.php`) jde
+  marker přetáhnout na nové místo, dokud je formulář otevřený
+  (`pinEditujiId` stav + `.pin-editing` CSS třída). Ukládá se spolu s
+  ostatními poli až kliknutím na "Uložit změny", ne okamžitě na mouseup.
+- **Nahrání nového obrázku existující mapy** — tužka v rámečku náhledu
+  na `hra/svet.php` (světová mapa i zóny, jen PJ/admin), akce
+  `upravit_obrazek_mapy`. Přepočítá `sirka_px`/`vyska_px` z nového
+  souboru (nemusí sedět rozměr se starým). Grid se NEpřepočítá
+  automaticky — PJ ho po nahrání zkontroluje ručně přes `tb-grid`. Mlha
+  války hráčů se při nesedícím rozměru bezpečně vynuluje (existující
+  kontrola v `dracak_vtt_mlha_nacti`), nepadá.
 
 ---
 
@@ -219,11 +242,54 @@ dohledat/ověřit hodnoty pro všechny rasy před opravou.
   nepodloženou konstantu "kolik hodin denně se pochoduje", která nikde v
   textu není.
 
-### Další krok
-Zatím nebyl odsouhlasený konkrétní implementační plán (na rozdíl od pinů/
-poznámek, kde fáze byly rozepsané a schválené předem) — další krok je
-nejspíš sepsat fázový plán stejným způsobem, jakým se postupovalo u pinů,
-a nechat ho schválit, než se začne stavět kód.
+### Další krok — SCHVÁLENÝ fázový plán (2026-10, čeká na realizaci)
+
+Žádná z fází níže není v kódu. Začít Fází 1, v pořadí — každá staví na
+předchozí.
+
+**Fáze 1 — Oprava dat + živá Pohyblivost/Únava na postavě**
+- Oprava `rasy.pohyblivost_zaklad` pro VŠECHNY rasy (dnes podezřelé —
+  Barbar měl být 12, ne 20/30 jako teď; potřeba dohledat/ověřit zbytek,
+  možná další foto z fyzické knihy).
+- `postavy.pohyblivost` se **neukládá jako sloupec** — je to vždycky
+  odvoditelné (rasa + OBR + SIL + aktuální naložení z inventáře),
+  uložená hodnota by šla snadno do nesouladu. Počítat na požádání přes
+  novou `dracak_vtt_postava_pohyblivost()`.
+- `postavy.unava` (nový sloupec) **se ukládat musí** — nahromaděný stav
+  v čase, ne odvoditelná hodnota (stejně jako `aktualni_hp`). Nová
+  `dracak_vtt_postava_unava_stupen()` (body → stupeň/postih podle
+  vytrvalosti = Odolnost, viz Tabulka únavy výše).
+- UI: zobrazit obojí na kartě postavy, zatím jen ke čtení.
+
+**Fáze 2 — Jízdní zvířata**
+- Nová tabulka `jizdni_zvirata` (7 řádků z Tabulky jezdeckých zvířat
+  výše).
+- `postavy.doprava_typ` ENUM(chůze/zvíře) + `doprava_zvire_id` nullable
+  FK — **žádné vynucené vlastnictví** (uživatel: "jedu na zvířeti, co
+  si vyberu z číselníku" i když je půjčené/ukradené). Integrace s
+  inventářem (nabídnout vlastněné zvíře jako první volbu) je pozdější
+  rozšíření, ne podmínka v1.
+- UI volby přímo u sedadla postavy na `svet.php`.
+
+**Fáze 3 — Povozy**
+- Žádná trvalá entita "svět vlastní povoz" — typ vozu + zápřah se volí
+  ad-hoc přímo při cestování, stejně jednoduché jako dnešní "zadej dny".
+
+**Fáze 4 — Jádro: hodinová simulace cestování**
+- U "Cestovat sem" PJ zadá vzdálenost (míle) a vybere terén (6
+  kategorií z Tabulky náročnosti terénu/naložení povozu).
+- Simulace po hodinách: tempo družiny = nejpomalejší člen (pravidlo
+  h2355), body/hodinu podle terénu a tempa, akumuluje únavu, zastaví se
+  při nutnosti odpočinku NEBO dojetí cíle.
+- V1 = jedna etapa (do prvního odpočinku), ne plně automatický
+  multi-day běh — PJ dostane výsledek a rozhodne, co dál. Žádná "kolik
+  hodin denně se chodí" konstanta (ta v textu není) — proto hodinová
+  smyčka, ne denní paušál.
+
+**Fáze 5 — Administrace světa**
+- `auto_naklad`/`auto_pohyblivost`/`auto_unava` přepínače (stejný vzor
+  jako 4 stávající v `svet_administrace.php`) + možnost hráč/PJ zadá
+  pohyblivost ručně místo výpočtu (zjednodušení).
 
 ---
 
