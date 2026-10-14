@@ -753,7 +753,8 @@ PJ přepíná aktivní mapu. **Chybí / drhne:**
 7. ✔ Měřidlo v hexech/sázích a šablony plošných kouzel (kruh, kužel) [S–M]
 8. ✔ (v ručním SQL 0084) Jednorázově změnit `svet_udalosti.typ` ENUM → VARCHAR [S]
 
-*B. Souboj s pravidly (tím se Owlbearu vyrovná i předčí)*
+*B. Souboj s pravidly (tím se Owlbearu vyrovná i předčí)* — **odloženo; popis průběhu
+souboje podle pravidel a návrh oken je v `docs/navrh-souboje-v1.md` (k odsouhlasení)**
 9. Dosah pohybu v tahu z pohyblivosti postavy (po naložení a únavě), spotřeba
    bodů pohybu, varování při překročení, zákaz sprintu při únavě [M–L]
 10. Útok z tokenu: cíl → ÚČ vs OČ → hod → zranění → životy (navázat na
