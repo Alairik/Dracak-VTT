@@ -3,6 +3,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/vtt.php';
 require_once __DIR__ . '/../../includes/vtt_mlha.php';
 require_once __DIR__ . '/../../includes/vtt_mapa_stav.php';
+require_once __DIR__ . '/../../includes/vtt_tokeny.php';
 
 header('Content-Type: application/json; charset=utf-8');
 $user = dracak_require_login();
@@ -70,12 +71,14 @@ if ($typEntity === 'obecny') {
     // Životaschopnost je v katalogu volný text ("20", "20-25", "viz text"...) —
     // vezmi první číslo, PJ si HP hned poté může ručně opravit.
     $hp = dracak_vtt_prvni_cislo($nestvura['zivotaschopnost']);
+    // Víc kusů téhož druhu se číslují (Goblin, Goblin 2, Goblin 3…), ať jdou
+    // na mapě i v pořadí tahů rozeznat.
+    $nazev = dracak_vtt_dalsi_nazev_instance($pdo, $mapaId, $nestvuraId, (string)$nestvura['nazev']);
     $ins = $pdo->prepare(
         'INSERT INTO nestvura_instance (mapa_id, nestvura_id, nazev_instance, aktualni_hp, max_hp) VALUES (?, ?, ?, ?, ?)'
     );
-    $ins->execute([$mapaId, $nestvuraId, $nestvura['nazev'], $hp, $hp]);
+    $ins->execute([$mapaId, $nestvuraId, $nazev, $hp, $hp]);
     $entitaId = (int)$pdo->lastInsertId();
-    $nazev = $nestvura['nazev'];
 } else {
     $postavaId = (int)($data['postava_id'] ?? 0);
     $stmt = $pdo->prepare('SELECT * FROM postavy WHERE id = ? AND svet_id = ?');

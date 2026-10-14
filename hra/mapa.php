@@ -169,7 +169,8 @@ $iniciativaBonusy = dracak_db()->query('SELECT id, popis, bonus FROM iniciativa_
 
   <div class="toolbar">
     <button class="tbtn" type="button" id="tb-pridat" title="Přidat token"><?php dracak_icon('user-round-plus'); ?></button>
-    <button class="tbtn armed" type="button" id="tb-move" title="Vybrat / přesunout"><?php dracak_icon('move'); ?></button>
+    <button class="tbtn armed" type="button" id="tb-move" title="Vybrat / přesunout (V)"><?php dracak_icon('move'); ?></button>
+    <button class="tbtn" type="button" id="tb-vyber" title="Výběr rámečkem — táhni přes tokeny, klepnutím přidáš další (jde i Shiftem)"><?php dracak_icon('mouse-pointer-2'); ?></button>
     <button class="tbtn" type="button" id="tb-ruka" title="Posouvat mapu (ruka) — jde i mezerníkem, pravým tlačítkem nebo dvěma prsty"><?php dracak_icon('hand'); ?></button>
     <button class="tbtn" type="button" id="tb-ruler" title="Měřit vzdálenost"><?php dracak_icon('ruler'); ?></button>
     <button class="tbtn" type="button" id="tb-ping" title="Ukázat na mapu ostatním"><?php dracak_icon('crosshair'); ?></button>
@@ -187,7 +188,7 @@ $iniciativaBonusy = dracak_db()->query('SELECT id, popis, bonus FROM iniciativa_
     <?php if ($isPjOrAdmin): ?>
       <button class="tbtn" type="button" id="tb-grid" title="Nastavení gridu"><?php dracak_icon('grid-2x2'); ?></button>
       <button class="tbtn" type="button" id="tb-mlha" title="Mlha války"><?php dracak_icon('cloud-fog'); ?></button>
-      <button class="tbtn" type="button" id="tb-kolo" title="Konec kola (odpočítat trvání efektů)"><?php dracak_icon('skip-forward'); ?></button>
+      <button class="tbtn" type="button" id="tb-kolo" title="Konec kola (odpočítat trvání efektů)"><?php dracak_icon('rotate-cw'); ?></button>
       <button class="tbtn" type="button" id="tb-dalsi-tah" title="Další na tahu (iniciativa)"><?php dracak_icon('skip-forward'); ?></button>
       <button class="tbtn" type="button" id="tb-krok-zpet" title="Krok zpět (vrátit poslední akci)"><?php dracak_icon('undo-2'); ?></button>
     <?php endif; ?>
@@ -560,6 +561,8 @@ $iniciativaBonusy = dracak_db()->query('SELECT id, popis, bonus FROM iniciativa_
     </div>
     <button class="btn btn-ghost" type="button" id="smazatTokenBtn" style="width:100%;margin-top:14px;">Smazat token</button>
   </div>
+
+  <div id="kontextMenu" class="kontext-menu" style="display:none;"></div>
 
   <div id="modalObrazky" class="modal-obrazky" style="display:none;">
     <div class="modal-obrazky-okno">

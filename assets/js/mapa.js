@@ -614,6 +614,7 @@ let currentTool = 'select';
 const toolButtons = {
   select: document.getElementById('tb-move'),
   ruka: document.getElementById('tb-ruka'),
+  vyber: document.getElementById('tb-vyber'),
   ruler: document.getElementById('tb-ruler'),
   ping: document.getElementById('tb-ping'),
   zed: document.getElementById('tb-zed'),
@@ -647,6 +648,7 @@ function setTool(tool) {
 }
 if (toolButtons.select) toolButtons.select.addEventListener('click', () => setTool('select'));
 if (toolButtons.ruka) toolButtons.ruka.addEventListener('click', () => setTool(currentTool === 'ruka' ? 'select' : 'ruka'));
+if (toolButtons.vyber) toolButtons.vyber.addEventListener('click', () => setTool(currentTool === 'vyber' ? 'select' : 'vyber'));
 if (toolButtons.ruler) toolButtons.ruler.addEventListener('click', () => setTool(currentTool === 'ruler' ? 'select' : 'ruler'));
 if (toolButtons.ping) toolButtons.ping.addEventListener('click', () => setTool(currentTool === 'ping' ? 'select' : 'ping'));
 if (toolButtons.zed) toolButtons.zed.addEventListener('click', () => setTool(currentTool === 'zed' ? 'select' : 'zed'));
@@ -933,7 +935,14 @@ function zakladniPrumerTokenu() {
   return sah > 0 ? sah * 0.82 : 40;
 }
 function prumerTokenu(t) { return zakladniPrumerTokenu() * (t.velikost > 0 ? t.velikost : 1); }
-function iniciala(label) { return label ? Array.from(String(label)).slice(0, 2).join('') : '?'; }
+// Dvě písmena jména; u číslovaných kusů ("Goblin 3") první písmeno a číslo ("G3"),
+// ať jdou na mapě rozeznat.
+function iniciala(label) {
+  if (!label) return '?';
+  const m = String(label).match(/^(.*\S)\s+(\d{1,2})$/);
+  if (m) return Array.from(m[1])[0] + m[2];
+  return Array.from(String(label)).slice(0, 2).join('');
+}
 function barvaTokenu(t) {
   if (t.barva) return t.barva;
   if (t.typ_entity === 'postava') return 'var(--color-accent-600, #7a3b2e)';
@@ -1410,6 +1419,8 @@ function zacitAkci(e, pinEl) {
     typ: 'nic', start: {x: e.clientX, y: e.clientY}, pointerId: e.pointerId, posunuto: false,
     prah: e.pointerType === 'touch' ? PRAH_DOTYK : PRAH_MYS, tlacitko: e.button, panRef: null,
   };
+  const elPod = e.target.closest('.vtt-token');
+  akce.cilToken = elPod ? tokenData(parseInt(elPod.dataset.id, 10)) : null;
   if (pinEl) { akce.typ = 'pin'; akce.pin = pinEl; return; }
   if (e.target.closest('#rotUchyt') && vybrane.size === 1) {
     akce.typ = 'otoceni';
@@ -1445,6 +1456,7 @@ function zacitAkci(e, pinEl) {
   }
   const el = e.target.closest('.vtt-token');
   const t = el ? tokenData(parseInt(el.dataset.id, 10)) : null;
+  akce.cilToken = t;
   if (t) {
     akce.typ = 'token';
     akce.token = t;
@@ -1453,9 +1465,37 @@ function zacitAkci(e, pinEl) {
     // data o tahu/vlastnictví jsou jen pomůcka pro UI — server
     // (hra/api/token_presun.php) je autoritativní nezávisle na tom.
     akce.smiTahnout = t.owned && t.na_tahu && !t.zamceno;
+    // Shift/Ctrl (nebo nástroj "Výběr rámečkem" na dotyku) přidává/odebírá
+    // token z výběru; obyčejný stisk na ještě nevybraný token vybere jen jeho.
+    akce.modifikator = e.shiftKey || e.ctrlKey || e.metaKey || currentTool === 'vyber';
+    if (!akce.modifikator && !vybrane.has(t.id)) nastavVyber([t.id]);
+    naplanujDlouhyStisk(e);
+    return;
+  }
+  // Prázdné místo: s Shiftem (nebo v nástroji "Výběr rámečkem") se táhne
+  // výběrový rámeček, jinak se posouvá mapa.
+  if (currentTool === 'vyber' || e.shiftKey || e.ctrlKey || e.metaKey) {
+    akce.typ = 'ramecek';
+    akce.start0 = m;
+    akce.pridat = e.shiftKey || e.ctrlKey || e.metaKey;
     return;
   }
   akce.typ = 'prazdno';
+  naplanujDlouhyStisk(e);
+}
+
+// Dlouhé stisknutí prstem = kontextové menu (jako pravé tlačítko myši).
+let dlouhyStiskTimer = null;
+function zrusDlouhyStisk() { clearTimeout(dlouhyStiskTimer); dlouhyStiskTimer = null; }
+function naplanujDlouhyStisk(e) {
+  zrusDlouhyStisk();
+  if (e.pointerType === 'mouse') return;
+  const id = e.pointerId, cx = e.clientX, cy = e.clientY;
+  dlouhyStiskTimer = setTimeout(() => {
+    if (!akce || akce.pointerId !== id || akce.posunuto || gesto.aktivni()) return;
+    akce.kontextOtevren = true;
+    otevritKontextMenu(cx, cy, akce.cilToken || null);
+  }, 550);
 }
 
 // Posouvá mapu o rozdíl od posledního zpracovaného bodu; začne až po
@@ -1468,13 +1508,17 @@ function panAkce(e) {
 }
 
 function zrusitAkci() {
+  zrusDlouhyStisk();
   if (!akce) return;
   const a = akce;
   akce = null;
+  if (a.typ === 'ramecek' && rulerSvg) rulerSvg.innerHTML = '';
   if (a.typ === 'token' && a.posunuto && a.smiTahnout) {
-    const el = tokenEl.get(a.token.id);
-    if (el) { el.style.left = a.token.x + 'px'; el.style.top = a.token.y + 'px'; el.classList.remove('tahnuty'); }
-    drzeneTokeny.delete(a.token.id);
+    (a.skupina || [a.token]).forEach((m) => {
+      const el = tokenEl.get(m.id);
+      if (el) { el.style.left = m.x + 'px'; el.style.top = m.y + 'px'; el.classList.remove('tahnuty'); }
+      drzeneTokeny.delete(m.id);
+    });
   }
   if (a.typ === 'ruler') { rulerStart = null; if (rulerSvg) rulerSvg.innerHTML = ''; }
   if (a.typ === 'mlha') { mlhaKreslim = false; mlhaObdelnikStart = null; if (rulerSvg) rulerSvg.innerHTML = ''; }
@@ -1512,7 +1556,7 @@ viewport.addEventListener('pointermove', (e) => {
   }
   if (!akce || akce.pointerId !== e.pointerId) return;
   const od = Math.hypot(e.clientX - akce.start.x, e.clientY - akce.start.y);
-  if (!akce.posunuto && od > akce.prah) akce.posunuto = true;
+  if (!akce.posunuto && od > akce.prah) { akce.posunuto = true; zrusDlouhyStisk(); }
   const m = bodMapy(e);
   switch (akce.typ) {
     case 'pan':
@@ -1524,6 +1568,14 @@ viewport.addEventListener('pointermove', (e) => {
       akce.posunuto = akce.posunuto || od > 2;
       akce.pin.style.left = Math.round(m.x) + 'px';
       akce.pin.style.top = Math.round(m.y) + 'px';
+      break;
+    }
+    case 'ramecek': {
+      if (!akce.posunuto || !rulerSvg) break;
+      const a0 = akce.start0;
+      const x = Math.min(a0.x, m.x), y = Math.min(a0.y, m.y), w = Math.abs(m.x - a0.x), h = Math.abs(m.y - a0.y);
+      rulerSvg.innerHTML = '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h
+        + '" fill="rgba(120,190,255,0.15)" stroke="#78beff" stroke-width="1.5" stroke-dasharray="6 4" vector-effect="non-scaling-stroke"/>';
       break;
     }
     case 'otoceni': {
@@ -1551,10 +1603,15 @@ viewport.addEventListener('pointermove', (e) => {
       }
       break;
     case 'token': {
-      if (!akce.smiTahnout) { panAkce(e); break; }
+      if (!akce.smiTahnout || akce.modifikator) { panAkce(e); break; }
       if (!akce.posunuto) break;
       const t = akce.token;
-      drzeneTokeny.add(t.id);
+      // Táhne se celý výběr (jen tokeny, kterými smíš hýbat); netažený token
+      // se táhne sám.
+      if (!akce.skupina) {
+        const ve = vybrane.has(t.id) ? Array.from(vybrane).map(tokenData).filter((x) => x && x.owned && x.na_tahu && !x.zamceno) : [t];
+        akce.skupina = ve.some((x) => x.id === t.id) ? ve : [t];
+      }
       let nx, ny;
       if (GRID_PX > 0) {
         // S gridem token vždycky sedí na střed buňky — místo úchopu
@@ -1564,10 +1621,15 @@ viewport.addEventListener('pointermove', (e) => {
       } else {
         nx = m.x - akce.offX; ny = m.y - akce.offY;
       }
-      akce.nx = Math.round(nx);
-      akce.ny = Math.round(ny);
-      const el = tokenEl.get(t.id);
-      if (el) { el.style.left = akce.nx + 'px'; el.style.top = akce.ny + 'px'; el.classList.add('tahnuty'); }
+      const dx = Math.round(nx) - t.x, dy = Math.round(ny) - t.y;
+      akce.dx = dx;
+      akce.dy = dy;
+      akce.skupina.forEach((c) => {
+        drzeneTokeny.add(c.id);
+        const el = tokenEl.get(c.id);
+        if (el) { el.style.left = (c.x + dx) + 'px'; el.style.top = (c.y + dy) + 'px'; el.classList.add('tahnuty'); }
+      });
+      aktualizujRotacniUchyt();
       break;
     }
     default:
@@ -1588,6 +1650,29 @@ function ulozPresunTokenu(t, x, y) {
       const el = tokenEl.get(t.id);
       if (el) el.classList.remove('tahnuty');
     });
+}
+
+// Společný přesun skupiny: jedna událost, "Krok zpět" vrátí všechny naráz.
+// Bez zapnutých nových funkcí (ruční SQL) se jede po jednom.
+function ulozPresunSkupiny(skupina, dx, dy) {
+  if (skupina.length === 1) { ulozPresunTokenu(skupina[0], skupina[0].x + dx, skupina[0].y + dy); return; }
+  const presuny = skupina.map((c) => ({token_id: c.id, x: c.x + dx, y: c.y + dy}));
+  const hotovo = () => skupina.forEach((c) => {
+    drzeneTokeny.delete(c.id);
+    const el = tokenEl.get(c.id);
+    if (el) el.classList.remove('tahnuty');
+  });
+  if (!FUNKCE.udalosti) {
+    presuny.forEach((p, i) => ulozPresunTokenu(skupina[i], p.x, p.y));
+    return;
+  }
+  postJson('api/token_presun_davka.php', {tokeny: presuny})
+    .then((d) => {
+      if (d.error) { logLine('Chyba přesunu skupiny: ' + d.error); obnovitStav(); return; }
+      skupina.forEach((c, i) => { c.x = presuny[i].x; c.y = presuny[i].y; });
+    })
+    .catch(() => { logLine('Přesun skupiny se nepodařilo odeslat.'); obnovitStav(); })
+    .finally(hotovo);
 }
 
 // Klik (ne tah) na mapu — nástroje ping / zeď / pin a pokládání tokenu.
@@ -1726,22 +1811,45 @@ function dokoncitAkci(a, e) {
       break;
     case 'token': {
       const t = a.token;
-      nastavVyber([t.id]);
-      if (a.smiTahnout && a.posunuto) {
-        if (a.nx !== undefined && (a.nx !== t.x || a.ny !== t.y)) ulozPresunTokenu(t, a.nx, a.ny);
+      if (a.kontextOtevren) break;
+      if (a.smiTahnout && !a.modifikator && a.posunuto) {
+        const skupina = a.skupina || [t];
+        if (a.dx || a.dy) ulozPresunSkupiny(skupina, a.dx, a.dy);
         else {
-          drzeneTokeny.delete(t.id);
-          const el = tokenEl.get(t.id);
-          if (el) { el.style.left = t.x + 'px'; el.style.top = t.y + 'px'; el.classList.remove('tahnuty'); }
+          skupina.forEach((c) => {
+            drzeneTokeny.delete(c.id);
+            const el = tokenEl.get(c.id);
+            if (el) { el.style.left = c.x + 'px'; el.style.top = c.y + 'px'; el.classList.remove('tahnuty'); }
+          });
         }
-      } else if (!a.posunuto && t.owned && t.na_tahu) {
-        otevritSpravovat(t);
+      } else if (!a.posunuto) {
+        if (a.modifikator) {
+          // přidat/odebrat z výběru
+          if (vybrane.has(t.id)) vybrane.delete(t.id); else vybrane.add(t.id);
+          aktualizujVyber();
+        } else {
+          nastavVyber([t.id]);
+          if (t.owned && t.na_tahu) otevritSpravovat(t);
+        }
       }
       break;
     }
+    case 'ramecek': {
+      const m = bodMapy(e);
+      if (rulerSvg) rulerSvg.innerHTML = '';
+      if (!a.posunuto) { if (!a.pridat) zrusitVyber(); break; }
+      const x1 = Math.min(a.start0.x, m.x), x2 = Math.max(a.start0.x, m.x);
+      const y1 = Math.min(a.start0.y, m.y), y2 = Math.max(a.start0.y, m.y);
+      const uvnitr = tokeny.filter((t) => t.x >= x1 && t.x <= x2 && t.y >= y1 && t.y <= y2).map((t) => t.id);
+      nastavVyber(a.pridat ? Array.from(new Set([...vybrane, ...uvnitr])) : uvnitr);
+      break;
+    }
+    case 'pan':
+      if (a.kontext && !a.posunuto) otevritKontextMenu(e.clientX, e.clientY, a.cilToken || null);
+      break;
     case 'klik':
     case 'prazdno':
-      if (!a.posunuto) klikNaMapu(bodMapy(e));
+      if (!a.posunuto && !a.kontextOtevren) klikNaMapu(bodMapy(e));
       break;
     default:
       break;
@@ -1749,6 +1857,7 @@ function dokoncitAkci(a, e) {
 }
 
 function konecPointeru(e, zruseno) {
+  zrusDlouhyStisk();
   pointery.delete(e.pointerId);
   try { viewport.releasePointerCapture(e.pointerId); } catch (err) { /* nevadí */ }
   if (gesto.aktivni()) {
@@ -1793,9 +1902,9 @@ window.addEventListener('keydown', (e) => {
     kamera.zoomStred(0.8);
   } else if (e.key === '0') {
     kamera.prizpusobit();
-  } else if ((e.key === 'q' || e.key === 'Q' || e.key === 'e' || e.key === 'E') && vybrane.size === 1) {
-    const t = tokenData(Array.from(vybrane)[0]);
-    if (t) otocitTokenO(t, (e.key === 'q' || e.key === 'Q') ? -krokOtoceni() : krokOtoceni());
+  } else if ((e.key === 'q' || e.key === 'Q' || e.key === 'e' || e.key === 'E') && vybrane.size >= 1 && !e.ctrlKey && !e.metaKey) {
+    const smer = (e.key === 'q' || e.key === 'Q') ? -krokOtoceni() : krokOtoceni();
+    Array.from(vybrane).map(tokenData).filter(Boolean).forEach((t) => otocitTokenO(t, smer));
   }
 });
 window.addEventListener('keyup', (e) => {
@@ -2287,6 +2396,16 @@ function applyEvent(u) {
       if (!drzeneTokeny.has(t.id)) nakreslitToken(t);
     }
     if (naTeteMape) obnovitMlhuPoPollu = true;
+  } else if (u.typ === 'tokeny_presun') {
+    (u.payload.presuny || []).forEach((pr) => {
+      const t = tokenData(pr.token_id);
+      if (!t) return;
+      t.x = pr.x_po;
+      t.y = pr.y_po;
+      if (!drzeneTokeny.has(t.id)) nakreslitToken(t);
+    });
+    aktualizujRotacniUchyt();
+    if (naTeteMape) obnovitMlhuPoPollu = true;
   } else if (u.typ === 'token_zmena') {
     const t = tokenData(u.payload.token_id);
     const zm = u.payload.zmeny || {};
@@ -2388,6 +2507,151 @@ document.addEventListener('visibilitychange', () => {
 // Cokoli, co uživatel na mapě udělá, vrací polling na rychlý režim.
 ['pointerdown', 'keydown'].forEach((n) => window.addEventListener(n, () => { posledniAktivita = Date.now(); }, {passive: true}));
 planPollu();
+
+
+// --- Kontextové menu (pravé tlačítko / dlouhé stisknutí) a hromadné akce ---
+const kontextMenu = document.getElementById('kontextMenu');
+function zavritKontextMenu() { if (kontextMenu) kontextMenu.style.display = 'none'; }
+
+// Na koho akce platí: je-li token součástí výběru, na celý výběr; jinak jen na něj.
+function cileAkce(t) {
+  if (t && vybrane.has(t.id) && vybrane.size > 1) return Array.from(vybrane).map(tokenData).filter(Boolean);
+  return t ? [t] : Array.from(vybrane).map(tokenData).filter(Boolean);
+}
+function krokKopie() { return GRID_PX > 0 ? (GRID_TYPE === 'hex' ? 1.5 * GRID_PX : GRID_PX) : 60; }
+
+function upravTokeny(cile, zmenyNaToken) {
+  cile.forEach((t) => { const zm = zmenyNaToken(t); if (zm) upravToken(t, zm); });
+}
+function smazatTokeny(cile) {
+  if (!IS_PJ_OR_ADMIN || !cile.length) return;
+  const text = cile.length === 1 ? 'Opravdu smazat token „' + cile[0].label + '“?' : 'Opravdu smazat ' + cile.length + ' tokenů?';
+  if (!confirm(text)) return;
+  Promise.all(cile.map((t) => postJson('api/token_smazat.php', {token_id: t.id}))).then((vysl) => {
+    const chyba = vysl.find((d) => d.error);
+    if (chyba) logLine('Chyba: ' + chyba.error);
+    if (spravovanyToken && cile.some((t) => t.id === spravovanyToken.tokenId)) {
+      spravovatPanel.classList.remove('open');
+      spravovanyToken = null;
+    }
+    vybrane.clear();
+    obnovitStav();
+  });
+}
+function kopirovatTokeny(cile) {
+  const kopirovatelne = cile.filter((t) => t.typ_entity !== 'postava');
+  if (!IS_PJ_OR_ADMIN || !kopirovatelne.length) { logLine('Postavu zkopírovat nejde.'); return; }
+  const minY = Math.min(...kopirovatelne.map((t) => t.y)), maxY = Math.max(...kopirovatelne.map((t) => t.y));
+  const posun = (maxY - minY) + krokKopie();
+  Promise.all(kopirovatelne.map((t) => {
+    const stred = GRID_PX > 0 ? gridCellCenter(t.x, t.y + posun) : {x: t.x, y: t.y + posun};
+    return postJson('api/token_duplikovat.php', {token_id: t.id, x: Math.round(stred.x), y: Math.round(stred.y)});
+  })).then((vysl) => {
+    const chyba = vysl.find((d) => d.error);
+    if (chyba) logLine('Chyba: ' + chyba.error);
+    obnovitStav();
+  });
+}
+function vrstvaTokenu(cile, nahoru) {
+  const zs = tokeny.map((t) => t.z);
+  let z = nahoru ? Math.max(...zs) : Math.min(...zs);
+  cile.forEach((t) => { z += nahoru ? 1 : -1; upravToken(t, {z}); });
+}
+
+function polozkyKontextu(t, cile) {
+  const pj = IS_PJ_OR_ADMIN;
+  const n = cile.length;
+  const pocet = n > 1 ? ' (' + n + ')' : '';
+  const polozky = [];
+  if (t) {
+    if (n === 1 && t.owned && t.na_tahu) polozky.push(['Otevřít panel', () => otevritSpravovat(t)]);
+    if (cile.every(smiMenitSmer)) {
+      polozky.push(['Otočit doleva' + pocet + '  (Q)', () => cile.forEach((c) => otocitTokenO(c, -krokOtoceni()))]);
+      polozky.push(['Otočit doprava' + pocet + '  (E)', () => cile.forEach((c) => otocitTokenO(c, krokOtoceni()))]);
+    }
+    if (pj && FUNKCE.zamek) {
+      const zamknout = !cile.every((c) => c.zamceno);
+      polozky.push([(zamknout ? 'Zamknout polohu' : 'Odemknout polohu') + pocet + '  (L)', () => upravTokeny(cile, () => ({zamceno: zamknout}))]);
+    }
+    if (pj && FUNKCE.udalosti) {
+      const skryt = cile.some((c) => c.viditelny);
+      polozky.push([(skryt ? 'Skrýt před hráči' : 'Ukázat hráčům') + pocet + '  (H)', () => upravTokeny(cile, () => ({viditelny: !skryt}))]);
+      polozky.push(['Do popředí' + pocet, () => vrstvaTokenu(cile, true)]);
+      polozky.push(['Do pozadí' + pocet, () => vrstvaTokenu(cile, false)]);
+    }
+    if (pj && cile.some((c) => c.typ_entity !== 'postava')) polozky.push(['Kopírovat' + pocet + '  (Ctrl+D)', () => kopirovatTokeny(cile)]);
+    if (pj) polozky.push(['Smazat' + pocet + '  (Delete)', () => smazatTokeny(cile), true]);
+  } else {
+    polozky.push(['Ping sem', () => { const m = kontextBod; if (m) klikPing(m); }]);
+    if (tokeny.length) polozky.push(['Vybrat všechny tokeny  (Ctrl+A)', () => nastavVyber(tokeny.map((x) => x.id))]);
+    if (vybrane.size) polozky.push(['Zrušit výběr  (Esc)', () => zrusitVyber()]);
+    polozky.push(['Celá mapa  (0)', () => kamera.prizpusobit()]);
+  }
+  return polozky;
+}
+let kontextBod = null;
+function klikPing(m) {
+  const x = Math.round(m.x), y = Math.round(m.y);
+  postJson('api/ping.php', {svet_id: SVET_ID, mapa_id: MAPA_ID, x, y}).then((d) => {
+    if (d.error) { logLine('Chyba: ' + d.error); return; }
+    posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
+    zobrazPing(x, y, d.jmeno || '');
+  });
+}
+function otevritKontextMenu(clientX, clientY, t) {
+  if (!kontextMenu) return;
+  kontextBod = kamera.naMapu(clientX, clientY);
+  if (t && !vybrane.has(t.id)) nastavVyber([t.id]);
+  const cile = t ? cileAkce(t) : [];
+  const polozky = polozkyKontextu(t, cile);
+  if (!polozky.length) return;
+  kontextMenu.innerHTML = '';
+  polozky.forEach(([text, fn, nebezpecna]) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = text;
+    if (nebezpecna) b.className = 'nebezpecna';
+    b.addEventListener('click', () => { zavritKontextMenu(); fn(); });
+    kontextMenu.appendChild(b);
+  });
+  kontextMenu.style.display = 'block';
+  const w = kontextMenu.offsetWidth, h = kontextMenu.offsetHeight;
+  kontextMenu.style.left = Math.max(8, Math.min(clientX, window.innerWidth - w - 8)) + 'px';
+  kontextMenu.style.top = Math.max(8, Math.min(clientY, window.innerHeight - h - 8)) + 'px';
+}
+window.addEventListener('pointerdown', (e) => {
+  if (kontextMenu && kontextMenu.style.display !== 'none' && !kontextMenu.contains(e.target)) zavritKontextMenu();
+}, true);
+viewport.addEventListener('wheel', zavritKontextMenu, {passive: true});
+
+// Klávesové zkratky pro výběr (Q/E otáčení je výš).
+window.addEventListener('keydown', (e) => {
+  if (jeVstupniPole(e.target)) return;
+  const ctrl = e.ctrlKey || e.metaKey;
+  const cile = Array.from(vybrane).map(tokenData).filter(Boolean);
+  if (e.key === 'Escape') {
+    zavritKontextMenu();
+    zrusitVyber();
+    if (currentTool !== 'select') setTool('select');
+  } else if (ctrl && (e.key === 'a' || e.key === 'A')) {
+    e.preventDefault();
+    nastavVyber(tokeny.map((t) => t.id));
+  } else if (ctrl && (e.key === 'd' || e.key === 'D')) {
+    e.preventDefault();
+    if (cile.length) kopirovatTokeny(cile);
+  } else if ((e.key === 'Delete' || e.key === 'Backspace') && cile.length) {
+    e.preventDefault();
+    smazatTokeny(cile);
+  } else if ((e.key === 'l' || e.key === 'L') && cile.length && IS_PJ_OR_ADMIN && FUNKCE.zamek) {
+    const zamknout = !cile.every((c) => c.zamceno);
+    upravTokeny(cile, () => ({zamceno: zamknout}));
+  } else if ((e.key === 'h' || e.key === 'H') && cile.length && IS_PJ_OR_ADMIN && FUNKCE.udalosti) {
+    const skryt = cile.some((c) => c.viditelny);
+    upravTokeny(cile, () => ({viditelny: !skryt}));
+  } else if ((e.key === 'v' || e.key === 'V') && !ctrl) {
+    setTool('select');
+  }
+});
 
 // --- Zoom: tlačítka, údaj, uložení pohledu ---
 const zoomInfo = document.getElementById('zoomInfo');

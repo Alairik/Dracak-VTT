@@ -12,6 +12,8 @@ require_once __DIR__ . '/../../includes/vtt_mapa_stav.php';
 // další INSERT.
 //
 // Bezpečně vratné typy (a proč):
+//  - tokeny_presun (skupina tokenů najednou): payload nese x_pred/y_pred pro
+//    každý token zvlášť.
 //  - token_zmena (otočení, velikost, barva, zámek, název, obrázek,
 //    viditelnost, vrstva): payload nese "pred" — hodnoty před změnou.
 //  - token_presun: payload nese x_pred/y_pred přímo — doslova "hodnota
@@ -109,6 +111,27 @@ switch ($typ) {
         }
         break;
 
+    case 'tokeny_presun':
+        // Společný přesun skupiny: payload nese pro každý token x_pred/y_pred.
+        if (!is_array($payload['presuny'] ?? null) || !$payload['presuny']) {
+            http_response_code(422);
+            echo json_encode(['error' => $reverzniTypyChyba]);
+            exit;
+        }
+        $presunyTokeny = [];
+        foreach ($payload['presuny'] as $pr) {
+            $stmt = $pdo->prepare('SELECT * FROM tokeny WHERE id = ? AND mapa_id = ?');
+            $stmt->execute([(int)($pr['token_id'] ?? 0), $mapaId]);
+            $t = $stmt->fetch();
+            if (!$t) {
+                http_response_code(422);
+                echo json_encode(['error' => 'Některý token z poslední události už na mapě není, nejde vrátit.']);
+                exit;
+            }
+            $presunyTokeny[] = ['token' => $t, 'pr' => $pr];
+        }
+        break;
+
     case 'token_zmena':
         // Otočení, velikost, barva… — vrátit jde jen událost, která nese
         // hodnoty před změnou ("pred"); starší záznamy je nemají.
@@ -168,6 +191,21 @@ try {
             'x_po' => $xPred, // stav po kroku zpět (= x_pred původní události)
             'y_po' => $yPred,
         ];
+    } elseif ($typ === 'tokeny_presun') {
+        $zaznam = [];
+        foreach ($presunyTokeny as $it) {
+            $xPred = (int)($it['pr']['x_pred'] ?? 0);
+            $yPred = (int)($it['pr']['y_pred'] ?? 0);
+            $pdo->prepare('UPDATE tokeny SET x = ?, y = ? WHERE id = ?')->execute([$xPred, $yPred, (int)$it['token']['id']]);
+            $zaznam[] = [
+                'token_id' => (int)$it['token']['id'],
+                'x_pred' => (int)$it['token']['x'],
+                'y_pred' => (int)$it['token']['y'],
+                'x_po' => $xPred,
+                'y_po' => $yPred,
+            ];
+        }
+        $revertPayload += ['presuny' => $zaznam];
     } elseif ($typ === 'token_zmena') {
         $sety = [];
         $params = [];

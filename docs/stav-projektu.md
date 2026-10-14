@@ -676,8 +676,23 @@ a mapa funguje jako dřív — ověřeno na kopii DB bez SQL).
   že pak `migrate.php` pod DML-only účtem projde (nový fallback pro
   `MODIFY ... VARCHAR(n)`).
 
-**Dál (zbývá z bloku A):** výběr více tokenů a kontextové menu, kreslení, měřidlo
-v hexech.
+**Hotovo — blok A, krok 3 (2026-10-14): výběr více tokenů, kontextové menu.**
+- Výběr: klik, Shift/Ctrl+klik (přidat/odebrat), **rámeček** (Shift+tažení, nebo
+  nástroj „Výběr rámečkem“, který funguje i prstem), Ctrl+A, Esc.
+- **Společný tah**: tažení jednoho z vybraných posune celou skupinu
+  (`hra/api/token_presun_davka.php`, jedna událost `tokeny_presun`, „Krok zpět“
+  vrátí všechny najednou; pravidla pohybu sdílí `includes/vtt_tokeny.php` s
+  jedním tokenem).
+- **Kontextové menu** (pravé tlačítko / dlouhé stisknutí prstem): otevřít panel,
+  otočit, zamknout, skrýt, do popředí/pozadí, kopírovat (`hra/api/token_duplikovat.php`),
+  smazat; u prázdného místa ping, vybrat vše, celá mapa. Zkratky: Q/E, L, H,
+  Ctrl+D, Delete, Esc, V.
+- **Číslování nestvůr** (Goblin, Goblin 2, …) při pokládání i kopírování; na
+  tokenu „G2“.
+- Před ručním SQL zůstávají k dispozici jen kopírování a mazání; společný tah se
+  posílá po jednom tokenu.
+
+**Dál (zbývá z bloku A):** kreslení na mapu, měřidlo v hexech a šablony kouzel.
 
 **Stav mapy před změnou (audit `hra/mapa.php` 2026-10-14, historické):** funguje grid (čtverec/hex), zdi
 (blokují hráče), mlha války (per hráč), měřidlo, ping, piny s vnořenými mapami,
@@ -713,7 +728,7 @@ PJ přepíná aktivní mapu. **Chybí / drhne:**
    (velikost se volí ručně; podle `velikosti` z pravidel se nenastavuje — kolik
    hexů tvor zabírá, kniha neuvádí tabulkou)
 4. Obecné tokeny (NPC bez statů, předmět, překážka, značka) [M]
-5. Výběr více tokenů, hromadný pohyb, zamknout, vrstvy, duplikovat, Delete,
+5. ✔ Výběr více tokenů, hromadný pohyb, zamknout, vrstvy, duplikovat, Delete,
    kontextové menu, klávesové zkratky [M]
 6. Kreslení na mapu (čára, šipka, tvar, text; sdílené/jen PJ) [M]
 7. Měřidlo ve hře-jednotkách (body pohybu / metry) a šablony plošných kouzel

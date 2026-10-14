@@ -53,6 +53,11 @@ if (!$isPjOrAdmin && $udalosti) {
         if (in_array($u['typ'], ['token_presun', 'token_zmena'], true) && !empty($u['payload']['token_id'])) {
             $tokenIds[(int)$u['payload']['token_id']] = true;
         }
+        if ($u['typ'] === 'tokeny_presun' && is_array($u['payload']['presuny'] ?? null)) {
+            foreach ($u['payload']['presuny'] as $pr) {
+                if (!empty($pr['token_id'])) $tokenIds[(int)$pr['token_id']] = true;
+            }
+        }
         if ($u['typ'] === 'hp_zmena' && !empty($u['payload']['entita_id']) && $u['mapa_id'] !== null) {
             $entity[] = [$u['payload']['typ_entity'] ?? '', (int)$u['payload']['entita_id'], (int)$u['mapa_id']];
         }
@@ -72,7 +77,21 @@ if (!$isPjOrAdmin && $udalosti) {
             $skryteEntity[$r['typ_entity'] . ':' . $r['entita_id'] . ':' . $r['mapa_id']] = true;
         }
     }
+    // Společný přesun: ze seznamu se vyřadí skryté tokeny, událost zůstane,
+    // jen když v ní zbude aspoň jeden viditelný.
+    foreach ($udalosti as &$u) {
+        if ($u['typ'] === 'tokeny_presun' && is_array($u['payload']['presuny'] ?? null)) {
+            $u['payload']['presuny'] = array_values(array_filter(
+                $u['payload']['presuny'],
+                fn($pr) => !isset($skryteTokeny[(int)($pr['token_id'] ?? 0)])
+            ));
+        }
+    }
+    unset($u);
     $udalosti = array_values(array_filter($udalosti, function (array $u) use ($skryteTokeny, $skryteEntity): bool {
+        if ($u['typ'] === 'tokeny_presun') {
+            return !empty($u['payload']['presuny']);
+        }
         if (in_array($u['typ'], ['token_presun', 'token_zmena'], true)) {
             $id = (int)($u['payload']['token_id'] ?? 0);
             if (isset($skryteTokeny[$id])) {
