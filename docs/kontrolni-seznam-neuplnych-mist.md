@@ -334,3 +334,41 @@ Tohle jsou místa, která agent při sweepu označil, ale po bližším pohledu 
 - VAROVÁNÍ (bestiář) — stylisticky neobratné už v předloze, ne chyba přepisu
 - Sarkon — heslo mimo abecední pořadí už na skenu
 - Vzluha — z dvou totožných vět ponechána srozumitelnější
+
+---
+
+## Na kontrolu při proofreadingu (stav 2026-10-14)
+
+Sem patří věci, kde jsem **převzal údaj z knihy tak, jak je** (při rozporu
+podle homebrew), nebo si text musel vyložit. Na konci se projdou společně s
+knihou a opraví najednou. Pravidlo je v `CLAUDE.md`.
+
+**Podezřelé údaje v Novém ceníku (h2055, nahráno beze změny, migrace 0082)**
+- [ ] Soudek 10 l váží 200 mn, ale soudek 20 l jen 100 mn (a 50 l 255 mn) — ostatní soudky sedí na řadu, tohle vypadá jako překlep (100?).
+- [ ] Nákladní vak střední stojí 7,50 st, ale malý nákladní vak 10 st — střední je levnější než malý.
+- [ ] Zimní boty normální: cena "8/9/10 lst" — "lst" je zřejmě "st" (v DB uloženo jako st).
+- [ ] Mahakamský ležák 10,24 st — DB drží jen 2 desetinná místa v zl (1,02 zl); přesná hodnota je v popisu.
+- [ ] Ledová truhla: poznámka "200 mn" je nejasná (kapacita? hmotnost ledu?) — uloženo jen v popisu, není to kontejner.
+- [ ] Potraviny: sloupce cestovního jídla jsou v ceníku posunuté (váha stojí ve sloupci poznámky) — cena i váha jsou "za den", kvalita rozsah "70 md až X zl".
+- [ ] Maskovací sítě: cena i váha "za velikost" / "za osobu" — uložena základní hodnota, jednotka v popisu.
+- [ ] Provazy: u každého stupně je nosnost lana (2 000 … 45 000 mn), cena a váha za 1 metr.
+- [ ] Měch, flakónek a láhev mají objem v litrech, ne kapacitu v mn — proto nejsou kontejnery.
+- [ ] Zdroj "kapacita" u sudů/soudků je hmotnost obsahu v mn (např. soudek 5 l = 100 mn), ověřit, že je to míněno takhle.
+
+**Povozy (migrace 0079)**
+- [ ] Váhy vozů se v PPP a v homebrew liší (viz tabulka v konverzaci 2026-10-14); výchozí je homebrew. Největší rozdíly: velký kočár (PPP 4 500–5 600, HB 5 000–8 000), velký dostavník (PPP 7 000–8 000, HB 8 500–10 000), žebřiňák (PPP 4 000–6 000, HB 3 000–6 000).
+- [ ] Únava cestujícího na žebřiňáku a valníku (1 bod za 4 body zvířete) je jen v homebrew, PPP ji nezná.
+- [ ] Velký kočár/dostavník: počet řidičů — homebrew 2, PPP "dva venku, z nichž jeden je kočí".
+- [ ] Konstrukční nosnost "krytý vůz 2×, nejbytelnější 3×" a "maringotka 1,5×, výjimečně 2×" — kalkulačka bere dolní hodnotu jako výchozí.
+
+**Pohyb, únava, naložení**
+- [ ] Tažný kůň: 800 mn na hřbetě, 1 000 mn "v tahu" jako základ; v zápřahu tedy 4 × 1 000 = 4 000 (kniha doslova nerozlišuje; potvrdil uživatel 2026-10-14).
+- [ ] Tabulka únavy u stupně "vysílená" nemá číselné postihy — v kódu jen "omdlévá", žádná čísla.
+- [ ] Vliv únavy na nosnost kniha neuvádí — nosnost se únavou nemění.
+- [ ] Spánek: u záporného bonusu odolnosti beru polovinu postihu zaokrouhlenou nahoru (kniha zaokrouhlení u postihu neříká); "poloviční spánek" a limit 2× denně se nehlídají.
+- [ ] Únava zvířat: kniha neříká, jak ovlivňuje jejich rychlost — rychlost zvířete se únavou nemění, jen se hlídá zastavení.
+- [ ] Zjednodušené tabulky PPZ "Cestování": "procházka (14 h)" odpovídá PPP **chůzi**, ne PPP procházce (ověřeno výpočtem, ale terminologie je matoucí).
+- [ ] Postih k iniciativě za únavu/naložení pochází z fota tabulky dodané uživatelem (migrace 0045) — zkontrolovat proti knize.
+- [ ] Váha postavy (jezdce, cestujícího) je v pravidlech jen jako rozsah podle rasy — zadává se ručně.
+- [ ] Dovednosti, které únava/naložení ovlivňují, ale kniha je nechává na PJ: Plavání (past +1 za stupeň únavy a naložení), Skok o tyči (ne při velkém naložení), Tichý pohyb (šance ovlivní naložení); kouzelník ve zbroji (postih k iniciativě), obří štít (−2 ini, +1 únava/h).
+

@@ -35,13 +35,11 @@ ním čeká, dokud se to neprovede ručně.
 
 **Ruční DDL blok je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný soubor, ve
 kterém jsou všechny dosud neprovedené DDL příkazy; uživatel ho dostává jako
-text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-14):**
-bloky pro `0065`–`0079` jsou na produkci provedené. Čeká blok: `DROP TABLE`
-tří mrtvých tabulek z 0008 (`stupne_unavy`, `narocnost_akci_unava`,
-`odstraneni_unavy`; schváleno uživatelem), `0080` (typ vybavení, skupina,
-kapacita) a `0081` (tabulky kontejnerů); `0082` (217 položek ceníku) pak
-proběhne sama přes `migrate.php`. Ověřeno na kopii produkčního stavu (dvakrát
-za sebou + `migrate.php`). Po potvrzení soubor vyprázdnit.
+text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-14):
+nic nečeká.** Bloky pro `0065`–`0081` i `DROP TABLE` tří mrtvých tabulek z
+0008 jsou na produkci provedené (kontrola vyšla 0, 2, 1, 2) a `0082`
+(217 položek ceníku) proběhla sama přes `migrate.php` (deploy run 148 zelený).
+Soubor je prázdný, dokud nepřibude další CREATE/ALTER.
 
 Kód je napsaný tak, že funguje i před ručními kroky (chybějící sloupce
 se berou jako "není"), jen se nic z toho nedá ukládat.
@@ -200,9 +198,8 @@ MariaDB.** Postup, který v session fungoval:
 
 ## Rozpracováno: cestování, pohyblivost, únava, naložení
 
-**Stav (2026-10-14): všechny fáze jsou v kódu (1, 1b, 2, 3, 4, 5); ruční DDL
-čeká jen na 0080/0081 a smazání tří mrtvých tabulek (viz "Čeká na ruční
-spuštění").** Zbývají jen drobnosti uvedené u jednotlivých fází.
+**Stav (2026-10-14): všechny fáze jsou v kódu i na produkci (1, 1b, 2, 3, 4, 5);
+žádné ruční DDL nečeká.** Zbývají jen drobnosti uvedené u jednotlivých fází.
 
 ### Co je podložené přímo v `content/pravidla-hrac.html` (ne odhad)
 
@@ -578,6 +575,13 @@ Soubory:
   doprava, efekty) s překreslením po 5 s; dole **tempo družiny = nejnižší
   pohyblivost** (pravidla-pj h2355: "Družina se pohybuje rychlostí
   nejpomalejší postavy" — základ pro Fázi 4). Odkaz v hlavičce `svet.php`.
+  **Jen pro PJ** pod tabulkou sekce „Pro PJ — co únava a naložení právě mění“
+  (`dracak_vtt_stav_pro_pj()` v `includes/vtt_denik.php`): u každé postavy,
+  kterou únava/naložení ovlivňuje, vypíše stupeň a důsledky (bonusy SIL/OBR,
+  zákazy, iniciativa) a připomene dovednosti, jejichž obtížnost určuje PJ
+  (Plavání — past +stupeň únavy +stupeň naložení; Skok o tyči — ne při velkém
+  naložení; Tichý pohyb). Hráč tuhle sekci nevidí (ověřeno v prohlížeči).
+  Zbývá totéž v panelu tokenu na mapě (viz plán „náhrada Owlbear Rodeo“).
 - **`hra/denik_tisk.php`** — tisková A4 verze papírového deníku podle
   kolonek h1690 (předvyplněná, `?id=`) a prázdný formulář (bez `id`).
 - **`includes/vtt_denik.php`** — výpočty podle pravidel (bonusy, bojeschopnost,

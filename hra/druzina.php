@@ -50,6 +50,7 @@ foreach ($postavy as $p) {
         if ($z['drzena']) { $drzena = $z; }
     }
     $radky[] = [
+        'pj' => $jePj ? dracak_vtt_stav_pro_pj($d) : null,
         'p' => $p, 'd' => $d, 'hp' => $hp, 'maxHp' => $maxHp,
         'hpPct' => $maxHp > 0 ? max(0, min(100, (int)round($hp / $maxHp * 100))) : 0,
         'hpStav' => $d['bojeschopnost'] && $d['bojeschopnost']['vyrazena'] ? 'out' : ($d['bojeschopnost'] && $d['bojeschopnost']['pod_tretinou'] ? 'low' : 'ok'),
@@ -127,6 +128,22 @@ if (!$fragment) {
         </tbody>
       </table>
     </div>
+    <?php if ($jePj): ?>
+      <h3 class="dn-h3" style="margin-top:18px;">Pro PJ — co únava a naložení právě mění</h3>
+      <?php $nikdo = true; foreach ($radky as $r): if (!$r['pj'] || !$r['pj']['ma_vliv']) { continue; } $nikdo = false; ?>
+        <div class="dz-pj">
+          <strong><?= $e($r['p']['nazev']) ?></strong>
+          <ul>
+            <?php foreach ($r['pj']['radky'] as $t): ?><li><?= $e($t) ?></li><?php endforeach; ?>
+          </ul>
+          <?php if ($r['pj']['pj_rozhoduje']): ?>
+            <div class="note"><em>Obtížnost dovedností určuješ ty:</em> <?= $e(implode(' · ', $r['pj']['pj_rozhoduje'])) ?>.</div>
+          <?php endif; ?>
+        </div>
+      <?php endforeach; ?>
+      <?php if ($nikdo): ?><p class="note">Nikdo z družiny není unavený ani přetížený.</p><?php endif; ?>
+      <p class="note">ÚČ, OČ, pohyblivost, inteligenci, charismu, postřeh a iniciativu postav počítá hra sama (pokud jsi to ve světě nevypnul); obtížnost dovedností zůstává na tobě.</p>
+    <?php endif; ?>
     <p class="note">ÚČ = držená zbraň (vybírá se v deníku). Pohyblivost je po naložení. Tempo družiny je nejnižší pohyblivost — družina se pohybuje rychlostí nejpomalejší postavy.</p>
   </div>
   <?php endif; ?>

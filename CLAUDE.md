@@ -146,6 +146,14 @@
      přes `edit-links.json`/`content-links.json` a přepisy v tabulce
      `pravidla_texty` (ty mají přednost před textem v souboru!).
      Text knihy se tedy NEdoplňuje jen do DB a naopak.
+- **Rozpor mezi zdroji: přednost má homebrew, překlepy se nechají.**
+  Když se základní pravidla (PPZ/PPP/PPE) a homebrew (`data-hb`, "Homebrew ·
+  zdroj: …") liší, platí **homebrew** — je upravený vůči lepší realitě
+  (rozhodnutí uživatele 2026-10-14). Obě hodnoty ulož, kde to jde (např.
+  `povozy.vaha_*` a `vaha_hb_*`), a výchozí je homebrew. **Zjevné překlepy
+  ve zdroji neopravuj sám** — nech podle knihy (při rozporu podle homebrew) a
+  zapiš je do `docs/kontrolni-seznam-neuplnych-mist.md`, sekce "Na kontrolu při
+  proofreadingu"; na konci se udělá společná korektura a opraví se najednou.
 - **Nejistota v herní mechanice (výpočty, vzorce, co přesně dělá
   iniciativa/finta/atribut) se neřeší odhadem.** Skutečný text pravidel
   je v `content/pravidla-hrac.html`, `pravidla-pj.html`,

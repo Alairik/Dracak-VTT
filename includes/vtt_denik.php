@@ -557,3 +557,65 @@ function dracak_vtt_denik_data(PDO $pdo, array $postava, bool $plne = true): arr
         'cile' => $plne ? dracak_vtt_mozne_cile($pdo, $postava) : [],
     ];
 }
+
+// Co únava a naložení postavy právě mění — přehled pro PJ (družina, panel
+// tokenu na mapě). $d = výsledek dracak_vtt_denik_data(). Engine umí
+// automaticky ÚČ, OČ, pohyblivost, INT/CHA, postřeh a iniciativu; zbytek (obtížnost
+// dovedností) kniha nechává na PJ, proto je tu jako připomínka:
+//   Plavání: past je o 1 těžší za každý stupeň únavy a každý stupeň naložení
+//   (žádné 0, mírné 1, střední 2, velké 3); Skok o tyči: nejde při velkém
+//   naložení; Tichý pohyb: šanci ovlivňuje naložení (výši určuje PJ).
+// Vrací ['radky' => [text], 'pj_rozhoduje' => [text], 'ma_vliv' => bool].
+function dracak_vtt_stav_pro_pj(array $d): array
+{
+    $radky = [];
+    $pj = [];
+    $unava = $d['unava'] ?? null;
+    $stupenUnavy = $unava ? (int)$unava['stupen'] : 0;
+    if ($unava && $stupenUnavy > 0) {
+        $t = 'Únava ' . $unava['nazev'] . ' (' . (int)$unava['body'] . ' / ' . (int)$unava['vytrvalost'] . ')';
+        if ($stupenUnavy < 4) {
+            $t .= ': bonus za sílu a obratnost −' . (int)$unava['postih_sil_obr'];
+            if ($unava['postih_int']) { $t .= ', inteligence −' . (int)$unava['postih_int']; }
+            if ($unava['postih_cha']) { $t .= ', charisma −' . (int)$unava['postih_cha']; }
+            $zak = [];
+            if (in_array('beh', $unava['zakazy'], true)) { $zak[] = 'běh a sprint'; }
+            elseif (in_array('sprint', $unava['zakazy'], true)) { $zak[] = 'sprint'; }
+            if (in_array('kouzla', $unava['zakazy'], true)) { $zak[] = 'kouzla (i z předmětů)'; }
+            if ($unava['jen_plazeni']) { $zak[] = 'chůze (jen plazení)'; }
+            if ($zak) { $t .= '; nesmí: ' . implode(', ', $zak); }
+            $t .= '; iniciativa ' . [1 => '−1', 2 => '−2', 3 => '−3'][$stupenUnavy];
+        } else {
+            $t .= ': omdlévá, bez pomoci umírá během 1k6 hodin';
+        }
+        if (!($d['nastaveni_pohybu']['auto_unava'] ?? true)) {
+            $t .= ' [automatika únavy je ve světě vypnutá — postihy musíš uplatnit ručně]';
+        }
+        $radky[] = $t;
+    }
+    $nal = $d['pohyblivost']['nalozeni']['kod'] ?? null;
+    $stupenNal = ['zadne' => 0, 'mirne' => 1, 'stredni' => 2, 'velke' => 3, 'prilis_velke' => 4][$nal] ?? 0;
+    if ($stupenNal > 0) {
+        $nazvy = ['mirne' => 'mírné', 'stredni' => 'střední', 'velke' => 'velké', 'prilis_velke' => 'nad 4× nosnosti'];
+        $t = 'Naložení ' . $nazvy[$nal] . ': pohyblivost ' . ($d['pohyblivost']['pohyblivost'] ?? '—');
+        if ($stupenNal <= 3) {
+            $t .= ', iniciativa ' . [1 => '−1', 2 => '−3', 3 => '−5'][$stupenNal];
+        }
+        if ($stupenNal >= 3) { $t .= ', −1 k útoku i obraně'; }
+        if (!($d['nastaveni_pohybu']['auto_naklad'] ?? true)) {
+            $t .= ' [automatika nákladu je ve světě vypnutá]';
+        }
+        $radky[] = $t;
+    }
+    if ($stupenUnavy > 0 || $stupenNal > 0) {
+        $pj[] = 'Plavání: past je o ' . (min(4, $stupenUnavy) + min(3, $stupenNal)) . ' těžší (stupeň únavy ' . $stupenUnavy . ' + stupeň naložení ' . min(3, $stupenNal) . ')';
+    }
+    if ($stupenNal >= 3) {
+        $pj[] = 'Skok o tyči: při velkém naložení nelze';
+    }
+    if ($stupenNal > 0) {
+        $pj[] = 'Tichý pohyb: šanci ovlivňuje naložení (výši určuješ ty)';
+    }
+    return ['radky' => $radky, 'pj_rozhoduje' => $pj, 'ma_vliv' => $radky !== []];
+}
+
