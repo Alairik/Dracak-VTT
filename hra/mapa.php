@@ -206,6 +206,9 @@ $iniciativaBonusy = dracak_db()->query('SELECT id, popis, bonus FROM iniciativa_
   <div id="panelIniciativa" style="display:none;">
     <div class="ini-titul" id="iniciativaTitle">Pořadí tahů</div>
     <div id="iniciativaList"></div>
+    <?php if ($isPjOrAdmin): ?>
+      <button class="btn btn-ghost" type="button" id="souborjKonecBtn" style="width:100%;margin-top:8px;font-size:12px;" title="Smaže pořadí tahů; hráči se zase mohou volně hýbat">Ukončit souboj</button>
+    <?php endif; ?>
   </div>
 
   <div class="popover" id="popover-pridat">

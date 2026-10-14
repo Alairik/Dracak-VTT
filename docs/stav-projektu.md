@@ -37,9 +37,9 @@ ním čeká, dokud se to neprovede ručně.
 **Ruční DDL blok je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný soubor, ve
 kterém jsou všechny dosud neprovedené DDL příkazy; uživatel ho dostává jako
 text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-14):
-nic nečeká.** Bloky pro `0065`–`0081` i `DROP TABLE` tří mrtvých tabulek z
-0008 jsou na produkci provedené (kontrola vyšla 0, 2, 1, 2) a `0082`
-(217 položek ceníku) proběhla sama přes `migrate.php` (deploy run 148 zelený).
+nic nečeká.** Bloky pro `0065`–`0081`, `DROP TABLE` tří mrtvých tabulek z
+0008 i `0084` (mapa) jsou na produkci provedené a `0082` (217 položek ceníku)
+a `0083` proběhly samy přes `migrate.php`.
 Soubor je prázdný, dokud nepřibude další CREATE/ALTER.
 
 Kód je napsaný tak, že funguje i před ručními kroky (chybějící sloupce
@@ -654,7 +654,8 @@ a mapa funguje jako dřív — ověřeno na kopii DB bez SQL).
   úchyt u vybraného tokenu, tlačítka v panelu, klávesy Q/E; šipka směru na okraji.
   Důvod: v rozšířeném soubojovém systému musí být každý tvor obrácen čelem k jedné
   ze šesti stran hexu (h1621/b10799). Hráč smí otáčet jen vlastní nezamčený token
-  a jen když je na tahu.
+  a jen když je na tahu (bez aktivního souboje, tj. bez hozené iniciativy na mapě,
+  smí hráči chodit i otáčet tokeny volně — rozhodnutí uživatele).
 - **Velikost** (½–4 sáhy), **barva** (11 barev), **zámek** polohy, **skrýt před
   hráči** (PJ), **přejmenování** (obecné tokeny a nestvůry), **obrázek** z
   knihovny světa (`svet_obrazky`, nahrání zmenšuje na 256 px, `hra/obrazek.php`
@@ -671,10 +672,9 @@ a mapa funguje jako dřív — ověřeno na kopii DB bez SQL).
 - **Ruční SQL (migrace 0084)**: sloupce `tokeny.smer, velikost_sahu, barva, zamceno,
   nazev, obrazek_id`, typ `obecny`, tabulky `svet_obrazky` a `mapa_kresby`,
   `svet_udalosti.typ` → VARCHAR(40) (další druhy událostí už DDL nevyžadují).
-  Soubor migrace `0084_mapa_tokeny_vzhled_obrazky_kresby.sql` se přidá do repa až
-  po potvrzení, že SQL proběhlo (jinak by `migrate.php` shodil deploy); ověřeno,
-  že pak `migrate.php` pod DML-only účtem projde (nový fallback pro
-  `MODIFY ... VARCHAR(n)`).
+  **Provedeno na produkci (2026-10-14, kontrola 6/1/1/2)**; soubor migrace
+  `0084_mapa_tokeny_vzhled_obrazky_kresby.sql` je v repu a `migrate.php` ho pod
+  DML-only účtem projde (nový fallback pro `MODIFY ... VARCHAR(n)`).
 
 **Hotovo — blok A, krok 3 (2026-10-14): výběr více tokenů, kontextové menu.**
 - Výběr: klik, Shift/Ctrl+klik (přidat/odebrat), **rámeček** (Shift+tažení, nebo
@@ -705,11 +705,13 @@ a mapa funguje jako dřív — ověřeno na kopii DB bez SQL).
   vzdálenost. Kruh, kužel a šipka při kreslení ukazují dosah stejným způsobem.
   Kruh/kužel je jen vizuální pomůcka — které hexy plošné kouzlo zasáhne, hra
   nepočítá.
+- **Ukončit souboj** (`hra/api/souboj_konec.php`, tlačítko v panelu pořadí tahů, jen
+  PJ): smaže `kolo_stav` a pořadí. Dřív souboj skončit nešel — po prvním hodu
+  iniciativy by hráči zůstali navždy vázaní na pořadí tahů.
 - Tokeny mají vrstvy nad kresbami a zdmi a pod mlhou (`z-index` 10–90).
 
-**Blok A je tím hotový v kódu.** Zbývá ručně spustit SQL z `docs/sql-k-rucnimu-spusteni.sql`
-(zapne vzhled tokenů, obrázky, kreslení, společný tah) a potom přidat soubor migrace
-0084 do repa.
+**Blok A je hotový a zapnutý na produkci** (ruční SQL 0084 proběhlo). Blok B
+(souboj s pravidly) je odložený na později, uživatel jde blok A testovat v ostré hře.
 
 **Stav mapy před změnou (audit `hra/mapa.php` 2026-10-14, historické):** funguje grid (čtverec/hex), zdi
 (blokují hráče), mlha války (per hráč), měřidlo, ping, piny s vnořenými mapami,

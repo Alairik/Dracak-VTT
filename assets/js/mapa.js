@@ -2412,6 +2412,14 @@ if (iniciativaHoditBtn) {
       .then(d => { if (d.error) { logLine('Chyba: ' + d.error); return; } obnovitStav(); });
   });
 }
+const souborjKonecBtn = document.getElementById('souborjKonecBtn');
+if (souborjKonecBtn) {
+  souborjKonecBtn.addEventListener('click', () => {
+    if (!confirm('Ukončit souboj? Pořadí tahů se smaže a hráči se zase mohou volně hýbat.')) return;
+    postJson('api/souboj_konec.php', {mapa_id: MAPA_ID})
+      .then(d => { if (d.error) { logLine('Chyba: ' + d.error); return; } obnovitStav(); });
+  });
+}
 const tbDalsiTah = document.getElementById('tb-dalsi-tah');
 if (tbDalsiTah) {
   tbDalsiTah.addEventListener('click', () => {
