@@ -47,21 +47,26 @@ postavený na příkladu v knize (h1626) a doplněný o obranu, zranění a výb
    zbraň −2, vícenásobné útoky, Rychlost, únava, naložení…) → výsledek → počet
    akcí (**HB, po třech:** 1–3 = 1, 4–6 = 2, 7–9 = 3, 10–12 = 4 …). Arpag 5, Bagrot 4,
    Roxan 2+1 = 3 → Arpag 2 akce, Bagrot 2 akce, Roxan 1 akce.
-3. **Kolo, tah po tahu** — panel pořadí zvýrazní, kdo je na tahu, a ukáže zbývající
-   akce a kolik jich smí v tomto tahu použít (nejvýš polovinu původních).
-   - Arpag: **Krok** o hex k Bagrotovi (volný sousední hex, otočka až 120°).
-   - Bagrot: **Pohyb** — 2 hexy k Roxan.
-   - Roxan: **Kouzlení** (okno kouzla: kouzlo, cíl, cena v magech, průběh 1/2,
-     tlačítko „přerušit“). Po první akci už Rychlost působí → Arpagovi se
-     zdvojnásobí zbývající akce.
-   - Arpag: **Krok a útok** na Bagrota → okno **Útok** (ÚČ rozepsané na části,
-     automatické opravy, hod 1k6+) → útok přeruší tah a otevře okno **Obrana**
-     Bagrotovi: „bránit se (stojí akci)“ / „nebránit se (−3)“ → okno **Výsledek**
-     (zásah ano/ne, zranění = rozdíl + útočnost, životy se odečtou, bojeschopnost).
-   - Arpag: druhá akce **Útok** — Bagrot už nemá akci → brání se jen brněním (−3).
-   - Bagrot: **Útok** na Roxan, která zrovna kouzlí poslední akci → útok na nehybného
-     (−5 místo obratnosti, −3, bez štítu); je-li zraněna, kouzlo už běží dál.
-   Kolo končí, až všichni vyčerpají akce.
+3. **Kolo ve dvou polovinách (HB)** — panel pořadí zvýrazní, kdo je na tahu, a ukáže
+   jeho akce (puntíky). V **1. polovině** (podle iniciativy od nejvyšší) odehraje každý
+   **větší půlku** svých akcí (u lichého počtu zaokrouhleno nahoru: 1 → 1, 2 → 1,
+   3 → 2, 4 → 2, 5 → 3), ve **2. polovině** (zase od nejvyšší iniciativy) zbytek.
+   - 1. polovina — Arpag (2 akce): **Krok** o hex k Bagrotovi (volný sousední hex,
+     otočka až 120°).
+   - Bagrot (2 akce): **Pohyb** — 2 hexy k Roxan.
+   - Roxan (1 akce): **Kouzlení** (okno kouzla: kouzlo, cíl, cena v magech, průběh
+     1/2, tlačítko „přerušit“). Kouzlo působí už po první akci → Arpagovi se
+     zdvojnásobí zbývající akce (z 1 na 2). Druhá akce kouzlení je až v příštím kole.
+   - 2. polovina — Arpag (2 akce): **Krok a útok** na Bagrota → okno **Útok** (ÚČ
+     rozepsané na části, automatické opravy, hod 1k6+) → útok přeruší tah a otevře
+     okno **Obrana** Bagrotovi: „bránit se (stojí akci)“ / „nebránit se (−3)“ →
+     okno **Výsledek** (zásah ano/ne, zranění = rozdíl + útočnost, životy se odečtou,
+     bojeschopnost). Pak druhá akce **Útok** — Bagrot už nemá akci → brání se jen
+     brněním (−3).
+   - Bagrot (1 akce zbývá, ale jednu spotřeboval na obranu → 0).
+   - Roxan: nemá akci. (Kdyby Bagrot zaútočil na Roxan, útočí na nehybného:
+     −5 místo obratnosti, −3, bez štítu; je-li zraněna, kouzlo už běží dál.)
+   Kolo končí po 2. polovině.
 4. **Konec kola** — odpočítají se trvání efektů (kolo seslání se nepočítá), číslo
    kola +1, znovu úmysly a iniciativa (Arpag s Rychlostí má +6 a 4 akce).
 5. **Konec souboje** — nestvůry mrtvé/vzdaly se/utekly (útěk → pronásledování),
@@ -86,14 +91,20 @@ a obrany s přerušením tahu, zranění a bojeschopnost přímo v boji, kouzlen
 akcích, střelba, útěk, finty, vícenásobné útoky nestvůr, ÚČ/OČ nestvůr jako čísla
 (v bestiáři je to volný text).
 
-Dnešní „Další na tahu“ předává tah po každé jedné akci; kniha dovoluje víc akcí
-v řadě (nejvýš polovinu původních) — u 2 akcí je to totéž, od 4 akcí ne.
+Dnešní „Další na tahu“ předává tah po každé jedné akci; podle domácího pravidla
+(dvě poloviny kola) má tvor v jednom tahu větší půlku akcí (1. polovina) nebo zbytek
+(2. polovina) — u 2 akcí je to totéž jako dnes, od 3 akcí ne.
 
 ## Rozhodnuto (uživatel, 2026-10-14)
 
-- **Tah po více akcích podle knihy**: v jednom tahu aspoň 1 a nejvýš polovina
-  akcí (h1623). **Rychlost uprostřed kola** → polovina se počítá z **nového**
-  (zdvojeného) počtu.
+- **Kolo se dělí na dvě poloviny (domácí pravidlo, HB, nahrazuje „aspoň jednu a
+  nejvýš polovinu akcí v tahu“ z knihy, h1623/b10819):** v 1. polovině každý podle
+  iniciativy (od nejvyšší) odehraje **větší půlku** svých akcí, ve 2. polovině (zase
+  od nejvyšší) zbytek. Počet akcí v tahu tedy vychází z aktuálního stavu: 1. polovina
+  = `zbývá − floor(celkem / 2)`, 2. polovina = vše, co zbývá. **Rychlost** (kniha:
+  zdvojí akce, které má tvor „v daném okamžiku k dispozici“, h1626) a **protoplazma**
+  (sníží je na polovinu dolů) se tak řeší sama: mění počet zbývajících akcí a
+  2. polovina se odehraje celá. Obrana mimo tah (h1623) stojí jednu akci ze zbývajících.
 - **Překvapení v rozšířeném systému = −6 k iniciativě** (řádek tabulky), ne
   „nemůže nic dělat“.
 - **Hody se nikdy nehází samy.** U každého hodu (1k6+, 1k10…) je tlačítko „Hodit“ →
@@ -103,8 +114,8 @@ v řadě (nejvýš polovinu původních) — u 2 akcí je to totéž, od 4 akcí
   opravy, zranění, životy, bojeschopnost (PJ může zranění jedním klikem opravit).
   Ověřeno: vendorovaná kostka (`dice-box` 1.1.4) neumí předepsat výsledek (`2d6@3,4`
   se ignoruje) — proto výsledek bere z kostek, ne ze serveru.
-- **Iniciativa nestvůr a postav ovládaných PJ je pro hráče skrytá**; hráč vidí
-  jen postavy, které ovládá.
+- **Iniciativa nestvůr a postav ovládaných PJ je pro hráče skrytá**; iniciativu
+  hráčských postav smějí vidět všichni hráči (rozhodnuto 2026-10-14).
 - **Nestvůry dostanou „malý deník“** (životy, ÚČ/OČ, odolnost, inteligence,
   charisma, pohyblivost, vytrvalost, výbava/kořist, schopnosti, kouzla), na který
   platí stejná pravidla jako na postavy (nosnost, únava, kouzla). Staty se
@@ -115,8 +126,7 @@ v řadě (nejvýš polovinu původních) — u 2 akcí je to totéž, od 4 akcí
 - **Zbytek návrhu (okna, pořadí událostí, zranění automaticky + oprava) schválen.**
 - **Zabrané hexy podle velikosti (úprava pro mapu):** A0, A, B = 1 hex; zvířecí C =
   2 hexy vedle sebe; D = 3 hexy u sebe; E = 5 hexů (2+3); F = 7 hexů (2+3+2).
-  Humanoidní C = 1 hex (potvrzeno).
-  *K potvrzení:* „F“ — v knize velikosti končí na E.
+  Humanoidní C = 1 hex, velikost F není (potvrzeno).
 
 ## Co se při kontrole ukázalo
 
@@ -127,19 +137,19 @@ v řadě (nejvýš polovinu původních) — u 2 akcí je to totéž, od 4 akcí
   Dva příklady v knize (iniciativa 3 → „všichni mají dvě akce“, h1623 i h1626) a
   „Arpagovi padne 7 (2 akce)“ (b10822) s HB tabulkou nesedí; ponechány podle knihy,
   zapsáno do `kontrolni-seznam-neuplnych-mist.md`.
-- **Smrt / vyřazení:** odstavec o prahu smrti postavy jsem v přepisu nenašel.
-  Stopy: mez vyřazení a bojeschopnost (h1610); příklad, kde nestvůra s 0 životy je
-  „na místě mrtvá“ (h1612); u berserka „0 a méně = padá k zemi, do 3 kol umírá“
-  (HB, h134); dovednost První pomoc „zastaví umírání při klesnutí životů pod 0“
-  (HB, h1806). Potřeba foto/odkaz na PPZ.
+- **Smrt / vyřazení (rozhodnuto 2026-10-14):** řeší se jen **mez vyřazení** (h1610,
+  v kódu `dracak_vtt_bojeschopnost()`; vyřazená = životy ≤ mez). Vyřazená postava
+  je **nehratelná** — nemá akce a nehýbe se, dokud jí heal v boji nevrátí životy nad
+  mez. Kdo není nad mezí na konci boje, umírá; to se řeší už mimo hru a rozhoduje
+  PJ. Žádné počítání kol do smrti, žádný práh smrti.
 
 ## Otevřené věci
 
-- Hexy: velikost F (viz výš); kotva víc-hexového tvora (který hex je
-  „přední“ pro útok na 3 hexy před sebou).
-- Co hráč vidí z pořadí: návrh = jen iniciativu vlastních postav a označení, kdo
-  je právě na tahu (bez čísel a pořadí ostatních).
-- Práh smrti postavy (viz výš).
+- Hexy: kotva víc-hexového tvora (který hex je „přední“ pro útok na 3 hexy před
+  sebou). Velikost F neexistuje (potvrzeno), největší je E = 5 hexů.
+- Co hráč vidí z pořadí (rozhodnuto): iniciativu **hráčských** postav vidí všichni
+  hráči (jejich vlastní i ostatních), iniciativu nestvůr a PJ-ovládaných postav ne;
+  nestvůra na tahu je jen zvýrazněná na mapě.
 
 ## Navržené pořadí stavby
 

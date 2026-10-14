@@ -123,6 +123,11 @@ MariaDB.** Postup, který v session fungoval:
   rozhodnutí 2026-10-14) — kniha PPZ měla 1–6 = 2, 7–12 = 4; tabulka v
   `content/pravidla-hrac.html` (h1623) je přepsaná a označená jako HB, příklady
   v knize (iniciativa 3 → dvě akce) HB neodpovídají a jsou v seznamu ke korektuře.
+  **Kolo se dělí na dvě poloviny (HB, b10819):** 1. polovina = větší půlka akcí
+  každého tvora podle iniciativy, 2. polovina = zbytek (Rychlost/protoplazma mění
+  počet zbývajících akcí). Smrt/vyřazení: jen mez vyřazení — vyřazená postava je
+  nehratelná, o smrti po boji rozhoduje PJ. Velikost F neexistuje. Detaily:
+  `docs/navrh-souboje-v1.md`.
 - Mlha války — per hráč/mapa, respektuje grid buňky + LoS, PJ má
   obdélníkový výběr, hromadné odhalení/zatažení, náhled "jak to vidí
   hráč" (průsvitný jen v PJ náhledu, hráčova vlastní mlha je neprůhledná).

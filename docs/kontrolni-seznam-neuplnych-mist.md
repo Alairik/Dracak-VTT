@@ -376,5 +376,6 @@ knihou a opraví najednou. Pravidlo je v `CLAUDE.md`.
 **Souboj (zjištěno při návrhu souboje 2026-10-14, viz `docs/navrh-souboje-v1.md`)**
 - [ ] Tabulka iniciativy a akcí (h1623, b10810–b10815): **HB (po třech: 1–3 = 1 akce, 4–6 = 2, 7–9 = 3, 10–12 = 4 …) nahradila PPZ (1–6 = 2, 7–12 = 4 …)**, rozhodnutí uživatele 2026-10-14. Při korektuře jen ověřit, že HB tabulka sedí s tím, jak se hraje.
 - [ ] Příklady v h1623 (b10822: iniciativy 3, 5, 2 → „všichni mají dvě akce“; „Arpagovi padne 7 (2 akce)“) a h1626 (iniciativa 3 → dvě akce) odpovídají tabulce PPZ, ne HB (HB: 3 → 1 akce, 5 → 2, 2 → 1, 7 → 3). Ponecháno podle knihy; při korektuře přepsat čísla v příkladech, nebo označit jako příklady PPZ.
-- [ ] Práh smrti a vyřazení postavy: samostatný odstavec v přepisu PPZ chybí; dohledat (foto/odkaz na stranu).
+- [ ] Kolo ve dvou polovinách (HB, h1623, b10819 přepsáno; nahradilo „aspoň jedna a nejvýš polovina akcí v tahu“). Příklad b10820 (Arpag se 4 akcemi: „útok — čekání — krok a útok — útok (4 tahy)“, „3 tahy“, „krok, krok a útok, útok (2 tahy)“) HB odpovídá jen poslední variantou (2 + 2); příklad ponechán podle knihy, při korektuře přepsat.
+- [x] Práh smrti a vyřazení postavy: rozhodnuto 2026-10-14 — řeší se jen mez vyřazení (h1610), vyřazená postava je nehratelná, osud po boji rozhoduje PJ; samostatný odstavec o smrti se nehledá.
 - [ ] PJ h2341: „velikost A = 1 hex, B = 2 hexy, C = 3 hexy“ nesedí s h1621 ani s domácím pravidlem mapy (A0/A/B = 1 hex, zvířecí C = 2, D = 3, E = 5, F = 7) — text vypadá poškozený.
