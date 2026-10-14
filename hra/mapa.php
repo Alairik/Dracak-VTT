@@ -142,6 +142,7 @@ $iniciativaBonusy = dracak_db()->query('SELECT id, popis, bonus FROM iniciativa_
       <img id="mapImg" src="mapa_obrazek.php?id=<?= $mapaId ?>" draggable="false" style="display:block;max-width:none;-webkit-user-drag:none;user-select:none;">
       <svg id="gridSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:0;"></svg>
       <svg id="zdiSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:5;"></svg>
+      <svg id="kresbySvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:8;"></svg>
       <svg id="rulerSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:140;"></svg>
       <canvas id="mlhaCanvas" style="position:absolute;top:0;left:0;pointer-events:none;z-index:100;"></canvas>
       <div id="pinIconTemplates" style="display:none;">
@@ -173,6 +174,7 @@ $iniciativaBonusy = dracak_db()->query('SELECT id, popis, bonus FROM iniciativa_
     <button class="tbtn" type="button" id="tb-vyber" title="Výběr rámečkem — táhni přes tokeny, klepnutím přidáš další (jde i Shiftem)"><?php dracak_icon('mouse-pointer-2'); ?></button>
     <button class="tbtn" type="button" id="tb-ruka" title="Posouvat mapu (ruka) — jde i mezerníkem, pravým tlačítkem nebo dvěma prsty"><?php dracak_icon('hand'); ?></button>
     <button class="tbtn" type="button" id="tb-ruler" title="Měřit vzdálenost"><?php dracak_icon('ruler'); ?></button>
+    <button class="tbtn" type="button" id="tb-kresleni" title="Kreslit na mapu (čára, šipka, obrazec, text)" style="display:none;"><?php dracak_icon('pen-line'); ?></button>
     <button class="tbtn" type="button" id="tb-ping" title="Ukázat na mapu ostatním"><?php dracak_icon('crosshair'); ?></button>
     <?php if ($mapaStrom): ?>
       <button class="tbtn" type="button" id="tb-strom" title="Mapa míst"><?php dracak_icon('list-tree'); ?></button>
@@ -243,6 +245,27 @@ $iniciativaBonusy = dracak_db()->query('SELECT id, popis, bonus FROM iniciativa_
       <input type="checkbox" id="polozitVic"> Pokládat víc kusů za sebou
     </label>
     <p class="note">Vyber a klepni na mapu, kam to položit.</p>
+  </div>
+
+  <div class="popover" id="popover-kresleni">
+    <button class="close-x" data-close-popover><?php dracak_icon('x', 14); ?></button>
+    <h3>Kreslení</h3>
+    <label>Tvar</label>
+    <div class="vz-seg" id="kresbaTvary"></div>
+    <label>Barva</label>
+    <div class="vz-barvy" id="kresbaBarvy"></div>
+    <label>Tloušťka</label>
+    <div class="vz-seg" id="kresbaSirky"></div>
+    <?php if ($isPjOrAdmin): ?>
+      <label style="display:flex;align-items:center;gap:6px;font-weight:400;">
+        <input type="checkbox" id="kresbaSkryta"> Jen pro PJ (hráči ji neuvidí)
+      </label>
+    <?php endif; ?>
+    <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
+      <button class="btn btn-ghost" type="button" id="kresbaSmazatMoje" style="flex:1;font-size:12px;">Smazat moje kresby</button>
+      <?php if ($isPjOrAdmin): ?><button class="btn btn-ghost" type="button" id="kresbaSmazatVse" style="flex:1;font-size:12px;">Smazat všechny</button><?php endif; ?>
+    </div>
+    <p class="note">Táhni po mapě. Kruh a kužel ukážou dosah v sázích (na hexech v hexech). Jednotlivou kresbu smažeš pravým tlačítkem (na dotyku dlouhým stisknutím).</p>
   </div>
 
   <div class="popover" id="popover-kostky">

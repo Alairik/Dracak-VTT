@@ -10,7 +10,7 @@ body { -webkit-tap-highlight-color:transparent; }
             -webkit-touch-callout:none; cursor:default; }
 #viewport[data-nastroj="ruka"], #viewport.pan-ready { cursor:grab; }
 #viewport[data-nastroj="ruler"], #viewport[data-nastroj="ping"], #viewport[data-nastroj="zed"],
-#viewport[data-nastroj="pin"], #viewport[data-nastroj="mlha"] { cursor:crosshair; }
+#viewport[data-nastroj="pin"], #viewport[data-nastroj="mlha"], #viewport[data-nastroj="kresleni"] { cursor:crosshair; }
 #mapWrap { position:absolute; left:0; top:0; transform-origin:0 0; --z:1; }
 #gridSvg path { vector-effect:non-scaling-stroke; }
 
@@ -143,6 +143,7 @@ body { -webkit-tap-highlight-color:transparent; }
 .vz-barva.vychozi { background:repeating-linear-gradient(45deg,#555 0 4px,#888 4px 8px); }
 .vz-seg { display:flex; gap:4px; flex-wrap:wrap; }
 .vz-seg .btn { padding:4px 10px; min-width:34px; }
+.popover .vz-seg .btn { color:#eee; border-color:rgba(255,255,255,.22); }
 .vz-seg .btn.aktivni { background:var(--color-accent-600, #7a3b2e); color:#fff; border-color:transparent; }
 .vz-check { display:flex; align-items:center; gap:6px; font-weight:400; margin:6px 0; font-size:12.5px; }
 .vz-nahled { width:34px; height:34px; border-radius:50%; background:#333 center/cover no-repeat; border:2px solid rgba(255,255,255,.3); flex:none; }

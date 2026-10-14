@@ -33,7 +33,11 @@ unset($u);
 // smí dojít jen PJ/adminovi, jinak by unikla hráčům obcházející filtr,
 // který jim mapa.php jinak aplikuje na počáteční SELECT.
 if (!$isPjOrAdmin) {
-    $udalosti = array_values(array_filter($udalosti, function (array $u): bool {
+    $udalosti = array_values(array_filter($udalosti, function (array $u) use ($user): bool {
+        if ($u['typ'] === 'kresba_pridana') {
+            // Skrytá kresba (jen pro PJ) neputuje hráčům; autor ji vidí sám.
+            return !empty($u['payload']['viditelne_hracum']) || (int)($u['payload']['ucet_id'] ?? 0) === (int)$user['id'];
+        }
         if ($u['typ'] !== 'zed_pridana') {
             return true;
         }

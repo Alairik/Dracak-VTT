@@ -692,7 +692,24 @@ a mapa funguje jako dřív — ověřeno na kopii DB bez SQL).
 - Před ručním SQL zůstávají k dispozici jen kopírování a mazání; společný tah se
   posílá po jednom tokenu.
 
-**Dál (zbývá z bloku A):** kreslení na mapu, měřidlo v hexech a šablony kouzel.
+**Hotovo — blok A, krok 4 (2026-10-14): kreslení a měřidlo v hexech.**
+- **Kreslení** (nástroj s tužkou; zapne se po ručním SQL — tabulka `mapa_kresby`):
+  čára, šipka, obdélník, kruh, kužel (60°), text; barva, tloušťka, „jen pro PJ“
+  (hráči skrytou kresbu nedostanou ani přes polling). Ostatním se kresba objeví
+  přes polling (`kresba_pridana`/`kresba_smazana`); smazat jde jednotlivě pravým
+  tlačítkem / dlouhým stisknutím, „moje“ nebo (PJ) všechny.
+  `includes/vtt_kresby.php`, `hra/api/kresba_pridat.php`, `kresba_smazat.php`;
+  kresby jsou i ve stavu mapy (`mapa_stav.php`).
+- **Měřidlo na hexech** počítá počet hexů od středu buňky ke středu buňky (jeden hex =
+  jeden sáh, h1621) a zvýrazní obě buňky; na čtverci a bez gridu zůstává přímá
+  vzdálenost. Kruh, kužel a šipka při kreslení ukazují dosah stejným způsobem.
+  Kruh/kužel je jen vizuální pomůcka — které hexy plošné kouzlo zasáhne, hra
+  nepočítá.
+- Tokeny mají vrstvy nad kresbami a zdmi a pod mlhou (`z-index` 10–90).
+
+**Blok A je tím hotový v kódu.** Zbývá ručně spustit SQL z `docs/sql-k-rucnimu-spusteni.sql`
+(zapne vzhled tokenů, obrázky, kreslení, společný tah) a potom přidat soubor migrace
+0084 do repa.
 
 **Stav mapy před změnou (audit `hra/mapa.php` 2026-10-14, historické):** funguje grid (čtverec/hex), zdi
 (blokují hráče), mlha války (per hráč), měřidlo, ping, piny s vnořenými mapami,
@@ -730,9 +747,8 @@ PJ přepíná aktivní mapu. **Chybí / drhne:**
 4. Obecné tokeny (NPC bez statů, předmět, překážka, značka) [M]
 5. ✔ Výběr více tokenů, hromadný pohyb, zamknout, vrstvy, duplikovat, Delete,
    kontextové menu, klávesové zkratky [M]
-6. Kreslení na mapu (čára, šipka, tvar, text; sdílené/jen PJ) [M]
-7. Měřidlo ve hře-jednotkách (body pohybu / metry) a šablony plošných kouzel
-   (kruh, kužel) [S–M]
+6. ✔ Kreslení na mapu (čára, šipka, tvar, text; sdílené/jen PJ) [M]
+7. ✔ Měřidlo v hexech/sázích a šablony plošných kouzel (kruh, kužel) [S–M]
 8. ✔ (v ručním SQL 0084) Jednorázově změnit `svet_udalosti.typ` ENUM → VARCHAR [S]
 
 *B. Souboj s pravidly (tím se Owlbearu vyrovná i předčí)*

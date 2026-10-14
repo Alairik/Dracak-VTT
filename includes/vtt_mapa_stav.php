@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/vtt.php';
 require_once __DIR__ . '/vtt_iniciativa.php';
+require_once __DIR__ . '/vtt_kresby.php';
 
 // Stav ručně spouštěného SQL (migrace 0084) — jedna sada dotazů na
 // information_schema za požadavek. Mapa je napsaná tak, aby fungovala i
@@ -246,6 +247,7 @@ function dracak_vtt_mapa_stav(PDO $pdo, array $user, array $mapa, bool $jePj): a
         'tokeny' => $tokeny,
         'kolo' => $kolo,
         'iniciativa' => $iniciativa,
+        'kresby' => dracak_vtt_kresby_pro_mapu($pdo, $mapaId, (int)$user['id'], $jePj),
         'volne_postavy' => array_map(fn($p) => ['id' => (int)$p['id'], 'nazev' => (string)$p['nazev']], $volnePostavy),
     ];
 }

@@ -621,6 +621,11 @@ const toolButtons = {
   pin: document.getElementById('tb-pin'),
 };
 function setTool(tool) {
+  if (currentTool === 'kresleni' && tool !== 'kresleni') {
+    const pk = document.getElementById('popover-kresleni');
+    if (pk) pk.classList.remove('open');
+    if (toolButtons.kresleni) toolButtons.kresleni.classList.remove('active');
+  }
   currentTool = tool;
   viewport.dataset.nastroj = tool; // CSS podle toho mění kurzor
   for (const [t, btn] of Object.entries(toolButtons)) {
@@ -857,23 +862,73 @@ function mlhaNakresliBod(p) {
   postJson('api/mlha_uprava.php', {mapa_id: MAPA_ID, ucet_id: mlhaNahledUcetId, x: stred.x, y: stred.y, odhalit: mlhaKreslimOdhalit})
     .then(d => { if (d.error) logLine('Chyba: ' + d.error); });
 }
+// --- Hexy: nejbližší buňka k bodu a vzdálenost v hexech ---
+// Rozložení "odd-r" (liché řady posunuté doprava o půl buňky), stejné jako
+// renderGrid()/gridCellCenter(). Vzdálenost = počet kroků mezi sousedními hexy
+// (jeden hex = jeden sáh, h1621).
+function hexBunka(px, py) {
+  const size = GRID_PX, colStep = Math.sqrt(3) * size, rowStep = 1.5 * size;
+  const offX = ((GRID_OFFSET_X % colStep) + colStep) % colStep;
+  const offY = ((GRID_OFFSET_Y % rowStep) + rowStep) % rowStep;
+  const rowApprox = Math.round((py - offY) / rowStep);
+  let best = null, bd = Infinity;
+  for (let row = rowApprox - 1; row <= rowApprox + 1; row++) {
+    const rowShift = (row & 1) ? colStep / 2 : 0;
+    const colApprox = Math.round((px - offX - rowShift) / colStep);
+    for (let col = colApprox - 1; col <= colApprox + 1; col++) {
+      const cx = offX + col * colStep + rowShift, cy = offY + row * rowStep;
+      const d = Math.hypot(cx - px, cy - py);
+      if (d < bd) { bd = d; best = {row, col, x: cx, y: cy}; }
+    }
+  }
+  return best;
+}
+function hexVzdalenost(a, b) {
+  const kostka = (c) => { const x = c.col - (c.row - (c.row & 1)) / 2; return {x, z: c.row, y: -x - c.row}; };
+  const A = kostka(a), B = kostka(b);
+  return Math.max(Math.abs(A.x - B.x), Math.abs(A.y - B.y), Math.abs(A.z - B.z));
+}
+function hexObrys(cx, cy, size) {
+  let pts = '';
+  for (let i = 0; i < 6; i++) {
+    const ang = Math.PI / 180 * (60 * i - 30);
+    pts += (i ? ' ' : '') + (cx + size * Math.cos(ang)).toFixed(1) + ',' + (cy + size * Math.sin(ang)).toFixed(1);
+  }
+  return pts;
+}
+function sahyText(n) {
+  if (Number.isInteger(n)) return n === 1 ? '1 sáh' : (n >= 2 && n <= 4 ? n + ' sáhy' : n + ' sáhů');
+  return n.toFixed(1).replace('.', ',') + ' sáhu';
+}
+// Vzdálenost dvou bodů mapy ve hře-jednotkách: na hexech počet hexů mezi
+// středy buněk, na čtverci/bez gridu přímá vzdálenost.
+function popisVzdalenosti(a, b) {
+  if (GRID_PX > 0 && GRID_TYPE === 'hex') return sahyText(hexVzdalenost(hexBunka(a.x, a.y), hexBunka(b.x, b.y)));
+  const pxSah = pxNaSah();
+  const dist = Math.hypot(b.x - a.x, b.y - a.y);
+  return pxSah > 0 ? sahyText(Math.round(dist / pxSah * 10) / 10) : Math.round(dist) + ' px';
+}
 function drawRuler(a, b) {
   if (!rulerSvg) return;
   clearTimeout(rulerClearTimer);
-  const dx = b.x - a.x, dy = b.y - a.y;
-  const distPx = Math.sqrt(dx * dx + dy * dy);
-  // 1 sáh = pxNaSah() (čtverec: 1 buňka; hex: střed-střed sousedních
-  // hexů, viz h1621 "jeden hex vždy odpovídá jednomu sáhu") — bez gridu
-  // nemáme měřítko, takže zůstává nepřevedené px jako jediná poctivá možnost.
-  const pxSah = pxNaSah();
-  const label = pxSah > 0 ? (distPx / pxSah).toFixed(1) + ' sáhů' : Math.round(distPx) + ' px';
+  const hex = GRID_PX > 0 && GRID_TYPE === 'hex';
+  // Na hexech se měří od středu do středu buňky (to je pohyb po hexech).
+  let ca = a, cb = b, obrysy = '';
+  if (hex) {
+    const ha = hexBunka(a.x, a.y), hb = hexBunka(b.x, b.y);
+    ca = {x: ha.x, y: ha.y};
+    cb = {x: hb.x, y: hb.y};
+    obrysy = '<polygon points="' + hexObrys(ha.x, ha.y, GRID_PX) + '" fill="rgba(255,179,71,.15)" stroke="#ffb347" stroke-width="1.5" vector-effect="non-scaling-stroke"/>'
+      + '<polygon points="' + hexObrys(hb.x, hb.y, GRID_PX) + '" fill="rgba(255,179,71,.25)" stroke="#ffb347" stroke-width="1.5" vector-effect="non-scaling-stroke"/>';
+  }
+  const label = popisVzdalenosti(ca, cb);
   // Písmo a body mají stejnou velikost na obrazovce bez ohledu na zoom.
   const k = 1 / kamera.stav.z;
-  rulerSvg.innerHTML =
-    '<line x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '" stroke="#ffb347" stroke-width="2" stroke-dasharray="6 4" vector-effect="non-scaling-stroke"/>' +
-    '<circle cx="' + a.x + '" cy="' + a.y + '" r="' + (4 * k) + '" fill="#ffb347"/>' +
-    '<circle cx="' + b.x + '" cy="' + b.y + '" r="' + (4 * k) + '" fill="#ffb347"/>' +
-    '<text x="' + (a.x + b.x) / 2 + '" y="' + ((a.y + b.y) / 2 - 8 * k) + '" fill="#fff" font-size="' + (13 * k) + '" ' +
+  rulerSvg.innerHTML = obrysy +
+    '<line x1="' + ca.x + '" y1="' + ca.y + '" x2="' + cb.x + '" y2="' + cb.y + '" stroke="#ffb347" stroke-width="2" stroke-dasharray="6 4" vector-effect="non-scaling-stroke"/>' +
+    '<circle cx="' + ca.x + '" cy="' + ca.y + '" r="' + (4 * k) + '" fill="#ffb347"/>' +
+    '<circle cx="' + cb.x + '" cy="' + cb.y + '" r="' + (4 * k) + '" fill="#ffb347"/>' +
+    '<text x="' + (ca.x + cb.x) / 2 + '" y="' + ((ca.y + cb.y) / 2 - 10 * k) + '" fill="#fff" font-size="' + (14 * k) + '" ' +
     'text-anchor="middle" paint-order="stroke" stroke="#000" stroke-width="' + (3 * k) + '">' + label + '</text>';
 }
 function clearRulerSoon() {
@@ -917,6 +972,7 @@ let tokeny = CFG.stav.tokeny.slice();
 let koloStav = CFG.stav.kolo;
 let iniciativa = CFG.stav.iniciativa;
 let volnePostavy = CFG.stav.volne_postavy;
+let kresby = CFG.stav.kresby || [];
 const tokenEl = new Map();
 const spravovatPanel = document.getElementById('panel-spravovat');
 let spravovanyToken = null;
@@ -967,7 +1023,7 @@ function nakreslitToken(t) {
     el.style.left = t.x + 'px';
     el.style.top = t.y + 'px';
   }
-  el.style.zIndex = String(t.z);
+  el.style.zIndex = String(20 + Math.max(-10, Math.min(70, t.z))); // pod mlhou (100), nad kresbami (8) a zdmi (5)
   el.style.setProperty('--d', d.toFixed(1) + 'px');
   const mrtvy = t.hp !== null && t.hp <= 0;
   el.classList.toggle('dead', mrtvy);
@@ -1294,6 +1350,7 @@ function aplikujStav(s) {
   koloStav = s.kolo;
   iniciativa = s.iniciativa;
   volnePostavy = s.volne_postavy;
+  if (Array.isArray(s.kresby)) { kresby = s.kresby; nakreslitKresby(); }
   if (typeof ocistitVyber === 'function') ocistitVyber();
   nakreslitTokeny();
   nakreslitIniciativu();
@@ -1433,6 +1490,12 @@ function zacitAkci(e, pinEl) {
     akce.kontext = e.button === 2;
     return;
   }
+  if (currentTool === 'kresleni') {
+    akce.typ = 'kresleni';
+    akce.body = [kresbaBodSnap(m, kresbaNastaveni.tvar)];
+    akce.prvni = m;
+    return;
+  }
   if (currentTool === 'ruler') {
     akce.typ = 'ruler';
     rulerStart = m;
@@ -1520,7 +1583,7 @@ function zrusitAkci() {
       drzeneTokeny.delete(m.id);
     });
   }
-  if (a.typ === 'ruler') { rulerStart = null; if (rulerSvg) rulerSvg.innerHTML = ''; }
+  if (a.typ === 'ruler' || a.typ === 'kresleni') { rulerStart = null; if (rulerSvg) rulerSvg.innerHTML = ''; }
   if (a.typ === 'mlha') { mlhaKreslim = false; mlhaObdelnikStart = null; if (rulerSvg) rulerSvg.innerHTML = ''; }
 }
 
@@ -1588,6 +1651,9 @@ viewport.addEventListener('pointermove', (e) => {
       aktualizujRotacniUchyt();
       break;
     }
+    case 'kresleni':
+      if (akce.posunuto || kresbaNastaveni.tvar === 'cara') nahledKresby(akce, m);
+      break;
     case 'ruler':
       if (rulerStart) drawRuler(rulerStart, m);
       break;
@@ -1784,6 +1850,10 @@ function dokoncitAkci(a, e) {
         document.getElementById('pinUpravitX').value = parseInt(a.pin.style.left, 10);
         document.getElementById('pinUpravitY').value = parseInt(a.pin.style.top, 10);
       }
+      break;
+    case 'kresleni':
+      if (a.posunuto || kresbaNastaveni.tvar === 'text') dokoncitKresbu(a, bodMapy(e));
+      else if (rulerSvg) rulerSvg.innerHTML = '';
       break;
     case 'ruler':
       rulerStart = null;
@@ -2396,6 +2466,20 @@ function applyEvent(u) {
       if (!drzeneTokeny.has(t.id)) nakreslitToken(t);
     }
     if (naTeteMape) obnovitMlhuPoPollu = true;
+  } else if (u.typ === 'kresba_pridana') {
+    if (u.mapa_id == MAPA_ID && !kresby.some((k) => k.id === u.payload.id)) {
+      kresby.push({
+        id: u.payload.id, typ: u.payload.typ, b: u.payload.b, t: u.payload.t, barva: u.payload.barva, sirka: u.payload.sirka,
+        viditelne_hracum: u.payload.viditelne_hracum, moje: false, smi_smazat: IS_PJ_OR_ADMIN,
+      });
+      nakreslitKresby();
+    }
+  } else if (u.typ === 'kresba_smazana') {
+    if (u.mapa_id == MAPA_ID) {
+      const ids = new Set(u.payload.ids || []);
+      kresby = kresby.filter((k) => !ids.has(k.id));
+      nakreslitKresby();
+    }
   } else if (u.typ === 'tokeny_presun') {
     (u.payload.presuny || []).forEach((pr) => {
       const t = tokenData(pr.token_id);
@@ -2582,6 +2666,8 @@ function polozkyKontextu(t, cile) {
     if (pj && cile.some((c) => c.typ_entity !== 'postava')) polozky.push(['Kopírovat' + pocet + '  (Ctrl+D)', () => kopirovatTokeny(cile)]);
     if (pj) polozky.push(['Smazat' + pocet + '  (Delete)', () => smazatTokeny(cile), true]);
   } else {
+    const kr = FUNKCE.kresby ? kresbaPodBodem(kontextBod.x, kontextBod.y) : null;
+    if (kr && kr.smi_smazat) polozky.push(['Smazat kresbu', () => smazatKresby({id: kr.id}), true]);
     polozky.push(['Ping sem', () => { const m = kontextBod; if (m) klikPing(m); }]);
     if (tokeny.length) polozky.push(['Vybrat všechny tokeny  (Ctrl+A)', () => nastavVyber(tokeny.map((x) => x.id))]);
     if (vybrane.size) polozky.push(['Zrušit výběr  (Esc)', () => zrusitVyber()]);
@@ -2653,6 +2739,218 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
+// --- Kreslení na mapu (čára, šipka, obdélník, kruh, kužel, text) ---
+// Kresby se ukládají (tabulka mapa_kresby) a ostatním se objeví přes polling.
+// Vykreslují se do #kresbySvg pod tokeny; rozpracovaná kresba v #rulerSvg.
+const kresbySvg = document.getElementById('kresbySvg');
+const TVARY_KRESBY = [['cara', 'Čára'], ['sipka', 'Šipka'], ['obdelnik', 'Obdélník'], ['kruh', 'Kruh'], ['kuzel', 'Kužel'], ['text', 'Text']];
+const SIRKY_KRESBY = [[3, 'Tenká'], [6, 'Střední'], [12, 'Tlustá']];
+const BARVY_KRESBY = ['#ffd166', '#ef476f', '#06d6a0', '#118ab2', '#ffffff', '#111111', '#b5179e', '#ff9f1c'];
+const kresbaNastaveni = {tvar: 'cara', barva: '#ffd166', sirka: 6};
+
+function escAttr(t) { return esc(t); }
+// SVG jedné kresby; $nahled = rozpracovaná (průhlednější, s popisem rozměru).
+function svgKresby(k, nahled) {
+  const b = k.b, w = k.sirka, c = k.barva;
+  const skryta = !k.viditelne_hracum;
+  const atr = 'stroke="' + c + '" stroke-width="' + w + '" stroke-linecap="round" stroke-linejoin="round" fill="none"'
+    + (skryta || nahled ? ' opacity="0.7"' : '') + (skryta ? ' stroke-dasharray="' + (w * 2) + ' ' + (w * 1.5) + '"' : '');
+  const vypln = 'fill="' + c + '" fill-opacity="0.14"';
+  const bod = (p) => p[0] + ',' + p[1];
+  switch (k.typ) {
+    case 'cara':
+      return '<polyline points="' + b.map(bod).join(' ') + '" ' + atr + '/>';
+    case 'sipka': {
+      if (b.length < 2) return '';
+      const a = Math.atan2(b[1][1] - b[0][1], b[1][0] - b[0][0]);
+      const d = Math.max(14, w * 4);
+      const p1 = [b[1][0] - d * Math.cos(a - 0.45), b[1][1] - d * Math.sin(a - 0.45)];
+      const p2 = [b[1][0] - d * Math.cos(a + 0.45), b[1][1] - d * Math.sin(a + 0.45)];
+      return '<line x1="' + b[0][0] + '" y1="' + b[0][1] + '" x2="' + b[1][0] + '" y2="' + b[1][1] + '" ' + atr + '/>'
+        + '<polyline points="' + bod(p1) + ' ' + bod(b[1]) + ' ' + bod(p2) + '" ' + atr + '/>';
+    }
+    case 'obdelnik': {
+      if (b.length < 2) return '';
+      const x = Math.min(b[0][0], b[1][0]), y = Math.min(b[0][1], b[1][1]);
+      return '<rect x="' + x + '" y="' + y + '" width="' + Math.abs(b[1][0] - b[0][0]) + '" height="' + Math.abs(b[1][1] - b[0][1]) + '" ' + atr.replace('fill="none"', vypln) + '/>';
+    }
+    case 'kruh': {
+      if (b.length < 2) return '';
+      const r = Math.hypot(b[1][0] - b[0][0], b[1][1] - b[0][1]);
+      return '<circle cx="' + b[0][0] + '" cy="' + b[0][1] + '" r="' + r + '" ' + atr.replace('fill="none"', 'fill="' + c + '" fill-opacity="0.18"') + '/>';
+    }
+    case 'kuzel': {
+      if (b.length < 2) return '';
+      const L = Math.hypot(b[1][0] - b[0][0], b[1][1] - b[0][1]);
+      const a = Math.atan2(b[1][1] - b[0][1], b[1][0] - b[0][0]);
+      const pol = Math.PI / 6; // kužel o rozevření 60°
+      const e1 = [b[0][0] + L * Math.cos(a - pol), b[0][1] + L * Math.sin(a - pol)];
+      const e2 = [b[0][0] + L * Math.cos(a + pol), b[0][1] + L * Math.sin(a + pol)];
+      return '<path d="M' + bod(b[0]) + ' L' + bod(e1) + ' A' + L + ' ' + L + ' 0 0 1 ' + bod(e2) + ' Z" ' + atr.replace('fill="none"', 'fill="' + c + '" fill-opacity="0.2"') + '/>';
+    }
+    case 'text': {
+      const velikost = 12 + w * 3;
+      return '<text x="' + b[0][0] + '" y="' + b[0][1] + '" font-size="' + velikost + '" font-weight="600" fill="' + c + '" stroke="#000" stroke-width="' + (velikost / 9)
+        + '" paint-order="stroke" stroke-linejoin="round"' + (skryta ? ' opacity="0.7"' : '') + '>' + esc(k.t || '') + '</text>';
+    }
+    default:
+      return '';
+  }
+}
+function nakreslitKresby() {
+  if (!kresbySvg) return;
+  const w = mapImgEl.naturalWidth || mapWrap.clientWidth, h = mapImgEl.naturalHeight || mapWrap.clientHeight;
+  if (w) { kresbySvg.setAttribute('width', w); kresbySvg.setAttribute('height', h); }
+  kresbySvg.innerHTML = kresby.map((k) => '<g data-id="' + k.id + '">' + svgKresby(k) + '</g>').join('');
+}
+
+// Vzdálenost bodu od kresby (pro výběr pravým tlačítkem).
+function kresbaPodBodem(x, y) {
+  const tol = 8 / kamera.stav.z;
+  for (let i = kresby.length - 1; i >= 0; i--) {
+    const k = kresby[i], b = k.b;
+    const prah = Math.max(k.sirka / 2 + 2, tol);
+    let zasah = false;
+    if (k.typ === 'cara') {
+      for (let j = 0; j < b.length - 1 && !zasah; j++) zasah = vzdalenostKUsecce(x, y, b[j][0], b[j][1], b[j + 1][0], b[j + 1][1]) <= prah;
+    } else if (k.typ === 'sipka') {
+      zasah = vzdalenostKUsecce(x, y, b[0][0], b[0][1], b[1][0], b[1][1]) <= Math.max(prah, 10 / kamera.stav.z);
+    } else if (k.typ === 'obdelnik') {
+      zasah = x >= Math.min(b[0][0], b[1][0]) - tol && x <= Math.max(b[0][0], b[1][0]) + tol && y >= Math.min(b[0][1], b[1][1]) - tol && y <= Math.max(b[0][1], b[1][1]) + tol;
+    } else if (k.typ === 'kruh') {
+      zasah = Math.hypot(x - b[0][0], y - b[0][1]) <= Math.hypot(b[1][0] - b[0][0], b[1][1] - b[0][1]) + tol;
+    } else if (k.typ === 'kuzel') {
+      const L = Math.hypot(b[1][0] - b[0][0], b[1][1] - b[0][1]);
+      const vzd = Math.hypot(x - b[0][0], y - b[0][1]);
+      let rozdil = Math.abs(Math.atan2(y - b[0][1], x - b[0][0]) - Math.atan2(b[1][1] - b[0][1], b[1][0] - b[0][0]));
+      if (rozdil > Math.PI) rozdil = 2 * Math.PI - rozdil;
+      zasah = vzd <= L + tol && (rozdil <= Math.PI / 6 || vzd < tol);
+    } else if (k.typ === 'text') {
+      const velikost = 12 + k.sirka * 3;
+      const delka = (k.t || '').length * velikost * 0.6;
+      zasah = x >= b[0][0] - tol && x <= b[0][0] + delka + tol && y >= b[0][1] - velikost - tol && y <= b[0][1] + tol;
+    }
+    if (zasah) return k;
+  }
+  return null;
+}
+
+// Zjednodušení čáry (Douglas–Peucker), ať se neposílají stovky bodů.
+function zjednoduseniCary(body, eps) {
+  if (body.length < 3) return body;
+  const rec = (a, z) => {
+    let dmax = 0, idx = -1;
+    for (let i = a + 1; i < z; i++) {
+      const d = vzdalenostKUsecce(body[i][0], body[i][1], body[a][0], body[a][1], body[z][0], body[z][1]);
+      if (d > dmax) { dmax = d; idx = i; }
+    }
+    if (dmax > eps && idx > 0) return rec(a, idx).slice(0, -1).concat(rec(idx, z));
+    return [body[a], body[z]];
+  };
+  return rec(0, body.length - 1);
+}
+
+function kresbaBodSnap(m, tvar) {
+  // Střed kruhu a hrot kužele se na gridu chytají na střed buňky.
+  if (GRID_PX > 0 && (tvar === 'kruh' || tvar === 'kuzel')) {
+    const c = GRID_TYPE === 'hex' ? hexBunka(m.x, m.y) : gridCellCenter(m.x, m.y);
+    return [c.x, c.y];
+  }
+  return [m.x, m.y];
+}
+function nahledKresby(akceK, m) {
+  const tvar = kresbaNastaveni.tvar;
+  const z = kamera.stav.z;
+  if (tvar === 'cara') {
+    const b = akceK.body, p = b[b.length - 1];
+    if (Math.hypot(m.x - p[0], m.y - p[1]) > 2 / z) b.push([m.x, m.y]);
+  } else if (tvar !== 'text') {
+    akceK.body = [akceK.body[0], [m.x, m.y]];
+  }
+  const k = {typ: tvar, b: akceK.body, barva: kresbaNastaveni.barva, sirka: kresbaNastaveni.sirka, viditelne_hracum: true};
+  let popis = '';
+  if ((tvar === 'kruh' || tvar === 'kuzel' || tvar === 'sipka') && akceK.body.length > 1) {
+    const a = {x: akceK.body[0][0], y: akceK.body[0][1]}, c = {x: akceK.body[1][0], y: akceK.body[1][1]};
+    const kk = 1 / z;
+    popis = '<text x="' + c.x + '" y="' + (c.y - 12 * kk) + '" fill="#fff" font-size="' + (14 * kk) + '" text-anchor="middle" paint-order="stroke" stroke="#000" stroke-width="' + (3 * kk) + '">'
+      + popisVzdalenosti(a, c) + '</text>';
+  }
+  if (rulerSvg) rulerSvg.innerHTML = svgKresby(k, true) + popis;
+}
+
+function odeslatKresbu(k) {
+  return postJson('api/kresba_pridat.php', {mapa_id: MAPA_ID, typ: k.typ, b: k.b, t: k.t, barva: k.barva, sirka: k.sirka, viditelne_hracum: k.viditelne_hracum})
+    .then((d) => {
+      if (d.error) { logLine('Chyba: ' + d.error); return; }
+      if (!kresby.some((x) => x.id === d.kresba.id)) kresby.push(d.kresba);
+      nakreslitKresby();
+    })
+    .catch(() => logLine('Kresbu se nepodařilo odeslat.'));
+}
+function dokoncitKresbu(akceK, m) {
+  if (rulerSvg) rulerSvg.innerHTML = '';
+  const tvar = kresbaNastaveni.tvar;
+  const skryta = IS_PJ_OR_ADMIN && document.getElementById('kresbaSkryta') && document.getElementById('kresbaSkryta').checked;
+  const k = {typ: tvar, b: akceK.body, barva: kresbaNastaveni.barva, sirka: kresbaNastaveni.sirka, viditelne_hracum: !skryta};
+  if (tvar === 'text') {
+    const t = prompt('Text na mapě:', '');
+    if (!t || !t.trim()) return;
+    k.t = t.trim().slice(0, 200);
+    k.b = [[Math.round(m.x), Math.round(m.y)]];
+  } else if (tvar === 'cara') {
+    if (akceK.body.length < 2) return;
+    k.b = zjednoduseniCary(akceK.body, 1.5 / kamera.stav.z).slice(0, 400);
+  } else {
+    if (akceK.body.length < 2 || Math.hypot(akceK.body[1][0] - akceK.body[0][0], akceK.body[1][1] - akceK.body[0][1]) < 4 / kamera.stav.z) return;
+  }
+  k.b = k.b.map((p) => [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]);
+  odeslatKresbu(k);
+}
+
+function smazatKresby(zadani) {
+  return postJson('api/kresba_smazat.php', zadani).then((d) => {
+    if (d.error) { logLine('Chyba: ' + d.error); return; }
+    const ids = new Set(d.ids);
+    kresby = kresby.filter((k) => !ids.has(k.id));
+    nakreslitKresby();
+  });
+}
+
+// Panel nastavení kreslení
+const kresleniTlacitko = document.getElementById('tb-kresleni');
+if (kresleniTlacitko && FUNKCE.kresby) {
+  kresleniTlacitko.style.display = '';
+  toolButtons.kresleni = kresleniTlacitko;
+  const popKresleni = document.getElementById('popover-kresleni');
+  const tvaryEl = document.getElementById('kresbaTvary'), barvyEl = document.getElementById('kresbaBarvy'), sirkyEl = document.getElementById('kresbaSirky');
+  tvaryEl.innerHTML = TVARY_KRESBY.map(([k, t]) => '<button type="button" class="btn btn-ghost" data-tvar="' + k + '">' + t + '</button>').join('');
+  barvyEl.innerHTML = BARVY_KRESBY.map((c) => '<button type="button" class="vz-barva" data-barva="' + c + '" style="background:' + c + ';"></button>').join('');
+  sirkyEl.innerHTML = SIRKY_KRESBY.map(([w, t]) => '<button type="button" class="btn btn-ghost" data-sirka="' + w + '">' + t + '</button>').join('');
+  const obnovNastaveni = () => {
+    tvaryEl.querySelectorAll('button').forEach((b) => b.classList.toggle('aktivni', b.dataset.tvar === kresbaNastaveni.tvar));
+    barvyEl.querySelectorAll('button').forEach((b) => b.classList.toggle('aktivni', b.dataset.barva === kresbaNastaveni.barva));
+    sirkyEl.querySelectorAll('button').forEach((b) => b.classList.toggle('aktivni', parseInt(b.dataset.sirka, 10) === kresbaNastaveni.sirka));
+  };
+  tvaryEl.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { kresbaNastaveni.tvar = b.dataset.tvar; obnovNastaveni(); } });
+  barvyEl.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { kresbaNastaveni.barva = b.dataset.barva; obnovNastaveni(); } });
+  sirkyEl.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { kresbaNastaveni.sirka = parseInt(b.dataset.sirka, 10); obnovNastaveni(); } });
+  obnovNastaveni();
+  kresleniTlacitko.addEventListener('click', () => {
+    if (currentTool === 'kresleni') { setTool('select'); popKresleni.classList.remove('open'); kresleniTlacitko.classList.remove('active'); return; }
+    closeAllPopovers();
+    setTool('kresleni');
+    umistitPopoverKBodu(popKresleni, kresleniTlacitko.getBoundingClientRect());
+    kresleniTlacitko.classList.add('active');
+  });
+  document.getElementById('kresbaSmazatMoje').addEventListener('click', () => {
+    if (confirm('Smazat všechny tvoje kresby na téhle mapě?')) smazatKresby({mapa_id: MAPA_ID, rezim: 'moje'});
+  });
+  const smazVse = document.getElementById('kresbaSmazatVse');
+  if (smazVse) smazVse.addEventListener('click', () => {
+    if (confirm('Smazat VŠECHNY kresby na téhle mapě (i cizí)?')) smazatKresby({mapa_id: MAPA_ID, rezim: 'vsechny'});
+  });
+}
+
 // --- Zoom: tlačítka, údaj, uložení pohledu ---
 const zoomInfo = document.getElementById('zoomInfo');
 let ulozPohledTimer = null;
@@ -2719,6 +3017,7 @@ function inicializovatMapu() {
   renderZdi();
   osvezitMlhu();
   nakreslitTokeny();
+  nakreslitKresby();
   nakreslitIniciativu();
   naplnitVolnePostavy();
   vychoziPohled();
