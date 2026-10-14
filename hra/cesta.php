@@ -168,8 +168,10 @@ dracak_vtt_page_start('Cesta — ' . $svet['nazev'], $user, true, ['../assets/cs
       <div id="cs-povoz-pole" class="cs-povoz-pole" hidden>
         <div class="field"><label for="cs-povoz-typ">Povoz</label>
           <select id="cs-povoz-typ">
-            <?php foreach ($povozy as $pv): ?>
-              <option value="<?= (int)$pv['id'] ?>" data-vaha="<?= (int)round(((int)$pv['vaha_od_mn'] + (int)$pv['vaha_do_mn']) / 2) ?>" data-nasobek="<?= $e($pv['nosnost_nasobek_od']) ?>"><?= $e($pv['nazev']) ?> (váha <?= (int)$pv['vaha_od_mn'] ?>–<?= (int)$pv['vaha_do_mn'] ?> mn, nosnost <?= rtrim(rtrim($e($pv['nosnost_nasobek_od']), '0'), '.') ?><?= $pv['nosnost_nasobek_od'] != $pv['nosnost_nasobek_do'] ? '–' . rtrim(rtrim($e($pv['nosnost_nasobek_do']), '0'), '.') : '' ?>× váhy)</option>
+            <?php foreach ($povozy as $pv):
+                $od = $pv['vaha_hb_od_mn'] ?? $pv['vaha_od_mn']; $do = $pv['vaha_hb_do_mn'] ?? $pv['vaha_do_mn'];
+                $nOd = rtrim(rtrim($e($pv['nosnost_nasobek_od']), '0'), '.'); $nDo = rtrim(rtrim($e($pv['nosnost_nasobek_do']), '0'), '.'); ?>
+              <option value="<?= (int)$pv['id'] ?>" data-vaha="<?= (int)round(((int)$od + (int)$do) / 2) ?>" data-nasobek="<?= $e($pv['nosnost_nasobek_od']) ?>"><?= $e($pv['nazev']) ?> (váha <?= (int)$od ?>–<?= (int)$do ?> mn, nosnost <?= $nOd ?><?= $nOd !== $nDo ? '–' . $nDo : '' ?>× váhy)</option>
             <?php endforeach; ?>
           </select></div>
         <div class="cs-povoz-radek">
@@ -183,7 +185,7 @@ dracak_vtt_page_start('Cesta — ' . $svet['nazev'], $user, true, ['../assets/cs
           <div class="field"><label for="cs-povoz-pocet">Spřežení</label>
             <select id="cs-povoz-pocet"><option value="1">1 zvíře</option><option value="2" selected>pár (2)</option><option value="3">trojka (3)</option><option value="4">2 páry (4)</option><option value="6">3 páry (6)</option></select></div>
         </div>
-        <p class="note">Váha vozu se předvyplní středem rozsahu z PPP (homebrew tabulka povozů h2057 má mírně jiná rozmezí) — přepiš podle konkrétního vozu. Do váhy pro spřežení se počítá vůz, posádka a náklad; zvíře se pak nakládá jako při jízdě (čtvrtina váhy proti nosnosti spřežení). Postavy označené "Na povoze" jedou na povoze, jejich váha a náklad se přičtou. Vozy se dají jet nejvýše krokem, klusem jen po velmi dobré cestě (maringotka nikdy); řízení klusem je riziko nehody.</p>
+        <p class="note">Váha vozu se předvyplní středem rozsahu podle upravených (homebrew) pravidel — přepiš podle konkrétního vozu. Do váhy pro spřežení se počítá vůz, posádka a náklad; zvíře se pak nakládá jako při jízdě (čtvrtina váhy proti nosnosti spřežení). Postavy označené "Na povoze" jedou na povoze, jejich váha a náklad se přičtou. Vozy se dají jet nejvýše krokem, klusem jen po velmi dobré cestě (maringotka nikdy); řízení klusem je riziko nehody.</p>
       </div>
       <?php endif; ?>
     </div>

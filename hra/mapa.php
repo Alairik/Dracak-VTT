@@ -166,6 +166,8 @@ if ($isPjOrAdmin) {
 }
 
 require_once __DIR__ . '/../includes/vtt_iniciativa.php';
+require_once __DIR__ . '/../includes/vtt_pohyblivost.php';
+$pohybNastaveni = dracak_vtt_svet_cestovani_nastaveni(dracak_db(), $svetId);
 $stmt = dracak_db()->prepare('SELECT * FROM kolo_stav WHERE mapa_id = ?');
 $stmt->execute([$mapaId]);
 $koloStav = $stmt->fetch() ?: null;
@@ -644,10 +646,12 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
     </div>
     <div style="margin-top:10px;">
       <label style="font-size:11px;font-weight:600;">Iniciativa — bonusy/postihy (zaškrtni, co platí)</label>
+      <div id="iniciativaAutoPozn" class="note" style="font-size:11px;margin:2px 0 4px;display:none;">U postavy se únava a naložení počítají samy podle jejího stavu.</div>
       <div id="iniciativaBonusyList" style="max-height:120px;overflow-y:auto;font-size:12px;margin-bottom:6px;">
         <?php foreach ($iniciativaBonusy as $b): ?>
           <label style="display:flex;align-items:center;gap:6px;font-weight:400;margin-bottom:2px;">
-            <input type="checkbox" class="iniciativa-bonus-check" value="<?= (int)$b['id'] ?>">
+            <?php $autoSkupina = in_array($b['popis'], DRACAK_VTT_INICIATIVA_UNAVA, true) ? 'unava' : (in_array($b['popis'], DRACAK_VTT_INICIATIVA_NALOZENI, true) ? 'nalozeni' : ''); ?>
+            <input type="checkbox" class="iniciativa-bonus-check" value="<?= (int)$b['id'] ?>"<?= $autoSkupina !== '' ? ' data-auto="' . $autoSkupina . '"' : '' ?>>
             <?= htmlspecialchars($b['popis']) ?> (<?= $b['bonus'] >= 0 ? '+' . (int)$b['bonus'] : (int)$b['bonus'] ?>)
           </label>
         <?php endforeach; ?>
@@ -684,6 +688,7 @@ $posledniUdalostId = (int)(dracak_db()->query('SELECT MAX(id) FROM svet_udalosti
 <script type="module">
 const SVET_ID = <?= $svetId ?>;
 const MAPA_ID = <?= $mapaId ?>;
+const POHYB_AUTO = <?= json_encode(['unava' => $pohybNastaveni['auto_unava'], 'nalozeni' => $pohybNastaveni['auto_naklad']]) ?>;
 // Grid konsty jsou "let", ne "const" — grid panel (viz níž) je mění živě
 // při náhledu ještě před uložením, a po uložení/po eventu od jiného
 // klienta se přepíšou na novou trvalou hodnotu.
@@ -1474,6 +1479,17 @@ function otevritSpravovat(el) {
       magRow.style.display = 'none';
     }
   }
+  // Iniciativa: u postavy se únava a naložení počítají samy (pokud je PJ
+  // nevypnul) — ruční zaškrtnutí těchhle řádků se zamkne.
+  let autoPozn = false;
+  document.querySelectorAll('.iniciativa-bonus-check[data-auto]').forEach((cb) => {
+    const zamknout = spravovanyToken.typEntity === 'postava' && POHYB_AUTO[cb.dataset.auto];
+    cb.disabled = zamknout;
+    if (zamknout) { cb.checked = false; autoPozn = true; }
+    cb.parentElement.style.opacity = zamknout ? '.5' : '';
+  });
+  const pozn = document.getElementById('iniciativaAutoPozn');
+  if (pozn) pozn.style.display = autoPozn ? '' : 'none';
   renderInventar();
   renderKorist();
   spravovatPanel.classList.add('open');
@@ -2134,7 +2150,7 @@ if (tbKrokZpet) {
 // --- Kostky (dice-box vizualizace + autoritativní server výsledek) ---
 let diceBox = null;
 import('../assets/js/vendor/dice-box/dice-box.es.min.js').then((mod) => {
-  diceBox = new mod.default('#diceBoxContainer', {assetPath: '../assets/js/vendor/dice-box/assets/'});
+  diceBox = new mod.default('#diceBoxContainer', {assetPath: new URL('../assets/js/vendor/dice-box/assets/', location.href).pathname});
   diceBox.init().catch(() => { diceBox = null; });
 }).catch(() => { diceBox = null; });
 

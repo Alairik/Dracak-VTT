@@ -452,3 +452,51 @@ function dracak_vtt_spanek(PDO $pdo, array $postava): ?array
     $hodin = $bonus >= 0 ? 8 - (int)ceil($bonus / 2) : 8 + (int)ceil(-$bonus / 2);
     return ['hodin' => $hodin, 'bodu' => (int)$postava['odolnost']];
 }
+
+// Iniciativa: postih za únavu a za naložení (TABULKA BONUSŮ A POSTIHŮ K
+// INICIATIVĚ, h1622, v DB iniciativa_bonusy z migrace 0045): únava −1,
+// vyčerpání −2, úplné vyčerpání −3; mírné naložení −1, střední −3, velké −5.
+// Stav postavy už engine zná, takže se přičítá sám (hra/api/iniciativa_hod.php)
+// — pokud PJ nevypnul příslušný přepínač světa (auto_unava, auto_naklad).
+//
+// Vrací ['popisy' => [názvy řádků z iniciativa_bonusy, které platí],
+//        'skupiny' => ['unava' => bool, 'nalozeni' => bool] (co engine
+//        vyhodnocuje sám; ruční zaškrtnutí téhle skupiny se pak ignoruje),
+//        'upozorneni' => [text]].
+// Vysílená postava (nad 4× vytrvalosti) omdlévá — tabulka pro ni nemá řádek;
+// stejně tak naložení nad 4× nosnosti: jen upozornění, žádné vymyšlené číslo.
+const DRACAK_VTT_INICIATIVA_UNAVA = [1 => 'Únava', 2 => 'Vyčerpání', 3 => 'Úplné vyčerpání'];
+const DRACAK_VTT_INICIATIVA_NALOZENI = ['mirne' => 'Mírné naložení', 'stredni' => 'Střední naložení', 'velke' => 'Velké naložení'];
+
+function dracak_vtt_iniciativa_auto_bonusy(PDO $pdo, array $postava): array
+{
+    $vysledek = ['popisy' => [], 'skupiny' => ['unava' => false, 'nalozeni' => false], 'upozorneni' => []];
+    $nast = dracak_vtt_svet_cestovani_nastaveni($pdo, !empty($postava['svet_id']) ? (int)$postava['svet_id'] : null);
+
+    if ($nast['auto_unava']) {
+        $unava = dracak_vtt_postava_unava_stupen($postava);
+        if ($unava !== null) {
+            $vysledek['skupiny']['unava'] = true;
+            if (isset(DRACAK_VTT_INICIATIVA_UNAVA[$unava['stupen']])) {
+                $vysledek['popisy'][] = DRACAK_VTT_INICIATIVA_UNAVA[$unava['stupen']];
+            } elseif ($unava['stupen'] >= 4) {
+                $vysledek['upozorneni'][] = 'Postava je vysílená a omdlévá — Tabulka bonusů a postihů k iniciativě pro ni nemá řádek.';
+            }
+        }
+    }
+    if ($nast['auto_naklad']) {
+        $naklad = dracak_vtt_postava_naklad_mn($pdo, (int)$postava['id'], $postava);
+        $poh = dracak_vtt_postava_pohyblivost($pdo, $postava, $naklad['naklad_mn']);
+        $kod = $poh['nalozeni']['kod'] ?? null;
+        if ($kod !== null) {
+            $vysledek['skupiny']['nalozeni'] = true;
+            if (isset(DRACAK_VTT_INICIATIVA_NALOZENI[$kod])) {
+                $vysledek['popisy'][] = DRACAK_VTT_INICIATIVA_NALOZENI[$kod];
+            } elseif ($kod === 'prilis_velke') {
+                $vysledek['upozorneni'][] = 'Náklad je nad 4× nosnosti — Tabulka bonusů a postihů k iniciativě pro to nemá řádek.';
+            }
+        }
+    }
+    return $vysledek;
+}
+

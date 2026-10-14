@@ -17,7 +17,8 @@
 -- jedné, ale NEJSOU si v cestě: těch 8 modelů je i v základních pravidlech PJ
 -- (Tabulka ceny povozů, Tabulka řízení) — kategorie je jen jejich seskupení.
 -- Váhy se v PPP a v h2057 mírně liší; obě rozmezí jsou uložena (vaha_* = PPP,
--- vaha_hb_* = h2057), kalkulačka cesty předvyplní PPP a PJ číslo přepíše.
+-- vaha_hb_* = h2057). Přednost má homebrew (rozhodnutí uživatele 2026-10-14:
+-- je upravený vůči realitě) — kalkulačka cesty předvyplní h2057, PJ číslo přepíše.
 --
 -- Sloupce:
 --   nosnost_nasobek_od/do   konstrukční nosnost = násobek vlastní váhy vozu

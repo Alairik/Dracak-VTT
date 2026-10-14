@@ -81,6 +81,14 @@
      `migrate.php` pod DML-only účtem doběhne bez chyby.
   5. Po potvrzení, že ho provedl, soubor přepiš na aktuální stav
      (prázdný, nebo jen nové příkazy od té doby).
+- **Otázky uživateli piš lidsky, česky, bez databázové a programátorské
+  mluvy.** Uživatel je account manager, ne vývojář: nerozumí slovům jako
+  DROP, index, tabulka, sloupec, migrace, ENUM, "varianta A/B" podle
+  technického rozdílu. Technická rozhodnutí (jak něco postavit) dělej
+  sám, nejbezpečnější cestou, a řekni jen výsledek. Ptej se jen na věci,
+  které jsou opravdu jeho: co má hra dělat z pohledu hráče/PJ, nebo jak
+  to je v knize. Každá otázka: jedna věta co se rozhoduje, příklad z hry,
+  a tvoje doporučení.
 - **`scripts/` smí na serveru obsahovat JEN `migrate.php`.** Nic jiného
   se tam nepřidává, aniž by se zároveň upravil `exclude` v `deploy.yml`
   — momentálně se `scripts/` nijak nevylučuje (spoléhá se na to, že tam

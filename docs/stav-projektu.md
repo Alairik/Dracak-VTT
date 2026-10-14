@@ -427,7 +427,8 @@ kontejnery** (vaky, truhly apod.).
   3 200, jezdecký 4 × 750 = 3 000; Tabulka nosnosti spřežení, h1639–h1641).
   1000 mn tažného koně beru jako tu základní hodnotu "v tahu" (tj. 4 ×
   1000 = 4 000 v zápřahu = 3 200 × 1,25), ne jako konečnou nosnost
-  zápřahu — to je moje čtení, kniha to doslova neříká; k potvrzení.
+  zápřahu — moje čtení, kniha to doslova neříká; **uživatel potvrdil 2026-10-14**
+  (základ 1000, v zápřahu 4000).
   Rozšíření na ostatní tvory z h2057 (~40 řádků: válečný kůň, vůl,
   velbloud, letci s řádky "na zemi", ceny…) čeká na rozhodnutí, jak
   značit letecké/pozemní varianty a co znamená sloupec "Ujede (číslo :
@@ -442,7 +443,8 @@ kontejnery** (vaky, truhly apod.).
   povozů a Tabulka řízení, h2366); PPP typy vůz/kočár/dostavník jsou jen
   jejich seskupení. Váhy se v PPP a v homebrew h2057 mírně liší — `povozy`
   drží obě rozmezí (`vaha_*` = PPP, `vaha_hb_*` = h2057), kalkulačka
-  předvyplní PPP a PJ číslo přepíše. Únava cestujících u žebřiňáku/valníku
+  předvyplní homebrew (**rozhodnuto uživatelem 2026-10-14: homebrew má
+  přednost, je upravený vůči realitě**) a PJ číslo přepíše. Únava cestujících u žebřiňáku/valníku
   (1 bod za 4 body zvířete) je jen v h2057, ostatní v PPP.
 - `0079_povozy.sql` (DDL + INSERT IGNORE): `povozy` (kategorie, váhy,
   násobek nosnosti, únava cestujících, `klus` ne/jen_dobra_cesta/ano, Tabulka
@@ -497,6 +499,22 @@ kontejnery** (vaky, truhly apod.).
   zastaví, výběr postav, váha jezdce (ručně — pravidla ji nemají jako
   jedno číslo, rasa má rozsah) a doprovodná zvířata. Odkazy: "Cesta" na
   `svet.php` a `druzina.php` (jen PJ).
+- **Iniciativa (2026-10-14, na pokyn uživatele):** Tabulka bonusů a postihů
+  k iniciativě (h1622, v DB `iniciativa_bonusy` z 0045 — od uživatele z fota)
+  má řádky Únava −1, Vyčerpání −2, Úplné vyčerpání −3, Mírné naložení −1,
+  Střední −3, Velké −5. U postavy se teď přičítají SAMY podle jejího stavu
+  (`dracak_vtt_iniciativa_auto_bonusy()`, `hra/api/iniciativa_hod.php`),
+  pokud PJ nevypnul `auto_unava` / `auto_naklad`; ruční zaškrtnutí těchto
+  řádků se u postavy ignoruje (nepočítat dvakrát), v panelu na mapě jsou
+  zamčené. Nestvůry zůstávají ruční. Vysílená postava (omdlévá) a náklad
+  nad 4× nosnosti: jen upozornění, tabulka pro ně řádek nemá. Prověřeno
+  hledáním "únav" a "naložen" ve všech třech knihách: jiný vliv únavy na
+  hodnoty postavy v pravidlech není (nosnost se z únavy nemění — kniha o tom
+  mlčí; zuřivost Šamana a kouzla Brána odpočinku/ignorování postihů tohle
+  potvrzují jen jako "postihy z únavy a naložení" obecně).
+- **Oprava mimochodem:** 3D kostky na mapě (`hra/mapa.php`) měly špatnou
+  cestu k souborům (`assetPath` relativní → URL "…cz../assets/…" ve workeru),
+  opraveno na absolutní cestu; ověřeno, že chyba z konzole zmizela.
 - **Spánek (2026-10-13):** v deníku tlačítko "Prospat N h" (`dracak_vtt_spanek()`,
   akce `spanek` v `postava_stav.php`): h1634 b10872 — hodin = 8 − polovina
   bonusu za odolnost (nahoru; příklad knihy odolnost 21 → 5 h sedí), zmizí
@@ -610,8 +628,6 @@ přístupný.
   nic se neruší.
 - Rozsah importu ceníku h2055 (doporučeno: nejdřív jen kontejnery) a
   kapacita kontejneru jako tvrdý limit s přepsáním PJ (doporučeno).
-- Povozy: váhy vozů se v PPP a v homebrew h2057 liší (obě rozmezí jsou v
-  DB; kalkulačka předvyplní PPP) — potvrdit, které má být výchozí.
 - **`DROP TABLE` tří mrtvých tabulek z migrace 0008:** `stupne_unavy`,
   `narocnost_akci_unava`, `odstraneni_unavy`. Všechny jsou jiný model
   únavy než v pravidlech (hranice 10 + odolnost, "spánek −10 bodů",
@@ -619,11 +635,8 @@ přístupný.
   1 směna boje = 1 bod, spánek odstraní tolik bodů, kolik je odolnost)
   a nic je nepoužívá; z editoru jsou pryč. DROP smí jen schválit
   uživatel, pak se přidá do `docs/sql-k-rucnimu-spusteni.sql`.
-- **Vliv únavy na nosnost:** únava snižuje bonus za sílu, ale tabulka
-  nosnosti zná jen bonus −5…+5 a kniha o vlivu na nosnost mlčí — nosnost
-  se proto z únavy nepočítá (viz "Co je podložené"). Potvrdit/upřesnit.
-- Tažný kůň: 1000 mn beru jako základ "v tahu" (4× v zápřahu = 4000);
-  potvrdit čtení (viz Fáze 2).
+- **Vliv únavy na nosnost:** v knize není (hledáno 2026-10-14), takže se
+  nepočítá. Uživatel to vzal na vědomí; kdyby se něco našlo, doplnit.
 - **Texty přepsané v `pravidla_texty`:** pravidla.php zobrazuje text z
   `content/*.html`, ale uživatelská úprava přes tužku (tabulka
   `pravidla_texty`, klíč = id bloku) má přednost. Odstavec b10870 (únava)

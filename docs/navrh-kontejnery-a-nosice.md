@@ -51,9 +51,13 @@ Do `predmety` se zatím nic z toho nenačetlo (DB má jen zbraně, zbroje, surov
 artefakty) a `predmety.typ` nemá hodnotu pro běžné vybavení — musel by se rozšířit
 ENUM (`migrate.php` umí ověřit přidání hodnoty).
 
-## Co potřebuju od tebe
+## Co potřebuju od uživatele (lidsky)
 
-1. **A, nebo B?** (B je moje doporučení — nevyžaduje DROP a nic nerozbije.)
-2. **Import ceníku:** jen kontejnery (doporučuju začít tím), nebo celý ceník?
-3. **Kapacita:** tvrdý limit (nejde přidat nad kapacitu), nebo jen varování, které
-   PJ přepíše?
+Technickou volbu (A/B) **dělá Claude sám — varianta B, nic se neruší** (uživatel
+řekl 2026-10-14, že technickým věcem nerozumí). Ptát se jen na tohle:
+
+1. Má se do hry přidat **celý ceník vybavení** (stany, deky, provazy, jídlo…),
+   nebo jen věci, do kterých se dává náklad (vaky, truhly, soudky, trakař)?
+   Doporučení: nejdřív jen ty nádoby.
+2. Když je nádoba plná (např. vak do 140 mn), má hra **nepustit** další věc,
+   nebo jen **upozornit** a nechat rozhodnout PJ? Doporučení: upozornit.

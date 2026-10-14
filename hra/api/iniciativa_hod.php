@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/../../includes/vtt_iniciativa.php';
+require_once __DIR__ . '/../../includes/vtt_pohyblivost.php';
 
 header('Content-Type: application/json; charset=utf-8');
 $user = dracak_require_login();
@@ -12,22 +13,6 @@ $bonusIds = array_map('intval', is_array($data['bonus_ids'] ?? null) ? $data['bo
 $jinyBonus = (int)($data['jiny_bonus'] ?? 0);
 
 $pdo = dracak_db();
-
-// Modifikátor = součet vybraných položek z Tabulky bonusů a postihů k
-// iniciativě (str. 78, database/migrations/0045_iniciativa_bonusy_tabulka.sql)
-// + volitelná ruční úprava pro cokoliv, co tabulka nepokrývá. Popisy se
-// vrací i do logu, ať je vidět PROČ vyšlo dané číslo, ne jen výsledné číslo.
-$vybraneBonusy = [];
-if ($bonusIds) {
-    $placeholders = implode(',', array_fill(0, count($bonusIds), '?'));
-    $stmt = $pdo->prepare("SELECT id, popis, bonus FROM iniciativa_bonusy WHERE id IN ($placeholders)");
-    $stmt->execute($bonusIds);
-    $vybraneBonusy = $stmt->fetchAll();
-}
-$modifikator = array_sum(array_column($vybraneBonusy, 'bonus')) + $jinyBonus;
-// TINYINT sloupec (-128..127) — jen ochrana proti přetečení sloupce, NE
-// pravidlová hranice (ta už je dána tabulkou bonusů výš).
-$modifikator = max(-100, min(100, $modifikator));
 
 $stmt = $pdo->prepare('SELECT t.*, m.svet_id FROM tokeny t JOIN mapy m ON m.id = t.mapa_id WHERE t.id = ? AND t.mapa_id = ?');
 $stmt->execute([$tokenId, $mapaId]);
@@ -42,6 +27,54 @@ if (!dracak_vtt_can_roll_iniciativa($user, $token)) {
     echo json_encode(['error' => 'Iniciativu za tenhle token hodit nesmíš.']);
     exit;
 }
+
+
+// Modifikátor = součet vybraných položek z Tabulky bonusů a postihů k
+// iniciativě (str. 78, database/migrations/0045_iniciativa_bonusy_tabulka.sql)
+// + volitelná ruční úprava pro cokoliv, co tabulka nepokrývá. Popisy se
+// vrací i do logu, ať je vidět PROČ vyšlo dané číslo, ne jen výsledné číslo.
+//
+// U postavy se postih za únavu a za naložení přičítá SÁM podle jejího stavu
+// (dracak_vtt_iniciativa_auto_bonusy; PJ to ve světě může vypnout) — ručně
+// zaškrtnuté řádky téhle skupiny se pak ignorují, aby se nepočítaly dvakrát.
+$auto = ['popisy' => [], 'skupiny' => ['unava' => false, 'nalozeni' => false], 'upozorneni' => []];
+if ($token['typ_entity'] === 'postava') {
+    $stmt = $pdo->prepare('SELECT * FROM postavy WHERE id = ?');
+    $stmt->execute([(int)$token['entita_id']]);
+    $postavaRow = $stmt->fetch();
+    if ($postavaRow) {
+        $auto = dracak_vtt_iniciativa_auto_bonusy($pdo, $postavaRow);
+    }
+}
+$vybraneBonusy = [];
+$ignorovane = [];
+if ($bonusIds) {
+    $placeholders = implode(',', array_fill(0, count($bonusIds), '?'));
+    $stmt = $pdo->prepare("SELECT id, popis, bonus FROM iniciativa_bonusy WHERE id IN ($placeholders)");
+    $stmt->execute($bonusIds);
+    foreach ($stmt->fetchAll() as $b) {
+        $pokryto = ($auto['skupiny']['unava'] && in_array($b['popis'], DRACAK_VTT_INICIATIVA_UNAVA, true))
+            || ($auto['skupiny']['nalozeni'] && in_array($b['popis'], DRACAK_VTT_INICIATIVA_NALOZENI, true));
+        if ($pokryto) {
+            $ignorovane[] = $b['popis'];
+        } else {
+            $vybraneBonusy[] = $b;
+        }
+    }
+}
+$automaticke = [];
+if ($auto['popisy']) {
+    $placeholders = implode(',', array_fill(0, count($auto['popisy']), '?'));
+    $stmt = $pdo->prepare("SELECT id, popis, bonus FROM iniciativa_bonusy WHERE popis IN ($placeholders)");
+    $stmt->execute($auto['popisy']);
+    $automaticke = $stmt->fetchAll();
+}
+$vsechnyBonusy = array_merge($vybraneBonusy, $automaticke);
+$popisyBonusu = array_merge(array_column($vybraneBonusy, 'popis'), array_map(fn($b) => $b['popis'] . ' (automaticky)', $automaticke));
+$modifikator = array_sum(array_column($vsechnyBonusy, 'bonus')) + $jinyBonus;
+// TINYINT sloupec (-128..127) — jen ochrana proti přetečení sloupce, NE
+// pravidlová hranice (ta už je dána tabulkou bonusů výš).
+$modifikator = max(-100, min(100, $modifikator));
 
 $hozeno = dracak_vtt_hod_kostkou(1, 6, 0);
 $hod = $hozeno['hody'][0];
@@ -75,7 +108,7 @@ try {
         'token_id' => $tokenId,
         'hod' => $hod,
         'modifikator' => $modifikator,
-        'bonusy' => array_column($vybraneBonusy, 'popis'),
+        'bonusy' => $popisyBonusu,
         'jiny_bonus' => $jinyBonus,
         'vysledek' => $vysledek,
         'akce_celkem' => $akce,
@@ -94,7 +127,10 @@ echo json_encode([
     'token_id' => $tokenId,
     'hod' => $hod,
     'modifikator' => $modifikator,
-    'bonusy' => array_column($vybraneBonusy, 'popis'),
+    'bonusy' => $popisyBonusu,
+    'automaticky' => array_column($automaticke, 'popis'),
+    'ignorovano_rucne' => $ignorovane,
+    'upozorneni' => $auto['upozorneni'],
     'vysledek' => $vysledek,
     'akce_celkem' => $akce,
     'akce_zbyvajici' => $akce,
