@@ -34,18 +34,12 @@ prvním takovém souboru deploy zastaví** (HTTP 500 v posledním kroku
 ním čeká, dokud se to neprovede ručně.
 
 **Ruční DDL blok je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný soubor, ve
-kterém jsou všechny dosud neprovedené DDL příkazy v pořadí; uživatel ho
-dostává jako text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav:
-čeká blok pro `0074` (tabulky `rychlost_chuze`, `rychlost_behu`), `0075`
-(`jizdni_zvirata.nosnost_tah_mn`), `0077` (3 přepínače `svet.auto_*`),
-`0078` (`postavy.pohyblivost_rucne`) a `0079` (tabulky `povozy`,
-`povoz_nalozeni`)** — ověřeno na kopii produkčního stavu
-(dvakrát za sebou, pak `migrate.php` pod DML-only účtem: 0074–0076 doběhly).
-Do spuštění deploy v posledním kroku skončí HTTP 500 (FTP část proběhne,
-kód je nasazený a bez tabulek funguje v degradovaném režimu). Předchozí
-blok (`0065`–`0071`) je na produkci hotový. `DROP TABLE stupne_unavy;` (stará
-nepoužívaná tabulka z 0008) uživatel zatím nechtěl/neprovedl — jako
-migrace jít nemůže (`migrate.php` odmítne DROP).
+kterém jsou všechny dosud neprovedené DDL příkazy; uživatel ho dostává jako
+text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-14):**
+bloky pro `0065`–`0079` jsou na produkci provedené (uživatel potvrdil, kontrolní
+čísla seděla). Čeká jen `DROP TABLE` tří mrtvých tabulek z 0008 (`stupne_unavy`,
+`narocnost_akci_unava`, `odstraneni_unavy`), schválený uživatelem; po jeho
+potvrzení soubor vyprázdnit.
 
 Kód je napsaný tak, že funguje i před ručními kroky (chybějící sloupce
 se berou jako "není"), jen se nic z toho nedá ukládat.
@@ -628,13 +622,6 @@ přístupný.
   nic se neruší.
 - Rozsah importu ceníku h2055 (doporučeno: nejdřív jen kontejnery) a
   kapacita kontejneru jako tvrdý limit s přepsáním PJ (doporučeno).
-- **`DROP TABLE` tří mrtvých tabulek z migrace 0008:** `stupne_unavy`,
-  `narocnost_akci_unava`, `odstraneni_unavy`. Všechny jsou jiný model
-  únavy než v pravidlech (hranice 10 + odolnost, "spánek −10 bodů",
-  "boj tři kola = 2 body"…; pravidla: h1634 — vytrvalost = odolnost,
-  1 směna boje = 1 bod, spánek odstraní tolik bodů, kolik je odolnost)
-  a nic je nepoužívá; z editoru jsou pryč. DROP smí jen schválit
-  uživatel, pak se přidá do `docs/sql-k-rucnimu-spusteni.sql`.
 - **Vliv únavy na nosnost:** v knize není (hledáno 2026-10-14), takže se
   nepočítá. Uživatel to vzal na vědomí; kdyby se něco našlo, doplnit.
 - **Texty přepsané v `pravidla_texty`:** pravidla.php zobrazuje text z

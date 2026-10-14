@@ -373,8 +373,9 @@ function dracak_vtt_postava_doprava(PDO $pdo, array $postava): ?array
 // pohyblivost (příklad Hrun b10871: 19 → 16 = −1 OBR −2 za 2× SIL), ÚČ, OČ.
 // Nosnost ze síly se NEMĚNÍ (tabulka nosnosti zná jen bonus −5…+5 a text
 // nic neříká) — viz dracak_vtt_postava_pohyblivost.
-// (DB tabulka stupne_unavy z migrace 0008 byla jiný, v textu
-// nedohledatelný model — hranice 10+oprava za ODO, 3 stupně; nepoužívá se.)
+// (DB tabulky stupne_unavy, narocnost_akci_unava a odstraneni_unavy z migrace
+// 0008 byly jiný, v textu nedohledatelný model — hranice 10+oprava za ODO;
+// uživatel schválil jejich smazání 2026-10-14, DROP je v ručním SQL.)
 const DRACAK_VTT_UNAVA_STUPNE = [
     0 => ['nazev' => 'bez únavy', 'popis' => null,
         'postih_sil_obr' => 0, 'postih_int' => 0, 'postih_cha' => 0,
