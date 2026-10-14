@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/../../includes/vtt.php';
+require_once __DIR__ . '/../../includes/vtt_kontejnery.php';
 
 // Hledání v katalogu pravidel podle názvu — pro výběr položky do inventáře
 // postavy v Osobním deníku (hra/denik.php). Katalog předmětů, lektvarů a
@@ -19,11 +20,18 @@ $like = '%' . addcslashes($q, '%_\\') . '%';
 $pdo = dracak_db();
 
 if ($typ === 'predmet') {
-    $stmt = $pdo->prepare('SELECT id, nazev, typ, vaha FROM predmety WHERE nazev LIKE ? ORDER BY nazev LIMIT 15');
+    // Sloupce z ceníku (migrace 0080) — před jejich vytvořením se prostě vynechají.
+    $maCenik = dracak_vtt_kontejnery_ma_sloupec($pdo, 'predmety', 'kapacita_mn');
+    $stmt = $pdo->prepare(
+        'SELECT id, nazev, typ, vaha' . ($maCenik ? ', kategorie_vybaveni, kapacita_mn' : '') . ' FROM predmety WHERE nazev LIKE ? ORDER BY nazev LIMIT 30'
+    );
     $stmt->execute([$like]);
+    $cislo = fn($v) => rtrim(rtrim(number_format((float)$v, 2, ',', ''), '0'), ',');
     $vysledky = array_map(fn($r) => [
         'id' => (int)$r['id'], 'nazev' => $r['nazev'],
-        'info' => $r['typ'] . ($r['vaha'] !== null ? ' · ' . rtrim(rtrim(number_format((float)$r['vaha'], 2, ',', ''), '0'), ',') . ' mn' : ' · bez váhy'),
+        'info' => (($r['kategorie_vybaveni'] ?? null) ?: $r['typ'])
+            . ($r['vaha'] !== null ? ' · ' . $cislo($r['vaha']) . ' mn' : ' · bez váhy')
+            . (($r['kapacita_mn'] ?? null) !== null ? ' · kontejner na ' . $cislo($r['kapacita_mn']) . ' mn' : ''),
     ], $stmt->fetchAll());
 } elseif ($typ === 'lektvar') {
     $stmt = $pdo->prepare('SELECT id, nazev FROM lektvary WHERE nazev LIKE ? ORDER BY nazev LIMIT 15');

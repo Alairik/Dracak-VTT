@@ -18,9 +18,9 @@ Přečti celý tenhle soubor, pak `CLAUDE.md` (hlavně pravidla o tom, že
 zdroj pravdy o hře jsou pravidla v `content/`, ne repo/DB, a o
 neodhadování mechaniky). **Fáze 1 a 2 ze sekce "Rozpracováno:
 cestování..." jsou v kódu hotové**; **Fáze 1b (váha/kontejnery) je
-částečně hotová, Fáze 3 (povozy), 4 (kalkulačka cesty) a 5 (přepínače)
-jsou v kódu, zbývá dokončení 1b (kontejnery) — čeká na rozhodnutí
-uživatele** — viz níž. Stav předchozí
+hotová v kódu, stejně jako Fáze 2–5 (zvířata, povozy, kalkulačka cesty,
+přepínače) — celé "cestování, naložení, únava" je tím hotové; čeká jen na
+ruční SQL** — viz níž. Stav předchozí
 konverzace je zapsaný přesně proto, aby ses nemusel/a ptát na věci, co
 už byly rozhodnuté (viz "Architektonická rozhodnutí" a celá sekce
 "Rozpracováno" níže — všechno v ní je buď přímo citovaný text pravidel,
@@ -36,10 +36,12 @@ ním čeká, dokud se to neprovede ručně.
 **Ruční DDL blok je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný soubor, ve
 kterém jsou všechny dosud neprovedené DDL příkazy; uživatel ho dostává jako
 text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-14):**
-bloky pro `0065`–`0079` jsou na produkci provedené (uživatel potvrdil, kontrolní
-čísla seděla). Čeká jen `DROP TABLE` tří mrtvých tabulek z 0008 (`stupne_unavy`,
-`narocnost_akci_unava`, `odstraneni_unavy`), schválený uživatelem; po jeho
-potvrzení soubor vyprázdnit.
+bloky pro `0065`–`0079` jsou na produkci provedené. Čeká blok: `DROP TABLE`
+tří mrtvých tabulek z 0008 (`stupne_unavy`, `narocnost_akci_unava`,
+`odstraneni_unavy`; schváleno uživatelem), `0080` (typ vybavení, skupina,
+kapacita) a `0081` (tabulky kontejnerů); `0082` (217 položek ceníku) pak
+proběhne sama přes `migrate.php`. Ověřeno na kopii produkčního stavu (dvakrát
+za sebou + `migrate.php`). Po potvrzení soubor vyprázdnit.
 
 Kód je napsaný tak, že funguje i před ručními kroky (chybějící sloupce
 se berou jako "není"), jen se nic z toho nedá ukládat.
@@ -198,10 +200,9 @@ MariaDB.** Postup, který v session fungoval:
 
 ## Rozpracováno: cestování, pohyblivost, únava, naložení
 
-**Stav: Fáze 1, 2, 4 a 5 jsou v kódu (DDL k nim je provedené až na
-0074/0075/0077/0078/0079, viz "Čeká na ruční spuštění"), Fáze 1b
-(kontejnery) čekají na rozhodnutí.** Tohle je aktuálně otevřený úkol a nejspíš další věc, na
-které se bude pokračovat.
+**Stav (2026-10-14): všechny fáze jsou v kódu (1, 1b, 2, 3, 4, 5); ruční DDL
+čeká jen na 0080/0081 a smazání tří mrtvých tabulek (viz "Čeká na ruční
+spuštění").** Zbývají jen drobnosti uvedené u jednotlivých fází.
 
 ### Co je podložené přímo v `content/pravidla-hrac.html` (ne odhad)
 
@@ -306,7 +307,7 @@ domácí rozšíření" vlastní hodnotu nemají, dědí ji za běhu od rodiče
 
 ### Další krok — SCHVÁLENÝ fázový plán (2026-10, čeká na realizaci)
 
-Fáze 1, 2, 3, 4 a 5 jsou v kódu (viz níž); zbývá Fáze 1b (kontejnery).
+Všechny fáze (1, 1b, 2, 3, 4, 5) jsou v kódu (viz níž).
 Fáze 4 se dělala dřív než 3, protože ji odblokovaly fotky tabulek.
 
 **Fáze 1 — Oprava dat + živá Pohyblivost/Únava na postavě — HOTOVO V KÓDU**
@@ -356,41 +357,38 @@ Fáze 4 se dělala dřív než 3, protože ji odblokovaly fotky tabulek.
   - Tabulka výcviků (h1603, b10603): "základní pohyblivost postavy se
     zvýší o 1" — bonus k pohyblivosti z výcviku se nepočítá.
 
-**Fáze 1b — Váha, kontejnery a nosiče (rozhodnuto uživatelem, ČÁSTEČNĚ HOTOVO)**
-Rozhodnutí: váha se musí počítat automaticky (hotovo pro plochý
-inventář postavy); jednotky sjednotit na mn (seed už je mn — viz výš);
-**zvířata a povozy mohou mít vlastní náklad, pokud na nich existují
-kontejnery** (vaky, truhly apod.).
-- Co dává text pravidel (vše ověřeno v `content/pravidla-hrac.html`):
-  - Hmotnost = mince `mn`, ≈ 50 g, mince ze všech kovů váží stejně,
-    **peníze se tedy váží (1 mince = 1 mn)** (h3).
-  - Ceník h2055 ("Nový ceník", homebrew): sloupce název | kapacita/
-    poznámka | cena | **váha**; kontejnery mají **kapacitu v mn a
-    vlastní váhu** — torna kožená 800/30 mn, vaky (malý 140/9 … nákladní
-    velký 2000/80), sedlové vaky (250/12, 500/24, 750/36), soudky
-    (5 l … 50 l, sud 225 l), truhly (malá/střední/velká dřevěná i
-    železná: kapacita 200/500/1500 mn, váha 60–500 mn), trakař 2000/750,
-    toulec, pochvy… Dále oblečení, stany, deky, provazy, jídlo atd. —
-    **nic z toho není v `predmety`** (DB má jen zbraně, zbroje,
-    suroviny, artefakty).
-  - Nosnost zvířat: Tabulka jezdeckých zvířat (h1635). **Do nákladu
-    na koních se započítává i váha jezdce** (h1681 b11168).
-  - Povozy: do váhy nákladu z hlediska zvířete se počítá i váha
-    povozu a posádky (h1640); "procento nákladu" podle terénu (h1641).
-- Stav dat: `predmety.vaha` je NULL u části řádků (např. Pavéza, Voda,
-  Ocet…), **lektvary váhu nemají vůbec** (jen občas v textu `popis`,
-  např. "Váha: 5mn"), ceníkové vybavení v DB není. Hodnoty `vaha` ve
-  migracích 0035/0036 (42 surovin pro Chodce a lektvary, 0,01–1,0) neměly
-  žádný zdroj v pravidlech (ověřeno hledáním názvů ve všech třech
-  souborech) — **migrace 0066 je vrací na NULL**, položky se v součtu
-  nákladu hlásí jako "bez uvedené váhy". Doplnit, až bude váha v knize.
-- Zbývá: (1) import ceníku h2055 do DB — `predmety.typ` ENUM nemá
-  hodnotu pro běžné vybavení a chybí sloupec kapacity (DDL, ruční
-  spuštění); (2) váha lektvarů; (3) model kontejnerů — předmět uložený
-  "v" kontejneru (self-FK v inventáři), nosič = postava / zvíře /
-  povoz, součet váhy po stromu; (4) peníze na postavě; (5) váha
-  jezdce do nákladu zvířete. Dělat po částech, až po odsouhlasení
-  návrhu modelu.
+**Fáze 1b — Váha, kontejnery a nosiče — HOTOVO V KÓDU (2026-10-14, čeká na ruční DDL 0080/0081)**
+Rozhodnutí uživatele: váha se počítá automaticky; zvířata a povozy mohou
+mít vlastní náklad v kontejnerech; **do hry celý ceník (úplně vše)**;
+přeplnění kontejneru se jen **hlásí** všem (hráč i PJ), nic nebrání.
+Technickou volbu modelu udělal Claude: model "vedle", bez DROP (návrh a
+důvody v `docs/navrh-kontejnery-a-nosice.md`).
+- `0080_predmety_vybaveni_sloupce.sql` (DDL): `predmety.typ` +hodnota
+  `vybaveni`, `kategorie_vybaveni`, `kapacita_mn`. `0081_kontejnery.sql`
+  (DDL): `postava_kontejnery` (jeden řádek = jeden fyzický vak/truhla,
+  `nosic` postava|zvire) a `kontejner_obsah`. `0082_cenik_vybaveni.sql`
+  (DML, automaticky po DDL): **všech 217 položek "Nový ceník" (h2055)** —
+  vaky, pochvy, nádoby, služby, svícení, sedla, oblečení (×3 velikosti A/B/C),
+  stany, sítě, truhlice, deky, provazy, psací potřeby, nářadí, jídelní
+  náčiní, nástroje pro řemesla, alkohol, potraviny. Cena v zl (1 zl = 10 st
+  = 100 md), váha v mn; 21 kontejnerů má `kapacita_mn` (vaky, torna, soudky,
+  sud, truhly, trakař). Zvláštnosti zdroje jsou v hlavičce migrace a
+  NEOPRAVOVÁNY (soudek 10 l váží 200 mn, střední nákladní vak je levnější než
+  malý, "lst" u zimních bot).
+- `includes/vtt_kontejnery.php` + `hra/api/postava_kontejner.php`: přidat
+  (přes katalog v deníku se vak/truhla stane kontejnerem), vložit, vyndat,
+  odebrat (obsah zpět do inventáře), přejmenovat, nosič, "použít jako
+  kontejner" u vaku ve volném inventáři. Přeplnění: server vrátí upozornění,
+  klient po potvrzení pošle znovu.
+- Váha: `dracak_vtt_postava_naklad_mn()` počítá volné věci + kontejnery
+  (vlastní váha + obsah) + peníze; kontejner na zvířeti (`nosic = zvire`,
+  jen pokud postava jede) jde do `naklad_zvire_mn` a kalkulace cesty ho přičte
+  zvířeti (spolu s jezdcem). UI: karta "Kontejnery" v sekci Vybavení deníku,
+  tisková verze vypisuje obsah s umístěním. Editor: typ `vybaveni`, nová pole.
+- **Zbývá / neřeší:** lektvary nemají váhu (kniha ji neuvádí); vnořené
+  kontejnery; povoz není trvalá entita (jeho náklad se zadává při cestě);
+  ceníky h2058–h2061 (zbraně, zbroje) už v DB jsou; h2057 jezdecká zvířata
+  jsou jen částečně (7 zvířat).
 
 **Fáze 2 — Jízdní zvířata — HOTOVO V KÓDU (čeká na ruční DDL výše)**
 - `0067_jizdni_zvirata.sql`: tabulka `jizdni_zvirata` se 7 řádky z
@@ -615,13 +613,6 @@ přístupný.
 
 ## Čeká na rozhodnutí / podklady od uživatele
 
-- **Model kontejnerů a nosičů (Fáze 1b) — rozhodnutí A/B:** podrobně a
-  srozumitelně v `docs/navrh-kontejnery-a-nosice.md`. Stručně: A = zrušit
-  unikátní index `postava_predmet` (DROP INDEX, schvaluje uživatel) a
-  upravit stávající inventář; B (doporučeno) = nové tabulky vedle,
-  nic se neruší.
-- Rozsah importu ceníku h2055 (doporučeno: nejdřív jen kontejnery) a
-  kapacita kontejneru jako tvrdý limit s přepsáním PJ (doporučeno).
 - **Vliv únavy na nosnost:** v knize není (hledáno 2026-10-14), takže se
   nepočítá. Uživatel to vzal na vědomí; kdyby se něco našlo, doplnit.
 - **Texty přepsané v `pravidla_texty`:** pravidla.php zobrazuje text z

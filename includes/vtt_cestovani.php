@@ -416,7 +416,7 @@ function dracak_vtt_cesta_vypocet(PDO $pdo, array $ucastnici, array $zvirata, fl
         if ($naZvireti) {
             $zv = $doprava['zvire'];
             $vahaJezdce = max(0.0, (float)($u['vaha_jezdce'] ?? 0));
-            $nakladZvirete = $vahaJezdce + $nakladMn;
+            $nakladZvirete = $vahaJezdce + $nakladMn + ($nastaveni['auto_naklad'] ? (float)($naklad['naklad_zvire_mn'] ?? 0) : 0.0);
             $zp = dracak_vtt_zvire_pohyblivost($pdo, $zv, $nakladZvirete);
             if ($zp['pohyblivost'] === null) {
                 $chyby[] = $nazev . ': ' . $zv['nazev'] . ' nese ' . round($nakladZvirete) . ' mn, to je nad 4× jeho nosnosti — neunese to.';

@@ -11,6 +11,7 @@ declare(strict_types=1);
 // něco neříkají, funkce to nevymýšlí, ale vrací null / nechává stav
 // nevyhodnocený (viz komentáře u konkrétních funkcí).
 require_once __DIR__ . '/vtt_iniciativa.php';
+require_once __DIR__ . '/vtt_kontejnery.php';
 
 // =====================================================================
 // Pohyblivost
@@ -269,10 +270,13 @@ function dracak_vtt_rychlost_pohybu(PDO $pdo, ?int $bonus): ?array
 // výsledek je 'neuplny' = true. Volající to musí dát najevo (součet je
 // pak jen dolní odhad). Kouzla nic nevážijí, nepočítají se.
 //
-// Zatím plochý součet = všechno, co postava má, nese sama. Kontejnery
-// (vaky, truhly) a nosiče (zvíře, povoz) jsou další krok, viz
-// docs/stav-projektu.md. Do nákladu zatím nepatří oblečení ani jídlo —
-// nejsou v modelu inventáře.
+// Kontejnery (vaky, truhly, soudky… — includes/vtt_kontejnery.php): do nákladu
+// jde jejich vlastní váha + obsah. Kontejner, který nese zvíře (nosic =
+// 'zvire'), se nepočítá postavě, ale zvířeti, na kterém jede: 'naklad_zvire_mn'.
+// Postava, která na zvířeti nejede (nebo se její řádek nepředá), nese i
+// "zvířecí" kontejnery sama — nemají kdo jiný. Oblečení, jídlo a ostatní
+// vybavení z ceníku jsou běžné předměty (typ vybaveni) — počítají se jako
+// ostatní inventář.
 function dracak_vtt_postava_naklad_mn(PDO $pdo, int $postavaId, ?array $postava = null): array
 {
     $naklad = 0.0;
@@ -301,6 +305,22 @@ function dracak_vtt_postava_naklad_mn(PDO $pdo, int $postavaId, ?array $postava 
         $bezVahy[] = $nazev;
     }
 
+    $nakladZvire = 0.0;
+    if (dracak_vtt_kontejnery_dostupne($pdo)) {
+        $kontejnery = dracak_vtt_kontejnery_vahy($pdo, $postavaId);
+        $doprava = $postava !== null ? dracak_vtt_postava_doprava($pdo, $postava) : null;
+        $naZvireti = $doprava !== null && $doprava['typ'] === 'zvire';
+        $naklad += $kontejnery['postava'];
+        if ($naZvireti) {
+            $nakladZvire = $kontejnery['zvire'];
+        } else {
+            $naklad += $kontejnery['zvire'];
+        }
+        foreach ($kontejnery['bez_vahy'] as $nazev) {
+            $bezVahy[] = $nazev;
+        }
+    }
+
     $penizeMn = 0;
     $penizePocitany = $postava !== null && array_key_exists('penize_zl', $postava);
     if ($penizePocitany) {
@@ -309,7 +329,7 @@ function dracak_vtt_postava_naklad_mn(PDO $pdo, int $postavaId, ?array $postava 
     }
 
     return [
-        'naklad_mn' => $naklad, 'neuplny' => $bezVahy !== [], 'bez_vahy' => $bezVahy,
+        'naklad_mn' => $naklad, 'naklad_zvire_mn' => $nakladZvire, 'neuplny' => $bezVahy !== [], 'bez_vahy' => $bezVahy,
         'penize_mn' => $penizeMn, 'penize_pocitany' => $penizePocitany,
     ];
 }

@@ -69,6 +69,15 @@ $ob = $d['obrana'] ?? null;
 $nos = $poh['nosnost_mn'] ?? null;
 $zbrane = $d['zbrane'] ?? [];
 $inv = array_values(array_filter($d['inventar'] ?? [], fn($i) => $i['kategorie'] === 'predmet' || $i['kategorie'] === 'lektvar'));
+// Kontejnery: samy jako řádek (vlastní váha) a jejich obsah s umístěním "v …".
+foreach ($d['kontejnery'] ?? [] as $k) {
+    $jmeno = $k['vlastni_nazev'] ?: $k['nazev'];
+    $kde = $k['nosic'] === 'zvire' ? 'na zvířeti' : '';
+    $inv[] = ['nazev' => $k['nazev'] . ($k['vlastni_nazev'] ? ' „' . $k['vlastni_nazev'] . '“' : ''), 'mnozstvi' => 1, 'umisteni' => $kde, 'vaha_celkem' => $k['vaha_vlastni']];
+    foreach ($k['obsah'] as $o) {
+        $inv[] = ['nazev' => $o['nazev'], 'mnozstvi' => $o['mnozstvi'], 'umisteni' => 'v ' . $jmeno . ($kde ? ' (' . $kde . ')' : ''), 'vaha_celkem' => $o['vaha_celkem']];
+    }
+}
 $nakl = $d['naklad'] ?? null;
 $maMag = $postava && dracak_vtt_ma_magenergii($postava);
 ?>
@@ -237,8 +246,8 @@ $maMag = $postava && dracak_vtt_ma_magenergii($postava);
   <table class="radky">
     <thead><tr><th>Předmět</th><th class="c">ks</th><th>umístění (kde je uložen)</th><th class="c">váha (mn)</th></tr></thead>
     <tbody>
-    <?php for ($i = 0; $i < 22; $i++): $r = $inv[$i] ?? null; ?>
-      <tr><td><?= $pole($r['nazev'] ?? null) ?></td><td class="c"><?= $pole($r['mnozstvi'] ?? null) ?></td><td>&nbsp;</td><td class="c"><?= $r && $r['vaha_celkem'] !== null ? $mn($r['vaha_celkem']) : '&nbsp;' ?></td></tr>
+    <?php for ($i = 0, $radku = max(22, count($inv)); $i < $radku; $i++): $r = $inv[$i] ?? null; ?>
+      <tr><td><?= $pole($r['nazev'] ?? null) ?></td><td class="c"><?= $pole($r['mnozstvi'] ?? null) ?></td><td><?= $r && !empty($r['umisteni']) ? $e($r['umisteni']) : '&nbsp;' ?></td><td class="c"><?= $r && $r['vaha_celkem'] !== null ? $mn($r['vaha_celkem']) : '&nbsp;' ?></td></tr>
     <?php endfor; ?>
     </tbody>
   </table>

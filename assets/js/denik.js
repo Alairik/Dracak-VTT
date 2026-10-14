@@ -151,6 +151,46 @@
     }
   });
 
+  // Kontejnery (hra/api/postava_kontejner.php): vložit, vyndat, odebrat, nosič.
+  // Při přeplnění server vrátí upozornění; po potvrzení se pošle znovu.
+  async function kontejnerAkce(telo) {
+    let d = await volej('api/postava_kontejner.php', Object.assign({ postava_id: Number(ID) }, telo));
+    if (d && d.vyzaduje_potvrzeni) {
+      if (!window.confirm(d.upozorneni)) return;
+      d = await volej('api/postava_kontejner.php', Object.assign({ postava_id: Number(ID), potvrdit: true }, telo));
+    }
+    if (d && d.upozorneni) hlaska(d.upozorneni, true);
+    await obnov();
+  }
+  document.addEventListener('click', function (ev) {
+    const tl = ev.target.closest('[data-kont-akce]');
+    if (!tl || !wrap.contains(tl)) return;
+    const akce = tl.dataset.kontAkce;
+    const kontejner = Number(tl.dataset.kontejner || 0);
+    if (akce === 'vloz') {
+      const box = tl.closest('.dn-kont');
+      const sel = box.querySelector('.dn-kont-predmet');
+      const ks = Math.max(1, Number(box.querySelector('.dn-kont-ks').value) || 1);
+      kontejnerAkce({ akce: 'vloz', kontejner_id: kontejner, predmet_id: Number(sel.value), mnozstvi: ks });
+    } else if (akce === 'vyndej') {
+      kontejnerAkce({ akce: 'vyndej', kontejner_id: kontejner, predmet_id: Number(tl.dataset.predmet), mnozstvi: tl.dataset.mnozstvi === '' ? null : Number(tl.dataset.mnozstvi) });
+    } else if (akce === 'odebrat') {
+      if (window.confirm('Odebrat kontejner ' + (tl.dataset.nazev || '') + '? Věci z něj se vrátí do volného inventáře.')) {
+        kontejnerAkce({ akce: 'odebrat', kontejner_id: kontejner });
+      }
+    } else if (akce === 'prejmenovat') {
+      const novy = window.prompt('Jak se má kontejner jmenovat? (prázdné = původní název)', tl.dataset.nazev || '');
+      if (novy !== null) kontejnerAkce({ akce: 'prejmenovat', kontejner_id: kontejner, nazev: novy });
+    } else if (akce === 'rozbalit') {
+      kontejnerAkce({ akce: 'rozbalit', predmet_id: Number(tl.dataset.predmet) });
+    }
+  });
+  document.addEventListener('change', function (ev) {
+    const el = ev.target;
+    if (!el.matches || !el.matches('.dn-kont-nosic') || !wrap.contains(el)) return;
+    kontejnerAkce({ akce: 'nosic', kontejner_id: Number(el.dataset.kontejner), nosic: el.value });
+  });
+
   // Hledání v katalogu (hra/api/katalog_hledat.php) a přidání jedním klikem.
   let hledaniCasovac = null;
   document.addEventListener('input', function (ev) {

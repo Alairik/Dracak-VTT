@@ -24,6 +24,22 @@ declare(strict_types=1);
 // kompaktní pole "2k6+2" (dracak_kostky_zapis_format/parse v
 // entity_crud.php) — quick=>false, protože je nahrazuje syntetické pole
 // 'kostky_zapis', které editor.php vkládá do formuláře ručně.
+// Existuje sloupec v DB? (pro pole, která přidává ruční DDL migrace — editor
+// je nabídne až po jejím provedení.) Výsledek se drží po dobu requestu.
+function dracak_entities_ma_sloupec(string $tabulka, string $sloupec): bool
+{
+    static $cache = [];
+    $klic = $tabulka . '.' . $sloupec;
+    if (!array_key_exists($klic, $cache)) {
+        $stmt = dracak_db()->prepare(
+            'SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+        );
+        $stmt->execute([$tabulka, $sloupec]);
+        $cache[$klic] = (int)$stmt->fetchColumn() > 0;
+    }
+    return $cache[$klic];
+}
+
 function dracak_kostky_pole(): array
 {
     $typyKostek = ['k3', 'k4', 'k6', 'k8', 'k10', 'k12', 'k20', 'k100'];
@@ -117,7 +133,7 @@ return [
         'summary_fields' => ['typ' => 'Typ', 'utocnost' => 'Útočnost', 'zraneni' => 'Zranění', 'oc' => 'Obrana', 'dosah' => 'Dosah'],
         'fields' => [
             ['name' => 'nazev', 'label' => 'Název', 'type' => 'text', 'required' => true, 'quick' => true],
-            ['name' => 'typ', 'label' => 'Typ', 'type' => 'select', 'options' => ['zbran', 'zbroj', 'surovina', 'artefakt'], 'quick' => true, 'filter' => 'select'],
+            ['name' => 'typ', 'label' => 'Typ', 'type' => 'select', 'options' => ['zbran', 'zbroj', 'surovina', 'artefakt', 'vybaveni'], 'quick' => true, 'filter' => 'select'],
             ['name' => 'utocnost', 'label' => 'Útočnost', 'type' => 'number', 'quick' => true, 'filter' => 'range'],
             ['name' => 'zraneni', 'label' => 'Zranění', 'type' => 'number', 'quick' => true, 'filter' => 'range'],
             ['name' => 'oc', 'label' => 'Obrana (OČ)', 'type' => 'number', 'quick' => true, 'filter' => 'range'],
@@ -130,8 +146,14 @@ return [
             ['name' => 'sil_pozadavek', 'label' => 'Požadavek na Sílu (např. "SIL +2 a vyšší")', 'type' => 'text'],
             ['name' => 'uc', 'label' => 'ÚČ (jen improvizované zbraně, PPP)', 'type' => 'number'],
             ['name' => 'typ_pro_vyrazeni_dveri', 'label' => 'Typ pro vyražení dveří', 'type' => 'select', 'options' => ['ostre_bodne', 'ostre_drtive', 'tupe_drtive']],
-            ['name' => 'vaha', 'label' => 'Váha', 'type' => 'number'],
-            ['name' => 'cena', 'label' => 'Cena', 'type' => 'number', 'filter' => 'range'],
+            ['name' => 'vaha', 'label' => 'Váha (mn)', 'type' => 'number'],
+            ['name' => 'cena', 'label' => 'Cena (zl)', 'type' => 'number', 'filter' => 'range'],
+            // Sloupce z migrace 0080 — v editoru až po jejím provedení (jinak by
+            // uložení padalo na neexistujícím sloupci).
+            ...(dracak_entities_ma_sloupec('predmety', 'kapacita_mn') ? [
+                ['name' => 'kategorie_vybaveni', 'label' => 'Skupina vybavení (ceník)', 'type' => 'text', 'filter' => 'select'],
+                ['name' => 'kapacita_mn', 'label' => 'Kapacita (mn) — vyplň jen u vaku, truhly, soudku… (kontejner)', 'type' => 'number'],
+            ] : []),
         ],
         'relations' => [
             ['join_table' => 'predmet_efekty', 'own_fk' => 'predmet_id', 'other_fk' => 'efekt_id', 'other_table' => 'efekty', 'other_label' => 'nazev', 'label' => 'Efekty'],

@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__ . '/../../includes/vtt.php';
 require_once __DIR__ . '/../../includes/vtt_predmety.php';
+require_once __DIR__ . '/../../includes/vtt_kontejnery.php';
 
 // Rychlé zápisy z Osobního deníku (hra/denik.php): životy, magenergie,
 // únava, zkušenost, peníze, co postava nosí/drží, osobní texty. Na rozdíl
@@ -206,6 +207,17 @@ switch ($akce) {
                 $pdo->prepare("INSERT IGNORE INTO $tabulka (postava_id, $fk) VALUES (?, ?)")->execute([$postavaId, $polozkaId]);
             } else {
                 $mnozstvi = max(1, min(1000, (int)($data['mnozstvi'] ?? 1)));
+                // Předmět s kapacitou (vak, truhla…) je kontejner: každý kus je
+                // vlastní fyzický kontejner (vlastní obsah), ne řádek s počtem.
+                if ($typ === 'predmet' && dracak_vtt_kontejnery_dostupne($pdo)) {
+                    $kontejnerPrvni = dracak_vtt_kontejner_pridat($pdo, $postavaId, $polozkaId);
+                    if ($kontejnerPrvni !== null) {
+                        for ($i = 1; $i < min($mnozstvi, 20); $i++) {
+                            dracak_vtt_kontejner_pridat($pdo, $postavaId, $polozkaId);
+                        }
+                        odpoved(200, ['ok' => true, 'kontejner' => true]);
+                    }
+                }
                 $pdo->prepare(
                     "INSERT INTO $tabulka (postava_id, $fk, mnozstvi) VALUES (?, ?, ?)
                      ON DUPLICATE KEY UPDATE mnozstvi = LEAST(65000, mnozstvi + VALUES(mnozstvi))"

@@ -1,3 +1,7 @@
+> **ROZHODNUTO A POSTAVENO (2026-10-14):** varianta B (model "vedle"), celý
+> ceník, přeplnění jen upozorní. Popis hotového řešení je v
+> `docs/stav-projektu.md` (Fáze 1b). Níže původní podklad k rozhodnutí.
+
 # Návrh: kontejnery (vaky, truhly…) a nosiče nákladu
 
 Podklad k rozhodnutí z `docs/stav-projektu.md` (Fáze 1b). Nic z toho zatím není

@@ -9,6 +9,7 @@ declare(strict_types=1);
 // Kde pravidla (nebo data) něco neurčují, funkce vrací null — nedomýšlí.
 require_once __DIR__ . '/vtt_pohyblivost.php';
 require_once __DIR__ . '/vtt_predmety.php';
+require_once __DIR__ . '/vtt_kontejnery.php';
 
 // TABULKA RODOVÝCH ZBRANÍ (h1609, b: "rodová zbraň dává postavě +1 k
 // útočnému číslu, pokud ji používá"). Klíč = základní rasa; trpasličí
@@ -431,19 +432,24 @@ function dracak_vtt_aktivni_efekty_postavy(PDO $pdo, int $postavaId): array
     return $stmt->fetchAll();
 }
 
-// Inventář s váhou — plochý (kontejnery zatím nejsou v modelu).
+// Volný inventář s váhou (předměty a lektvary). Předměty uložené v kontejnerech
+// tu nejsou — jsou v dracak_vtt_kontejnery_postavy(). 'kapacita_mn' je vyplněná
+// jen u předmětu, který je kontejner (vak, truhla…) a leží ve volném inventáři
+// (např. přidal ho PJ) — deník nabídne "rozbalit jako kontejner".
 function dracak_vtt_inventar_s_vahou(PDO $pdo, int $postavaId): array
 {
     $vysledek = [];
+    $kapacita = dracak_vtt_ma_sloupec($pdo, 'predmety', 'kapacita_mn') ? 'p.kapacita_mn' : 'NULL';
     $stmt = $pdo->prepare(
-        'SELECT p.id, p.nazev, p.typ, p.vaha, pp.mnozstvi
+        "SELECT p.id, p.nazev, p.typ, p.vaha, $kapacita AS kapacita_mn, pp.mnozstvi
          FROM postava_predmety pp JOIN predmety p ON p.id = pp.predmet_id
-         WHERE pp.postava_id = ? ORDER BY FIELD(p.typ, "zbran", "zbroj", "artefakt", "surovina"), p.nazev'
+         WHERE pp.postava_id = ? ORDER BY FIELD(p.typ, 'zbran', 'zbroj', 'artefakt', 'surovina', 'vybaveni'), p.nazev"
     );
     $stmt->execute([$postavaId]);
     foreach ($stmt->fetchAll() as $r) {
         $vysledek[] = [
             'kategorie' => 'predmet', 'id' => (int)$r['id'], 'nazev' => $r['nazev'], 'typ' => $r['typ'],
+            'kapacita_mn' => $r['kapacita_mn'] !== null ? (float)$r['kapacita_mn'] : null,
             'mnozstvi' => (int)$r['mnozstvi'],
             'vaha_ks' => $r['vaha'] !== null ? (float)$r['vaha'] : null,
             'vaha_celkem' => $r['vaha'] !== null ? (float)$r['vaha'] * (int)$r['mnozstvi'] : null,
@@ -545,6 +551,8 @@ function dracak_vtt_denik_data(PDO $pdo, array $postava, bool $plne = true): arr
         'jazyky' => $plne ? dracak_vtt_jazyky_postavy($pdo, $postava) : [],
         'efekty' => $plne ? dracak_vtt_aktivni_efekty_postavy($pdo, (int)$postava['id']) : [],
         'inventar' => $plne ? dracak_vtt_inventar_s_vahou($pdo, (int)$postava['id']) : [],
+        'kontejnery' => $plne ? dracak_vtt_kontejnery_postavy($pdo, (int)$postava['id']) : [],
+        'kontejnery_dostupne' => dracak_vtt_kontejnery_dostupne($pdo),
         'doprava' => dracak_vtt_postava_doprava($pdo, $postava),
         'cile' => $plne ? dracak_vtt_mozne_cile($pdo, $postava) : [],
     ];

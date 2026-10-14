@@ -535,6 +535,7 @@ $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' =>
                   <td class="c"><?= $i['vaha_ks'] !== null ? $mn($i['vaha_ks']) : '<span class="dn-stitek neuplne" title="Váha v katalogu chybí">bez váhy</span>' ?></td>
                   <td class="c"><?= $i['vaha_celkem'] !== null ? $mn($i['vaha_celkem']) : '—' ?></td>
                   <td class="c dn-inv-akce"><?php if ($i['kategorie'] === 'lektvar' && $svetId > 0): ?> <button type="button" class="dn-pm dn-pm-mini" data-pouzij="lektvar" data-polozka="<?= (int)$i['id'] ?>" data-nazev="<?= $e($i['nazev']) ?>"<?= !empty($i['skodi']) ? ' data-skodi="1"' : '' ?>>Vypít</button><?php endif; ?>
+                    <?php if (!empty($i['kapacita_mn']) && $d['kontejnery_dostupne']): ?><button type="button" class="dn-pm dn-pm-mini" data-kont-akce="rozbalit" data-predmet="<?= (int)$i['id'] ?>" title="Změnit na kontejner, do kterého jde něco vložit">Použít jako kontejner</button><?php endif; ?>
                     <button type="button" class="dn-pm dn-pm-mini" data-inv="zmena" data-typ="<?= $e($i['kategorie']) ?>" data-id="<?= (int)$i['id'] ?>" data-delta="-1" aria-label="Ubrat kus">−</button><button type="button" class="dn-pm dn-pm-mini" data-inv="zmena" data-typ="<?= $e($i['kategorie']) ?>" data-id="<?= (int)$i['id'] ?>" data-delta="1" aria-label="Přidat kus">+</button><button type="button" class="dn-pm dn-pm-mini" data-inv="odebrat" data-typ="<?= $e($i['kategorie']) ?>" data-id="<?= (int)$i['id'] ?>" data-nazev="<?= $e($i['nazev']) ?>" aria-label="Odebrat z inventáře">✕</button>
                   </td>
                 </tr>
@@ -548,10 +549,78 @@ $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' =>
             </table>
           </div>
           <?php if ($nakl['neuplny']): ?><p class="note"><span class="dn-stitek neuplne">neúplný součet</span> Bez uvedené váhy (v součtu chybí): <?= $e(implode(', ', $nakl['bez_vahy'])) ?>.</p><?php endif; ?>
-          <p class="note">Do nákladu se zatím nepočítá oblečení a jídlo (nejsou v inventáři); vaky, truhly a zvířata jako nosiče nákladu přibudou.</p>
+          <p class="note">Do nákladu se počítá volný inventář, kontejnery (vlastní váha + obsah) a peníze. Oblečení, jídlo a další vybavení z ceníku najdeš v katalogu pod „předmět“.</p>
         <?php endif; ?>
       </div>
 
+
+      <div class="dn-karta dn-sirka-cela" id="kontejnery">
+        <h3 class="dn-h3">Kontejnery <small class="note">vaky, truhly, soudky, trakař…</small></h3>
+        <?php if (!$d['kontejnery_dostupne']): ?>
+          <p class="note">Kontejnery čekají na úpravu databáze (ruční SQL).</p>
+        <?php else: ?>
+          <?php
+            $jedeNaZvireti = $d['doprava'] && $d['doprava']['typ'] === 'zvire';
+            $volnePredmety = array_filter($d['inventar'], fn($i) => $i['kategorie'] === 'predmet' && empty($i['kapacita_mn']));
+          ?>
+          <?php if (!$d['kontejnery']): ?>
+            <p class="note">Zatím žádný kontejner. V katalogu výše vyhledej třeba „vak“, „truhla“ nebo „soudek“ (hledání „předmět“) a přidej ho — pak do něj můžeš věci vkládat.</p>
+          <?php endif; ?>
+          <div class="dn-kont-seznam">
+          <?php foreach ($d['kontejnery'] as $k):
+              $pct = $k['kapacita_mn'] ? max(0, min(100, $k['obsah_vaha'] / $k['kapacita_mn'] * 100)) : 0; ?>
+            <div class="dn-kont" data-kontejner="<?= (int)$k['id'] ?>">
+              <div class="dn-kont-hlava">
+                <strong><?= $e($k['vlastni_nazev'] ?: $k['nazev']) ?></strong>
+                <?php if ($k['vlastni_nazev']): ?><span class="note">(<?= $e($k['nazev']) ?>)</span><?php endif; ?>
+                <span class="dn-stitek">vlastní váha <?= $k['vaha_vlastni'] !== null ? $mn($k['vaha_vlastni']) . ' mn' : '—' ?></span>
+                <?php if ($k['plne']): ?><span class="dn-stitek nebezpeci">přeplněno</span><?php endif; ?>
+              </div>
+              <?php if ($k['kapacita_mn'] !== null): ?>
+                <div class="dn-bar <?= $k['plne'] ? 'out' : ($pct >= 90 ? 'low' : 'ok') ?>" aria-label="Zaplnění kontejneru"><i style="width:<?= round($pct, 1) ?>%"></i></div>
+                <div class="dn-metr-pozn"><?= $mn($k['obsah_vaha']) ?> / <?= $mn($k['kapacita_mn']) ?> mn<?= $k['volne'] !== null && !$k['plne'] ? ' · volno ' . $mn($k['volne']) . ' mn' : '' ?></div>
+              <?php endif; ?>
+              <?php if ($k['obsah']): ?>
+                <table class="dn-tab dn-kont-obsah"><tbody>
+                <?php foreach ($k['obsah'] as $o): ?>
+                  <tr>
+                    <td><?= $e($o['nazev']) ?></td>
+                    <td class="c"><?= (int)$o['mnozstvi'] ?> ks</td>
+                    <td class="c"><?= $o['vaha_celkem'] !== null ? $mn($o['vaha_celkem']) . ' mn' : '<span class="dn-stitek neuplne">bez váhy</span>' ?></td>
+                    <td class="c dn-inv-akce">
+                      <button type="button" class="dn-pm dn-pm-mini" data-kont-akce="vyndej" data-kontejner="<?= (int)$k['id'] ?>" data-predmet="<?= (int)$o['predmet_id'] ?>" data-mnozstvi="1" aria-label="Vyndat kus">−1</button>
+                      <button type="button" class="dn-pm dn-pm-mini" data-kont-akce="vyndej" data-kontejner="<?= (int)$k['id'] ?>" data-predmet="<?= (int)$o['predmet_id'] ?>" data-mnozstvi="" aria-label="Vyndat vše">vyndat vše</button>
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
+                </tbody></table>
+              <?php else: ?><p class="note">Prázdný.</p><?php endif; ?>
+              <?php if ($volnePredmety): ?>
+                <div class="dn-kont-vloz">
+                  <select class="dn-kont-predmet" aria-label="Co vložit">
+                    <?php foreach ($volnePredmety as $v): ?><option value="<?= (int)$v['id'] ?>" data-max="<?= (int)$v['mnozstvi'] ?>"><?= $e($v['nazev']) ?> (<?= (int)$v['mnozstvi'] ?> ks)</option><?php endforeach; ?>
+                  </select>
+                  <input type="number" class="dn-kont-ks" min="1" value="1" aria-label="Kolik kusů">
+                  <button type="button" class="btn btn-secondary" data-kont-akce="vloz" data-kontejner="<?= (int)$k['id'] ?>">Vložit</button>
+                </div>
+              <?php endif; ?>
+              <div class="dn-kont-pata">
+                <label>Nese:
+                  <select class="dn-kont-nosic" data-kontejner="<?= (int)$k['id'] ?>" <?= $jedeNaZvireti || $k['nosic'] === 'zvire' ? '' : 'disabled title="Postava nejede na zvířeti"' ?>>
+                    <option value="postava" <?= $k['nosic'] === 'postava' ? 'selected' : '' ?>>postava</option>
+                    <option value="zvire" <?= $k['nosic'] === 'zvire' ? 'selected' : '' ?>>zvíře<?= $jedeNaZvireti ? ' (' . $e($d['doprava']['zvire']['nazev']) . ')' : '' ?></option>
+                  </select>
+                </label>
+                <button type="button" class="btn btn-ghost" data-kont-akce="prejmenovat" data-kontejner="<?= (int)$k['id'] ?>" data-nazev="<?= $e($k['vlastni_nazev'] ?? '') ?>">Přejmenovat</button>
+                <button type="button" class="btn btn-ghost" data-kont-akce="odebrat" data-kontejner="<?= (int)$k['id'] ?>" data-nazev="<?= $e($k['vlastni_nazev'] ?: $k['nazev']) ?>">Odebrat kontejner</button>
+              </div>
+            </div>
+          <?php endforeach; ?>
+          </div>
+          <?php if ($d['naklad']['naklad_zvire_mn'] > 0): ?><p class="note">Na zvířeti: <strong><?= $mn($d['naklad']['naklad_zvire_mn']) ?> mn</strong> — počítá se jemu (spolu s jezdcem), ne postavě.</p><?php endif; ?>
+          <p class="note">Kapacita je jen hlídaná — když ji překročíš, hra upozorní a ty rozhodneš. Věc vložená do kontejneru zmizí z volného inventáře; váha se počítá pořád.</p>
+        <?php endif; ?>
+      </div>
       <div class="dn-karta">
         <h3 class="dn-h3">Peníze</h3>
         <?php if ($d['penize'] !== null): $pn = $d['penize']; ?>

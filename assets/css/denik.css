@@ -231,3 +231,14 @@
 .dn-dusledky { margin: 4px 0 0; padding-left: 16px; font-size: 11.5px; color: var(--color-neutral-600); line-height: 1.4; }
 .dn-dusledky li { margin: 0; }
 .dn-vlast-h s, .dn-vlast-b s { opacity: .5; font-size: .8em; margin-right: 2px; }
+
+/* Kontejnery (vaky, truhly…) v sekci Vybavení */
+.dn-kont-seznam { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; margin-bottom: 10px; }
+.dn-kont { border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 12px 14px; background: var(--color-surface, #fffdf8); display: flex; flex-direction: column; gap: 8px; }
+.dn-kont-hlava { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: baseline; }
+.dn-kont-obsah td { padding: 3px 6px; font-size: 13px; }
+.dn-kont-vloz { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.dn-kont-vloz select { flex: 1 1 150px; min-width: 0; }
+.dn-kont-vloz input { width: 64px; }
+.dn-kont-pata { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12.5px; }
+.dn-kont-pata label { display: flex; gap: 6px; align-items: center; margin: 0; text-transform: none; letter-spacing: 0; font-weight: 500; }
