@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS mapa_kresby (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
   mapa_id INT UNSIGNED NOT NULL,
   ucet_id INT UNSIGNED NULL,
-  typ VARCHAR(20) NOT NULL COMMENT 'cara, sipka, obdelnik, kruh, text',
+  typ VARCHAR(20) NOT NULL COMMENT 'cara, sipka, obdelnik, kruh, kuzel, text',
   data TEXT NOT NULL COMMENT 'JSON: body, text…',
   barva VARCHAR(7) NOT NULL DEFAULT '#ffd166',
   sirka SMALLINT UNSIGNED NOT NULL DEFAULT 4 COMMENT 'tloušťka čáry v px mapy',
