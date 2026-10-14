@@ -372,3 +372,9 @@ knihou a opraví najednou. Pravidlo je v `CLAUDE.md`.
 - [ ] Váha postavy (jezdce, cestujícího) je v pravidlech jen jako rozsah podle rasy — zadává se ručně.
 - [ ] Dovednosti, které únava/naložení ovlivňují, ale kniha je nechává na PJ: Plavání (past +1 za stupeň únavy a naložení), Skok o tyči (ne při velkém naložení), Tichý pohyb (šance ovlivní naložení); kouzelník ve zbroji (postih k iniciativě), obří štít (−2 ini, +1 únava/h).
 
+
+**Souboj (zjištěno při návrhu souboje 2026-10-14, viz `docs/navrh-souboje-v1.md`)**
+- [ ] Tabulka iniciativy a akcí (h1623, b10810–b10815): v textu 1–6 = 2 akce; uživatel si pamatuje „1–3 = 1 akce“ — ověřit na straně 78 (příklady v knize s iniciativou 3 mluví o dvou akcích).
+- [ ] Příklad v h1623 (b10822): „Arpagovi padne 7 (2 akce)“ odporuje tabulce (7–12 = 4 akce) — pravděpodobně překlep.
+- [ ] Práh smrti a vyřazení postavy: samostatný odstavec v přepisu PPZ chybí; dohledat (foto/odkaz na stranu).
+- [ ] PJ h2341: „velikost A = 1 hex, B = 2 hexy, C = 3 hexy“ nesedí s h1621 ani s domácím pravidlem mapy (A0/A/B = 1 hex, zvířecí C = 2, D = 3, E = 5, F = 7) — text vypadá poškozený.

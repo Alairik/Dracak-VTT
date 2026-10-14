@@ -88,16 +88,61 @@ akcích, střelba, útěk, finty, vícenásobné útoky nestvůr, ÚČ/OČ nestv
 Dnešní „Další na tahu“ předává tah po každé jedné akci; kniha dovoluje víc akcí
 v řadě (nejvýš polovinu původních) — u 2 akcí je to totéž, od 4 akcí ne.
 
-## Otevřené věci k rozhodnutí / ověření
+## Rozhodnuto (uživatel, 2026-10-14)
 
-- Rychlost seslaná v půlce kola: „polovina původních akcí“ se počítá z původních 2,
-  nebo z nových 4? (Příklad v knize odpovídá nově zdvojenému počtu.)
-- Překvapení: v základním systému strana nic nedělá; v tabulce iniciativy je
-  „překvapení −6“. Brát obojí?
-- Shoda v iniciativě: kniha hráčů říká obratnost a pak PJ; PJ kniha má delší
-  pořadí (obratnost, KZ, zranění, náklad, síla, inteligence).
-- Hexy nestvůr (h2341): „A = 1, B = 2, C = 3“ hexy — ale člověk (B) stojí na 1 hexu
-  (h1621). Text vypadá poškozený → do kontroly při proofreadingu.
-- Smrt: v příkladu (h1612) je nestvůra s 0 životy „na místě mrtvá“; samostatný
-  odstavec o prahu smrti postavy ještě dohledat.
-- ÚČ/OČ nestvůr: volný text („(+4 + 6/+1) = 10+/1 …“) — potřeba čísel pro automatický hod.
+- **Tah po více akcích podle knihy**: v jednom tahu aspoň 1 a nejvýš polovina
+  akcí (h1623). **Rychlost uprostřed kola** → polovina se počítá z **nového**
+  (zdvojeného) počtu.
+- **Překvapení v rozšířeném systému = −6 k iniciativě** (řádek tabulky), ne
+  „nemůže nic dělat“.
+- **Hody se nikdy nehází samy.** U každého hodu (1k6+, 1k10…) je tlačítko „Hodit“ →
+  ukáže se 3D kostka, a **hodnoty, které kostky ukážou, jsou hod** (klient je pošle,
+  server jen hlídá rozsah). Alternativně hráč **zapíše hod ručně** (fyzická
+  kostka). Šestka u 1k6+ = další hod. Automatizuje se jen to ostatní: součty,
+  opravy, zranění, životy, bojeschopnost (PJ může zranění jedním klikem opravit).
+  Ověřeno: vendorovaná kostka (`dice-box` 1.1.4) neumí předepsat výsledek (`2d6@3,4`
+  se ignoruje) — proto výsledek bere z kostek, ne ze serveru.
+- **Iniciativa nestvůr a postav ovládaných PJ je pro hráče skrytá**; hráč vidí
+  jen postavy, které ovládá.
+- **Nestvůry dostanou „malý deník“** (životy, ÚČ/OČ, odolnost, inteligence,
+  charisma, pohyblivost, vytrvalost, výbava/kořist, schopnosti, kouzla), na který
+  platí stejná pravidla jako na postavy (nosnost, únava, kouzla). Staty se
+  v souboji odvodí z čísel v zápisu nestvůry, např. „(+4 + 5) = 9“ = bonus za sílu
+  +4 a síla zbraně 5; OČ „(−1 + 7) = 6“ = bonus za obratnost −1 a KZ 7. Rozbor
+  bestiáře (208 nestvůr): ÚČ se čistě rozebere u 112, OČ u 133; zbytek má proměnné
+  (X), „dle podoby“ nebo „závisí“ → PJ doplní před bojem.
+- **Zbytek návrhu (okna, pořadí událostí, zranění automaticky + oprava) schválen.**
+- **Zabrané hexy podle velikosti (úprava pro mapu):** A0, A, B = 1 hex; zvířecí C =
+  2 hexy vedle sebe; D = 3 hexy u sebe; E = 5 hexů (2+3); F = 7 hexů (2+3+2).
+  *K potvrzení:* humanoidní C (obr), a „F“ — v knize velikosti končí na E.
+
+## Co se při kontrole ukázalo
+
+- **Tabulka iniciativy a akcí** (h1623): v textu je **1–6 = 2 akce**, 7–12 = 4, … Dva
+  příklady v knize (iniciativa 3 → „všichni mají dvě akce“, h1623 i h1626) to
+  potvrzují. Příklad „Arpagovi padne 7 (2 akce)“ (h1623, b10822) tabulce odporuje →
+  pravděpodobně překlep, do kontroly. Hodnotu „1–3 = 1 akce“ jsem nikde nenašel;
+  pokud ji uživatel pamatuje z knihy, je potřeba foto str. 78.
+- **Smrt / vyřazení:** odstavec o prahu smrti postavy jsem v přepisu nenašel.
+  Stopy: mez vyřazení a bojeschopnost (h1610); příklad, kde nestvůra s 0 životy je
+  „na místě mrtvá“ (h1612); u berserka „0 a méně = padá k zemi, do 3 kol umírá“
+  (HB, h134); dovednost První pomoc „zastaví umírání při klesnutí životů pod 0“
+  (HB, h1806). Potřeba foto/odkaz na PPZ.
+
+## Otevřené věci
+
+- Hexy: humanoidní C a velikost F (viz výš); kotva víc-hexového tvora (který hex je
+  „přední“ pro útok na 3 hexy před sebou).
+- Co hráč vidí z pořadí: návrh = jen iniciativu vlastních postav a označení, kdo
+  je právě na tahu (bez čísel a pořadí ostatních).
+- Práh smrti postavy (viz výš).
+
+## Navržené pořadí stavby
+
+1. Zahájit souboj (překvapení −6), úmysly, iniciativa s tlačítkem hodu + 3D kostka
+   + ruční zápis, skrytá iniciativa pro hráče, tah po více akcích.
+2. Lišta akcí a pohyb po hexech (krok, otočka, čelo, 3 hexy před sebou, víc-hexoví tvorové).
+3. Útok / obrana / výsledek (hody tlačítkem), zranění automaticky + oprava, bojeschopnost,
+   vyřazení.
+4. Malý deník nestvůry (staty z čísel v zápisu), kořist.
+5. Kouzlení po akcích, střelba, útěk, zvláštní případy, později finty.
