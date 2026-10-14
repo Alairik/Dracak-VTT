@@ -19,8 +19,9 @@ zdroj pravdy o hře jsou pravidla v `content/`, ne repo/DB, a o
 neodhadování mechaniky). **Fáze 1 a 2 ze sekce "Rozpracováno:
 cestování..." jsou v kódu hotové**; **Fáze 1b (váha/kontejnery) je
 hotová v kódu, stejně jako Fáze 2–5 (zvířata, povozy, kalkulačka cesty,
-přepínače) — celé "cestování, naložení, únava" je tím hotové; čeká jen na
-ruční SQL** — viz níž. Stav předchozí
+přepínače) — celé "cestování, naložení, únava" je tím hotové a nasazené,
+žádné ruční SQL nečeká.** Další velký cíl je sekce "Plán: náhrada Owlbear
+Rodeo" níž. Stav předchozí
 konverzace je zapsaný přesně proto, aby ses nemusel/a ptát na věci, co
 už byly rozhodnuté (viz "Architektonická rozhodnutí" a celá sekce
 "Rozpracováno" níže — všechno v ní je buď přímo citovaný text pravidel,
@@ -612,6 +613,92 @@ jménem ("Dýka" -> "Dýka (vrhací)"); kouzla/schopnosti jsou jen ke čtení
 finty, přesvědčení, erb/portrét, kontejnery a nosiče nákladu (Fáze 1b),
 historie změn postavy; deník cizí postavy ostatním hráčům zatím není
 přístupný.
+
+---
+
+## Plán: náhrada Owlbear Rodeo (zadáno 2026-10-14, nic z toho zatím není hotové)
+
+**Cíl uživatele:** VTT, které může v ostrém provozu nahradit Owlbear Rodeo —
+správa tokenů, mapy, souboj, otáčení tokenů, volitelně pochod po mapě světa a
+přechody mezi lokacemi. Cílem je začít testovat v živé hře, ne „dokonalost“.
+
+**Stav mapy (audit `hra/mapa.php` 2026-10-14):** funguje grid (čtverec/hex), zdi
+(blokují hráče), mlha války (per hráč), měřidlo, ping, piny s vnořenými mapami,
+iniciativa a pořadí tahů, krok zpět, kostky 3D, HP/magenergie/efekty na tokenu,
+PJ přepíná aktivní mapu. **Chybí / drhne:**
+- mapa se zobrazí v původní velikosti, **žádný zoom ani posun**; pohyb tokenů
+  je jen `mousedown` (myš), **žádný dotyk**;
+- token = jen `postava` nebo `nestvura_instance`, na mapě jen dvoupísmenný
+  „puck“; **žádné otočení, velikost, portrét, obecný token** (NPC bez statů,
+  předmět, překážka), výběr více tokenů, zamknutí, vrstvy, pravé tlačítko,
+  klávesové zkratky, kreslení;
+- synchronizace = polling `api/udalosti.php` každých 1,5 s; při 10 typech
+  událostí (`token_pridan`, `token_smazan`, `efekt_*`, `iniciativa_hozena`,
+  `kolo_nove`, `tah_zmena`, `predmet_*`, `krok_zpet`) se **celá stránka
+  přenačte** (`location.reload()`) — zmizí otevřené panely, vybraný token;
+- `svet_udalosti.typ` je **ENUM** → každý nový druh události (otočení,
+  kreslení…) by chtěl ruční ALTER. Řešení: jednou ručně změnit na VARCHAR,
+  pak už nové typy další DDL nepotřebují;
+- „Cestovat sem“ (`api/pin_cestovat.php`) jen přičte ručně zadané dny;
+  s kalkulačkou cesty (`includes/vtt_cestovani.php`) není propojené a pin
+  nepřenese družinu na cílovou mapu;
+- token se hýbe libovolně — pohyblivost postavy (po naložení a únavě) se na
+  mapě nepoužívá, i když ji hra umí spočítat.
+
+**Úkoly (S ≈ hodiny, M ≈ půl dne, L ≈ den a víc):**
+
+*A. Plynulá mapa (bez toho se nedá hrát)*
+1. Zoom + posun + „přizpůsobit na obrazovku“, jednotné Pointer Events (myš i
+   dotyk, pinch) [M]
+2. Aktualizace bez `location.reload()` — přidání/smazání tokenu, efekty,
+   iniciativa, kolo/tah překreslit na místě [M–L]
+3. Token: otočení (směr), velikost (podle `velikosti` z pravidel), portrét,
+   barva týmu, popisek [M]
+4. Obecné tokeny (NPC bez statů, předmět, překážka, značka) [M]
+5. Výběr více tokenů, hromadný pohyb, zamknout, vrstvy, duplikovat, Delete,
+   kontextové menu, klávesové zkratky [M]
+6. Kreslení na mapu (čára, šipka, tvar, text; sdílené/jen PJ) [M]
+7. Měřidlo ve hře-jednotkách (body pohybu / metry) a šablony plošných kouzel
+   (kruh, kužel) [S–M]
+8. Jednorázově změnit `svet_udalosti.typ` ENUM → VARCHAR (ruční SQL, viz
+   pravidlo v CLAUDE.md) — dělat spolu s bodem 2/3 [S]
+
+*B. Souboj s pravidly (tím se Owlbearu vyrovná i předčí)*
+9. Dosah pohybu v tahu z pohyblivosti postavy (po naložení a únavě), spotřeba
+   bodů pohybu, varování při překročení, zákaz sprintu při únavě [M–L]
+10. Útok z tokenu: cíl → ÚČ vs OČ → hod → zranění → životy (navázat na
+    existující `hod_postavy.php`, `pouzij_predmet.php`) [L]
+11. Skupina nestvůr jedním tahem („5× goblin“) s číslováním a hromadnou
+    iniciativou [M]
+12. Čitelné stavy na tokenu: pruh životů, ikony efektů, únava/přetížení (PJ)
+    [S]
+13. PJ-info o únavě a naložení v panelu tokenu (už je na `druzina.php`) [S]
+
+*C. Svět a cesta*
+14. Pochod po mapě světa: měřítko mapy (km/px), PJ vyznačí trasu → výpočet z
+    kalkulačky cesty (povrch, terén, tempo, zvíře/povoz) → čas + únava se
+    zapíšou postavám [L]
+15. Přechod mezi lokacemi: pin → „Vstoupit“ přenese tokeny družiny na vstupní
+    bod cílové mapy a přepne aktivní mapu všem [M]
+16. Knihovna map: duplikace, velké obrázky (automatické zmenšení, limit
+    hostingu), pořadí scén [M]
+17. Jedny „hodiny světa“ (den/hodina) propojené s cestou, odpočinkem a
+    spánkem [M]
+
+*D. Příprava na ostré hraní*
+18. Ověřit celý tok pozvání: PJ vytvoří svět → pozve hráče → hráč založí
+    postavu → vidí jen své [M]
+19. Zálohy databáze i `uploads/` na WEDOSu + ověřený postup obnovy [S]
+20. Chybový log čitelný pro admina (aby se chyby z ostré hry nemusely
+    popisovat z paměti) [S]
+21. Zátěž polling: adaptivní interval (rychle v boji, pomalu v klidu, stop při
+    skryté záložce), spočítat počet dotazů/min pro 6 hráčů [S–M]
+22. Rozvržení na tabletu/telefonu (panely, toolbar) [M]
+23. Zkušební scénář „první ostrá hra“ (cca 12 kroků) a jeho projití na dvou
+    zařízeních [S]
+
+**Doporučené pořadí:** nejdřív blok A (1–3, 8), pak krátký zkušební
+večer, teprve potom B a C podle toho, co v praxi vadí nejvíc.
 
 ---
 
