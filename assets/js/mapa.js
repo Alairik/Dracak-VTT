@@ -1,0 +1,2159 @@
+// Mapa (hra/mapa.php): kamera, tokeny, nástroje, synchronizace.
+// Konfigurace a počáteční data předává PHP v window.MAPA — samotný skript
+// je statický soubor, aby se dal cachovat a upravovat bez PHP.
+
+// --- Kamera: zoom a posun přes CSS transform na #mapWrap ---
+// Souřadnice mapy (pixely původního obrázku) se na obrazovku převádějí jen
+// tady — zbytek aplikace pracuje výhradně v souřadnicích mapy a pro vstup
+// z myši/prstu volá kamera.naMapu(). Grid, zdi, mlha i tokeny se tak počítají
+// v jedné soustavě bez ohledu na zoom.
+
+const ZOOM_MIN = 0.05, ZOOM_MAX = 4;
+function vytvorKameru(viewport, svet) {
+  const MIN = ZOOM_MIN;
+  const MAX = ZOOM_MAX;
+  const stav = { x: 0, y: 0, z: 1 };
+  const posluchaci = [];
+  let sirka = 0, vyska = 0; // rozměry mapy v px (naturalWidth/Height)
+
+  function pouzit() {
+    svet.style.transform = 'translate(' + stav.x.toFixed(2) + 'px,' + stav.y.toFixed(2) + 'px) scale(' + stav.z.toFixed(5) + ')';
+    posluchaci.forEach((fn) => fn(stav));
+  }
+
+  function omezit() {
+    // Mapa nesmí "odplout" úplně pryč: aspoň čtvrtina viewportu musí zůstat
+    // pokryta mapou na každé ose.
+    const r = viewport.getBoundingClientRect();
+    const w = sirka * stav.z, h = vyska * stav.z;
+    const okrajX = Math.min(r.width * 0.25, w * 0.5), okrajY = Math.min(r.height * 0.25, h * 0.5);
+    stav.x = Math.min(r.width - okrajX, Math.max(okrajX - w, stav.x));
+    stav.y = Math.min(r.height - okrajY, Math.max(okrajY - h, stav.y));
+  }
+
+  const kamera = {
+    stav,
+    nastavRozmery(w, h) { sirka = w; vyska = h; },
+    naPosluch(fn) { posluchaci.push(fn); },
+    // Klientské souřadnice (clientX/Y) → souřadnice mapy.
+    naMapu(clientX, clientY) {
+      const r = viewport.getBoundingClientRect();
+      return { x: (clientX - r.left - stav.x) / stav.z, y: (clientY - r.top - stav.y) / stav.z };
+    },
+    naObrazovku(mx, my) {
+      const r = viewport.getBoundingClientRect();
+      return { x: r.left + stav.x + mx * stav.z, y: r.top + stav.y + my * stav.z };
+    },
+    // Přiblíží/oddálí tak, aby bod pod kurzorem zůstal na místě.
+    zoomKolem(clientX, clientY, faktor) {
+      const r = viewport.getBoundingClientRect();
+      const novy = Math.min(MAX, Math.max(MIN, stav.z * faktor));
+      if (novy === stav.z) return;
+      const px = clientX - r.left, py = clientY - r.top;
+      const mx = (px - stav.x) / stav.z, my = (py - stav.y) / stav.z;
+      stav.z = novy;
+      stav.x = px - mx * novy;
+      stav.y = py - my * novy;
+      omezit();
+      pouzit();
+    },
+    posun(dx, dy) {
+      stav.x += dx;
+      stav.y += dy;
+      omezit();
+      pouzit();
+    },
+    // Přesně nastaví zoom a polohu (pro gesto dvěma prsty).
+    nastav(x, y, z) {
+      stav.z = Math.min(MAX, Math.max(MIN, z));
+      stav.x = x;
+      stav.y = y;
+      omezit();
+      pouzit();
+    },
+    // Celá mapa se vejde do okna, vystředěná.
+    prizpusobit() {
+      const r = viewport.getBoundingClientRect();
+      if (!sirka || !vyska || !r.width || !r.height) return;
+      const z = Math.min(MAX, Math.max(MIN, Math.min(r.width / sirka, r.height / vyska) * 0.98));
+      stav.z = z;
+      stav.x = (r.width - sirka * z) / 2;
+      stav.y = (r.height - vyska * z) / 2;
+      pouzit();
+    },
+    // Výchozí pohled při otevření mapy: na velkém monitoru 1:1, jinak
+    // vejít celou mapu; kdyby ale 1:1 nevyplnilo ani půlku okna, přiblížit.
+    vychozi() {
+      this.prizpusobit();
+    },
+    // Vystředí bod mapy (např. token na tahu) bez změny zoomu.
+    vystredit(mx, my) {
+      const r = viewport.getBoundingClientRect();
+      stav.x = r.width / 2 - mx * stav.z;
+      stav.y = r.height / 2 - my * stav.z;
+      omezit();
+      pouzit();
+    },
+    obnovit() { pouzit(); },
+    // Pohyb kolem středu okna (tlačítka + / −).
+    zoomStred(faktor) {
+      const r = viewport.getBoundingClientRect();
+      this.zoomKolem(r.left + r.width / 2, r.top + r.height / 2, faktor);
+    },
+  };
+  return kamera;
+}
+
+// Gesto dvěma prsty: současný zoom a posun podle středu mezi prsty.
+function vytvorGesto(kamera) {
+  let zacatek = null;
+  return {
+    aktivni() { return zacatek !== null; },
+    start(a, b) {
+      zacatek = {
+        vzdalenost: Math.max(1, Math.hypot(b.x - a.x, b.y - a.y)),
+        stredX: (a.x + b.x) / 2,
+        stredY: (a.y + b.y) / 2,
+        kamera: { x: kamera.stav.x, y: kamera.stav.y, z: kamera.stav.z },
+      };
+    },
+    pohyb(a, b, viewport) {
+      if (!zacatek) return;
+      const r = viewport.getBoundingClientRect();
+      const vzd = Math.max(1, Math.hypot(b.x - a.x, b.y - a.y));
+      const stredX = (a.x + b.x) / 2, stredY = (a.y + b.y) / 2;
+      const z = zacatek.kamera.z * (vzd / zacatek.vzdalenost);
+      // Bod mapy, který byl na začátku pod středem prstů, má zůstat pod
+      // jejich středem (to dává plynulý zoom + posun dohromady).
+      const mx = (zacatek.stredX - r.left - zacatek.kamera.x) / zacatek.kamera.z;
+      const my = (zacatek.stredY - r.top - zacatek.kamera.y) / zacatek.kamera.z;
+      const zOmezene = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
+      kamera.nastav(stredX - r.left - mx * zOmezene, stredY - r.top - my * zOmezene, zOmezene);
+    },
+    konec() { zacatek = null; },
+  };
+}
+
+const CFG = window.MAPA;
+const SVET_ID = CFG.svetId;
+const MAPA_ID = CFG.mapaId;
+const POHYB_AUTO = CFG.pohybAuto;
+const FUNKCE = CFG.funkce; // které nové funkce tokenů jsou v DB (otočení, velikost…)
+// Grid konsty jsou "let", ne "const" — grid panel (viz níž) je mění živě
+// při náhledu ještě před uložením, a po uložení/po eventu od jiného
+// klienta se přepíšou na novou trvalou hodnotu.
+let GRID_PX = CFG.grid.px;
+let GRID_TYPE = CFG.grid.typ;
+let GRID_OFFSET_X = CFG.grid.offX;
+let GRID_OFFSET_Y = CFG.grid.offY;
+let gridSaved = {px: GRID_PX, typ: GRID_TYPE, offX: GRID_OFFSET_X, offY: GRID_OFFSET_Y};
+let zdiList = CFG.zdi.slice();
+// Piny — typ určuje ikonu v CSS/JS stejně jako server-side výběr ikony
+// pro počáteční vykreslení.
+const MAPA_BODY = CFG.piny;
+let zedVybranaId = null;
+let posledniUdalostId = CFG.stav.posledni_udalost_id;
+const SVET_POSTAVY = CFG.svetPostavy;
+const IS_PJ_OR_ADMIN = CFG.jePj;
+let mlhaAktivni = CFG.mlhaAktivni;
+// Koho mlhu PJ zrovna nahlíží/upravuje — null = normální PJ pohled
+// (bez náhledu). Jen PJ/admin, hráč tohle vůbec nemá v UI.
+let mlhaNahledUcetId = null;
+let mlhaKreslimOdhalit = true;
+
+const mapWrap = document.getElementById('mapWrap');
+const viewport = document.getElementById('viewport');
+const logList = document.getElementById('logList');
+const rulerSvg = document.getElementById('rulerSvg');
+const mapImgEl = document.getElementById('mapImg');
+const mlhaCanvas = document.getElementById('mlhaCanvas');
+
+// --- Kamera (zoom + posun) ---
+const kamera = vytvorKameru(viewport, mapWrap);
+const gesto = vytvorGesto(kamera);
+
+// --- Mlha války: canvas vrstva nad tokeny (z-index 100). Hráč: vždycky
+// svoje vlastní odhalené území (hra/api/mlha_stav.php). PJ/admin: prázdno,
+// POKUD zrovna nenahlíží konkrétního hráče přes popover "Mlha" — pak to
+// samé, ale přes hra/api/mlha_nahled.php (PJ-only, cizí mlha na vyžádání).
+// Server je jediný zdroj pravdy, klient si bitmapu jen vykresluje.
+let mlhaPosledniStav = null;
+// Buňka mlhy JE buňka herního gridu (čtverec i hex) — stejná geometrie
+// jako renderGrid()/gridCellCenter() níž, jen vrácená jako Path2D pro
+// vykreslení/optimistické kreslení. Střed (cx,cy) je v souřadnicích mapy.
+function mlhaBunkaTvarCesta(cx, cy) {
+  const p = new Path2D();
+  if (GRID_TYPE === 'hex') {
+    for (let i = 0; i < 6; i++) {
+      const a = Math.PI / 180 * (60 * i - 30);
+      const x = cx + GRID_PX * Math.cos(a), y = cy + GRID_PX * Math.sin(a);
+      if (i === 0) p.moveTo(x, y); else p.lineTo(x, y);
+    }
+    p.closePath();
+  } else {
+    p.rect(cx - GRID_PX / 2, cy - GRID_PX / 2, GRID_PX, GRID_PX);
+  }
+  return p;
+}
+// Střed buňky (row, col) v px — inverzní k gridCellCenter(), jen s
+// explicitním indexem místo "nejbližší k bodu" (potřeba pro vykreslení
+// celé uložené bitmapy, ne jen jednoho kliknutí). Musí být přesná
+// shoda se server-side dracak_vtt_mlha_bunka_stred() (includes/vtt_mlha.php).
+function mlhaBunkaStred(row, col) {
+  if (GRID_TYPE === 'hex') {
+    const colStep = Math.sqrt(3) * GRID_PX, rowStep = 1.5 * GRID_PX;
+    const offX = ((GRID_OFFSET_X % colStep) + colStep) % colStep;
+    const offY = ((GRID_OFFSET_Y % rowStep) + rowStep) % rowStep;
+    const rowShift = (Math.abs(row % 2) === 1) ? colStep / 2 : 0;
+    return {x: offX + col * colStep + rowShift, y: offY + row * rowStep};
+  }
+  const offX = ((GRID_OFFSET_X % GRID_PX) + GRID_PX) % GRID_PX;
+  const offY = ((GRID_OFFSET_Y % GRID_PX) + GRID_PX) % GRID_PX;
+  return {x: offX + col * GRID_PX + GRID_PX / 2, y: offY + row * GRID_PX + GRID_PX / 2};
+}
+// Hráč vidí mlhu plně neprůhlednou (nemá pod ní co vidět — to je
+// smysl mlhy). PJ/admin ji ale vidí jen v NÁHLEDU cizí mlhy (viz
+// osvezitMlhu níž — jinak se PJ mlha vůbec nevykresluje), kde potřebuje
+// průsvitno prokouknout mapu pod ní, ať ví, kam přesně maluje.
+function mlhaBarvaSkryte() {
+  return IS_PJ_OR_ADMIN ? 'rgba(8,8,10,0.65)' : '#08080a';
+}
+function renderMlha(stav) {
+  if (!mlhaCanvas) return;
+  mlhaPosledniStav = stav;
+  const w = mapImgEl.naturalWidth || mapWrap.clientWidth;
+  const h = mapImgEl.naturalHeight || mapWrap.clientHeight;
+  if (!w || !h) return;
+  mlhaCanvas.width = w;
+  mlhaCanvas.height = h;
+  const ctx = mlhaCanvas.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
+  if (!stav || stav.zadna_mlha || !stav.sloupcu || !stav.radku) return;
+  const bin = atob(stav.bitmapa_b64);
+  ctx.fillStyle = mlhaBarvaSkryte();
+  for (let r = 0; r < stav.radku; r++) {
+    for (let c = 0; c < stav.sloupcu; c++) {
+      if (bin.charCodeAt(r * stav.sloupcu + c) === 1) continue;
+      const stred = mlhaBunkaStred(r + stav.min_row, c + stav.min_col);
+      ctx.fill(mlhaBunkaTvarCesta(stred.x, stred.y));
+    }
+  }
+}
+function osvezitMlhu() {
+  if (!mlhaCanvas) return;
+  if (IS_PJ_OR_ADMIN) {
+    if (!mlhaNahledUcetId) { renderMlha(null); return; }
+    fetch('api/mlha_nahled.php?mapa_id=' + MAPA_ID + '&ucet_id=' + mlhaNahledUcetId)
+      .then(r => r.json())
+      .then(renderMlha)
+      .catch(() => {});
+    return;
+  }
+  fetch('api/mlha_stav.php?mapa_id=' + MAPA_ID)
+    .then(r => r.json())
+    .then(renderMlha)
+    .catch(() => {});
+}
+
+// --- Grid overlay: čistě vizuální, neinteraktivní (pointer-events:none),
+// nad obrázkem a pod tokeny/rulerem. Čtverec = rovné čáry po GRID_PX.
+// Hex = "pointy-top" šestiúhelníky (vrchol nahoře/dole, řady vodorovně,
+// liché řady posunuté o půl šířky doprava — "odd-r offset" layout),
+// GRID_PX je hex "size" = poloměr od středu k vrcholu (circumradius).
+function renderGrid() {
+  const gridSvg = document.getElementById('gridSvg');
+  if (!gridSvg) return;
+  // Velikost tokenů se odvíjí od gridu — při jeho změně (i živém náhledu
+  // v nastavení) se překreslí i ony.
+  if (typeof nakreslitTokeny === 'function') nakreslitTokeny();
+  if (!GRID_PX || GRID_PX <= 0) { gridSvg.innerHTML = ''; return; }
+  const w = mapImgEl.naturalWidth || mapWrap.clientWidth;
+  const h = mapImgEl.naturalHeight || mapWrap.clientHeight;
+  if (!w || !h) return;
+
+  // Celý grid je jediná cesta (<path>) — tisíce samostatných polygonů
+  // dělaly při zoomu zbytečně těžký překreslovací krok.
+  let d = '';
+  if (GRID_TYPE === 'hex') {
+    const size = GRID_PX;
+    const colStep = Math.sqrt(3) * size;
+    const rowStep = 1.5 * size;
+    const offX = ((GRID_OFFSET_X % colStep) + colStep) % colStep;
+    const offY = ((GRID_OFFSET_Y % rowStep) + rowStep) % rowStep;
+    const firstRow = -1, lastRow = Math.ceil((h - offY) / rowStep) + 1;
+    const firstCol = -1, lastCol = Math.ceil((w - offX) / colStep) + 1;
+    for (let row = firstRow; row <= lastRow; row++) {
+      const cy = offY + row * rowStep;
+      const rowShift = (Math.abs(row % 2) === 1) ? colStep / 2 : 0;
+      for (let col = firstCol; col <= lastCol; col++) {
+        const cx = offX + col * colStep + rowShift;
+        if (cx < -colStep || cx > w + colStep || cy < -rowStep * 1.5 || cy > h + rowStep * 1.5) continue;
+        for (let i = 0; i < 6; i++) {
+          const a = Math.PI / 180 * (60 * i - 30);
+          d += (i ? 'L' : 'M') + (cx + size * Math.cos(a)).toFixed(1) + ' ' + (cy + size * Math.sin(a)).toFixed(1);
+        }
+        d += 'Z';
+      }
+    }
+  } else {
+    const offX = ((GRID_OFFSET_X % GRID_PX) + GRID_PX) % GRID_PX;
+    const offY = ((GRID_OFFSET_Y % GRID_PX) + GRID_PX) % GRID_PX;
+    for (let x = offX; x <= w; x += GRID_PX) d += 'M' + x.toFixed(1) + ' 0V' + h;
+    for (let y = offY; y <= h; y += GRID_PX) d += 'M0 ' + y.toFixed(1) + 'H' + w;
+  }
+
+  gridSvg.setAttribute('width', w);
+  gridSvg.setAttribute('height', h);
+  gridSvg.innerHTML = '<path d="' + d + '" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="1" vector-effect="non-scaling-stroke"/>';
+}
+// --- Zdi: vykreslení (barva podle blokuje_pohyb/blokuje_vystrel, skrytá
+// zeď jen v náhledu PJ jako přerušovaná a poloprůhledná — hráčům se sem
+// vůbec nedostane, viz filtr v mapa.php i udalosti.php). ---
+function renderZdi() {
+  const svg = document.getElementById('zdiSvg');
+  if (!svg) return;
+  const w = mapImgEl.naturalWidth || mapWrap.clientWidth;
+  const h = mapImgEl.naturalHeight || mapWrap.clientHeight;
+  if (!w || !h) return;
+  svg.setAttribute('width', w);
+  svg.setAttribute('height', h);
+  let html = '';
+  zdiList.forEach(z => {
+    let barva = '#a33b2e';
+    if (z.blokuje_pohyb && !z.blokuje_vystrel) barva = '#3b7a3b';
+    else if (!z.blokuje_pohyb && z.blokuje_vystrel) barva = '#3b5f8f';
+    const vybrana = z.id === zedVybranaId;
+    const sw = Math.max(2, z.sirka_px);
+    html += '<line x1="' + z.x1 + '" y1="' + z.y1 + '" x2="' + z.x2 + '" y2="' + z.y2 + '"'
+      + ' stroke="' + (vybrana ? '#ffd166' : barva) + '" stroke-width="' + sw + '" stroke-linecap="round"'
+      + ' opacity="' + (z.viditelna_hracum ? 1 : 0.55) + '"'
+      + (z.viditelna_hracum ? '' : ' stroke-dasharray="4 3"') + '/>';
+  });
+  svg.innerHTML = html;
+}
+
+// --- Magnetické body pro kreslení zdi: vrchol/střed hrany/střed buňky,
+// čtverec i hex (viz renderGrid() výš pro stejné "odd-r offset" hex rozložení). ---
+function squareSnapCandidates(px, py) {
+  const g = GRID_PX;
+  const offX = ((GRID_OFFSET_X % g) + g) % g;
+  const offY = ((GRID_OFFSET_Y % g) + g) % g;
+  const ci = Math.round((px - offX) / g);
+  const cj = Math.round((py - offY) / g);
+  const pts = [];
+  for (let di = -1; di <= 1; di++) {
+    for (let dj = -1; dj <= 1; dj++) {
+      const x0 = offX + (ci + di) * g, y0 = offY + (cj + dj) * g;
+      pts.push({x: x0, y: y0});
+      pts.push({x: x0 + g / 2, y: y0 + g / 2});
+      pts.push({x: x0 + g / 2, y: y0});
+      pts.push({x: x0, y: y0 + g / 2});
+    }
+  }
+  return pts;
+}
+function hexSnapCandidates(px, py) {
+  const size = GRID_PX;
+  const colStep = Math.sqrt(3) * size;
+  const rowStep = 1.5 * size;
+  const offX = ((GRID_OFFSET_X % colStep) + colStep) % colStep;
+  const offY = ((GRID_OFFSET_Y % rowStep) + rowStep) % rowStep;
+  const rowApprox = Math.round((py - offY) / rowStep);
+  const pts = [];
+  for (let row = rowApprox - 1; row <= rowApprox + 1; row++) {
+    const rowShift = (Math.abs(row % 2) === 1) ? colStep / 2 : 0;
+    const colApprox = Math.round((px - offX - rowShift) / colStep);
+    for (let col = colApprox - 1; col <= colApprox + 1; col++) {
+      const cx = offX + col * colStep + rowShift;
+      const cy = offY + row * rowStep;
+      pts.push({x: cx, y: cy});
+      const verts = [];
+      for (let i = 0; i < 6; i++) {
+        const a = Math.PI / 180 * (60 * i - 30);
+        verts.push({x: cx + size * Math.cos(a), y: cy + size * Math.sin(a)});
+      }
+      verts.forEach(v => pts.push(v));
+      for (let i = 0; i < 6; i++) {
+        const v1 = verts[i], v2 = verts[(i + 1) % 6];
+        pts.push({x: (v1.x + v2.x) / 2, y: (v1.y + v2.y) / 2});
+      }
+    }
+  }
+  return pts;
+}
+function snapPoint(px, py, enabled) {
+  if (!enabled || !GRID_PX || GRID_PX <= 0) return {x: px, y: py};
+  // Bez poloměru — vždycky nejbližší magnetický bod, žádná "mrtvá zóna",
+  // kde by klik propadl bez přichycení (stejný princip jako u tokenů v
+  // gridCellCenter(), jen tu kandidáti jsou vrcholy/středy hran/středy
+  // buněk místo jen středu buňky, viz squareSnapCandidates/hexSnapCandidates).
+  const candidates = GRID_TYPE === 'hex' ? hexSnapCandidates(px, py) : squareSnapCandidates(px, py);
+  let best = null, bestDist = Infinity;
+  for (const c of candidates) {
+    const d = Math.hypot(c.x - px, c.y - py);
+    if (d < bestDist) { bestDist = d; best = c; }
+  }
+  return best || {x: px, y: py};
+}
+
+// --- Magnet pro tokeny: vždycky střed nejbližší buňky (ne volitelné
+// 3 body jako u zdi) — token patří do buňky, ne kamkoliv na ni. Bez
+// gridu žádný magnet není (stejný princip jako jinde — bez gridu
+// nemáme měřítko ani buňky, na co by se to chytalo). ---
+function gridCellCenter(px, py) {
+  if (!GRID_PX || GRID_PX <= 0) return {x: px, y: py};
+  if (GRID_TYPE === 'hex') {
+    const size = GRID_PX;
+    const colStep = Math.sqrt(3) * size;
+    const rowStep = 1.5 * size;
+    const offX = ((GRID_OFFSET_X % colStep) + colStep) % colStep;
+    const offY = ((GRID_OFFSET_Y % rowStep) + rowStep) % rowStep;
+    const rowApprox = Math.round((py - offY) / rowStep);
+    let best = null, bestDist = Infinity;
+    for (let row = rowApprox - 1; row <= rowApprox + 1; row++) {
+      const rowShift = (Math.abs(row % 2) === 1) ? colStep / 2 : 0;
+      const colApprox = Math.round((px - offX - rowShift) / colStep);
+      for (let col = colApprox - 1; col <= colApprox + 1; col++) {
+        const cx = offX + col * colStep + rowShift;
+        const cy = offY + row * rowStep;
+        const d = Math.hypot(cx - px, cy - py);
+        if (d < bestDist) { bestDist = d; best = {x: cx, y: cy}; }
+      }
+    }
+    return best;
+  }
+  const offX = ((GRID_OFFSET_X % GRID_PX) + GRID_PX) % GRID_PX;
+  const offY = ((GRID_OFFSET_Y % GRID_PX) + GRID_PX) % GRID_PX;
+  const i = Math.floor((px - offX) / GRID_PX);
+  const j = Math.floor((py - offY) / GRID_PX);
+  return {x: offX + i * GRID_PX + GRID_PX / 2, y: offY + j * GRID_PX + GRID_PX / 2};
+}
+
+// Px na 1 sáh. Čtverec: GRID_PX je přímo strana buňky = 1 sáh. Hex:
+// GRID_PX je "size" (circumradius, střed->vrchol, viz renderGrid()
+// výš), ale podle pravidel (content/pravidla-hrac.html h1621/b10798:
+// "jeden hex vždy odpovídá jednomu sáhu") je 1 sáh vzdálenost
+// STŘED-STŘED sousedních hexů, ne circumradius samotný — to je
+// colStep = √3 × size (shodné se vzdáleností všech 6 sousedů v
+// "odd-r" rozložení, viz hexSnapCandidates/renderGrid).
+function pxNaSah() {
+  if (!GRID_PX || GRID_PX <= 0) return 0;
+  return GRID_TYPE === 'hex' ? Math.sqrt(3) * GRID_PX : GRID_PX;
+}
+
+// --- Vzdálenost bodu od úsečky — pro výběr existující zdi klikem. ---
+function vzdalenostKUsecce(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const lenSq = dx * dx + dy * dy;
+  let t = lenSq > 0 ? ((px - x1) * dx + (py - y1) * dy) / lenSq : 0;
+  t = Math.max(0, Math.min(1, t));
+  const cx = x1 + t * dx, cy = y1 + t * dy;
+  return Math.hypot(px - cx, py - cy);
+}
+function najdiZedBlizkoBodu(px, py) {
+  let nejblizsi = null, nejmensiVzdalenost = Infinity;
+  zdiList.forEach(z => {
+    const prah = Math.max(6, z.sirka_px / 2 + 4);
+    const d = vzdalenostKUsecce(px, py, z.x1, z.y1, z.x2, z.y2);
+    if (d <= prah && d < nejmensiVzdalenost) { nejmensiVzdalenost = d; nejblizsi = z; }
+  });
+  return nejblizsi;
+}
+
+// 1 sáh = 1 buňka gridu (stejné jako ruler) — šířka zdi se zadává v
+// sáhách, když je grid aktivní, jinak jako syrové px (bez gridu nemáme
+// měřítko, viz drawRuler()).
+function zedSirkaPx() {
+  const input = document.getElementById('zedSirka');
+  if (!input) return 6;
+  const val = parseFloat(input.value) || 0;
+  const pxSah = pxNaSah();
+  return pxSah > 0 ? Math.max(1, val * pxSah) : Math.max(1, val);
+}
+function zedSnapEnabled() {
+  const chk = document.getElementById('zedSnap');
+  return !!(chk && chk.checked);
+}
+function aktualizovatZedJednotky() {
+  const input = document.getElementById('zedSirka');
+  const label = document.getElementById('zedSirkaJednotka');
+  if (!input) return;
+  if (GRID_PX > 0) {
+    input.min = '0.1'; input.max = '2'; input.step = '0.1'; input.value = '0.2';
+    if (label) label.textContent = 'sáhy';
+  } else {
+    input.min = '1'; input.max = '60'; input.step = '1'; input.value = '6';
+    if (label) label.textContent = 'px';
+  }
+}
+// Rozpracovaná zeď = klikem posbírané body (start, libovolně mezibodů,
+// konec) — NEukládá se po jednom, čeká na výslovné "Uložit" (viz
+// zedUlozitBtn). Vykresluje se do rulerSvg (sdílená ephemerní vrstva,
+// stejně jako ruler/drag-preview — zed a ruler nástroj nejdou použít
+// zároveň, takže není kolize).
+function drawZedRozpracovanouCestu(aktualniBod) {
+  if (!rulerSvg) return;
+  const sw = Math.max(2, zedSirkaPx());
+  let html = '';
+  for (let i = 0; i < zedRozpracovaneBody.length - 1; i++) {
+    const a = zedRozpracovaneBody[i], b = zedRozpracovaneBody[i + 1];
+    html += '<line x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '"'
+      + ' stroke="#ffd166" stroke-width="' + sw + '" stroke-linecap="round" opacity="0.8"/>';
+  }
+  const posledni = zedRozpracovaneBody[zedRozpracovaneBody.length - 1];
+  if (posledni && aktualniBod) {
+    html += '<line x1="' + posledni.x + '" y1="' + posledni.y + '" x2="' + aktualniBod.x + '" y2="' + aktualniBod.y + '"'
+      + ' stroke="#ffd166" stroke-width="' + sw + '" stroke-linecap="round" stroke-dasharray="6 4" opacity="0.5"/>';
+  }
+  zedRozpracovaneBody.forEach(b => { html += '<circle cx="' + b.x + '" cy="' + b.y + '" r="4" fill="#ffd166"/>'; });
+  rulerSvg.innerHTML = html;
+}
+function aktualizovatZedUlozitTlacitko() {
+  const btnUlozit = document.getElementById('zedUlozitBtn');
+  const btnZrusit = document.getElementById('zedZrusitBtn');
+  const zobrazit = zedRozpracovaneBody.length >= 2;
+  if (btnUlozit) btnUlozit.style.display = zobrazit ? '' : 'none';
+  if (btnZrusit) btnZrusit.style.display = zedRozpracovaneBody.length > 0 ? '' : 'none';
+}
+function zrusitZedRozpracovanouCestu() {
+  zedRozpracovaneBody = [];
+  aktualizovatZedUlozitTlacitko();
+  if (rulerSvg) rulerSvg.innerHTML = '';
+}
+
+
+function logLine(text) {
+  if (!logList) return;
+  const div = document.createElement('div');
+  div.textContent = text;
+  logList.appendChild(div);
+}
+
+function postJson(url, body) {
+  return fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)}).then(r => r.json());
+}
+
+// --- Popovery a panely ---
+function closeAllPopovers() {
+  zrusitZivyNahledGridu();
+  zrusitMlhaNahled();
+  ukoncitEditaciPinu();
+  document.querySelectorAll('.popover.open').forEach(p => p.classList.remove('open'));
+  document.querySelectorAll('.tbtn.active').forEach(b => b.classList.remove('active'));
+}
+// Pin v editačním módu (popover-pin-upravit otevřený) jde přetáhnout na
+// nové místo — viz mapWrap mousedown/move/up níž. Platí jen pro TENHLE
+// konkrétní pin a jen dokud je formulář otevřený, ať to nekoliduje s
+// běžným tažením tokenů/kreslením zdi/měřítkem.
+let pinEditujiId = null;
+function ukoncitEditaciPinu() {
+  if (pinEditujiId === null) return;
+  const el = document.querySelector('.mapa-bod-marker[data-bod-id="' + pinEditujiId + '"]');
+  if (el) el.classList.remove('pin-editing');
+  pinEditujiId = null;
+}
+// Umístí popover tak, aby byl celý vidět ve viewportu — zkusí ho otevřít
+// "dolů" od bodu (horní okraj popoveru = horní okraj bodu, jako dřív),
+// a pokud by se tam nevešel celý (bod hodně dole na obrazovce), otevře
+// ho "nahoru" (dolní okraj popoveru = horní okraj bodu) místo toho. Bez
+// týhle logiky popover u pinu blízko dolního okraje mizel mimo obrazovku.
+function umistitPopoverKBodu(pop, rect) {
+  pop.classList.add('open'); // musí být viditelný, aby šlo změřit výšku
+  const vyska = pop.offsetHeight;
+  const mezera = 10;
+  let top = rect.top;
+  if (rect.top + vyska + mezera > window.innerHeight) {
+    top = rect.bottom - vyska;
+  }
+  top = Math.max(mezera, Math.min(top, window.innerHeight - vyska - mezera));
+  pop.style.top = top + 'px';
+}
+function togglePopover(id, btn) {
+  const wasOpen = document.getElementById(id).classList.contains('open');
+  closeAllPopovers();
+  if (!wasOpen) {
+    const pop = document.getElementById(id);
+    umistitPopoverKBodu(pop, btn.getBoundingClientRect());
+    btn.classList.add('active');
+  }
+}
+document.querySelectorAll('[data-close-popover]').forEach(b => b.addEventListener('click', closeAllPopovers));
+document.querySelectorAll('[data-close-panel]').forEach(b => b.addEventListener('click', (e) => e.target.closest('.panel').classList.remove('open')));
+
+const tbPridat = document.getElementById('tb-pridat');
+if (tbPridat) tbPridat.addEventListener('click', () => togglePopover('popover-pridat', tbPridat));
+const tbKostky = document.getElementById('tb-kostky');
+if (tbKostky) tbKostky.addEventListener('click', () => togglePopover('popover-kostky', tbKostky));
+const tbLog = document.getElementById('tb-log');
+if (tbLog) tbLog.addEventListener('click', () => document.getElementById('panel-log').classList.toggle('open'));
+const tbStrom = document.getElementById('tb-strom');
+if (tbStrom) tbStrom.addEventListener('click', () => document.getElementById('panel-strom').classList.toggle('open'));
+const stromHledat = document.getElementById('stromHledat');
+if (stromHledat) {
+  // Ukáže uzel, pokud sedí jeho vlastní název NEBO sedí název
+  // libovolného potomka (ať je vidět i cesta k zanořené shodě).
+  const filtrovatStrom = (dotaz) => {
+    const q = dotaz.trim().toLowerCase();
+    const navstiv = (li) => {
+      const odkaz = li.querySelector(':scope > a.strom-link');
+      let shoda = !q || (odkaz && odkaz.textContent.toLowerCase().includes(q));
+      const podUl = li.querySelector(':scope > ul');
+      if (podUl) {
+        podUl.querySelectorAll(':scope > li').forEach((podLi) => { if (navstiv(podLi)) shoda = true; });
+      }
+      li.style.display = shoda ? '' : 'none';
+      return shoda;
+    };
+    document.querySelectorAll('#stromRoot > li').forEach(navstiv);
+  };
+  stromHledat.addEventListener('input', (e) => filtrovatStrom(e.target.value));
+}
+
+// --- Nástroje toolbaru: select/move (výchozí), ruler (měření), ping, zeď ---
+let currentTool = 'select';
+const toolButtons = {
+  select: document.getElementById('tb-move'),
+  ruka: document.getElementById('tb-ruka'),
+  ruler: document.getElementById('tb-ruler'),
+  ping: document.getElementById('tb-ping'),
+  zed: document.getElementById('tb-zed'),
+  pin: document.getElementById('tb-pin'),
+};
+function setTool(tool) {
+  currentTool = tool;
+  viewport.dataset.nastroj = tool; // CSS podle toho mění kurzor
+  for (const [t, btn] of Object.entries(toolButtons)) {
+    if (btn) btn.classList.toggle('armed', t === tool);
+  }
+  rulerStart = null;
+  if (rulerSvg) rulerSvg.innerHTML = '';
+  zedRozpracovaneBody = [];
+  aktualizovatZedUlozitTlacitko();
+  const popZed = document.getElementById('popover-zed');
+  if (popZed) {
+    if (tool === 'zed') {
+      umistitPopoverKBodu(popZed, toolButtons.zed.getBoundingClientRect());
+      toolButtons.zed.classList.add('active');
+      aktualizovatZedJednotky();
+    } else {
+      popZed.classList.remove('open');
+      toolButtons.zed.classList.remove('active');
+      zedVybranaId = null;
+      const btnSmazat = document.getElementById('zedSmazatBtn');
+      if (btnSmazat) btnSmazat.style.display = 'none';
+      renderZdi();
+    }
+  }
+}
+if (toolButtons.select) toolButtons.select.addEventListener('click', () => setTool('select'));
+if (toolButtons.ruka) toolButtons.ruka.addEventListener('click', () => setTool(currentTool === 'ruka' ? 'select' : 'ruka'));
+if (toolButtons.ruler) toolButtons.ruler.addEventListener('click', () => setTool(currentTool === 'ruler' ? 'select' : 'ruler'));
+if (toolButtons.ping) toolButtons.ping.addEventListener('click', () => setTool(currentTool === 'ping' ? 'select' : 'ping'));
+if (toolButtons.zed) toolButtons.zed.addEventListener('click', () => setTool(currentTool === 'zed' ? 'select' : 'zed'));
+if (toolButtons.pin) toolButtons.pin.addEventListener('click', () => setTool(currentTool === 'pin' ? 'select' : 'pin'));
+
+// --- Grid panel: živý náhled před uložením (viz zrusitZivyNahledGridu
+// volané z closeAllPopovers — zavření bez uložení náhled vrátí zpět). ---
+const gridZapnutyChk = document.getElementById('gridZapnuty');
+const gridTypSelect = document.getElementById('gridTypSelect');
+const gridVelikostSlider = document.getElementById('gridVelikostSlider');
+const gridVelikostHodnota = document.getElementById('gridVelikostHodnota');
+const gridPosunXInput = document.getElementById('gridPosunXInput');
+const gridPosunYInput = document.getElementById('gridPosunYInput');
+const gridNastaveniFields = document.getElementById('gridNastaveniFields');
+
+function zrusitZivyNahledGridu() {
+  if (!gridZapnutyChk) return;
+  GRID_PX = gridSaved.px; GRID_TYPE = gridSaved.typ; GRID_OFFSET_X = gridSaved.offX; GRID_OFFSET_Y = gridSaved.offY;
+  renderGrid();
+}
+// Slider nastavuje GRID_PX (u hexu circumradius, viz pxNaSah() výš),
+// ne přímo "1 sáh v px" — u hexu proto popisek u slideru dopočítá
+// skutečnou velikost sáhu (√3×), ať PJ neměří grid podle čísla, co ve
+// skutečnosti znamená něco jiného.
+function aktualizovatGridVelikostHodnotu() {
+  const raw = parseInt(gridVelikostSlider.value, 10) || 0;
+  const sah = gridTypSelect.value === 'hex' ? Math.round(raw * Math.sqrt(3)) : raw;
+  gridVelikostHodnota.textContent = sah;
+}
+function nacistGridFormular() {
+  if (!gridZapnutyChk) return;
+  gridZapnutyChk.checked = gridSaved.px > 0;
+  gridTypSelect.value = gridSaved.typ;
+  gridVelikostSlider.value = gridSaved.px > 0 ? gridSaved.px : 70;
+  aktualizovatGridVelikostHodnotu();
+  gridPosunXInput.value = gridSaved.offX;
+  gridPosunYInput.value = gridSaved.offY;
+  gridNastaveniFields.style.display = gridZapnutyChk.checked ? '' : 'none';
+}
+function zivyNahledGridu() {
+  GRID_PX = gridZapnutyChk.checked ? parseInt(gridVelikostSlider.value, 10) : 0;
+  GRID_TYPE = gridTypSelect.value;
+  GRID_OFFSET_X = parseInt(gridPosunXInput.value, 10) || 0;
+  GRID_OFFSET_Y = parseInt(gridPosunYInput.value, 10) || 0;
+  renderGrid();
+}
+if (gridZapnutyChk) {
+  gridZapnutyChk.addEventListener('change', () => { gridNastaveniFields.style.display = gridZapnutyChk.checked ? '' : 'none'; zivyNahledGridu(); });
+  gridTypSelect.addEventListener('change', () => { aktualizovatGridVelikostHodnotu(); zivyNahledGridu(); });
+  gridVelikostSlider.addEventListener('input', () => { aktualizovatGridVelikostHodnotu(); zivyNahledGridu(); });
+  gridPosunXInput.addEventListener('input', zivyNahledGridu);
+  gridPosunYInput.addEventListener('input', zivyNahledGridu);
+}
+const tbGrid = document.getElementById('tb-grid');
+if (tbGrid) tbGrid.addEventListener('click', () => { nacistGridFormular(); togglePopover('popover-grid', tbGrid); });
+const gridUlozitBtn = document.getElementById('gridUlozitBtn');
+if (gridUlozitBtn) {
+  gridUlozitBtn.addEventListener('click', () => {
+    const novy = {
+      px: gridZapnutyChk.checked ? parseInt(gridVelikostSlider.value, 10) : 0,
+      typ: gridTypSelect.value,
+      offX: parseInt(gridPosunXInput.value, 10) || 0,
+      offY: parseInt(gridPosunYInput.value, 10) || 0,
+    };
+    postJson('api/mapa_grid_uprava.php', {mapa_id: MAPA_ID, grid_velikost_px: novy.px, grid_typ: novy.typ, grid_posun_x: novy.offX, grid_posun_y: novy.offY})
+      .then(d => {
+        if (d.error) { logLine('Chyba: ' + d.error); return; }
+        gridSaved = novy;
+        GRID_PX = novy.px; GRID_TYPE = novy.typ; GRID_OFFSET_X = novy.offX; GRID_OFFSET_Y = novy.offY;
+        aktualizovatZedJednotky();
+        closeAllPopovers();
+        logLine('Nastavení gridu uloženo.');
+      });
+  });
+}
+
+// --- Mlha: popover má 3 nezávislé věci (viz CLAUDE.md diskuze) —
+// zapnout/vypnout pro mapu, náhled konkrétního hráče, ruční kreslení
+// (odhalit/zatáhnout) do TOHO náhledu. Výběr hráče v selectu rovnou
+// vyzbrojí currentTool='mlha' (viz mousedown/move/up výš) — zvlášť
+// tlačítko na "začít kreslit" by bylo matoucí navíc, náhled a kreslení
+// jsou jedna a ta samá obrazovka.
+const tbMlha = document.getElementById('tb-mlha');
+if (tbMlha) tbMlha.addEventListener('click', () => togglePopover('popover-mlha', tbMlha));
+const mlhaAktivniChk = document.getElementById('mlhaAktivniChk');
+if (mlhaAktivniChk) {
+  mlhaAktivniChk.addEventListener('change', () => {
+    const nova = mlhaAktivniChk.checked;
+    postJson('api/mapa_mlha_aktivni.php', {mapa_id: MAPA_ID, aktivni: nova})
+      .then(d => {
+        if (d.error) { logLine('Chyba: ' + d.error); mlhaAktivniChk.checked = !nova; return; }
+        mlhaAktivni = d.aktivni;
+        logLine(mlhaAktivni ? 'Mlha zapnuta.' : 'Mlha vypnuta — hráči teď vidí celou mapu.');
+      });
+  });
+}
+const mlhaNahledSelect = document.getElementById('mlhaNahledSelect');
+const mlhaKresliciFields = document.getElementById('mlhaKresliciFields');
+function zrusitMlhaNahled() {
+  mlhaNahledUcetId = null;
+  if (mlhaNahledSelect) mlhaNahledSelect.value = '';
+  if (mlhaKresliciFields) mlhaKresliciFields.style.display = 'none';
+  if (currentTool === 'mlha') setTool('select');
+  osvezitMlhu();
+}
+const mlhaOdhalitBtn = document.getElementById('mlhaOdhalitBtn');
+const mlhaZatahnoutBtn = document.getElementById('mlhaZatahnoutBtn');
+const mlhaRezimVolnaRukaBtn = document.getElementById('mlhaRezimVolnaRukaBtn');
+const mlhaRezimObdelnikBtn = document.getElementById('mlhaRezimObdelnikBtn');
+const mlhaKreslimRezimEl = document.getElementById('mlhaKreslimRezim');
+// Dva nezávislé přepínače (štětec odhalit/zatáhnout × tvar volná ruka/obdélník)
+// sdílí jeden řádek textu dole v popoveru — každá ze dvou funkcí níž mění
+// jen "svoji" část stavu a pak obě společně přeskládají celý text, aby se
+// vzájemně nepřepisovaly (dřív nastavMlhaKreslimRezim mazala zmínku o tvaru).
+function obnovMlhaRezimText() {
+  if (!mlhaKreslimRezimEl) return;
+  const tvar = mlhaRezimObdelnik ? 'Obdélník — táhni z rohu do rohu.' : 'Volná ruka — táhni po mapě.';
+  const stetec = mlhaKreslimOdhalit ? 'odhalit' : 'zatáhnout';
+  mlhaKreslimRezimEl.textContent = tvar + ' Režim: ' + stetec;
+}
+function nastavMlhaKreslimRezim(odhalit) {
+  mlhaKreslimOdhalit = odhalit;
+  if (mlhaOdhalitBtn) mlhaOdhalitBtn.classList.toggle('btn-primary', odhalit);
+  if (mlhaOdhalitBtn) mlhaOdhalitBtn.classList.toggle('btn-secondary', !odhalit);
+  if (mlhaZatahnoutBtn) mlhaZatahnoutBtn.classList.toggle('btn-primary', !odhalit);
+  if (mlhaZatahnoutBtn) mlhaZatahnoutBtn.classList.toggle('btn-ghost', odhalit);
+  obnovMlhaRezimText();
+}
+function nastavMlhaRezimObdelnik(obdelnik) {
+  mlhaRezimObdelnik = obdelnik;
+  mlhaObdelnikStart = null;
+  if (rulerSvg) rulerSvg.innerHTML = '';
+  if (mlhaRezimVolnaRukaBtn) mlhaRezimVolnaRukaBtn.classList.toggle('btn-primary', !obdelnik);
+  if (mlhaRezimVolnaRukaBtn) mlhaRezimVolnaRukaBtn.classList.toggle('btn-secondary', obdelnik);
+  if (mlhaRezimObdelnikBtn) mlhaRezimObdelnikBtn.classList.toggle('btn-primary', obdelnik);
+  if (mlhaRezimObdelnikBtn) mlhaRezimObdelnikBtn.classList.toggle('btn-ghost', !obdelnik);
+  obnovMlhaRezimText();
+}
+if (mlhaOdhalitBtn) mlhaOdhalitBtn.addEventListener('click', () => nastavMlhaKreslimRezim(true));
+if (mlhaZatahnoutBtn) mlhaZatahnoutBtn.addEventListener('click', () => nastavMlhaKreslimRezim(false));
+if (mlhaRezimVolnaRukaBtn) mlhaRezimVolnaRukaBtn.addEventListener('click', () => nastavMlhaRezimObdelnik(false));
+if (mlhaRezimObdelnikBtn) mlhaRezimObdelnikBtn.addEventListener('click', () => nastavMlhaRezimObdelnik(true));
+if (mlhaNahledSelect) {
+  mlhaNahledSelect.addEventListener('change', () => {
+    mlhaNahledUcetId = mlhaNahledSelect.value ? parseInt(mlhaNahledSelect.value, 10) : null;
+    if (mlhaKresliciFields) mlhaKresliciFields.style.display = mlhaNahledUcetId ? '' : 'none';
+    if (mlhaNahledUcetId) { nastavMlhaRezimObdelnik(false); nastavMlhaKreslimRezim(true); }
+    setTool(mlhaNahledUcetId ? 'mlha' : 'select');
+    osvezitMlhu();
+  });
+}
+const mlhaOdhalitVseBtn = document.getElementById('mlhaOdhalitVseBtn');
+const mlhaZatahnoutVseBtn = document.getElementById('mlhaZatahnoutVseBtn');
+// Hromadná akce pro VŠECHNY hráče světa najednou — bez undo, proto potvrzení.
+function mlhaHromadne(odhalit) {
+  const otazka = odhalit
+    ? 'Odhalit celou mapu úplně všem hráčům? Přepíše se jim tím dosavadní prozkoumané území.'
+    : 'Zatáhnout celou mapu zpátky úplně všem hráčům? Smažou se jim tím všechny dosavadní odhalené oblasti.';
+  if (!confirm(otazka)) return;
+  postJson('api/mlha_hromadne.php', {mapa_id: MAPA_ID, odhalit})
+    .then(d => {
+      if (d.error) { logLine('Chyba: ' + d.error); return; }
+      logLine(odhalit ? 'Mapa odhalena všem hráčům.' : 'Mapa zatažena všem hráčům.');
+      osvezitMlhu();
+    });
+}
+if (mlhaOdhalitVseBtn) mlhaOdhalitVseBtn.addEventListener('click', () => mlhaHromadne(true));
+if (mlhaZatahnoutVseBtn) mlhaZatahnoutVseBtn.addEventListener('click', () => mlhaHromadne(false));
+
+// --- Ruler: čistě klientská pomůcka, nic se neukládá ani nesynchronizuje ---
+let rulerStart = null, rulerClearTimer = null;
+let zedRozpracovaneBody = [];
+let mlhaKreslim = false, mlhaPosledniBunka = null;
+let mlhaRezimObdelnik = false, mlhaObdelnikStart = null;
+function rulerPoint(e) {
+  return kamera.naMapu(e.clientX, e.clientY);
+}
+// PJ ruční kreslení mlhy, volná ruka (viz popover "Mlha") — na rozdíl
+// od dracak_vtt_mlha_odhal_kolem_bodu() žádná LoS kontrola, žádné
+// "nikdy znovu nezatáhnout", jen přímo ta jedna buňka GRIDU pod
+// kurzorem (gridCellCenter() řeší čtverec i hex stejně jako u tokenů).
+// Optimistické kreslení přímo tvaru buňky (okamžitá odezva, žádná
+// bit-manipulace báze64 navíc) — server dotaz potvrzuje/ukládá async;
+// obdélníkový režim (mlhaRezimObdelnik) po odeslání vždycky přetáhne
+// čerstvý stav ze serveru (viz mapWrap mouseup níž), tohle platí jen
+// pro kreslení bod-po-bodu.
+function mlhaNakresliBod(p) {
+  if (!mlhaNahledUcetId || GRID_PX <= 0) return;
+  const stred = gridCellCenter(p.x, p.y);
+  const key = Math.round(stred.x) + ':' + Math.round(stred.y);
+  if (key === mlhaPosledniBunka) return;
+  mlhaPosledniBunka = key;
+  if (mlhaCanvas) {
+    const ctx = mlhaCanvas.getContext('2d');
+    const tvar = mlhaBunkaTvarCesta(stred.x, stred.y);
+    if (mlhaKreslimOdhalit) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.fill(tvar);
+      ctx.restore();
+    } else {
+      ctx.fillStyle = mlhaBarvaSkryte();
+      ctx.fill(tvar);
+    }
+  }
+  postJson('api/mlha_uprava.php', {mapa_id: MAPA_ID, ucet_id: mlhaNahledUcetId, x: stred.x, y: stred.y, odhalit: mlhaKreslimOdhalit})
+    .then(d => { if (d.error) logLine('Chyba: ' + d.error); });
+}
+function drawRuler(a, b) {
+  if (!rulerSvg) return;
+  clearTimeout(rulerClearTimer);
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const distPx = Math.sqrt(dx * dx + dy * dy);
+  // 1 sáh = pxNaSah() (čtverec: 1 buňka; hex: střed-střed sousedních
+  // hexů, viz h1621 "jeden hex vždy odpovídá jednomu sáhu") — bez gridu
+  // nemáme měřítko, takže zůstává nepřevedené px jako jediná poctivá možnost.
+  const pxSah = pxNaSah();
+  const label = pxSah > 0 ? (distPx / pxSah).toFixed(1) + ' sáhů' : Math.round(distPx) + ' px';
+  // Písmo a body mají stejnou velikost na obrazovce bez ohledu na zoom.
+  const k = 1 / kamera.stav.z;
+  rulerSvg.innerHTML =
+    '<line x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '" stroke="#ffb347" stroke-width="2" stroke-dasharray="6 4" vector-effect="non-scaling-stroke"/>' +
+    '<circle cx="' + a.x + '" cy="' + a.y + '" r="' + (4 * k) + '" fill="#ffb347"/>' +
+    '<circle cx="' + b.x + '" cy="' + b.y + '" r="' + (4 * k) + '" fill="#ffb347"/>' +
+    '<text x="' + (a.x + b.x) / 2 + '" y="' + ((a.y + b.y) / 2 - 8 * k) + '" fill="#fff" font-size="' + (13 * k) + '" ' +
+    'text-anchor="middle" paint-order="stroke" stroke="#000" stroke-width="' + (3 * k) + '">' + label + '</text>';
+}
+function clearRulerSoon() {
+  rulerClearTimer = setTimeout(() => { if (rulerSvg) rulerSvg.innerHTML = ''; }, 2500);
+}
+
+// --- Ping: efemérní ukazovátko, viditelné i ostatním přes polling ---
+function zobrazPing(x, y, jmeno) {
+  const el = document.createElement('div');
+  el.className = 'vtt-ping';
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  const dot = document.createElement('div');
+  dot.className = 'ping-dot';
+  el.appendChild(dot);
+  if (jmeno) {
+    const label = document.createElement('div');
+    label.className = 'ping-label';
+    label.textContent = jmeno;
+    el.appendChild(label);
+  }
+  mapWrap.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+const nestvuraHledat = document.getElementById('nestvuraHledat');
+if (nestvuraHledat) {
+  nestvuraHledat.addEventListener('input', () => {
+    const q = nestvuraHledat.value.trim().toLowerCase();
+    document.querySelectorAll('#novaNestvuraSelect option').forEach(opt => {
+      opt.style.display = (!q || opt.textContent.toLowerCase().includes(q)) ? '' : 'none';
+    });
+  });
+}
+
+// --- Tokeny: stav ze serveru a vykreslení ---
+// Tokeny se kreslí z dat (ne z HTML od PHP), aby šly překreslit "na místě"
+// bez location.reload() — viz obnovitStav() a hra/api/mapa_stav.php.
+// Obnova nic neruší: otevřené panely, zoom ani vybraný token zůstávají.
+let tokeny = CFG.stav.tokeny.slice();
+let koloStav = CFG.stav.kolo;
+let iniciativa = CFG.stav.iniciativa;
+let volnePostavy = CFG.stav.volne_postavy;
+const tokenEl = new Map();
+const spravovatPanel = document.getElementById('panel-spravovat');
+let spravovanyToken = null;
+// Tokeny, které tenhle klient právě přesouvá (pozici jim nepřepisuje obnova
+// stavu, dokud server nepotvrdí přesun).
+const drzeneTokeny = new Set();
+
+function esc(text) {
+  return String(text ?? '').replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+}
+function tokenData(id) { return tokeny.find((t) => t.id === id) || null; }
+// Token je ve výchozí velikosti o něco menší než buňka gridu (aby se do hexu
+// vešel celý); bez gridu pevných 40 px jako dřív.
+function zakladniPrumerTokenu() {
+  const sah = pxNaSah();
+  return sah > 0 ? sah * 0.82 : 40;
+}
+function prumerTokenu(t) { return zakladniPrumerTokenu() * (t.velikost > 0 ? t.velikost : 1); }
+function iniciala(label) { return label ? Array.from(String(label)).slice(0, 2).join('') : '?'; }
+function barvaTokenu(t) {
+  if (t.barva) return t.barva;
+  if (t.typ_entity === 'postava') return 'var(--color-accent-600, #7a3b2e)';
+  if (t.typ_entity === 'nestvura_instance') return '#4a2b2b';
+  return '#555';
+}
+
+function vytvorTokenEl(t) {
+  const el = document.createElement('div');
+  el.className = 'vtt-token';
+  el.dataset.id = String(t.id);
+  el.innerHTML = '<div class="face"></div><div class="puck"><span></span></div><div class="hp"></div><div class="fx"></div>';
+  mapWrap.appendChild(el);
+  return el;
+}
+
+function nakreslitToken(t) {
+  let el = tokenEl.get(t.id);
+  if (!el) { el = vytvorTokenEl(t); tokenEl.set(t.id, el); }
+  const d = prumerTokenu(t);
+  if (!drzeneTokeny.has(t.id)) {
+    el.style.left = t.x + 'px';
+    el.style.top = t.y + 'px';
+  }
+  el.style.zIndex = String(t.z);
+  el.style.setProperty('--d', d.toFixed(1) + 'px');
+  const mrtvy = t.hp !== null && t.hp <= 0;
+  el.classList.toggle('dead', mrtvy);
+  el.classList.toggle('not-turn', !t.na_tahu && t.owned);
+  el.classList.toggle('movable', t.owned && t.na_tahu && !t.zamceno);
+  el.classList.toggle('zamceno', !!t.zamceno);
+  el.classList.toggle('skryty', !t.viditelny);
+  el.classList.toggle('vybrany', typeof jeVybrany === 'function' && jeVybrany(t.id));
+  const puck = el.querySelector('.puck');
+  puck.style.background = barvaTokenu(t);
+  puck.style.fontSize = Math.max(9, Math.round(d * 0.3)) + 'px';
+  puck.firstChild.textContent = iniciala(t.label);
+  const face = el.querySelector('.face');
+  face.style.display = FUNKCE.smer ? '' : 'none';
+  face.style.transform = 'rotate(' + (t.smer || 0) + 'deg)';
+  const hp = el.querySelector('.hp');
+  if (t.hp !== null) {
+    hp.style.display = '';
+    hp.textContent = t.hp + (t.max_hp !== null ? '/' + t.max_hp : '');
+  } else {
+    hp.style.display = 'none';
+  }
+  const fx = el.querySelector('.fx');
+  fx.textContent = (t.efekty || []).join(', ');
+  fx.style.display = t.efekty && t.efekty.length ? '' : 'none';
+  el.title = t.label + (!t.na_tahu && t.owned ? ' (není na tahu)' : '') + (t.zamceno ? ' (zamčený)' : '');
+}
+
+function nakreslitTokeny() {
+  const zive = new Set();
+  tokeny.forEach((t) => { zive.add(t.id); nakreslitToken(t); });
+  for (const [id, el] of tokenEl) {
+    if (!zive.has(id)) { el.remove(); tokenEl.delete(id); }
+  }
+}
+
+// --- Pořadí tahů (panel vpravo nahoře) ---
+const iniPanel = document.getElementById('panelIniciativa');
+const iniList = document.getElementById('iniciativaList');
+const iniTitle = document.getElementById('iniciativaTitle');
+function nakreslitIniciativu() {
+  if (!iniPanel) return;
+  if (!koloStav) { iniPanel.style.display = 'none'; return; }
+  iniPanel.style.display = '';
+  iniTitle.textContent = 'Kolo ' + koloStav.cislo_kola + ' — pořadí tahů';
+  iniList.innerHTML = '';
+  iniciativa.forEach((r) => {
+    const aktivni = r.token_id === koloStav.aktivni_token_id;
+    const radek = document.createElement('div');
+    radek.className = 'ini-radek' + (aktivni ? ' aktivni' : '');
+    radek.dataset.tokenId = String(r.token_id);
+    const jmeno = document.createElement('span');
+    jmeno.textContent = r.label || '?';
+    const cisla = document.createElement('span');
+    cisla.textContent = r.hod + (r.modifikator >= 0 ? '+' : '') + r.modifikator + '=' + r.vysledek + ' · ' + r.akce_zbyvajici + '/' + r.akce_celkem + ' akcí';
+    radek.append(jmeno, cisla);
+    iniList.appendChild(radek);
+  });
+}
+if (iniList) {
+  iniList.addEventListener('click', (e) => {
+    const radek = e.target.closest('.ini-radek');
+    const t = radek ? tokenData(parseInt(radek.dataset.tokenId, 10)) : null;
+    if (t) kamera.vystredit(t.x, t.y);
+  });
+}
+
+// --- Postavy, které ještě nemají na mapě token (výběr v "Přidat token") ---
+function naplnitVolnePostavy() {
+  const sel = document.getElementById('novaPostavaSelect');
+  const wrap = document.getElementById('novaPostavaWrap');
+  const prazdno = document.getElementById('novaPostavaPrazdno');
+  if (!sel) return;
+  const puvodni = sel.value;
+  sel.innerHTML = '<option value="">—</option>' + volnePostavy.map((p) => '<option value="' + p.id + '">' + esc(p.nazev) + '</option>').join('');
+  if (volnePostavy.some((p) => String(p.id) === puvodni)) sel.value = puvodni;
+  if (wrap) wrap.style.display = volnePostavy.length ? '' : 'none';
+  if (prazdno) prazdno.style.display = volnePostavy.length ? 'none' : '';
+}
+
+// --- Obnova stavu na místě (místo location.reload) ---
+let obnovaBezi = false, obnovaZnovu = false, obnovaTimer = null;
+function planujObnovuStavu(zpozdeni = 120) {
+  clearTimeout(obnovaTimer);
+  obnovaTimer = setTimeout(obnovitStav, zpozdeni);
+}
+async function obnovitStav() {
+  if (obnovaBezi) { obnovaZnovu = true; return; }
+  obnovaBezi = true;
+  try {
+    const r = await fetch('api/mapa_stav.php?mapa_id=' + MAPA_ID, {cache: 'no-store', credentials: 'same-origin'});
+    if (r.ok) aplikujStav(await r.json());
+  } catch (err) { /* výpadek sítě — příští událost to zkusí znovu */ }
+  obnovaBezi = false;
+  if (obnovaZnovu) { obnovaZnovu = false; obnovitStav(); }
+}
+function aplikujStav(s) {
+  tokeny = s.tokeny;
+  koloStav = s.kolo;
+  iniciativa = s.iniciativa;
+  volnePostavy = s.volne_postavy;
+  if (typeof ocistitVyber === 'function') ocistitVyber();
+  nakreslitTokeny();
+  nakreslitIniciativu();
+  naplnitVolnePostavy();
+  obnovPanelSpravovat();
+}
+
+// --- Panel Spravovat (klik na vlastní token) ---
+const inventarCache = new Map();
+function klicEntity(typEntity, entitaId) { return typEntity + ':' + entitaId; }
+
+function otevritSpravovat(t) {
+  spravovanyToken = {
+    typEntity: t.typ_entity,
+    entitaId: t.entita_id,
+    tokenId: t.id,
+    hp: t.hp,
+    magenergie: t.magenergie,
+    maxMagenergie: t.max_magenergie,
+  };
+  document.getElementById('spravovatNazev').textContent = t.label;
+  const magRow = document.getElementById('panelMagenergieRow');
+  if (magRow) {
+    if (spravovanyToken.maxMagenergie !== null) {
+      magRow.style.display = '';
+      document.getElementById('spravovatMagenergieText').textContent = (spravovanyToken.magenergie ?? 0) + '/' + spravovanyToken.maxMagenergie;
+    } else {
+      magRow.style.display = 'none';
+    }
+  }
+  // Iniciativa: u postavy se únava a naložení počítají samy (pokud je PJ
+  // nevypnul) — ruční zaškrtnutí těchhle řádků se zamkne.
+  let autoPozn = false;
+  document.querySelectorAll('.iniciativa-bonus-check[data-auto]').forEach((cb) => {
+    const zamknout = spravovanyToken.typEntity === 'postava' && POHYB_AUTO[cb.dataset.auto];
+    cb.disabled = zamknout;
+    if (zamknout) { cb.checked = false; autoPozn = true; }
+    cb.parentElement.style.opacity = zamknout ? '.5' : '';
+  });
+  const pozn = document.getElementById('iniciativaAutoPozn');
+  if (pozn) pozn.style.display = autoPozn ? '' : 'none';
+  nactiInventar();
+  spravovatPanel.classList.add('open');
+}
+// Po obnově stavu sedí panel k aktuálním datům (životy, magenergie…);
+// zmizel-li token (smazaný jiným klientem), panel se zavře.
+function obnovPanelSpravovat() {
+  if (!spravovanyToken) return;
+  const t = tokenData(spravovanyToken.tokenId);
+  if (!t) {
+    spravovatPanel.classList.remove('open');
+    spravovanyToken = null;
+    return;
+  }
+  const hpZmena = spravovanyToken.hp !== t.hp;
+  spravovanyToken.hp = t.hp;
+  spravovanyToken.magenergie = t.magenergie;
+  spravovanyToken.maxMagenergie = t.max_magenergie;
+  document.getElementById('spravovatNazev').textContent = t.label;
+  const txt = document.getElementById('spravovatMagenergieText');
+  if (txt && t.max_magenergie !== null) txt.textContent = (t.magenergie ?? 0) + '/' + t.max_magenergie;
+  if (hpZmena) { renderInventar(); renderKorist(); }
+}
+// Inventář se načítá až pro token, na který někdo klikl (dřív se posílal
+// v HTML pro všechny tokeny najednou).
+async function nactiInventar() {
+  const st = spravovanyToken;
+  if (!st) return;
+  const klic = klicEntity(st.typEntity, st.entitaId);
+  const cont = document.getElementById('spravovatInventar');
+  if (cont && !inventarCache.has(klic)) cont.innerHTML = '<p class="note" style="margin:0;">Načítám inventář…</p>';
+  try {
+    const r = await fetch('api/entita_inventar.php?typ_entity=' + encodeURIComponent(st.typEntity) + '&entita_id=' + st.entitaId, {cache: 'no-store', credentials: 'same-origin'});
+    const d = await r.json();
+    if (d.polozky) inventarCache.set(klic, d.polozky); else inventarCache.delete(klic);
+  } catch (err) { inventarCache.delete(klic); }
+  if (spravovanyToken && klicEntity(spravovanyToken.typEntity, spravovanyToken.entitaId) === klic) {
+    renderInventar();
+    renderKorist();
+  }
+}
+
+// --- Vstup: myš, dotyk i pero přes Pointer Events ---
+// Jedna cesta pro všechna zařízení. Jeden prst/myš dělá akci podle nástroje
+// (tah tokenu, měření, kreslení mlhy…), na prázdném místě posouvá mapu.
+// Dva prsty vždy přibližují a posouvají; kolečko myši přibližuje; pravé či
+// prostřední tlačítko a mezerník posouvají mapu v jakémkoli nástroji.
+const PRAH_MYS = 5, PRAH_DOTYK = 10;
+const pointery = new Map();
+let akce = null;
+let mezernikDrzen = false;
+let polozitVic = false;
+
+function bodMapy(e) { return kamera.naMapu(e.clientX, e.clientY); }
+function jeVstupniPole(el) {
+  return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
+}
+
+function zacitAkci(e, pinEl) {
+  const m = bodMapy(e);
+  akce = {
+    typ: 'nic', start: {x: e.clientX, y: e.clientY}, pointerId: e.pointerId, posunuto: false,
+    prah: e.pointerType === 'touch' ? PRAH_DOTYK : PRAH_MYS, tlacitko: e.button, panRef: null,
+  };
+  if (pinEl) { akce.typ = 'pin'; akce.pin = pinEl; return; }
+  if (e.button === 1 || e.button === 2 || mezernikDrzen || currentTool === 'ruka') {
+    akce.typ = 'pan';
+    akce.kontext = e.button === 2;
+    return;
+  }
+  if (currentTool === 'ruler') {
+    akce.typ = 'ruler';
+    rulerStart = m;
+    drawRuler(m, m);
+    return;
+  }
+  if (currentTool === 'mlha') {
+    akce.typ = 'mlha';
+    if (mlhaRezimObdelnik) {
+      mlhaObdelnikStart = m;
+    } else {
+      mlhaKreslim = true;
+      mlhaPosledniBunka = null;
+      mlhaNakresliBod(m);
+    }
+    return;
+  }
+  if (currentTool === 'zed' || currentTool === 'ping' || currentTool === 'pin') {
+    akce.typ = 'klik'; // klik = nástroj, tah = posun mapy
+    return;
+  }
+  const el = e.target.closest('.vtt-token');
+  const t = el ? tokenData(parseInt(el.dataset.id, 10)) : null;
+  if (t) {
+    akce.typ = 'token';
+    akce.token = t;
+    akce.offX = m.x - t.x;
+    akce.offY = m.y - t.y;
+    // data o tahu/vlastnictví jsou jen pomůcka pro UI — server
+    // (hra/api/token_presun.php) je autoritativní nezávisle na tom.
+    akce.smiTahnout = t.owned && t.na_tahu && !t.zamceno;
+    return;
+  }
+  akce.typ = 'prazdno';
+}
+
+// Posouvá mapu o rozdíl od posledního zpracovaného bodu; začne až po
+// překročení prahu (aby klik a třes prstu mapu nehýbaly).
+function panAkce(e) {
+  if (!akce.posunuto) return;
+  const ref = akce.panRef || akce.start;
+  kamera.posun(e.clientX - ref.x, e.clientY - ref.y);
+  akce.panRef = {x: e.clientX, y: e.clientY};
+}
+
+function zrusitAkci() {
+  if (!akce) return;
+  const a = akce;
+  akce = null;
+  if (a.typ === 'token' && a.posunuto && a.smiTahnout) {
+    const el = tokenEl.get(a.token.id);
+    if (el) { el.style.left = a.token.x + 'px'; el.style.top = a.token.y + 'px'; el.classList.remove('tahnuty'); }
+    drzeneTokeny.delete(a.token.id);
+  }
+  if (a.typ === 'ruler') { rulerStart = null; if (rulerSvg) rulerSvg.innerHTML = ''; }
+  if (a.typ === 'mlha') { mlhaKreslim = false; mlhaObdelnikStart = null; if (rulerSvg) rulerSvg.innerHTML = ''; }
+}
+
+viewport.addEventListener('pointerdown', (e) => {
+  // Piny si klik vyřizují samy (tlačítko); výjimka je pin v editaci, který
+  // se táhne po mapě.
+  const pin = e.target.closest('.mapa-bod-marker');
+  const pinTazeny = !!pin && pinEditujiId !== null && parseInt(pin.dataset.bodId, 10) === pinEditujiId;
+  if (pin && !pinTazeny) return;
+  if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 1 && e.button !== 2) return;
+  pointery.set(e.pointerId, {x: e.clientX, y: e.clientY});
+  try { viewport.setPointerCapture(e.pointerId); } catch (err) { /* nevadí */ }
+  if (pointery.size === 2) {
+    zrusitAkci();
+    const [a, b] = Array.from(pointery.values());
+    gesto.start(a, b);
+    return;
+  }
+  if (pointery.size > 2) return;
+  zacitAkci(e, pinTazeny ? pin : null);
+  if (e.button === 1) e.preventDefault(); // prostřední tlačítko jinak spustí automatický posun prohlížeče
+});
+
+viewport.addEventListener('pointermove', (e) => {
+  const p = pointery.get(e.pointerId);
+  if (!p) return;
+  p.x = e.clientX;
+  p.y = e.clientY;
+  if (gesto.aktivni()) {
+    const body = Array.from(pointery.values());
+    if (body.length >= 2) gesto.pohyb(body[0], body[1], viewport);
+    return;
+  }
+  if (!akce || akce.pointerId !== e.pointerId) return;
+  const od = Math.hypot(e.clientX - akce.start.x, e.clientY - akce.start.y);
+  if (!akce.posunuto && od > akce.prah) akce.posunuto = true;
+  const m = bodMapy(e);
+  switch (akce.typ) {
+    case 'pan':
+    case 'klik':
+    case 'prazdno':
+      panAkce(e);
+      break;
+    case 'pin': {
+      akce.posunuto = akce.posunuto || od > 2;
+      akce.pin.style.left = Math.round(m.x) + 'px';
+      akce.pin.style.top = Math.round(m.y) + 'px';
+      break;
+    }
+    case 'ruler':
+      if (rulerStart) drawRuler(rulerStart, m);
+      break;
+    case 'mlha':
+      if (mlhaRezimObdelnik) {
+        if (!mlhaObdelnikStart || !rulerSvg) break;
+        const x = Math.min(mlhaObdelnikStart.x, m.x), y = Math.min(mlhaObdelnikStart.y, m.y);
+        const sw = Math.abs(m.x - mlhaObdelnikStart.x), sh = Math.abs(m.y - mlhaObdelnikStart.y);
+        rulerSvg.innerHTML = '<rect x="' + x + '" y="' + y + '" width="' + sw + '" height="' + sh
+          + '" fill="rgba(255,209,102,0.15)" stroke="#ffd166" stroke-width="2" stroke-dasharray="6 4" vector-effect="non-scaling-stroke"/>';
+      } else if (mlhaKreslim) {
+        mlhaNakresliBod(m);
+      }
+      break;
+    case 'token': {
+      if (!akce.smiTahnout) { panAkce(e); break; }
+      if (!akce.posunuto) break;
+      const t = akce.token;
+      drzeneTokeny.add(t.id);
+      let nx, ny;
+      if (GRID_PX > 0) {
+        // S gridem token vždycky sedí na střed buňky — místo úchopu
+        // uvnitř tokenu se tu záměrně ignoruje.
+        const c = gridCellCenter(m.x, m.y);
+        nx = c.x; ny = c.y;
+      } else {
+        nx = m.x - akce.offX; ny = m.y - akce.offY;
+      }
+      akce.nx = Math.round(nx);
+      akce.ny = Math.round(ny);
+      const el = tokenEl.get(t.id);
+      if (el) { el.style.left = akce.nx + 'px'; el.style.top = akce.ny + 'px'; el.classList.add('tahnuty'); }
+      break;
+    }
+    default:
+      break;
+  }
+});
+
+function ulozPresunTokenu(t, x, y) {
+  drzeneTokeny.add(t.id);
+  postJson('api/token_presun.php', {token_id: t.id, x, y})
+    .then((d) => {
+      if (d.error) { logLine('Chyba přesunu: ' + d.error); obnovitStav(); return; }
+      t.x = x; t.y = y;
+    })
+    .catch(() => { logLine('Přesun se nepodařilo odeslat.'); obnovitStav(); })
+    .finally(() => {
+      drzeneTokeny.delete(t.id);
+      const el = tokenEl.get(t.id);
+      if (el) el.classList.remove('tahnuty');
+    });
+}
+
+// Klik (ne tah) na mapu — nástroje ping / zeď / pin a pokládání tokenu.
+function klikNaMapu(m) {
+  if (currentTool === 'ping') {
+    const x = Math.round(m.x), y = Math.round(m.y);
+    postJson('api/ping.php', {svet_id: SVET_ID, mapa_id: MAPA_ID, x, y})
+      .then((d) => {
+        if (d.error) { logLine('Chyba: ' + d.error); return; }
+        posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
+        zobrazPing(x, y, d.jmeno || '');
+      });
+    return;
+  }
+  if (currentTool === 'zed') {
+    // Výběr existující zdi jen když zrovna nerozkreslujeme novou cestu —
+    // uprostřed klikání bodů se klik vždycky bere jako další bod, ať
+    // omylem nevybereš/nesmažeš jinou zeď, co ti leží v cestě.
+    if (zedRozpracovaneBody.length === 0) {
+      const blizkaZed = najdiZedBlizkoBodu(m.x, m.y);
+      const btnSmazat = document.getElementById('zedSmazatBtn');
+      if (blizkaZed) {
+        zedVybranaId = blizkaZed.id;
+        if (btnSmazat) btnSmazat.style.display = 'block';
+        renderZdi();
+        return;
+      }
+      zedVybranaId = null;
+      if (btnSmazat) btnSmazat.style.display = 'none';
+      renderZdi();
+    }
+    const bod = snapPoint(m.x, m.y, zedSnapEnabled());
+    zedRozpracovaneBody.push(bod);
+    aktualizovatZedUlozitTlacitko();
+    drawZedRozpracovanouCestu(bod);
+    return;
+  }
+  if (currentTool === 'pin') {
+    // Vždycky znovu otevře s čerstvými souřadnicemi (ne toggle) — dva
+    // kliky po sobě by jinak podruhé jen zavřely formulář, ne
+    // přepsaly souřadnice na nový bod.
+    const xEl = document.getElementById('pinNovyX'), yEl = document.getElementById('pinNovyY');
+    if (xEl) xEl.value = Math.round(m.x);
+    if (yEl) yEl.value = Math.round(m.y);
+    closeAllPopovers();
+    const pop = document.getElementById('popover-pin-novy');
+    if (pop && toolButtons.pin) {
+      umistitPopoverKBodu(pop, toolButtons.pin.getBoundingClientRect());
+      toolButtons.pin.classList.add('active');
+    }
+    return;
+  }
+  if (currentTool !== 'select') return;
+  polozitToken(m);
+}
+
+// Položí vybranou postavu / nestvůru z popoveru "Přidat token" na mapu.
+function polozitToken(m) {
+  const postavaSel = document.getElementById('novaPostavaSelect');
+  const nestvuraSel = document.getElementById('novaNestvuraSelect');
+  const stred = GRID_PX > 0 ? gridCellCenter(m.x, m.y) : m;
+  const x = Math.round(stred.x), y = Math.round(stred.y);
+  let tel = null;
+  if (postavaSel && postavaSel.value) {
+    tel = {mapa_id: MAPA_ID, typ_entity: 'postava', postava_id: parseInt(postavaSel.value, 10), x, y};
+    if (!polozitVic) postavaSel.value = '';
+  } else if (nestvuraSel && nestvuraSel.value) {
+    tel = {mapa_id: MAPA_ID, typ_entity: 'nestvura', nestvura_id: parseInt(nestvuraSel.value, 10), x, y};
+    if (!polozitVic) nestvuraSel.selectedIndex = -1;
+  }
+  if (!tel) { if (typeof zrusitVyber === 'function') zrusitVyber(); return; }
+  postJson('api/token_pridat.php', tel).then((d) => {
+    if (d.error) { logLine('Chyba přidání: ' + d.error); return; }
+    obnovitStav();
+  });
+}
+
+function dokoncitAkci(a, e) {
+  switch (a.typ) {
+    case 'pin':
+      // Jen uloží novou pozici do skrytých polí formuláře — zápis do DB
+      // proběhne až kliknutím na "Uložit změny", spolu s ostatními
+      // upravovanými poli (stejný vzor jako zbytek téhle edit formy).
+      if (a.posunuto) {
+        document.getElementById('pinUpravitX').value = parseInt(a.pin.style.left, 10);
+        document.getElementById('pinUpravitY').value = parseInt(a.pin.style.top, 10);
+      }
+      break;
+    case 'ruler':
+      rulerStart = null;
+      clearRulerSoon();
+      break;
+    case 'mlha':
+      if (mlhaRezimObdelnik) {
+        if (!mlhaObdelnikStart) break;
+        const m = bodMapy(e);
+        const start = mlhaObdelnikStart;
+        mlhaObdelnikStart = null;
+        if (rulerSvg) rulerSvg.innerHTML = '';
+        postJson('api/mlha_uprava.php', {
+          mapa_id: MAPA_ID, ucet_id: mlhaNahledUcetId,
+          x: start.x, y: start.y, x2: m.x, y2: m.y, odhalit: mlhaKreslimOdhalit,
+        }).then((d) => { if (d.error) { logLine('Chyba: ' + d.error); return; } osvezitMlhu(); });
+      } else {
+        mlhaKreslim = false;
+      }
+      break;
+    case 'token': {
+      const t = a.token;
+      if (a.smiTahnout && a.posunuto) {
+        if (a.nx !== undefined && (a.nx !== t.x || a.ny !== t.y)) ulozPresunTokenu(t, a.nx, a.ny);
+        else {
+          drzeneTokeny.delete(t.id);
+          const el = tokenEl.get(t.id);
+          if (el) { el.style.left = t.x + 'px'; el.style.top = t.y + 'px'; el.classList.remove('tahnuty'); }
+        }
+      } else if (!a.posunuto && t.owned && t.na_tahu) {
+        otevritSpravovat(t);
+      }
+      break;
+    }
+    case 'klik':
+    case 'prazdno':
+      if (!a.posunuto) klikNaMapu(bodMapy(e));
+      break;
+    default:
+      break;
+  }
+}
+
+function konecPointeru(e, zruseno) {
+  pointery.delete(e.pointerId);
+  try { viewport.releasePointerCapture(e.pointerId); } catch (err) { /* nevadí */ }
+  if (gesto.aktivni()) {
+    if (pointery.size < 2) gesto.konec();
+    akce = null; // zbylý prst po gestu nezačíná novou akci
+    return;
+  }
+  if (!akce || akce.pointerId !== e.pointerId) return;
+  const a = akce;
+  akce = null;
+  if (zruseno) {
+    akce = a;
+    zrusitAkci();
+    return;
+  }
+  dokoncitAkci(a, e);
+}
+viewport.addEventListener('pointerup', (e) => konecPointeru(e, false));
+viewport.addEventListener('pointercancel', (e) => konecPointeru(e, true));
+viewport.addEventListener('contextmenu', (e) => e.preventDefault());
+
+viewport.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  let dy = e.deltaY;
+  if (e.deltaMode === 1) dy *= 16; else if (e.deltaMode === 2) dy *= 400;
+  if (e.shiftKey && !e.ctrlKey) {
+    kamera.posun(-dy, 0);
+    return;
+  }
+  kamera.zoomKolem(e.clientX, e.clientY, Math.exp(-dy * (e.ctrlKey ? 0.01 : 0.0018)));
+}, {passive: false});
+
+window.addEventListener('keydown', (e) => {
+  if (jeVstupniPole(e.target)) return;
+  if (e.code === 'Space') {
+    mezernikDrzen = true;
+    viewport.classList.add('pan-ready');
+    e.preventDefault();
+  } else if (e.key === '+' || e.key === '=') {
+    kamera.zoomStred(1.25);
+  } else if (e.key === '-') {
+    kamera.zoomStred(0.8);
+  } else if (e.key === '0') {
+    kamera.prizpusobit();
+  }
+});
+window.addEventListener('keyup', (e) => {
+  if (e.code === 'Space') {
+    mezernikDrzen = false;
+    viewport.classList.remove('pan-ready');
+  }
+});
+window.addEventListener('blur', () => { mezernikDrzen = false; viewport.classList.remove('pan-ready'); });
+window.addEventListener('resize', () => kamera.obnovit());
+
+// --- Piny (na libovolné mapě od fáze 2, viz MAPA_BODY/popover-pin-*) ---
+let pinVybranyId = null;
+function otevriPinInfo(bod) {
+  pinVybranyId = bod.id;
+  document.getElementById('pinInfoNazev').textContent = bod.nazev;
+  const typLabel = {
+    mesto: 'Město', vesnice: 'Vesnice', tajne_misto: 'Tajné místo',
+    budova: 'Budova', mistnost: 'Místnost', sklep: 'Sklep / dungeon', prechod: 'Přechod',
+    jine: 'Jiné místo',
+  }[bod.typ] || bod.typ;
+  document.getElementById('pinInfoTyp').textContent = typLabel + (IS_PJ_OR_ADMIN && !bod.viditelny_hracum ? ' — skryté hráčům' : '');
+  document.getElementById('pinInfoPopis').textContent = bod.popis || '';
+  const npcWrap = document.getElementById('pinInfoNpcWrap');
+  const npcList = document.getElementById('pinInfoNpcList');
+  if (bod.npc && bod.npc.length) {
+    npcWrap.style.display = '';
+    npcList.innerHTML = bod.npc.map(n => {
+      const rp = [n.rasa_nazev, n.povolani_nazev].filter(Boolean).join(' / ');
+      return '<li>' + esc(n.nazev) + (rp ? ' <span style="opacity:.65;">(' + esc(rp) + ', ' + esc(n.uroven) + '. úr.)</span>' : '') + '</li>';
+    }).join('');
+  } else {
+    npcWrap.style.display = 'none';
+  }
+  const otevritBtn = document.getElementById('pinInfoOtevritBtn');
+  const aktivniBtn = document.getElementById('pinInfoAktivniBtn');
+  const cestovatBtn = document.getElementById('pinInfoCestovatBtn');
+  const upravitBtn = document.getElementById('pinInfoUpravitBtn');
+  const smazatBtn = document.getElementById('pinInfoSmazatBtn');
+  if (bod.cilova_mapa_id) {
+    otevritBtn.style.display = '';
+    otevritBtn.href = 'mapa.php?id=' + bod.cilova_mapa_id;
+    aktivniBtn.style.display = IS_PJ_OR_ADMIN ? '' : 'none';
+  } else {
+    otevritBtn.style.display = 'none';
+    aktivniBtn.style.display = 'none';
+  }
+  cestovatBtn.style.display = IS_PJ_OR_ADMIN ? '' : 'none';
+  upravitBtn.style.display = IS_PJ_OR_ADMIN ? '' : 'none';
+  smazatBtn.style.display = IS_PJ_OR_ADMIN ? '' : 'none';
+  const btn = document.querySelector('.mapa-bod-marker[data-bod-id="' + bod.id + '"]');
+  const pop = document.getElementById('popover-pin-info');
+  if (pop && btn) {
+    closeAllPopovers();
+    umistitPopoverKBodu(pop, btn.getBoundingClientRect());
+  }
+}
+document.querySelectorAll('.mapa-bod-marker').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    // V editačním módu klik na TENHLE pin už jen táhne (viz mousedown/
+    // move/up výš) — nemá znovu přepínat na info popover a tím
+    // nechtěně zavírat rozdělaný formulář úprav.
+    if (pinEditujiId !== null && parseInt(btn.dataset.bodId, 10) === pinEditujiId) return;
+    const bod = MAPA_BODY.find(b => b.id === parseInt(btn.dataset.bodId, 10));
+    if (bod) otevriPinInfo(bod);
+  });
+});
+const pinInfoAktivniBtn = document.getElementById('pinInfoAktivniBtn');
+if (pinInfoAktivniBtn) {
+  pinInfoAktivniBtn.addEventListener('click', () => {
+    const bod = MAPA_BODY.find(b => b.id === pinVybranyId);
+    if (!bod || !bod.cilova_mapa_id) return;
+    postJson('api/aktivni_mapa_nastavit.php', {mapa_id: bod.cilova_mapa_id})
+      .then(d => { if (d.error) { logLine('Chyba: ' + d.error); return; } logLine('Aktivní mapa nastavena na: ' + bod.nazev); });
+  });
+}
+const pinInfoCestovatBtn = document.getElementById('pinInfoCestovatBtn');
+if (pinInfoCestovatBtn) {
+  pinInfoCestovatBtn.addEventListener('click', () => {
+    const bod = MAPA_BODY.find(b => b.id === pinVybranyId);
+    if (!bod) return;
+    const vstup = prompt('Kolik dní cesta na „' + bod.nazev + '“ zabrala?', '1');
+    if (vstup === null) return;
+    const dny = parseInt(vstup, 10);
+    if (isNaN(dny) || dny < 0) { logLine('Zadej nezáporné celé číslo dní.'); return; }
+    postJson('api/pin_cestovat.php', {bod_id: bod.id, dny})
+      .then(d => {
+        if (d.error) { logLine('Chyba: ' + d.error); return; }
+        logLine('Cesta na „' + bod.nazev + '“ — herní čas posunut o ' + dny + ' ' + (dny === 1 ? 'den' : (dny < 5 ? 'dny' : 'dní')) + '.');
+      });
+  });
+}
+const pinInfoUpravitBtn = document.getElementById('pinInfoUpravitBtn');
+if (pinInfoUpravitBtn) {
+  pinInfoUpravitBtn.addEventListener('click', () => {
+    const bod = MAPA_BODY.find(b => b.id === pinVybranyId);
+    if (!bod) return;
+    document.getElementById('pinUpravitId').value = bod.id;
+    document.getElementById('pinUpravitX').value = bod.x;
+    document.getElementById('pinUpravitY').value = bod.y;
+    document.getElementById('pinUpravitNazev').value = bod.nazev;
+    document.getElementById('pinUpravitTyp').value = bod.typ;
+    document.getElementById('pinUpravitCilovaMapa').value = bod.cilova_mapa_id || '';
+    document.getElementById('pinUpravitPopis').value = bod.popis || '';
+    document.getElementById('pinUpravitViditelny').checked = !!bod.viditelny_hracum;
+    closeAllPopovers();
+    const pop = document.getElementById('popover-pin-upravit');
+    const zdroj = document.querySelector('.mapa-bod-marker[data-bod-id="' + bod.id + '"]');
+    if (pop && zdroj) {
+      umistitPopoverKBodu(pop, zdroj.getBoundingClientRect());
+      pinEditujiId = bod.id;
+      zdroj.classList.add('pin-editing');
+    }
+  });
+}
+const pinUpravitUlozitBtn = document.getElementById('pinUpravitUlozitBtn');
+if (pinUpravitUlozitBtn) {
+  pinUpravitUlozitBtn.addEventListener('click', () => {
+    const id = parseInt(document.getElementById('pinUpravitId').value, 10);
+    const nazev = document.getElementById('pinUpravitNazev').value.trim();
+    if (!nazev) { logLine('Pin musí mít název.'); return; }
+    const typ = document.getElementById('pinUpravitTyp').value;
+    const cilovaMapaEl = document.getElementById('pinUpravitCilovaMapa');
+    const cilovaMapaId = cilovaMapaEl.value ? parseInt(cilovaMapaEl.value, 10) : null;
+    const popis = document.getElementById('pinUpravitPopis').value.trim();
+    const viditelnyHracum = document.getElementById('pinUpravitViditelny').checked;
+    const x = parseInt(document.getElementById('pinUpravitX').value, 10);
+    const y = parseInt(document.getElementById('pinUpravitY').value, 10);
+    postJson('api/mapa_bod_upravit.php', {id, nazev, typ, cilova_mapa_id: cilovaMapaId, popis, viditelny_hracum: viditelnyHracum, x, y})
+      .then(d => {
+        if (d.error) { logLine('Chyba: ' + d.error); return; }
+        const bod = MAPA_BODY.find(b => b.id === id);
+        if (bod) {
+          Object.assign(bod, {nazev, typ, cilova_mapa_id: cilovaMapaId, popis, viditelny_hracum: viditelnyHracum, x, y});
+        }
+        const btn = document.querySelector('.mapa-bod-marker[data-bod-id="' + id + '"]');
+        if (btn) {
+          btn.style.left = x + 'px';
+          btn.style.top = y + 'px';
+          btn.title = nazev;
+          btn.style.opacity = viditelnyHracum ? '' : '.6';
+          const tmpl = document.querySelector('#pinIconTemplates [data-typ="' + typ + '"]');
+          btn.innerHTML = tmpl ? tmpl.innerHTML : '';
+        }
+        closeAllPopovers();
+        logLine('Pin „' + nazev + '“ upraven.');
+      });
+  });
+}
+const pinInfoSmazatBtn = document.getElementById('pinInfoSmazatBtn');
+if (pinInfoSmazatBtn) {
+  pinInfoSmazatBtn.addEventListener('click', () => {
+    if (!pinVybranyId || !confirm('Smazat tenhle pin?')) return;
+    postJson('api/mapa_bod_smazat.php', {id: pinVybranyId})
+      .then(d => {
+        if (d.error) { logLine('Chyba: ' + d.error); return; }
+        const btn = document.querySelector('.mapa-bod-marker[data-bod-id="' + pinVybranyId + '"]');
+        if (btn) btn.remove();
+        closeAllPopovers();
+      });
+  });
+}
+const pinNovyUlozitBtn = document.getElementById('pinNovyUlozitBtn');
+if (pinNovyUlozitBtn) {
+  pinNovyUlozitBtn.addEventListener('click', () => {
+    const nazev = document.getElementById('pinNovyNazev').value.trim();
+    if (!nazev) { logLine('Pin musí mít název.'); return; }
+    const typ = document.getElementById('pinNovyTyp').value;
+    const cilovaMapaEl = document.getElementById('pinNovyCilovaMapa');
+    const cilovaMapaId = cilovaMapaEl.value ? parseInt(cilovaMapaEl.value, 10) : null;
+    const popis = document.getElementById('pinNovyPopis').value.trim();
+    const viditelnyHracum = document.getElementById('pinNovyViditelny').checked;
+    const x = parseInt(document.getElementById('pinNovyX').value, 10);
+    const y = parseInt(document.getElementById('pinNovyY').value, 10);
+    postJson('api/mapa_bod_pridat.php', {
+      mapa_id: MAPA_ID, nazev, typ, x, y, cilova_mapa_id: cilovaMapaId, popis, viditelny_hracum: viditelnyHracum,
+    }).then(d => {
+      if (d.error) { logLine('Chyba: ' + d.error); return; }
+      const bod = {id: d.id, nazev, typ, x, y, cilova_mapa_id: cilovaMapaId, popis, viditelny_hracum: viditelnyHracum, npc: []};
+      MAPA_BODY.push(bod);
+      const layer = document.getElementById('mapaBodyLayer');
+      if (layer) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'mapa-bod-marker';
+        btn.dataset.bodId = String(bod.id);
+        btn.title = nazev;
+        btn.style.cssText = 'position:absolute;left:' + x + 'px;top:' + y + 'px;pointer-events:auto;background:none;border:none;cursor:pointer;padding:0;' + (viditelnyHracum ? '' : 'opacity:.6;');
+        const tmpl = document.querySelector('#pinIconTemplates [data-typ="' + typ + '"]');
+        btn.innerHTML = tmpl ? tmpl.innerHTML : '';
+        btn.addEventListener('click', (e) => { e.stopPropagation(); otevriPinInfo(bod); });
+        layer.appendChild(btn);
+      }
+      document.getElementById('pinNovyNazev').value = '';
+      document.getElementById('pinNovyPopis').value = '';
+      closeAllPopovers();
+      setTool('select');
+    });
+  });
+}
+
+// --- Panel Spravovat: život, efekt, smazání ---
+document.querySelectorAll('#panel-spravovat [data-delta]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (!spravovanyToken) return;
+    postJson('api/hp_uprava.php', {mapa_id: MAPA_ID, typ_entity: spravovanyToken.typEntity, entita_id: spravovanyToken.entitaId, delta: parseInt(btn.dataset.delta, 10)})
+      .then(d => {
+        if (d.error) { logLine('Chyba: ' + d.error); return; }
+        const t = tokenData(spravovanyToken.tokenId);
+        if (t) {
+          t.hp = d.nove_hp;
+          if (d.max_hp !== undefined) t.max_hp = d.max_hp;
+          nakreslitToken(t);
+        }
+        obnovPanelSpravovat();
+        posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
+      });
+  });
+});
+document.querySelectorAll('#panel-spravovat [data-mag-delta]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (!spravovanyToken || spravovanyToken.maxMagenergie === null) return;
+    postJson('api/magenergie_uprava.php', {mapa_id: MAPA_ID, entita_id: spravovanyToken.entitaId, delta: parseInt(btn.dataset.magDelta, 10)})
+      .then(d => {
+        if (d.error) { logLine('Chyba: ' + d.error); return; }
+        spravovanyToken.magenergie = d.nova_magenergie;
+        const tm = tokenData(spravovanyToken.tokenId);
+        if (tm) tm.magenergie = d.nova_magenergie;
+        const txt = document.getElementById('spravovatMagenergieText');
+        if (txt) txt.textContent = d.nova_magenergie + '/' + d.max_magenergie;
+        posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
+      });
+  });
+});
+const efektBtn = document.getElementById('efektBtn');
+if (efektBtn) {
+  efektBtn.addEventListener('click', () => {
+    if (!spravovanyToken) return;
+    const efektId = parseInt(document.getElementById('efektSelect').value, 10);
+    const kola = document.getElementById('efektKola').value;
+    postJson('api/efekt_pridat.php', {mapa_id: MAPA_ID, typ_entity: spravovanyToken.typEntity, entita_id: spravovanyToken.entitaId, efekt_id: efektId, zbyva_kol: kola})
+      .then(d => { if (d.error) { logLine('Chyba: ' + d.error); return; } obnovitStav(); });
+  });
+}
+document.querySelectorAll('.chip-efekt').forEach(chip => {
+  chip.addEventListener('click', () => {
+    if (!spravovanyToken) return;
+    document.getElementById('efektSelect').value = chip.dataset.efektId;
+    document.getElementById('efektKola').value = '3';
+    document.getElementById('efektBtn').click();
+  });
+});
+
+// --- Inventář spravované entity: "Použít" na každé položce ---
+function renderInventar() {
+  const cont = document.getElementById('spravovatInventar');
+  if (!cont || !spravovanyToken) return;
+  const jeMrtvaNestvura = spravovanyToken.typEntity === 'nestvura_instance' && spravovanyToken.hp !== null && spravovanyToken.hp <= 0;
+  if (jeMrtvaNestvura) { cont.innerHTML = ''; return; }
+  const polozky = inventarCache.get(klicEntity(spravovanyToken.typEntity, spravovanyToken.entitaId)) || [];
+  if (!polozky.length) { cont.innerHTML = ''; return; }
+  let html = '<h4 style="font-size:12px;color:#e8c9a8;margin:0 0 6px;">Inventář</h4>';
+  polozky.forEach((p, i) => {
+    const mnozstviText = p.typ_polozky === 'kouzlo' ? '' : (' ×' + p.mnozstvi);
+    html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:12.5px;">'
+      + '<span style="flex:1;">' + esc(p.nazev) + mnozstviText + '</span>'
+      + '<button class="btn btn-ghost" type="button" data-pouzit-index="' + i + '" style="font-size:11px;padding:3px 8px;">Použít</button>'
+      + '</div>';
+  });
+  cont.innerHTML = html;
+  cont.querySelectorAll('[data-pouzit-index]').forEach(btn => {
+    btn.addEventListener('click', () => pouzitPolozku(polozky[parseInt(btn.dataset.pouzitIndex, 10)]));
+  });
+}
+
+// Bez cíle = použito na sobě (typický "vypij lektvar"). Zadáním přesného
+// data-label jiného tokenu na mapě jde mířit i jinam — prostý prompt(),
+// ne picker, ať to zůstane malé.
+function vyberCil(vychoziLabel) {
+  const zadani = prompt('Cíl (prázdné = použít na "' + vychoziLabel + '"), napiš přesný název tokenu na mapě:', '');
+  if (zadani === null) return undefined;
+  if (zadani.trim() === '') return null;
+  const cil = tokeny.find(t => t.label === zadani.trim() && (t.typ_entity === 'postava' || t.typ_entity === 'nestvura_instance'));
+  if (!cil) { alert('Token "' + zadani + '" na mapě nenašel.'); return undefined; }
+  return {typEntity: cil.typ_entity, entitaId: cil.entita_id};
+}
+
+function pouzitPolozku(p) {
+  if (!spravovanyToken) return;
+  const cil = vyberCil(document.getElementById('spravovatNazev').textContent);
+  if (cil === undefined) return;
+  const body = {
+    typ_entity: spravovanyToken.typEntity, entita_id: spravovanyToken.entitaId,
+    typ_polozky: p.typ_polozky, polozka_id: p.polozka_id, mapa_id: MAPA_ID,
+  };
+  if (cil) { body.cil_typ_entity = cil.typEntity; body.cil_entita_id = cil.entitaId; }
+  postJson('api/pouzij_predmet.php', body).then(d => {
+    if (d.error) { logLine('Chyba: ' + d.error); return; }
+    let zprava = document.getElementById('spravovatNazev').textContent + ' použil(a) ' + p.nazev;
+    if (d.kostka) zprava += ': [' + d.kostka.hody.join(', ') + ']' + (d.kostka.bonus ? (d.kostka.bonus > 0 ? '+' : '') + d.kostka.bonus : '') + ' = ' + d.kostka.celkem;
+    if (d.hp) zprava += ' (' + (d.hp.delta > 0 ? '+' : '') + d.hp.delta + ' život)';
+    if (d.magenergie) zprava += ' (-' + d.magenergie.cena + ' magenergie, zbývá ' + d.magenergie.nova_magenergie + '/' + d.magenergie.max_magenergie + ')';
+    logLine(zprava);
+    posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
+    obnovitStav();
+    nactiInventar();
+  });
+}
+
+// --- Kořist z mrtvé nestvůry: "Předat" na každé položce vybavy ---
+function renderKorist() {
+  const cont = document.getElementById('spravovatKorist');
+  if (!cont || !spravovanyToken) return;
+  const jeMrtvaNestvura = IS_PJ_OR_ADMIN && spravovanyToken.typEntity === 'nestvura_instance' && spravovanyToken.hp !== null && spravovanyToken.hp <= 0;
+  if (!jeMrtvaNestvura) { cont.innerHTML = ''; return; }
+  const polozky = inventarCache.get(klicEntity('nestvura_instance', spravovanyToken.entitaId)) || [];
+  let html = '<h4 style="font-size:12px;color:#e8c9a8;margin:0 0 6px;">Kořist</h4>';
+  if (!polozky.length) {
+    html += '<p class="note" style="margin:0;">Nemá u sebe nic.</p>';
+  } else {
+    html += '<select id="koristCilSelect" class="input" style="margin-bottom:6px;">'
+      + SVET_POSTAVY.map(p => '<option value="' + p.id + '">' + esc(p.nazev) + '</option>').join('')
+      + '</select>';
+    polozky.forEach((p, i) => {
+      const mnozstviText = p.typ_polozky === 'kouzlo' ? '' : (' ×' + p.mnozstvi);
+      html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:12.5px;">'
+        + '<span style="flex:1;">' + esc(p.nazev) + mnozstviText + '</span>'
+        + '<button class="btn btn-ghost" type="button" data-predat-index="' + i + '" style="font-size:11px;padding:3px 8px;">Předat</button>'
+        + '</div>';
+    });
+  }
+  cont.innerHTML = html;
+  cont.querySelectorAll('[data-predat-index]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = polozky[parseInt(btn.dataset.predatIndex, 10)];
+      const cilId = parseInt(document.getElementById('koristCilSelect').value, 10);
+      postJson('api/loot.php', {
+        nestvura_instance_id: spravovanyToken.entitaId,
+        typ_polozky: p.typ_polozky, polozka_id: p.polozka_id,
+        cilova_postava_id: cilId,
+      }).then(d => {
+        if (d.error) { logLine('Chyba: ' + d.error); return; }
+        logLine('Předáno: ' + d.polozka_nazev + (d.mnozstvi > 1 ? ' ×' + d.mnozstvi : ''));
+        posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
+        obnovitStav();
+        nactiInventar();
+      });
+    });
+  });
+}
+const smazatBtn = document.getElementById('smazatTokenBtn');
+if (smazatBtn) {
+  smazatBtn.addEventListener('click', () => {
+    if (!spravovanyToken) return;
+    if (!confirm('Opravdu smazat token?')) return;
+    postJson('api/token_smazat.php', {token_id: spravovanyToken.tokenId})
+      .then(d => {
+        if (d.error) { logLine('Chyba: ' + d.error); return; }
+        spravovatPanel.classList.remove('open');
+        spravovanyToken = null;
+        obnovitStav();
+      });
+  });
+}
+const zedSmazatBtn = document.getElementById('zedSmazatBtn');
+if (zedSmazatBtn) {
+  zedSmazatBtn.addEventListener('click', () => {
+    if (zedVybranaId === null) return;
+    postJson('api/zed_smazat.php', {id: zedVybranaId}).then(d => {
+      if (d.error) { logLine('Chyba: ' + d.error); return; }
+      zdiList = zdiList.filter(z => z.id !== zedVybranaId);
+      zedVybranaId = null;
+      zedSmazatBtn.style.display = 'none';
+      renderZdi();
+    });
+  });
+}
+const zedZrusitBtn = document.getElementById('zedZrusitBtn');
+if (zedZrusitBtn) zedZrusitBtn.addEventListener('click', zrusitZedRozpracovanouCestu);
+const zedUlozitBtn = document.getElementById('zedUlozitBtn');
+if (zedUlozitBtn) {
+  zedUlozitBtn.addEventListener('click', () => {
+    if (zedRozpracovaneBody.length < 2) return;
+    const sirkaPx = zedSirkaPx();
+    const blokujePohyb = document.getElementById('zedBlokujePohyb').checked;
+    const blokujeVystrel = document.getElementById('zedBlokujeVystrel').checked;
+    const viditelnaHracum = document.getElementById('zedViditelnaHracum').checked;
+    const useky = [];
+    for (let i = 0; i < zedRozpracovaneBody.length - 1; i++) {
+      useky.push([zedRozpracovaneBody[i], zedRozpracovaneBody[i + 1]]);
+    }
+    // Ukládá se úsek po úseku sekvenčně (ne najednou) — ať chyba uprostřed
+    // lomené zdi nezanechá nekonzistentní stav a zdiList/render odpovídá
+    // přesně tomu, co se fakt uložilo na server.
+    function ulozUsek(i) {
+      if (i >= useky.length) {
+        zedRozpracovaneBody = [];
+        aktualizovatZedUlozitTlacitko();
+        if (rulerSvg) rulerSvg.innerHTML = '';
+        return;
+      }
+      const [a, b] = useky[i];
+      postJson('api/zed_pridat.php', {
+        mapa_id: MAPA_ID, x1: a.x, y1: a.y, x2: b.x, y2: b.y,
+        sirka_px: sirkaPx, blokuje_pohyb: blokujePohyb, blokuje_vystrel: blokujeVystrel, viditelna_hracum: viditelnaHracum,
+      }).then(d => {
+        if (d.error) { logLine('Chyba: ' + d.error); return; }
+        zdiList.push({
+          id: d.id, x1: a.x, y1: a.y, x2: b.x, y2: b.y, sirka_px: sirkaPx,
+          blokuje_pohyb: blokujePohyb, blokuje_vystrel: blokujeVystrel, viditelna_hracum: viditelnaHracum,
+        });
+        posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
+        renderZdi();
+        ulozUsek(i + 1);
+      });
+    }
+    ulozUsek(0);
+  });
+}
+const koloBtn = document.getElementById('tb-kolo');
+if (koloBtn) {
+  koloBtn.addEventListener('click', () => {
+    postJson('api/kolo_konec.php', {mapa_id: MAPA_ID})
+      .then(d => { if (d.error) { logLine('Chyba: ' + d.error); return; } obnovitStav(); });
+  });
+}
+const iniciativaHoditBtn = document.getElementById('iniciativaHoditBtn');
+if (iniciativaHoditBtn) {
+  iniciativaHoditBtn.addEventListener('click', () => {
+    if (!spravovanyToken) return;
+    const bonusIds = Array.from(document.querySelectorAll('.iniciativa-bonus-check:checked')).map(c => parseInt(c.value, 10));
+    const jinyBonus = parseInt(document.getElementById('iniciativaJinyBonus').value, 10) || 0;
+    postJson('api/iniciativa_hod.php', {mapa_id: MAPA_ID, token_id: spravovanyToken.tokenId, bonus_ids: bonusIds, jiny_bonus: jinyBonus})
+      .then(d => { if (d.error) { logLine('Chyba: ' + d.error); return; } obnovitStav(); });
+  });
+}
+const tbDalsiTah = document.getElementById('tb-dalsi-tah');
+if (tbDalsiTah) {
+  tbDalsiTah.addEventListener('click', () => {
+    postJson('api/dalsi_tah.php', {mapa_id: MAPA_ID})
+      .then(d => { if (d.error) { logLine('Chyba: ' + d.error); return; } obnovitStav(); });
+  });
+}
+const tbKrokZpet = document.getElementById('tb-krok-zpet');
+if (tbKrokZpet) {
+  tbKrokZpet.addEventListener('click', () => {
+    postJson('api/krok_zpet.php', {mapa_id: MAPA_ID})
+      .then(d => { if (d.error) { logLine('Chyba: ' + d.error); return; } obnovitStav(); });
+  });
+}
+
+// --- Kostky (dice-box vizualizace + autoritativní server výsledek) ---
+let diceBox = null;
+import('./vendor/dice-box/dice-box.es.min.js').then((mod) => {
+  diceBox = new mod.default('#diceBoxContainer', {assetPath: new URL('../assets/js/vendor/dice-box/assets/', location.href).pathname});
+  diceBox.init().catch(() => { diceBox = null; });
+}).catch(() => { diceBox = null; });
+
+const hoditBtn = document.getElementById('hoditBtn');
+if (hoditBtn) {
+  hoditBtn.addEventListener('click', () => {
+    const notace = document.getElementById('kostkyNotace').value.trim();
+    if (!notace) return;
+    postJson('api/kostka_hod.php', {svet_id: SVET_ID, mapa_id: MAPA_ID, notace})
+      .then(d => {
+        if (d.error) { logLine('Chyba: ' + d.error); return; }
+        logLine(d.hodil + ' hodil ' + d.notace + ': [' + d.hody.join(', ') + ']' + (d.bonus ? (d.bonus > 0 ? '+' : '') + d.bonus : '') + ' = ' + d.celkem);
+        posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
+        if (diceBox) { try { diceBox.roll(notace.replace(/k/gi, 'd')); } catch (e) {} }
+      });
+  });
+}
+
+// --- Polling delt ---
+// Události, po kterých se stav mapy znovu načte celý (token přibyl/zmizel,
+// efekty, pořadí tahů, použitý předmět…). Načte se "na místě" — nic se
+// nepřenačítá a nikomu nezmizí otevřené panely ani zoom.
+const UDALOSTI_OBNOVA_STAVU = ['token_pridan', 'token_smazan', 'efekt_aplikovan', 'efekt_konci', 'iniciativa_hozena', 'kolo_nove', 'tah_zmena', 'predmet_pouzit', 'predmet_loot', 'krok_zpet'];
+let obnovitMlhuPoPollu = false;
+
+function applyEvent(u) {
+  const naTeteMape = u.mapa_id === null || u.mapa_id === undefined || u.mapa_id == MAPA_ID;
+  if (u.typ === 'token_presun') {
+    const t = tokenData(u.payload.token_id);
+    if (t) {
+      t.x = u.payload.x_po;
+      t.y = u.payload.y_po;
+      if (!drzeneTokeny.has(t.id)) nakreslitToken(t);
+    }
+    if (naTeteMape) obnovitMlhuPoPollu = true;
+  } else if (u.typ === 'kostka_hod') {
+    logLine((u.payload.hodil || '?') + ' hodil ' + u.payload.notace + ': [' + u.payload.hody.join(', ') + ']'
+      + (u.payload.bonus ? (u.payload.bonus > 0 ? '+' : '') + u.payload.bonus : '') + ' = ' + u.payload.celkem);
+  } else if (u.typ === 'hp_zmena') {
+    const t = tokeny.find((x) => x.typ_entity === u.payload.typ_entity && x.entita_id === u.payload.entita_id);
+    if (t) {
+      t.hp = u.payload.nove_hp;
+      if (u.payload.max_hp) t.max_hp = u.payload.max_hp;
+      nakreslitToken(t);
+      if (spravovanyToken && spravovanyToken.tokenId === t.id) obnovPanelSpravovat();
+    }
+  } else if (u.typ === 'magenergie_zmena') {
+    const t = tokeny.find((x) => x.typ_entity === 'postava' && x.entita_id === u.payload.entita_id);
+    if (t) t.magenergie = u.payload.nova_magenergie;
+    if (spravovanyToken && spravovanyToken.typEntity === 'postava' && spravovanyToken.entitaId === u.payload.entita_id) {
+      spravovanyToken.magenergie = u.payload.nova_magenergie;
+      const txt = document.getElementById('spravovatMagenergieText');
+      if (txt) txt.textContent = u.payload.nova_magenergie + '/' + u.payload.max_magenergie;
+    }
+  } else if (u.typ === 'ping') {
+    if (u.mapa_id == MAPA_ID) zobrazPing(u.payload.x, u.payload.y, u.payload.jmeno || '');
+  } else if (u.typ === 'zed_pridana') {
+    if (u.mapa_id == MAPA_ID && !zdiList.some(z => z.id === u.payload.id)) {
+      zdiList.push(u.payload);
+      renderZdi();
+    }
+  } else if (u.typ === 'zed_smazana') {
+    if (u.mapa_id == MAPA_ID) {
+      zdiList = zdiList.filter(z => z.id !== u.payload.id);
+      if (zedVybranaId === u.payload.id) zedVybranaId = null;
+      renderZdi();
+    }
+  } else if (u.typ === 'mapa_grid_zmena') {
+    if (u.mapa_id == MAPA_ID) {
+      gridSaved = {px: u.payload.grid_velikost_px || 0, typ: u.payload.grid_typ, offX: u.payload.grid_posun_x, offY: u.payload.grid_posun_y};
+      GRID_PX = gridSaved.px; GRID_TYPE = gridSaved.typ; GRID_OFFSET_X = gridSaved.offX; GRID_OFFSET_Y = gridSaved.offY;
+      renderGrid();
+      aktualizovatZedJednotky();
+    }
+  } else if (UDALOSTI_OBNOVA_STAVU.includes(u.typ)) {
+    if (naTeteMape) {
+      planujObnovuStavu();
+      obnovitMlhuPoPollu = true;
+    }
+  }
+}
+
+// Polling se přizpůsobuje: rychle, dokud se něco děje a okno je vidět;
+// pomaleji v klidu; skoro vůbec, když je záložka schovaná. Šetří hosting
+// (každý hráč jinak dělá dotaz každou vteřinu a půl celé hodiny).
+let pollBezi = false;
+let posledniAktivita = Date.now();
+let pollCislo = 0;
+function dalsiPollZa() {
+  if (document.hidden) return 10000;
+  const klid = Date.now() - posledniAktivita;
+  if (klid > 120000) return 4000;
+  if (klid > 30000) return 2500;
+  return 1500;
+}
+async function poll() {
+  if (pollBezi) return;
+  pollBezi = true;
+  pollCislo++;
+  try {
+    const r = await fetch('api/udalosti.php?svet_id=' + SVET_ID + '&od=' + posledniUdalostId, {credentials: 'same-origin', cache: 'no-store'});
+    const d = await r.json();
+    if (d.udalosti) {
+      for (const u of d.udalosti) {
+        posledniUdalostId = Math.max(posledniUdalostId, u.id);
+        applyEvent(u);
+      }
+      if (d.udalosti.length) posledniAktivita = Date.now();
+    }
+  } catch (err) { /* výpadek sítě — zkusí se příště */ }
+  // Mlha nemá vlastní typ události (PJ ruční kreslení i odhalení hráčem se
+  // projeví pravidelným dotazem) — proto se obnovuje po pohybu tokenů a jinak
+  // jen každý pátý dotaz.
+  if (obnovitMlhuPoPollu || pollCislo % 5 === 0) {
+    obnovitMlhuPoPollu = false;
+    osvezitMlhu();
+  }
+  pollBezi = false;
+}
+function planPollu() {
+  setTimeout(async () => { await poll(); planPollu(); }, dalsiPollZa());
+}
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) { posledniAktivita = Date.now(); obnovitStav(); poll(); }
+});
+// Cokoli, co uživatel na mapě udělá, vrací polling na rychlý režim.
+['pointerdown', 'keydown'].forEach((n) => window.addEventListener(n, () => { posledniAktivita = Date.now(); }, {passive: true}));
+planPollu();
+
+// --- Zoom: tlačítka, údaj, uložení pohledu ---
+const zoomInfo = document.getElementById('zoomInfo');
+let ulozPohledTimer = null;
+kamera.naPosluch((st) => {
+  mapWrap.style.setProperty('--z', String(st.z));
+  if (zoomInfo) zoomInfo.textContent = Math.round(st.z * 100) + ' %';
+  clearTimeout(ulozPohledTimer);
+  ulozPohledTimer = setTimeout(() => {
+    try { sessionStorage.setItem('mapa_pohled_' + MAPA_ID, JSON.stringify({x: st.x, y: st.y, z: st.z})); } catch (err) { /* nevadí */ }
+  }, 400);
+});
+const zoomPlus = document.getElementById('zoom-plus');
+const zoomMinus = document.getElementById('zoom-minus');
+const zoomFit = document.getElementById('zoom-fit');
+if (zoomPlus) zoomPlus.addEventListener('click', () => kamera.zoomStred(1.25));
+if (zoomMinus) zoomMinus.addEventListener('click', () => kamera.zoomStred(0.8));
+if (zoomFit) zoomFit.addEventListener('click', () => kamera.prizpusobit());
+const polozitVicChk = document.getElementById('polozitVic');
+if (polozitVicChk) polozitVicChk.addEventListener('change', () => { polozitVic = polozitVicChk.checked; });
+
+// Výchozí pohled: je-li na mapě družina, zaměří se na ni (a na čitelnou
+// velikost buňky); jinak se vejde celá mapa. Po obnovení stránky se vrací
+// poslední pohled z téhle záložky.
+function vychoziPohled() {
+  let ulozeny = null;
+  try { ulozeny = JSON.parse(sessionStorage.getItem('mapa_pohled_' + MAPA_ID) || 'null'); } catch (err) { ulozeny = null; }
+  if (ulozeny && isFinite(ulozeny.x) && isFinite(ulozeny.y) && isFinite(ulozeny.z)) {
+    kamera.nastav(ulozeny.x, ulozeny.y, ulozeny.z);
+    return;
+  }
+  const viditelne = tokeny.filter((t) => t.viditelny || IS_PJ_OR_ADMIN);
+  if (!viditelne.length) { kamera.prizpusobit(); return; }
+  // Oblast okna, kterou nezakrývá lišta nástrojů (vlevo na počítači, dole
+  // na telefonu) ani horní lišta.
+  const r = viewport.getBoundingClientRect();
+  const tb = document.querySelector('.toolbar');
+  const tr = tb ? tb.getBoundingClientRect() : null;
+  const dole = tr && tr.width > tr.height ? r.height - tr.top + 12 : 0;
+  const vlevo = tr && tr.width <= tr.height ? tr.right + 12 : 0;
+  const nahore = 64;
+  const volnaSirka = r.width - vlevo, volnaVyska = r.height - nahore - dole;
+  const minX = Math.min(...viditelne.map((t) => t.x)), maxX = Math.max(...viditelne.map((t) => t.x));
+  const minY = Math.min(...viditelne.map((t) => t.y)), maxY = Math.max(...viditelne.map((t) => t.y));
+  const sah = pxNaSah() || 70;
+  const okraj = sah * 3;
+  const zVejde = Math.min(volnaSirka / (maxX - minX + 2 * okraj), volnaVyska / (maxY - minY + 2 * okraj));
+  const zCitelne = Math.min(1.25, Math.max(0.3, 64 / sah));
+  const z = Math.min(zVejde, zCitelne);
+  let px = vlevo + volnaSirka / 2 - ((minX + maxX) / 2) * z;
+  let py = nahore + volnaVyska / 2 - ((minY + maxY) / 2) * z;
+  // Mapa vyplní okno, pokud se to dá (žádný prázdný pruh kolem okraje).
+  const mw = mapImgEl.naturalWidth * z, mh = mapImgEl.naturalHeight * z;
+  px = mw > r.width ? Math.min(vlevo, Math.max(r.width - mw, px)) : (r.width - mw) / 2;
+  py = mh > r.height ? Math.min(nahore, Math.max(r.height - mh, py)) : (r.height - mh) / 2;
+  kamera.nastav(px, py, z);
+}
+
+function inicializovatMapu() {
+  const w = mapImgEl.naturalWidth, h = mapImgEl.naturalHeight;
+  mapWrap.style.width = w + 'px';
+  mapWrap.style.height = h + 'px';
+  kamera.nastavRozmery(w, h);
+  renderGrid();
+  renderZdi();
+  osvezitMlhu();
+  nakreslitTokeny();
+  nakreslitIniciativu();
+  naplnitVolnePostavy();
+  vychoziPohled();
+}
+if (mapImgEl.complete && mapImgEl.naturalWidth) inicializovatMapu(); else mapImgEl.addEventListener('load', inicializovatMapu);

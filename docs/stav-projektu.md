@@ -616,13 +616,41 @@ přístupný.
 
 ---
 
-## Plán: náhrada Owlbear Rodeo (zadáno 2026-10-14, nic z toho zatím není hotové)
+## Plán: náhrada Owlbear Rodeo (zadáno 2026-10-14; blok A rozpracován)
 
 **Cíl uživatele:** VTT, které může v ostrém provozu nahradit Owlbear Rodeo —
 správa tokenů, mapy, souboj, otáčení tokenů, volitelně pochod po mapě světa a
 přechody mezi lokacemi. Cílem je začít testovat v živé hře, ne „dokonalost“.
 
-**Stav mapy (audit `hra/mapa.php` 2026-10-14):** funguje grid (čtverec/hex), zdi
+**Hotovo — blok A, krok 1 (2026-10-14): kamera a obnova bez přenačtení.**
+- `assets/js/mapa.js` + `assets/css/mapa.css` (dřív inline v `hra/mapa.php`);
+  PHP jen předá data v `window.MAPA`. Skript je statický soubor s `?v=filemtime`.
+- **Kamera:** zoom (kolečko, +/−/0, tlačítka vpravo dole, pinch) a posun
+  (tah prázdného místa, pravé/prostřední tlačítko, mezerník, nástroj „ruka“,
+  dva prsty) přes CSS `transform` na `#mapWrap`. Všechny nástroje počítají
+  v souřadnicích mapy přes `kamera.naMapu()`. Pohled se pamatuje v
+  `sessionStorage`; při otevření se zaměří na družinu.
+- **Pointer Events** (myš, dotyk, pero jednotně): tah tokenu prstem, měřidlo,
+  zeď, mlha, ping, pin fungují i na tabletu. Na malé obrazovce je lišta
+  nástrojů dole.
+- **Bez `location.reload()`:** `includes/vtt_mapa_stav.php` (stav mapy pro
+  uživatele: tokeny, efekty, pořadí tahů, volné postavy) → `hra/api/mapa_stav.php`;
+  klient po událostech (`token_pridan`, `kolo_nove`, `tah_zmena`…) načte stav a
+  překreslí tokeny a panel iniciativy na místě. Inventář tokenu se načítá až při
+  kliknutí (`hra/api/entita_inventar.php`, jen PJ a vlastník) — dřív byl v HTML
+  všech tokenů (i cizích).
+- **Souřadnice tokenu = střed** (dřív levý horní roh 40px čtverečku); migrace
+  `0083` (UPDATE +20) je DML a proběhne sama. Token se přizpůsobí gridu (≈ 0,82
+  sáhu), HP/efekty pod ním; `.face` (šipka směru) čeká na ruční SQL pro `smer`.
+- Polling je adaptivní (1,5 s při aktivitě, 2,5–4 s v klidu, 10 s ve skryté
+  záložce); mlha se obnovuje po pohybu tokenů a jinak každý pátý dotaz.
+- Mimochodem: opraven stored XSS (jména postav/nestvůr se vkládala do
+  `innerHTML` bez escapování) a nečitelná tlačítka v tmavých panelech.
+
+**Dál (zbývá z bloku A):** velikost/otočení/barva/zámek/obecné tokeny (čeká
+na ruční SQL), výběr více tokenů a kontextové menu, kreslení, měřidlo v hexech.
+
+**Stav mapy před změnou (audit `hra/mapa.php` 2026-10-14, historické):** funguje grid (čtverec/hex), zdi
 (blokují hráče), mlha války (per hráč), měřidlo, ping, piny s vnořenými mapami,
 iniciativa a pořadí tahů, krok zpět, kostky 3D, HP/magenergie/efekty na tokenu,
 PJ přepíná aktivní mapu. **Chybí / drhne:**
@@ -648,9 +676,9 @@ PJ přepíná aktivní mapu. **Chybí / drhne:**
 **Úkoly (S ≈ hodiny, M ≈ půl dne, L ≈ den a víc):**
 
 *A. Plynulá mapa (bez toho se nedá hrát)*
-1. Zoom + posun + „přizpůsobit na obrazovku“, jednotné Pointer Events (myš i
+1. ✔ Zoom + posun + „přizpůsobit na obrazovku“, jednotné Pointer Events (myš i
    dotyk, pinch) [M]
-2. Aktualizace bez `location.reload()` — přidání/smazání tokenu, efekty,
+2. ✔ Aktualizace bez `location.reload()` — přidání/smazání tokenu, efekty,
    iniciativa, kolo/tah překreslit na místě [M–L]
 3. Token: otočení (směr), velikost (podle `velikosti` z pravidel), portrét,
    barva týmu, popisek [M]

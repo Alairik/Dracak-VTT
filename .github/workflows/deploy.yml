@@ -81,7 +81,7 @@ jobs:
           # deploy krok výš hlásil úspěch, ale soubor na produkci
           # reálně chyběl.
           fail=0
-          for path in dashboard.php editor.php pravidla.php hra/svety.php hra/svet.php hra/mapa.php hra/mapa_obrazek.php hra/denik.php hra/denik_tisk.php hra/druzina.php hra/api/postava_stav.php hra/api/hod_postavy.php hra/api/katalog_hledat.php hra/cesta.php hra/api/cesta_vypocet.php; do
+          for path in dashboard.php editor.php pravidla.php hra/svety.php hra/svet.php hra/mapa.php hra/mapa_obrazek.php hra/denik.php hra/denik_tisk.php hra/druzina.php hra/api/postava_stav.php hra/api/hod_postavy.php hra/api/katalog_hledat.php hra/cesta.php hra/api/cesta_vypocet.php hra/api/mapa_stav.php hra/api/entita_inventar.php assets/js/mapa.js assets/css/mapa.css; do
             code=$(curl -sS -o /dev/null -w "%{http_code}" "https://vtt.zvelebil.online/$path")
             echo "$path -> HTTP $code"
             if [ "$code" = "404" ] || [ "$code" -ge 500 ]; then

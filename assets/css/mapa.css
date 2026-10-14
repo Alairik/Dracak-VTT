@@ -1,0 +1,145 @@
+/* Mapa (hra/mapa.php) — rozložení, kamera, tokeny, mobil.
+   Dříve inline v mapa.php; mapa je teď kamera (zoom + posun přes transform
+   na #mapWrap), viz assets/js/mapa-kamera.js. */
+
+html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#161412; overscroll-behavior:none; }
+body { -webkit-tap-highlight-color:transparent; }
+
+/* --- Kamera --- */
+#viewport { position:fixed; inset:0; overflow:hidden; touch-action:none; user-select:none; -webkit-user-select:none;
+            -webkit-touch-callout:none; cursor:default; }
+#viewport[data-nastroj="ruka"], #viewport.pan-ready { cursor:grab; }
+#viewport[data-nastroj="ruler"], #viewport[data-nastroj="ping"], #viewport[data-nastroj="zed"],
+#viewport[data-nastroj="pin"], #viewport[data-nastroj="mlha"] { cursor:crosshair; }
+#mapWrap { position:absolute; left:0; top:0; transform-origin:0 0; --z:1; }
+#gridSvg path { vector-effect:non-scaling-stroke; }
+
+/* Ovládání přiblížení vpravo dole */
+#zoomCtl { position:fixed; right:16px; bottom:16px; z-index:190; display:flex; align-items:center; gap:2px;
+           background:rgba(24,22,20,.88); border-radius:12px; padding:4px; backdrop-filter:blur(4px); color:#ddd; }
+#zoomCtl .tbtn { width:38px; height:38px; }
+#zoomInfo { min-width:46px; text-align:center; font-size:12px; opacity:.8; }
+
+/* Piny a ping zůstávají stejně velké na obrazovce bez ohledu na zoom */
+.mapa-bod-marker { transform:translate(-50%,-100%) scale(calc(1 / var(--z, 1))); transform-origin:50% 100%; }
+
+/* --- Tokeny ---
+   .vtt-token je nulový bod ve STŘEDU tokenu (x, y z databáze); puck, životy
+   a šipka směru se kolem něj rozkládají podle velikosti --d. */
+.vtt-token { position:absolute; width:0; height:0; user-select:none; -webkit-user-select:none; }
+.vtt-token .puck { position:absolute; left:calc(var(--d) / -2); top:calc(var(--d) / -2); width:var(--d); height:var(--d);
+                   box-sizing:border-box; border-radius:50%; color:#fff; display:flex; align-items:center; justify-content:center;
+                   font-weight:600; border:2px solid rgba(255,255,255,.35); box-shadow:0 2px 6px rgba(0,0,0,.5);
+                   overflow:hidden; text-shadow:0 1px 2px rgba(0,0,0,.6); }
+.vtt-token .hp { position:absolute; left:0; top:calc(var(--d) / 2 + 3px); transform:translateX(-50%); white-space:nowrap;
+                 font-size:11px; background:rgba(0,0,0,.7); color:#fff; border-radius:4px; padding:1px 5px; pointer-events:none; }
+.vtt-token .fx { position:absolute; left:0; top:calc(var(--d) / 2 + 22px); transform:translateX(-50%); white-space:nowrap;
+                 font-size:10px; background:rgba(0,0,0,.6); color:#fdd; border-radius:4px; padding:1px 5px; pointer-events:none; }
+.vtt-token .face { position:absolute; left:0; top:0; width:0; height:0; pointer-events:none; }
+.vtt-token .face::before { content:""; position:absolute; left:calc(var(--d) / 2 - 3px); top:-7px; width:0; height:0;
+                           border-left:12px solid #ffd166; border-top:7px solid transparent; border-bottom:7px solid transparent;
+                           filter:drop-shadow(0 0 2px rgba(0,0,0,.85)); }
+.vtt-token.movable { cursor:grab; }
+.vtt-token.tahnuty { cursor:grabbing; opacity:.85; }
+.vtt-token.not-turn { cursor:not-allowed; }
+.vtt-token.not-turn .puck { opacity:.6; box-shadow:0 0 0 2px rgba(255,255,255,.25) inset; }
+.vtt-token.dead .puck { filter:grayscale(1); opacity:.55; }
+.vtt-token.skryty .puck { opacity:.55; border-style:dashed; }
+.vtt-token.vybrany .puck { outline:3px solid #ffd166; outline-offset:2px; }
+.vtt-token.zamceno .puck::after { content:"\1F512"; position:absolute; right:2px; bottom:0; font-size:calc(var(--d) * .28); }
+
+/* --- Pořadí tahů --- */
+#panelIniciativa { position:fixed; top:70px; right:16px; z-index:190; background:rgba(24,22,20,.92); color:#fff;
+                   border-radius:12px; padding:10px 14px; min-width:230px; font-size:13px; max-height:50vh; overflow-y:auto; }
+#panelIniciativa .ini-titul { font-weight:600; margin-bottom:6px; }
+.ini-radek { display:flex; justify-content:space-between; gap:8px; padding:2px 0; cursor:pointer; }
+.ini-radek.aktivni { color:#e8c9a8; font-weight:600; }
+
+  html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#161412; }
+  #emptyState { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; color:#ddd; text-align:center; padding:24px; }
+
+  .topbar { position:fixed; top:14px; left:50%; transform:translateX(-50%); z-index:200;
+            background:rgba(24,22,20,.88); color:#fff; border-radius:999px; padding:8px 18px;
+            display:flex; align-items:center; gap:10px; font-size:14px; backdrop-filter:blur(4px);
+            max-width:min(80vw, 900px); }
+  .topbar a { color:#e8c9a8; text-decoration:none; font-weight:600; }
+  .topbar .typ { font-size:11px; opacity:.65; flex:none; }
+  .breadcrumb { display:flex; align-items:center; gap:7px; overflow-x:auto; white-space:nowrap; min-width:0; }
+  .breadcrumb .sep { opacity:.4; }
+  .breadcrumb span:not(.sep) { font-weight:600; }
+
+  .toolbar { position:fixed; left:16px; top:50%; transform:translateY(-50%); z-index:200;
+             display:flex; flex-direction:column; gap:8px; background:rgba(24,22,20,.88);
+             padding:8px; border-radius:14px; backdrop-filter:blur(4px);
+             max-height:calc(100vh - 32px); overflow-y:auto; scrollbar-width:thin; }
+  .tbtn { flex:none; width:46px; height:46px; border-radius:10px; border:none; background:transparent; color:#eee;
+          font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+          transition:background .12s; }
+  .tbtn:hover { background:rgba(255,255,255,.12); }
+  .tbtn.active { background:var(--color-accent-600, #7a3b2e); }
+  .tbtn.armed { background:#3a6b4a; }
+  .tbtn svg, .close-x svg { display:block; }
+
+  .popover { position:fixed; left:74px; z-index:210; background:rgba(24,22,20,.95); color:#eee;
+             border-radius:12px; padding:14px; width:280px; box-shadow:0 8px 24px rgba(0,0,0,.5);
+             display:none; }
+  .popover.open { display:block; }
+  .popover h3 { margin:0 0 8px; font-size:13px; color:#e8c9a8; }
+  .popover label { font-size:11px; font-weight:600; display:block; margin:8px 0 3px; }
+  .popover select, .popover input { width:100%; box-sizing:border-box; }
+  .popover .note { font-size:11px; color:#bbb; margin-top:8px; }
+  .popover .close-x { position:absolute; top:8px; right:10px; cursor:pointer; color:#999; background:none; border:none; }
+
+  .panel { position:fixed; right:0; top:0; bottom:0; width:300px; z-index:200; background:rgba(20,18,16,.95);
+           color:#eee; padding:16px; box-sizing:border-box; transform:translateX(100%); transition:transform .15s;
+           overflow-y:auto; }
+  .panel.open { transform:translateX(0); }
+  .panel h3 { margin:0 0 10px; font-size:14px; color:#e8c9a8; }
+  .panel .close-x { position:absolute; top:12px; right:14px; cursor:pointer; color:#999; background:none; border:none; }
+  .panel-hp-row { display:flex; gap:6px; margin:8px 0; }
+  .panel-hp-row button { flex:1; }
+  .panel select, .panel input { width:100%; box-sizing:border-box; margin-bottom:6px; }
+
+  #logList { font-size:12.5px; display:flex; flex-direction:column-reverse; gap:5px; }
+
+  .strom, .strom ul { list-style:none; margin:0; padding-left:14px; }
+  .strom { padding-left:0; }
+  .strom li { margin:2px 0; }
+  .strom-link { display:flex; align-items:center; gap:6px; color:#ddd; text-decoration:none;
+                padding:4px 6px; border-radius:6px; font-size:13px; }
+  .strom-link svg { flex:none; width:14px; height:14px; }
+  .strom-link:hover { background:rgba(255,255,255,.1); }
+  .strom-link.aktivni { background:var(--color-accent-600, #7a3b2e); color:#fff; font-weight:600; }
+
+  .mapa-bod-marker.pin-editing { cursor:move; outline:2px dashed #ffd166; outline-offset:3px; border-radius:50%; }
+
+  .vtt-ping { position:absolute; transform:translate(-50%,-50%) scale(calc(1 / var(--z, 1))); pointer-events:none; z-index:150;
+              display:flex; flex-direction:column; align-items:center; }
+  .ping-dot { width:22px; height:22px; border-radius:50%; border:3px solid #ffb347; box-sizing:border-box;
+              animation:pingPulse 1s ease-out infinite; }
+  .ping-label { margin-top:4px; font-size:11px; background:rgba(0,0,0,.7); color:#fff; padding:1px 6px;
+                border-radius:4px; white-space:nowrap; }
+  @keyframes pingPulse {
+    0% { box-shadow:0 0 0 0 rgba(255,179,71,.6); }
+    100% { box-shadow:0 0 0 16px rgba(255,179,71,0); }
+  }
+
+/* --- Tmavé panely a vyskakovací okna: čitelná tlačítka a zaškrtávátka --- */
+.panel .btn-ghost, .popover .btn-ghost { color:#eee; border-color:rgba(255,255,255,.22); }
+.panel .btn-ghost:hover, .popover .btn-ghost:hover { background:rgba(255,255,255,.12); }
+.panel input[type=checkbox], .popover input[type=checkbox] { width:auto; margin:0; flex:none; }
+.panel .btn, .popover .btn { touch-action:manipulation; }
+.panel label, .popover label { color:#ddd; }
+
+/* --- Malé obrazovky (tablet na výšku, telefon): lišta nástrojů dole, vyskakovací okna přes šířku --- */
+@media (max-width: 760px), (max-height: 560px) {
+  .topbar { top:8px; max-width:94vw; padding:6px 12px; font-size:13px; }
+  .toolbar { left:8px; right:8px; top:auto; bottom:8px; transform:none; flex-direction:row; overflow-x:auto; overflow-y:hidden;
+             max-height:none; padding:6px; gap:4px; }
+  .tbtn { width:44px; height:44px; }
+  #zoomCtl { right:8px; bottom:70px; }
+  #zoomCtl .tbtn { width:36px; height:36px; }
+  .popover { left:8px !important; right:8px; width:auto; top:auto !important; bottom:70px; max-height:58vh; overflow-y:auto; }
+  .panel { width:min(300px, 92vw); }
+  #panelIniciativa { top:52px; right:8px; min-width:0; max-width:62vw; font-size:12px; }
+}
