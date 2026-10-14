@@ -118,7 +118,11 @@ MariaDB.** Postup, který v session fungoval:
 
 ### Boj
 - Iniciativa + pořadí tahů (`includes/vtt_iniciativa.php`), vynucení
-  pořadí (`dracak_vtt_je_na_tahu`).
+  pořadí (`dracak_vtt_je_na_tahu`). **Počet akcí z iniciativy je HOMEBREW, po
+  třech** (`ceil(výsledek / 3)`: 1–3 = 1 akce, 4–6 = 2, 7–9 = 3, 10–12 = 4 …;
+  rozhodnutí 2026-10-14) — kniha PPZ měla 1–6 = 2, 7–12 = 4; tabulka v
+  `content/pravidla-hrac.html` (h1623) je přepsaná a označená jako HB, příklady
+  v knize (iniciativa 3 → dvě akce) HB neodpovídají a jsou v seznamu ke korektuře.
 - Mlha války — per hráč/mapa, respektuje grid buňky + LoS, PJ má
   obdélníkový výběr, hromadné odhalení/zatažení, náhled "jak to vidí
   hráč" (průsvitný jen v PJ náhledu, hráčova vlastní mlha je neprůhledná).
@@ -753,8 +757,11 @@ PJ přepíná aktivní mapu. **Chybí / drhne:**
 7. ✔ Měřidlo v hexech/sázích a šablony plošných kouzel (kruh, kužel) [S–M]
 8. ✔ (v ručním SQL 0084) Jednorázově změnit `svet_udalosti.typ` ENUM → VARCHAR [S]
 
-*B. Souboj s pravidly (tím se Owlbearu vyrovná i předčí)* — **odloženo; popis průběhu
-souboje podle pravidel a návrh oken je v `docs/navrh-souboje-v1.md` (k odsouhlasení)**
+*B. Souboj s pravidly (tím se Owlbearu vyrovná i předčí)* — **rozjednáno: popis průběhu
+souboje podle pravidel a návrh oken je v `docs/navrh-souboje-v1.md`, rozhodnutí
+uživatele (hody tlačítkem + 3D kostka, skrytá iniciativa nestvůr, deník nestvůr,
+hexy podle velikosti, iniciativa po třech = HB) jsou tam zapsaná; stavět se začne
+po povolení „jdi“**
 9. Dosah pohybu v tahu z pohyblivosti postavy (po naložení a únavě), spotřeba
    bodů pohybu, varování při překročení, zákaz sprintu při únavě [M–L]
 10. Útok z tokenu: cíl → ÚČ vs OČ → hod → zranění → životy (navázat na

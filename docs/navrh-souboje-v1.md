@@ -45,7 +45,8 @@ postavený na příkladu v knize (h1626) a doplněný o obranu, zranění a výb
    Arpag: útok. Roxan: kouzlení Rychlost na Arpaga. Bagrot: pohyb k Roxan.
 2. **Iniciativa** — okno s tokeny: 1k6 + automatické bonusy (kouzlení +1, obouruční
    zbraň −2, vícenásobné útoky, Rychlost, únava, naložení…) → výsledek → počet
-   akcí (1–6 = 2, 7–12 = 4 …). Arpag 5, Bagrot 4, Roxan 2+1 = 3; všichni 2 akce.
+   akcí (**HB, po třech:** 1–3 = 1, 4–6 = 2, 7–9 = 3, 10–12 = 4 …). Arpag 5, Bagrot 4,
+   Roxan 2+1 = 3 → Arpag 2 akce, Bagrot 2 akce, Roxan 1 akce.
 3. **Kolo, tah po tahu** — panel pořadí zvýrazní, kdo je na tahu, a ukáže zbývající
    akce a kolik jich smí v tomto tahu použít (nejvýš polovinu původních).
    - Arpag: **Krok** o hex k Bagrotovi (volný sousední hex, otočka až 120°).
@@ -114,15 +115,18 @@ v řadě (nejvýš polovinu původních) — u 2 akcí je to totéž, od 4 akcí
 - **Zbytek návrhu (okna, pořadí událostí, zranění automaticky + oprava) schválen.**
 - **Zabrané hexy podle velikosti (úprava pro mapu):** A0, A, B = 1 hex; zvířecí C =
   2 hexy vedle sebe; D = 3 hexy u sebe; E = 5 hexů (2+3); F = 7 hexů (2+3+2).
-  *K potvrzení:* humanoidní C (obr), a „F“ — v knize velikosti končí na E.
+  Humanoidní C = 1 hex (potvrzeno).
+  *K potvrzení:* „F“ — v knize velikosti končí na E.
 
 ## Co se při kontrole ukázalo
 
-- **Tabulka iniciativy a akcí** (h1623): v textu je **1–6 = 2 akce**, 7–12 = 4, … Dva
-  příklady v knize (iniciativa 3 → „všichni mají dvě akce“, h1623 i h1626) to
-  potvrzují. Příklad „Arpagovi padne 7 (2 akce)“ (h1623, b10822) tabulce odporuje →
-  pravděpodobně překlep, do kontroly. Hodnotu „1–3 = 1 akce“ jsem nikde nenašel;
-  pokud ji uživatel pamatuje z knihy, je potřeba foto str. 78.
+- **Tabulka iniciativy a akcí** (h1623): **homebrew, po třech** — 1–3 = 1 akce, 4–6 = 2,
+  7–9 = 3, 10–12 = 4, … (rozhodnutí uživatele 2026-10-14). Kniha (PPZ) měla 1–6 = 2,
+  7–12 = 4, …; homebrew má přednost, tabulka v `content/pravidla-hrac.html` je přepsaná
+  (ids b10810–b10815 + nové b93070, b93071) a kód počítá `ceil(výsledek / 3)`.
+  Dva příklady v knize (iniciativa 3 → „všichni mají dvě akce“, h1623 i h1626) a
+  „Arpagovi padne 7 (2 akce)“ (b10822) s HB tabulkou nesedí; ponechány podle knihy,
+  zapsáno do `kontrolni-seznam-neuplnych-mist.md`.
 - **Smrt / vyřazení:** odstavec o prahu smrti postavy jsem v přepisu nenašel.
   Stopy: mez vyřazení a bojeschopnost (h1610); příklad, kde nestvůra s 0 životy je
   „na místě mrtvá“ (h1612); u berserka „0 a méně = padá k zemi, do 3 kol umírá“
@@ -131,7 +135,7 @@ v řadě (nejvýš polovinu původních) — u 2 akcí je to totéž, od 4 akcí
 
 ## Otevřené věci
 
-- Hexy: humanoidní C a velikost F (viz výš); kotva víc-hexového tvora (který hex je
+- Hexy: velikost F (viz výš); kotva víc-hexového tvora (který hex je
   „přední“ pro útok na 3 hexy před sebou).
 - Co hráč vidí z pořadí: návrh = jen iniciativu vlastních postav a označení, kdo
   je právě na tahu (bez čísel a pořadí ostatních).

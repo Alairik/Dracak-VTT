@@ -14,30 +14,31 @@ declare(strict_types=1);
 // položky z ní (checkboxy v UI) místo jednoho ručního čísla.
 require_once __DIR__ . '/vtt.php';
 
-// TABULKA INICIATIVY A AKCÍ, h1623, str. 77 — přepsáno doslova ze zdroje:
+// TABULKA INICIATIVY A AKCÍ, h1623 — HOMEBREW (rozhodnutí uživatele
+// 2026-10-14: homebrew má přednost před PPZ, viz CLAUDE.md). Iniciativa
+// jde po třech:
 //   výsledek 0 a méně -> 0 akcí
-//   výsledek 1–6      -> 2 akce
-//   výsledek 7–12     -> 4 akce
-//   výsledek 13–18    -> 6 akcí
-//   výsledek 19–24    -> 8 akcí
-//   výsledek 25–30    -> 10 akcí
+//   výsledek 1–3      -> 1 akce
+//   výsledek 4–6      -> 2 akce
+//   výsledek 7–9      -> 3 akce
+//   výsledek 10–12    -> 4 akce
+//   … a tak dál (+1 akce za každé další 3 body)
+// Kniha (PPZ, str. 77) měla 1–6 = 2, 7–12 = 4, … (po šesti, vždy sudý
+// počet); ta tabulka je v content/pravidla-hrac.html nahrazená a zápis
+// rozporu je v docs/kontrolni-seznam-neuplnych-mist.md.
 // (Pravidla u výsledku 0 a méně navíc říkají "snižuje postih v dalším
 // kole" — carry-over postihu mezi koly se v týhle dávce netrackuje,
 // stejně jako zbytek "Tabulky bonusů a postihů k iniciativě" na str. 78,
 // viz komentář výš. Tady se řeší jen počet akcí pro AKTUÁLNÍ kolo.)
 //
-// Vzorec akce = 2 * ceil(vysledek / 6) je čistě aritmetické zobecnění
-// těch šesti řádků výše (ne vymyšlené číslo) — pro vysledek nad 30
-// (možné při vysokém ručním modifikátoru, viz výš) pokračuje stejný krok
-// "+2 akce na každých +6 výsledku", protože žádná jiná hodnota není v
-// pravidlech ani naznačená a tabulka výslovně nikde neříká, že by nad 30
-// mělo dojít k nějakému stropu.
+// Vzorec akce = ceil(vysledek / 3) — žádný strop, nad 15 pokračuje
+// stejný krok (žádná jiná hodnota není ani naznačená).
 function dracak_vtt_iniciativa_akce(int $vysledek): int
 {
     if ($vysledek <= 0) {
         return 0;
     }
-    return 2 * (int)ceil($vysledek / 6);
+    return (int)ceil($vysledek / 3);
 }
 
 // Kdo smí hodit iniciativu za daný token — stejný tvar oprávnění jako
