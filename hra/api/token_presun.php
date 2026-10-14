@@ -33,6 +33,13 @@ if (!dracak_vtt_can_move_token($user, $token)) {
     echo json_encode(['error' => 'Tímhle tokenem hýbat nesmíš.']);
     exit;
 }
+// Zamčený token (PJ ho zamkl proti posunu) hráč pohnout nesmí; PJ si ho
+// musí nejdřív odemknout.
+if (!empty($token['zamceno']) && !dracak_vtt_je_pj_sveta($user, (int)$token['svet_id'])) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Token je zamčený.']);
+    exit;
+}
 // Pořadí tahů (viz includes/vtt.php, dracak_vtt_je_na_tahu): probíhá-li
 // na téhle mapě boj (řádek v kolo_stav), smí token hýbat jen hráč,
 // jehož token je zrovna aktivni_token_id — pj/admin výjimka je uvnitř

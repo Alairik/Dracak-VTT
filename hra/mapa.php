@@ -154,6 +154,7 @@ $iniciativaBonusy = dracak_db()->query('SELECT id, popis, bonus FROM iniciativa_
         <span data-typ="prechod"><?php dracak_icon('signpost', 28); ?></span>
         <span data-typ="jine"><?php dracak_icon('map-pin', 28); ?></span>
       </div>
+      <div id="rotUchyt" title="Táhni a otoč token" style="display:none;"></div>
       <div id="mapaBodyLayer" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:50;">
         <?php foreach ($mapaBody as $b): ?>
           <button type="button" class="mapa-bod-marker" data-bod-id="<?= (int)$b['id'] ?>"
@@ -220,6 +221,22 @@ $iniciativaBonusy = dracak_db()->query('SELECT id, popis, bonus FROM iniciativa_
       <select class="input" id="novaNestvuraSelect" size="6">
         <?php foreach ($nestvuryKatalog as $n): ?><option value="<?= (int)$n['id'] ?>"><?= htmlspecialchars($n['nazev']) ?></option><?php endforeach; ?>
       </select>
+    <?php endif; ?>
+    <?php if ($isPjOrAdmin): ?>
+      <div id="obecnySekce" style="display:none;">
+        <label for="obecnyNazev">Vlastní token (NPC bez statistik, překážka, předmět)</label>
+        <input class="input" type="text" id="obecnyNazev" maxlength="100" placeholder="Název — např. Sud, Kapitán stráže">
+        <div class="vz-radek" style="margin-top:6px;">
+          <select class="input" id="obecnaBarva" style="flex:1;"></select>
+          <select class="input" id="obecnaVelikost" style="flex:1;">
+            <option value="0.5">½ sáhu</option>
+            <option value="1" selected>1 sáh</option>
+            <option value="2">2 sáhy</option>
+            <option value="3">3 sáhy</option>
+            <option value="4">4 sáhy</option>
+          </select>
+        </div>
+      </div>
     <?php endif; ?>
     <label style="display:flex;align-items:center;gap:6px;font-weight:400;">
       <input type="checkbox" id="polozitVic"> Pokládat víc kusů za sebou
@@ -447,6 +464,43 @@ $iniciativaBonusy = dracak_db()->query('SELECT id, popis, bonus FROM iniciativa_
   <div class="panel" id="panel-spravovat">
     <button class="close-x" data-close-panel><?php dracak_icon('x', 16); ?></button>
     <h3 id="spravovatNazev">—</h3>
+
+    <!-- Vzhled a poloha tokenu: otočení, velikost, barva, zámek, obrázek.
+         Co z toho se zobrazí, řídí JS podle oprávnění (PJ vs. vlastník) a
+         podle toho, jestli je v DB hotové ruční SQL (window.MAPA.funkce). -->
+    <div id="vzhledSekce" class="panel-sekce" style="display:none;">
+      <h4 class="panel-h4">Vzhled</h4>
+      <div id="vzhledNazevRadek" class="vz-radek" style="display:none;">
+        <input class="input" type="text" id="vzhledNazev" maxlength="100" placeholder="Název tokenu">
+        <button class="btn btn-ghost" type="button" id="vzhledNazevUlozit">Uložit</button>
+      </div>
+      <div id="vzhledBarvaRadek" class="vz-radek" style="display:none;">
+        <span class="vz-popisek">Barva</span>
+        <div id="vzhledBarvy" class="vz-barvy"></div>
+      </div>
+      <div id="vzhledVelikostRadek" class="vz-radek" style="display:none;">
+        <span class="vz-popisek">Velikost</span>
+        <div id="vzhledVelikost" class="vz-seg"></div>
+      </div>
+      <div id="vzhledOtoceniRadek" class="vz-radek" style="display:none;">
+        <span class="vz-popisek">Otočení</span>
+        <div class="vz-seg">
+          <button class="btn btn-ghost" type="button" id="vzhledOtocL" title="Otočit doleva (Q)"><?php dracak_icon('rotate-ccw', 16); ?></button>
+          <button class="btn btn-ghost" type="button" id="vzhledOtocR" title="Otočit doprava (E)"><?php dracak_icon('rotate-cw', 16); ?></button>
+        </div>
+      </div>
+      <div id="vzhledObrazekRadek" class="vz-radek" style="display:none;">
+        <span class="vz-popisek">Obrázek</span>
+        <span id="vzhledObrazekNahled" class="vz-nahled"></span>
+        <button class="btn btn-ghost" type="button" id="vzhledObrazekVybrat">Vybrat…</button>
+        <button class="btn btn-ghost" type="button" id="vzhledObrazekOdebrat">Odebrat</button>
+      </div>
+      <label id="vzhledZamcenoRadek" class="vz-check" style="display:none;"><input type="checkbox" id="vzhledZamceno"> Zamknout polohu</label>
+      <label id="vzhledSkrytyRadek" class="vz-check" style="display:none;"><input type="checkbox" id="vzhledSkryty"> Skrýt před hráči</label>
+    </div>
+
+    <div id="sekceEntita">
+    <div id="spravovatPjStav" class="pj-stav" style="display:none;"></div>
     <div class="panel-hp-row">
       <button class="btn btn-ghost" type="button" data-delta="-5">−5</button>
       <button class="btn btn-ghost" type="button" data-delta="-1">−1</button>
@@ -503,7 +557,22 @@ $iniciativaBonusy = dracak_db()->query('SELECT id, popis, bonus FROM iniciativa_
     <?php endif; ?>
     <div id="spravovatInventar" style="margin-top:14px;"></div>
     <div id="spravovatKorist" style="margin-top:14px;"></div>
+    </div>
     <button class="btn btn-ghost" type="button" id="smazatTokenBtn" style="width:100%;margin-top:14px;">Smazat token</button>
+  </div>
+
+  <div id="modalObrazky" class="modal-obrazky" style="display:none;">
+    <div class="modal-obrazky-okno">
+      <button class="close-x" type="button" id="modalObrazkyZavrit" title="Zavřít"><?php dracak_icon('x', 16); ?></button>
+      <h3>Obrázek tokenu</h3>
+      <p class="note" style="margin-top:0;">Knihovna obrázků světa. Vyber obrázek, nebo nahraj nový (PNG, JPG, WEBP — zmenší se na 256 px).</p>
+      <div id="obrazkyMrizka" class="obrazky-mrizka"></div>
+      <div class="vz-radek" style="margin-top:10px;">
+        <input type="file" id="obrazekSoubor" accept="image/png,image/jpeg,image/webp" style="flex:1;min-width:0;">
+        <button class="btn btn-secondary" type="button" id="obrazekNahrat">Nahrát</button>
+      </div>
+      <p class="note" id="obrazekChyba" style="color:#ff9a8a;display:none;"></p>
+    </div>
   </div>
 
   <div id="diceBoxContainer" style="position:fixed;inset:0;pointer-events:none;z-index:9999;"></div>

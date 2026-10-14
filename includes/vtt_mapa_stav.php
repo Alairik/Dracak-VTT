@@ -13,40 +13,97 @@ declare(strict_types=1);
 require_once __DIR__ . '/vtt.php';
 require_once __DIR__ . '/vtt_iniciativa.php';
 
-// Volitelné sloupce tokenu, které vznikly až s ručním SQL (otočení,
-// velikost, barva, zámek, popisek). Do doby, než je admin spustí, se
-// berou výchozí hodnoty a funkce, které je potřebují, se v UI schovají.
-const DRACAK_VTT_TOKEN_VOLITELNE = ['smer', 'velikost_sahu', 'barva', 'zamceno', 'nazev'];
+// Stav ručně spouštěného SQL (migrace 0084) — jedna sada dotazů na
+// information_schema za požadavek. Mapa je napsaná tak, aby fungovala i
+// před spuštěním SQL (nové funkce se pak jen schovají).
+function dracak_vtt_ddl_mapa(): array
+{
+    static $stav = null;
+    if ($stav !== null) {
+        return $stav;
+    }
+    $stav = ['sloupce' => [], 'typ_entity' => '', 'udalosti_varchar' => false, 'tabulky' => []];
+    try {
+        $pdo = dracak_db();
+        foreach ($pdo->query(
+            'SELECT COLUMN_NAME, COLUMN_TYPE FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = "tokeny"'
+        )->fetchAll(PDO::FETCH_NUM) as [$nazev, $typ]) {
+            $stav['sloupce'][$nazev] = true;
+            if ($nazev === 'typ_entity') {
+                $stav['typ_entity'] = (string)$typ;
+            }
+        }
+        $typUdalosti = $pdo->query(
+            'SELECT DATA_TYPE FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = "svet_udalosti" AND COLUMN_NAME = "typ"'
+        )->fetchColumn();
+        $stav['udalosti_varchar'] = $typUdalosti !== false && strtolower((string)$typUdalosti) === 'varchar';
+        foreach ($pdo->query(
+            'SELECT TABLE_NAME FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ("svet_obrazky", "mapa_kresby")'
+        )->fetchAll(PDO::FETCH_COLUMN) as $tabulka) {
+            $stav['tabulky'][$tabulka] = true;
+        }
+    } catch (Throwable $e) {
+        // information_schema nedostupné — nové funkce zůstanou vypnuté
+    }
+    return $stav;
+}
 
 function dracak_vtt_tokeny_ma_sloupec(string $sloupec): bool
 {
-    static $cache = [];
-    if (!array_key_exists($sloupec, $cache)) {
-        try {
-            $stmt = dracak_db()->prepare(
-                'SELECT COUNT(*) FROM information_schema.COLUMNS
-                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = "tokeny" AND COLUMN_NAME = ?'
-            );
-            $stmt->execute([$sloupec]);
-            $cache[$sloupec] = (int)$stmt->fetchColumn() > 0;
-        } catch (Throwable $e) {
-            $cache[$sloupec] = false;
-        }
-    }
-    return $cache[$sloupec];
+    return isset(dracak_vtt_ddl_mapa()['sloupce'][$sloupec]);
 }
 
-// Které z nových funkcí tokenů jsou v DB k dispozici (UI podle toho nabízí
-// nebo schovává ovládání).
+// Které z nových funkcí mapy jsou v DB k dispozici (UI podle toho nabízí
+// nebo schovává ovládání, API je podle toho povolují).
 function dracak_vtt_tokeny_funkce(): array
 {
+    $ddl = dracak_vtt_ddl_mapa();
+    $sl = $ddl['sloupce'];
+    $udalosti = $ddl['udalosti_varchar'];
     return [
-        'smer' => dracak_vtt_tokeny_ma_sloupec('smer'),
-        'velikost' => dracak_vtt_tokeny_ma_sloupec('velikost_sahu'),
-        'barva' => dracak_vtt_tokeny_ma_sloupec('barva'),
-        'zamek' => dracak_vtt_tokeny_ma_sloupec('zamceno'),
-        'nazev' => dracak_vtt_tokeny_ma_sloupec('nazev'),
+        'smer' => isset($sl['smer']) && $udalosti,
+        'velikost' => isset($sl['velikost_sahu']) && $udalosti,
+        'barva' => isset($sl['barva']) && $udalosti,
+        'zamek' => isset($sl['zamceno']) && $udalosti,
+        'nazev' => isset($sl['nazev']) && $udalosti,
+        'obrazek' => isset($sl['obrazek_id']) && $udalosti && isset($ddl['tabulky']['svet_obrazky']),
+        'obecny' => str_contains($ddl['typ_entity'], 'obecny'),
+        'kresby' => $udalosti && isset($ddl['tabulky']['mapa_kresby']),
+        'udalosti' => $udalosti,
     ];
+}
+
+// Klíče, kterými se mění vzhled tokenu (token_uprava.php, událost token_zmena),
+// a sloupce v tabulce tokeny, které jim odpovídají.
+const DRACAK_VTT_TOKEN_KLIC_NA_SLOUPEC = [
+    'smer' => 'smer',
+    'velikost' => 'velikost_sahu',
+    'barva' => 'barva',
+    'zamceno' => 'zamceno',
+    'nazev' => 'nazev',
+    'obrazek_id' => 'obrazek_id',
+    'viditelny' => 'viditelny_hracum',
+    'z' => 'z_poradi',
+];
+
+// Hodnota klíče z řádku tabulky tokeny ve tvaru, v jakém ji nese token_zmena.
+function dracak_vtt_token_hodnota_klice(array $radek, string $klic)
+{
+    $sloupec = DRACAK_VTT_TOKEN_KLIC_NA_SLOUPEC[$klic] ?? null;
+    if ($sloupec === null || !array_key_exists($sloupec, $radek)) {
+        return null;
+    }
+    $h = $radek[$sloupec];
+    return match ($klic) {
+        'smer', 'z' => (int)$h,
+        'velikost' => (float)$h,
+        'zamceno', 'viditelny' => (bool)$h,
+        'obrazek_id' => $h === null ? null : (int)$h,
+        default => $h === null ? null : (string)$h,
+    };
 }
 
 function dracak_vtt_mapa_stav(PDO $pdo, array $user, array $mapa, bool $jePj): array
@@ -113,6 +170,7 @@ function dracak_vtt_mapa_stav(PDO $pdo, array $user, array $mapa, bool $jePj): a
             'velikost' => isset($t['velikost_sahu']) ? (float)$t['velikost_sahu'] : 1.0,
             'barva' => isset($t['barva']) && $t['barva'] !== null && $t['barva'] !== '' ? (string)$t['barva'] : null,
             'zamceno' => isset($t['zamceno']) ? (bool)$t['zamceno'] : false,
+            'obrazek_id' => isset($t['obrazek_id']) && $t['obrazek_id'] !== null ? (int)$t['obrazek_id'] : null,
         ];
     }
 

@@ -131,6 +131,40 @@ body { -webkit-tap-highlight-color:transparent; }
 .panel .btn, .popover .btn { touch-action:manipulation; }
 .panel label, .popover label { color:#ddd; }
 
+/* --- Vzhled tokenu (panel), otáčecí úchyt, knihovna obrázků --- */
+.panel-sekce { border-bottom:1px solid rgba(255,255,255,.12); padding-bottom:8px; margin-bottom:10px; }
+.panel-h4 { margin:0 0 6px; font-size:12px; color:#e8c9a8; font-weight:600; }
+.vz-radek { display:flex; align-items:center; gap:6px; margin:6px 0; flex-wrap:wrap; }
+.vz-popisek { font-size:11px; font-weight:600; color:#ccc; min-width:54px; }
+.vz-barvy { display:flex; flex-wrap:wrap; gap:6px; flex:1; }
+.vz-barva { width:24px; height:24px; border-radius:50%; border:2px solid rgba(255,255,255,.35); cursor:pointer; padding:0; }
+.vz-barva.aktivni { border-color:#fff; box-shadow:0 0 0 2px #ffd166; }
+.vz-barva.vychozi { background:repeating-linear-gradient(45deg,#555 0 4px,#888 4px 8px); }
+.vz-seg { display:flex; gap:4px; flex-wrap:wrap; }
+.vz-seg .btn { padding:4px 10px; min-width:34px; }
+.vz-seg .btn.aktivni { background:var(--color-accent-600, #7a3b2e); color:#fff; border-color:transparent; }
+.vz-check { display:flex; align-items:center; gap:6px; font-weight:400; margin:6px 0; font-size:12.5px; }
+.vz-nahled { width:34px; height:34px; border-radius:50%; background:#333 center/cover no-repeat; border:2px solid rgba(255,255,255,.3); flex:none; }
+#sekceEntita[hidden] { display:none; }
+.pj-stav { background:rgba(255,209,102,.08); border-left:3px solid #ffd166; border-radius:6px; padding:6px 10px; margin-bottom:10px; font-size:12.5px; }
+.pj-stav ul { margin:2px 0 0; padding-left:16px; }
+
+#rotUchyt { position:absolute; z-index:160; width:26px; height:26px; border-radius:50%; cursor:grab; touch-action:none;
+            background:#ffd166 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23332' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12a9 9 0 1 1-3-6.7'/%3E%3Cpath d='M21 4v5h-5'/%3E%3C/svg%3E") center/16px no-repeat;
+            border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.6);
+            transform:translate(-50%,-50%) scale(calc(1 / var(--z, 1))); }
+#rotUchyt:active { cursor:grabbing; }
+
+.modal-obrazky { position:fixed; inset:0; z-index:400; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; padding:12px; }
+.modal-obrazky-okno { position:relative; background:rgba(24,22,20,.98); color:#eee; border-radius:14px; padding:16px; width:min(560px, 100%);
+                      max-height:88vh; overflow-y:auto; box-shadow:0 10px 40px rgba(0,0,0,.6); }
+.modal-obrazky-okno h3 { margin:0 0 8px; font-size:15px; color:#e8c9a8; }
+.modal-obrazky-okno .close-x { position:absolute; top:10px; right:12px; background:none; border:none; color:#999; cursor:pointer; }
+.obrazky-mrizka { display:grid; grid-template-columns:repeat(auto-fill, minmax(78px, 1fr)); gap:8px; min-height:60px; }
+.obrazky-mrizka button { background:#333 center/cover no-repeat; border:2px solid transparent; border-radius:10px; aspect-ratio:1; cursor:pointer; padding:0; position:relative; }
+.obrazky-mrizka button:hover { border-color:#e8c9a8; }
+.obrazky-mrizka button span { position:absolute; left:0; right:0; bottom:0; font-size:10px; background:rgba(0,0,0,.6); padding:1px 3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; border-radius:0 0 8px 8px; }
+
 /* --- Malé obrazovky (tablet na výšku, telefon): lišta nástrojů dole, vyskakovací okna přes šířku --- */
 @media (max-width: 760px), (max-height: 560px) {
   .topbar { top:8px; max-width:94vw; padding:6px 12px; font-size:13px; }

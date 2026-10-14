@@ -148,8 +148,9 @@ function migrate_je_create_table_if_not_exists(string $stmt, ?string &$tabulka):
 
 // Stejný princip jako výš, pro "ALTER TABLE ... ADD/MODIFY" — pokryje
 // jen vzory, co CLAUDE.md u migrací povoluje (ALTER ADD, plus MODIFY
-// COLUMN ... ENUM(...) jako rozšíření výčtu, což je taky čistě
-// přídavné, nic nemaže). Cokoliv jiného (např. MODIFY měnící typ na
+// COLUMN ... ENUM(...) jako rozšíření výčtu a MODIFY COLUMN ... VARCHAR(n)
+// jako uvolnění výčtu na volný text — obojí je čistě přídavné, hodnoty se
+// nemažou). Cokoliv jiného (např. MODIFY měnící typ na
 // něco, co by mohlo zahodit data) tenhle fallback záměrně NEPOZNÁ a
 // nechá to spadnout normálně — radši hlasitá chyba než tiché
 // přeskočení něčeho, co jsme neověřili.
@@ -201,6 +202,25 @@ function migrate_alter_uz_hotovo(PDO $pdo, string $stmt, ?string &$popis): bool
    $q->execute([$tabulka, $jmeno]);
    if ((int)$q->fetchColumn() > 0) {
     $popis = "cizí klíč $tabulka.$jmeno už existuje";
+    return true;
+   }
+   return false;
+  }
+
+  // MODIFY [COLUMN] jméno VARCHAR(n) — zrušení pevného výčtu ENUM ve
+  // prospěch volného textu (hodnoty se nemažou). Hotovo, když sloupec už
+  // je VARCHAR aspoň tak dlouhý.
+  if (preg_match('/^MODIFY\s+(?:COLUMN\s+)?`?(\w+)`?\s+VARCHAR\s*\(\s*(\d+)\s*\)/i', $zbytek, $mm)) {
+   $sloupec = $mm[1];
+   $delka = (int)$mm[2];
+   $q = $pdo->prepare(
+    'SELECT DATA_TYPE, CHARACTER_MAXIMUM_LENGTH FROM information_schema.COLUMNS'
+    . ' WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+    );
+   $q->execute([$tabulka, $sloupec]);
+   $radek = $q->fetch(PDO::FETCH_ASSOC);
+   if ($radek && strtolower((string)$radek['DATA_TYPE']) === 'varchar' && (int)$radek['CHARACTER_MAXIMUM_LENGTH'] >= $delka) {
+    $popis = "$tabulka.$sloupec už je VARCHAR({$radek['CHARACTER_MAXIMUM_LENGTH']})";
     return true;
    }
    return false;

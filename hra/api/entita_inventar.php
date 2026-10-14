@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__ . '/../../includes/vtt.php';
 require_once __DIR__ . '/../../includes/vtt_predmety.php';
+require_once __DIR__ . '/../../includes/vtt_denik.php';
 
 // Inventář jedné entity (postava / instance nestvůry) pro panel tokenu.
 // Dřív se posílal v HTML stránky pro všechny tokeny najednou — při obnově
@@ -49,4 +50,19 @@ if (!dracak_vtt_je_pj_sveta($user, $svetId) && $vlastnikId !== (int)$user['id'])
     exit;
 }
 
-echo json_encode(['polozky' => dracak_vtt_inventar($typEntity, $entitaId)], JSON_UNESCAPED_UNICODE);
+$odpoved = ['polozky' => dracak_vtt_inventar($typEntity, $entitaId)];
+// PJ u postavy navíc vidí, co únava a naložení právě mění (stejná sekce jako
+// na stránce družiny) — hra to počítá sama, obtížnost dovedností určuje PJ.
+if ($typEntity === 'postava' && dracak_vtt_je_pj_sveta($user, $svetId)) {
+    try {
+        $stmt = $pdo->prepare('SELECT * FROM postavy WHERE id = ?');
+        $stmt->execute([$entitaId]);
+        $postava = $stmt->fetch();
+        if ($postava) {
+            $odpoved['pj_stav'] = dracak_vtt_stav_pro_pj(dracak_vtt_denik_data($pdo, $postava, false));
+        }
+    } catch (Throwable $e) {
+        // výpočet stavu je jen pomůcka, inventář se vrátí i bez něj
+    }
+}
+echo json_encode($odpoved, JSON_UNESCAPED_UNICODE);

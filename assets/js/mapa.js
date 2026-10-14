@@ -968,9 +968,18 @@ function nakreslitToken(t) {
   el.classList.toggle('skryty', !t.viditelny);
   el.classList.toggle('vybrany', typeof jeVybrany === 'function' && jeVybrany(t.id));
   const puck = el.querySelector('.puck');
-  puck.style.background = barvaTokenu(t);
+  puck.style.backgroundColor = barvaTokenu(t);
   puck.style.fontSize = Math.max(9, Math.round(d * 0.3)) + 'px';
   puck.firstChild.textContent = iniciala(t.label);
+  if (FUNKCE.obrazek && t.obrazek_id) {
+    puck.style.backgroundImage = "url('obrazek.php?id=" + t.obrazek_id + "')";
+    puck.style.backgroundSize = 'cover';
+    puck.style.backgroundPosition = 'center';
+    puck.firstChild.style.display = 'none';
+  } else {
+    puck.style.backgroundImage = '';
+    puck.firstChild.style.display = '';
+  }
   const face = el.querySelector('.face');
   face.style.display = FUNKCE.smer ? '' : 'none';
   face.style.transform = 'rotate(' + (t.smer || 0) + 'deg)';
@@ -993,6 +1002,222 @@ function nakreslitTokeny() {
   for (const [id, el] of tokenEl) {
     if (!zive.has(id)) { el.remove(); tokenEl.delete(id); }
   }
+  aktualizujRotacniUchyt();
+}
+
+// --- Výběr tokenů ---
+// Vybraný token má obrys a (když ho smíš otáčet) úchyt na otáčení. Výběr je
+// množina, aby šel později rozšířit na více tokenů najednou.
+const vybrane = new Set();
+function jeVybrany(id) { return vybrane.has(id); }
+function aktualizujVyber() {
+  tokenEl.forEach((el, id) => el.classList.toggle('vybrany', vybrane.has(id)));
+  aktualizujRotacniUchyt();
+}
+function nastavVyber(ids) {
+  vybrane.clear();
+  ids.forEach((id) => vybrane.add(id));
+  aktualizujVyber();
+}
+function zrusitVyber() {
+  if (!vybrane.size) return;
+  vybrane.clear();
+  aktualizujVyber();
+}
+// Po obnově stavu zmizelé tokeny z výběru vypadnou.
+function ocistitVyber() {
+  for (const id of Array.from(vybrane)) { if (!tokenData(id)) vybrane.delete(id); }
+}
+
+// --- Otočení ---
+// Krok otáčení podle gridu: hex = 6 stran (60°; v rozšířeném soubojovém systému
+// musí být každý tvor obrácen čelem k jedné ze šesti stran hexu, h1621),
+// čtverec = 8 směrů (45°), bez gridu po 15°.
+function krokOtoceni() { return GRID_PX > 0 ? (GRID_TYPE === 'hex' ? 60 : 45) : 15; }
+function smiMenitSmer(t) {
+  return !!t && FUNKCE.smer && (IS_PJ_OR_ADMIN || (t.owned && t.na_tahu && !t.zamceno));
+}
+function aktualizujRotacniUchyt() {
+  const uchyt = document.getElementById('rotUchyt');
+  if (!uchyt) return;
+  const t = vybrane.size === 1 ? tokenData(Array.from(vybrane)[0]) : null;
+  if (!t || !smiMenitSmer(t)) { uchyt.style.display = 'none'; return; }
+  const a = (t.smer || 0) * Math.PI / 180;
+  const r = prumerTokenu(t) / 2 + 22 / kamera.stav.z;
+  uchyt.style.display = '';
+  uchyt.style.left = (t.x + Math.cos(a) * r) + 'px';
+  uchyt.style.top = (t.y + Math.sin(a) * r) + 'px';
+}
+kamera.naPosluch(() => aktualizujRotacniUchyt());
+
+// --- Úprava vzhledu tokenu (otočení, velikost, barva, zámek, obrázek…) ---
+// Změna se hned projeví lokálně (optimisticky) a odešle na server; při chybě
+// se stav načte znovu ze serveru.
+function pouzitZmenyTokenu(t, zmeny) {
+  for (const [klic, hodnota] of Object.entries(zmeny)) {
+    if (klic === 'nazev') continue; // jméno závisí na entitě — řeší obnova stavu
+    t[klic] = hodnota;
+  }
+  nakreslitToken(t);
+  aktualizujRotacniUchyt();
+  if (spravovanyToken && spravovanyToken.tokenId === t.id) obnovVzhledSekci();
+}
+function upravToken(t, zmeny) {
+  pouzitZmenyTokenu(t, zmeny);
+  return postJson('api/token_uprava.php', {token_id: t.id, zmeny})
+    .then((d) => {
+      if (d.error) { logLine('Chyba: ' + d.error); obnovitStav(); return null; }
+      if ('nazev' in zmeny || 'viditelny' in zmeny) obnovitStav();
+      return d;
+    })
+    .catch(() => { logLine('Změna se nepodařila odeslat.'); obnovitStav(); return null; });
+}
+function otocitTokenO(t, stupne) {
+  if (!smiMenitSmer(t)) return;
+  upravToken(t, {smer: (((t.smer || 0) + stupne) % 360 + 360) % 360});
+}
+
+const BARVY_TOKENU = [
+  ['#c0392b', 'Červená'], ['#d9822b', 'Oranžová'], ['#d4ac0d', 'Žlutá'], ['#2e8b57', 'Zelená'], ['#17a2b8', 'Tyrkysová'],
+  ['#2f6fc9', 'Modrá'], ['#7d4fc4', 'Fialová'], ['#d6509b', 'Růžová'], ['#6b6b6b', 'Šedá'], ['#222222', 'Černá'], ['#e8e8e8', 'Bílá'],
+];
+const VELIKOSTI_TOKENU = [[0.5, '½'], [1, '1'], [2, '2'], [3, '3'], [4, '4']];
+
+const vzhledEl = {
+  sekce: document.getElementById('vzhledSekce'),
+  nazevRadek: document.getElementById('vzhledNazevRadek'), nazev: document.getElementById('vzhledNazev'),
+  barvaRadek: document.getElementById('vzhledBarvaRadek'), barvy: document.getElementById('vzhledBarvy'),
+  velikostRadek: document.getElementById('vzhledVelikostRadek'), velikost: document.getElementById('vzhledVelikost'),
+  otoceniRadek: document.getElementById('vzhledOtoceniRadek'),
+  obrazekRadek: document.getElementById('vzhledObrazekRadek'), obrazekNahled: document.getElementById('vzhledObrazekNahled'),
+  zamcenoRadek: document.getElementById('vzhledZamcenoRadek'), zamceno: document.getElementById('vzhledZamceno'),
+  skrytyRadek: document.getElementById('vzhledSkrytyRadek'), skryty: document.getElementById('vzhledSkryty'),
+};
+function spravovanyTokenData() { return spravovanyToken ? tokenData(spravovanyToken.tokenId) : null; }
+
+function obnovVzhledSekci() {
+  const t = spravovanyTokenData();
+  if (!t || !vzhledEl.sekce) return;
+  const pj = IS_PJ_OR_ADMIN;
+  const smiObrazek = FUNKCE.obrazek && (pj || (t.owned && t.na_tahu && !t.zamceno));
+  const radky = [
+    [vzhledEl.nazevRadek, pj && FUNKCE.nazev && t.typ_entity !== 'postava'],
+    [vzhledEl.barvaRadek, pj && FUNKCE.barva],
+    [vzhledEl.velikostRadek, pj && FUNKCE.velikost],
+    [vzhledEl.otoceniRadek, smiMenitSmer(t)],
+    [vzhledEl.obrazekRadek, smiObrazek],
+    [vzhledEl.zamcenoRadek, pj && FUNKCE.zamek],
+    [vzhledEl.skrytyRadek, pj && FUNKCE.udalosti],
+  ];
+  radky.forEach(([el, zobrazit]) => { if (el) el.style.display = zobrazit ? '' : 'none'; });
+  vzhledEl.sekce.style.display = radky.some(([, z]) => z) ? '' : 'none';
+  if (vzhledEl.nazev && document.activeElement !== vzhledEl.nazev) vzhledEl.nazev.value = t.typ_entity === 'obecny' ? t.label : (t.label || '');
+  vzhledEl.barvy.querySelectorAll('.vz-barva').forEach((b) => b.classList.toggle('aktivni', (b.dataset.barva || '') === (t.barva || '')));
+  vzhledEl.velikost.querySelectorAll('button').forEach((b) => b.classList.toggle('aktivni', parseFloat(b.dataset.velikost) === (t.velikost || 1)));
+  if (vzhledEl.zamceno) vzhledEl.zamceno.checked = !!t.zamceno;
+  if (vzhledEl.skryty) vzhledEl.skryty.checked = !t.viditelny;
+  if (vzhledEl.obrazekNahled) {
+    vzhledEl.obrazekNahled.style.backgroundImage = t.obrazek_id ? "url('obrazek.php?id=" + t.obrazek_id + "')" : '';
+  }
+}
+if (vzhledEl.sekce) {
+  // Barvy a velikosti se sestaví jednou.
+  vzhledEl.barvy.innerHTML = '<button type="button" class="vz-barva vychozi" data-barva="" title="Výchozí barva"></button>'
+    + BARVY_TOKENU.map(([kod, nazev]) => '<button type="button" class="vz-barva" data-barva="' + kod + '" title="' + nazev + '" style="background:' + kod + ';"></button>').join('');
+  vzhledEl.barvy.addEventListener('click', (e) => {
+    const b = e.target.closest('.vz-barva');
+    const t = spravovanyTokenData();
+    if (b && t) upravToken(t, {barva: b.dataset.barva || null});
+  });
+  vzhledEl.velikost.innerHTML = VELIKOSTI_TOKENU.map(([v, text]) => '<button type="button" class="btn btn-ghost" data-velikost="' + v + '" title="' + v + ' sáhu">' + text + '</button>').join('');
+  vzhledEl.velikost.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    const t = spravovanyTokenData();
+    if (b && t) upravToken(t, {velikost: parseFloat(b.dataset.velikost)});
+  });
+  document.getElementById('vzhledOtocL').addEventListener('click', () => { const t = spravovanyTokenData(); if (t) otocitTokenO(t, -krokOtoceni()); });
+  document.getElementById('vzhledOtocR').addEventListener('click', () => { const t = spravovanyTokenData(); if (t) otocitTokenO(t, krokOtoceni()); });
+  vzhledEl.zamceno.addEventListener('change', () => { const t = spravovanyTokenData(); if (t) upravToken(t, {zamceno: vzhledEl.zamceno.checked}); });
+  vzhledEl.skryty.addEventListener('change', () => { const t = spravovanyTokenData(); if (t) upravToken(t, {viditelny: !vzhledEl.skryty.checked}); });
+  const ulozNazev = () => {
+    const t = spravovanyTokenData();
+    if (t) upravToken(t, {nazev: vzhledEl.nazev.value.trim()}).then(() => { document.getElementById('spravovatNazev').textContent = vzhledEl.nazev.value.trim() || t.label; });
+  };
+  document.getElementById('vzhledNazevUlozit').addEventListener('click', ulozNazev);
+  vzhledEl.nazev.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); ulozNazev(); } });
+  document.getElementById('vzhledObrazekVybrat').addEventListener('click', () => {
+    const t = spravovanyTokenData();
+    if (t) otevritObrazky((id) => upravToken(t, {obrazek_id: id}));
+  });
+  document.getElementById('vzhledObrazekOdebrat').addEventListener('click', () => { const t = spravovanyTokenData(); if (t) upravToken(t, {obrazek_id: null}); });
+}
+
+// --- Knihovna obrázků světa (okno "Obrázek tokenu") ---
+const modalObrazky = document.getElementById('modalObrazky');
+let obrazekPoVyberu = null;
+function zobrazChybuObrazku(text) {
+  const el = document.getElementById('obrazekChyba');
+  if (!el) return;
+  el.textContent = text || '';
+  el.style.display = text ? '' : 'none';
+}
+async function nactiObrazky() {
+  const mrizka = document.getElementById('obrazkyMrizka');
+  try {
+    const r = await fetch('api/obrazky_seznam.php?svet_id=' + SVET_ID, {cache: 'no-store', credentials: 'same-origin'});
+    const d = await r.json();
+    const seznam = d.obrazky || [];
+    mrizka.innerHTML = seznam.length ? '' : '<p class="note" style="grid-column:1/-1;margin:0;">Zatím tu nic není — nahraj první obrázek.</p>';
+    seznam.forEach((o) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.title = o.nazev;
+      b.style.backgroundImage = "url('obrazek.php?id=" + o.id + "')";
+      const popis = document.createElement('span');
+      popis.textContent = o.nazev;
+      b.appendChild(popis);
+      b.addEventListener('click', () => {
+        const cb = obrazekPoVyberu;
+        zavritObrazky();
+        if (cb) cb(o.id);
+      });
+      mrizka.appendChild(b);
+    });
+  } catch (err) {
+    mrizka.innerHTML = '<p class="note" style="grid-column:1/-1;">Knihovnu se nepodařilo načíst.</p>';
+  }
+}
+function otevritObrazky(poVyberu) {
+  if (!modalObrazky) return;
+  obrazekPoVyberu = poVyberu;
+  zobrazChybuObrazku('');
+  modalObrazky.style.display = 'flex';
+  nactiObrazky();
+}
+function zavritObrazky() {
+  if (modalObrazky) modalObrazky.style.display = 'none';
+  obrazekPoVyberu = null;
+}
+if (modalObrazky) {
+  document.getElementById('modalObrazkyZavrit').addEventListener('click', zavritObrazky);
+  modalObrazky.addEventListener('pointerdown', (e) => { if (e.target === modalObrazky) zavritObrazky(); });
+  document.getElementById('obrazekNahrat').addEventListener('click', async () => {
+    const vstup = document.getElementById('obrazekSoubor');
+    if (!vstup.files.length) { zobrazChybuObrazku('Nejdřív vyber soubor.'); return; }
+    const fd = new FormData();
+    fd.append('svet_id', String(SVET_ID));
+    fd.append('soubor', vstup.files[0]);
+    zobrazChybuObrazku('');
+    try {
+      const r = await fetch('api/obrazek_nahrat.php', {method: 'POST', body: fd, credentials: 'same-origin'});
+      const d = await r.json();
+      if (d.error) { zobrazChybuObrazku(d.error); return; }
+      vstup.value = '';
+      nactiObrazky();
+    } catch (err) {
+      zobrazChybuObrazku('Nahrání se nepodařilo.');
+    }
+  });
 }
 
 // --- Pořadí tahů (panel vpravo nahoře) ---
@@ -1081,6 +1306,10 @@ function otevritSpravovat(t) {
     maxMagenergie: t.max_magenergie,
   };
   document.getElementById('spravovatNazev').textContent = t.label;
+  // Vlastní (obecný) token nemá životy, iniciativu, efekty ani inventář.
+  const sekceEntita = document.getElementById('sekceEntita');
+  if (sekceEntita) sekceEntita.style.display = t.typ_entity === 'obecny' ? 'none' : '';
+  obnovVzhledSekci();
   const magRow = document.getElementById('panelMagenergieRow');
   if (magRow) {
     if (spravovanyToken.maxMagenergie !== null) {
@@ -1101,7 +1330,9 @@ function otevritSpravovat(t) {
   });
   const pozn = document.getElementById('iniciativaAutoPozn');
   if (pozn) pozn.style.display = autoPozn ? '' : 'none';
-  nactiInventar();
+  const pjEl = document.getElementById('spravovatPjStav');
+  if (pjEl) { pjEl.style.display = 'none'; pjEl.innerHTML = ''; }
+  if (t.typ_entity !== 'obecny') nactiInventar();
   spravovatPanel.classList.add('open');
 }
 // Po obnově stavu sedí panel k aktuálním datům (životy, magenergie…);
@@ -1121,6 +1352,7 @@ function obnovPanelSpravovat() {
   document.getElementById('spravovatNazev').textContent = t.label;
   const txt = document.getElementById('spravovatMagenergieText');
   if (txt && t.max_magenergie !== null) txt.textContent = (t.magenergie ?? 0) + '/' + t.max_magenergie;
+  obnovVzhledSekci();
   if (hpZmena) { renderInventar(); renderKorist(); }
 }
 // Inventář se načítá až pro token, na který někdo klikl (dřív se posílal
@@ -1135,11 +1367,25 @@ async function nactiInventar() {
     const r = await fetch('api/entita_inventar.php?typ_entity=' + encodeURIComponent(st.typEntity) + '&entita_id=' + st.entitaId, {cache: 'no-store', credentials: 'same-origin'});
     const d = await r.json();
     if (d.polozky) inventarCache.set(klic, d.polozky); else inventarCache.delete(klic);
+    pjStavCache.set(klic, d.pj_stav || null);
   } catch (err) { inventarCache.delete(klic); }
   if (spravovanyToken && klicEntity(spravovanyToken.typEntity, spravovanyToken.entitaId) === klic) {
     renderInventar();
     renderKorist();
+    renderPjStav();
   }
+}
+// PJ vidí u postavy, co únava a naložení právě mění, a u kterých dovedností
+// obtížnost určuje on (hra/api/entita_inventar.php → pj_stav).
+const pjStavCache = new Map();
+function renderPjStav() {
+  const el = document.getElementById('spravovatPjStav');
+  if (!el || !spravovanyToken) return;
+  const st = pjStavCache.get(klicEntity(spravovanyToken.typEntity, spravovanyToken.entitaId));
+  if (!IS_PJ_OR_ADMIN || !st || !st.ma_vliv) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = '';
+  el.innerHTML = '<h4 class="panel-h4">Únava a naložení</h4><ul>' + st.radky.map((r) => '<li>' + esc(r) + '</li>').join('') + '</ul>'
+    + (st.pj_rozhoduje && st.pj_rozhoduje.length ? '<p class="note" style="margin:4px 0 0;"><em>Obtížnost určuješ ty:</em> ' + esc(st.pj_rozhoduje.join(' · ')) + '.</p>' : '');
 }
 
 // --- Vstup: myš, dotyk i pero přes Pointer Events ---
@@ -1165,6 +1411,12 @@ function zacitAkci(e, pinEl) {
     prah: e.pointerType === 'touch' ? PRAH_DOTYK : PRAH_MYS, tlacitko: e.button, panRef: null,
   };
   if (pinEl) { akce.typ = 'pin'; akce.pin = pinEl; return; }
+  if (e.target.closest('#rotUchyt') && vybrane.size === 1) {
+    akce.typ = 'otoceni';
+    akce.token = tokenData(Array.from(vybrane)[0]);
+    akce.smerPred = akce.token ? akce.token.smer : 0;
+    if (akce.token) return;
+  }
   if (e.button === 1 || e.button === 2 || mezernikDrzen || currentTool === 'ruka') {
     akce.typ = 'pan';
     akce.kontext = e.button === 2;
@@ -1272,6 +1524,16 @@ viewport.addEventListener('pointermove', (e) => {
       akce.posunuto = akce.posunuto || od > 2;
       akce.pin.style.left = Math.round(m.x) + 'px';
       akce.pin.style.top = Math.round(m.y) + 'px';
+      break;
+    }
+    case 'otoceni': {
+      const t = akce.token;
+      if (!t) break;
+      const uhel = Math.atan2(m.y - t.y, m.x - t.x) * 180 / Math.PI;
+      const krok = e.shiftKey ? 1 : krokOtoceni();
+      t.smer = (((Math.round(uhel / krok) * krok) % 360) + 360) % 360;
+      nakreslitToken(t);
+      aktualizujRotacniUchyt();
       break;
     }
     case 'ruler':
@@ -1382,7 +1644,24 @@ function klikNaMapu(m) {
   polozitToken(m);
 }
 
-// Položí vybranou postavu / nestvůru z popoveru "Přidat token" na mapu.
+// Vlastní token (NPC bez statistik, překážka, předmět) — pole v popoveru "Přidat token".
+const obecnySekceEl = document.getElementById('obecnySekce');
+const obecnyNazevEl = document.getElementById('obecnyNazev');
+const obecnaBarvaEl = document.getElementById('obecnaBarva');
+const obecnaVelikostEl = document.getElementById('obecnaVelikost');
+if (obecnySekceEl) {
+  obecnySekceEl.style.display = FUNKCE.obecny ? '' : 'none';
+  obecnaBarvaEl.innerHTML = '<option value="">výchozí barva</option>' + BARVY_TOKENU.map(([kod, nazev]) => '<option value="' + kod + '">' + nazev + '</option>').join('');
+  // Co je vyplněné, to se položí — ostatní výběry se proto vzájemně vyprázdní.
+  const vyprazdnit = (...els) => els.forEach((el) => { if (el) { if (el.tagName === 'SELECT') el.selectedIndex = el.size > 1 ? -1 : 0; else el.value = ''; } });
+  obecnyNazevEl.addEventListener('input', () => { if (obecnyNazevEl.value.trim()) vyprazdnit(document.getElementById('novaPostavaSelect'), document.getElementById('novaNestvuraSelect')); });
+  ['novaPostavaSelect', 'novaNestvuraSelect'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', () => { if (el.value) vyprazdnit(obecnyNazevEl, id === 'novaPostavaSelect' ? document.getElementById('novaNestvuraSelect') : document.getElementById('novaPostavaSelect')); });
+  });
+}
+
+// Položí vybranou postavu / nestvůru / vlastní token z popoveru "Přidat token" na mapu.
 function polozitToken(m) {
   const postavaSel = document.getElementById('novaPostavaSelect');
   const nestvuraSel = document.getElementById('novaNestvuraSelect');
@@ -1395,6 +1674,13 @@ function polozitToken(m) {
   } else if (nestvuraSel && nestvuraSel.value) {
     tel = {mapa_id: MAPA_ID, typ_entity: 'nestvura', nestvura_id: parseInt(nestvuraSel.value, 10), x, y};
     if (!polozitVic) nestvuraSel.selectedIndex = -1;
+  } else if (obecnyNazevEl && obecnyNazevEl.value.trim() !== '') {
+    tel = {
+      mapa_id: MAPA_ID, typ_entity: 'obecny', nazev: obecnyNazevEl.value.trim(), x, y,
+      barva: obecnaBarvaEl && obecnaBarvaEl.value ? obecnaBarvaEl.value : null,
+      velikost: obecnaVelikostEl ? parseFloat(obecnaVelikostEl.value) : 1,
+    };
+    if (!polozitVic) obecnyNazevEl.value = '';
   }
   if (!tel) { if (typeof zrusitVyber === 'function') zrusitVyber(); return; }
   postJson('api/token_pridat.php', tel).then((d) => {
@@ -1433,8 +1719,14 @@ function dokoncitAkci(a, e) {
         mlhaKreslim = false;
       }
       break;
+    case 'otoceni':
+      if (a.token && a.token.smer !== a.smerPred) {
+        upravToken(a.token, {smer: a.token.smer});
+      }
+      break;
     case 'token': {
       const t = a.token;
+      nastavVyber([t.id]);
       if (a.smiTahnout && a.posunuto) {
         if (a.nx !== undefined && (a.nx !== t.x || a.ny !== t.y)) ulozPresunTokenu(t, a.nx, a.ny);
         else {
@@ -1501,6 +1793,9 @@ window.addEventListener('keydown', (e) => {
     kamera.zoomStred(0.8);
   } else if (e.key === '0') {
     kamera.prizpusobit();
+  } else if ((e.key === 'q' || e.key === 'Q' || e.key === 'e' || e.key === 'E') && vybrane.size === 1) {
+    const t = tokenData(Array.from(vybrane)[0]);
+    if (t) otocitTokenO(t, (e.key === 'q' || e.key === 'Q') ? -krokOtoceni() : krokOtoceni());
   }
 });
 window.addEventListener('keyup', (e) => {
@@ -1992,6 +2287,14 @@ function applyEvent(u) {
       if (!drzeneTokeny.has(t.id)) nakreslitToken(t);
     }
     if (naTeteMape) obnovitMlhuPoPollu = true;
+  } else if (u.typ === 'token_zmena') {
+    const t = tokenData(u.payload.token_id);
+    const zm = u.payload.zmeny || {};
+    if ('nazev' in zm || 'viditelny' in zm || !t) {
+      if (naTeteMape) planujObnovuStavu();
+    } else {
+      pouzitZmenyTokenu(t, zm);
+    }
   } else if (u.typ === 'kostka_hod') {
     logLine((u.payload.hodil || '?') + ' hodil ' + u.payload.notace + ': [' + u.payload.hody.join(', ') + ']'
       + (u.payload.bonus ? (u.payload.bonus > 0 ? '+' : '') + u.payload.bonus : '') + ' = ' + u.payload.celkem);

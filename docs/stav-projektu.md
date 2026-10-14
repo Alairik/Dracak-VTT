@@ -647,8 +647,37 @@ přechody mezi lokacemi. Cílem je začít testovat v živé hře, ne „dokonal
 - Mimochodem: opraven stored XSS (jména postav/nestvůr se vkládala do
   `innerHTML` bez escapování) a nečitelná tlačítka v tmavých panelech.
 
-**Dál (zbývá z bloku A):** velikost/otočení/barva/zámek/obecné tokeny (čeká
-na ruční SQL), výběr více tokenů a kontextové menu, kreslení, měřidlo v hexech.
+**Hotovo — blok A, krok 2 (2026-10-14): vzhled tokenů** (v kódu hotové, zapne se
+po ručním SQL z `docs/sql-k-rucnimu-spusteni.sql`; do té doby se ovládání schová
+a mapa funguje jako dřív — ověřeno na kopii DB bez SQL).
+- **Otočení** tokenu čelem k jedné ze 6 stran hexu (60°; čtverec 45°, bez gridu 15°):
+  úchyt u vybraného tokenu, tlačítka v panelu, klávesy Q/E; šipka směru na okraji.
+  Důvod: v rozšířeném soubojovém systému musí být každý tvor obrácen čelem k jedné
+  ze šesti stran hexu (h1621/b10799). Hráč smí otáčet jen vlastní nezamčený token
+  a jen když je na tahu.
+- **Velikost** (½–4 sáhy), **barva** (11 barev), **zámek** polohy, **skrýt před
+  hráči** (PJ), **přejmenování** (obecné tokeny a nestvůry), **obrázek** z
+  knihovny světa (`svet_obrazky`, nahrání zmenšuje na 256 px, `hra/obrazek.php`
+  hlídá přístup ke světu). Nový token dědí vzhled posledního tokenu téže postavy /
+  téhož druhu nestvůry ve světě.
+- **Vlastní tokeny** (typ `obecny`): NPC bez statistik, překážka, sud… — jen PJ.
+- `hra/api/token_uprava.php` (oprávnění po polích, událost `token_zmena` s
+  hodnotami „před“ → vrací ji „Krok zpět“), `token_pridat.php` (obecný token,
+  dědění vzhledu), `token_presun.php` (zámek), `obrazek_nahrat.php`,
+  `obrazky_seznam.php`.
+- **Skrytý token neprosákne hráčům ani přes polling** (`hra/api/udalosti.php`
+  filtruje pohyb, změny a životy skrytých tokenů).
+- PJ vidí v panelu tokenu postavy sekci „Únava a naložení“ (jako na stránce družiny).
+- **Ruční SQL (migrace 0084)**: sloupce `tokeny.smer, velikost_sahu, barva, zamceno,
+  nazev, obrazek_id`, typ `obecny`, tabulky `svet_obrazky` a `mapa_kresby`,
+  `svet_udalosti.typ` → VARCHAR(40) (další druhy událostí už DDL nevyžadují).
+  Soubor migrace `0084_mapa_tokeny_vzhled_obrazky_kresby.sql` se přidá do repa až
+  po potvrzení, že SQL proběhlo (jinak by `migrate.php` shodil deploy); ověřeno,
+  že pak `migrate.php` pod DML-only účtem projde (nový fallback pro
+  `MODIFY ... VARCHAR(n)`).
+
+**Dál (zbývá z bloku A):** výběr více tokenů a kontextové menu, kreslení, měřidlo
+v hexech.
 
 **Stav mapy před změnou (audit `hra/mapa.php` 2026-10-14, historické):** funguje grid (čtverec/hex), zdi
 (blokují hráče), mlha války (per hráč), měřidlo, ping, piny s vnořenými mapami,
@@ -680,16 +709,16 @@ PJ přepíná aktivní mapu. **Chybí / drhne:**
    dotyk, pinch) [M]
 2. ✔ Aktualizace bez `location.reload()` — přidání/smazání tokenu, efekty,
    iniciativa, kolo/tah překreslit na místě [M–L]
-3. Token: otočení (směr), velikost (podle `velikosti` z pravidel), portrét,
-   barva týmu, popisek [M]
+3. ✔ Token: otočení (směr), velikost, portrét, barva týmu, popisek [M]
+   (velikost se volí ručně; podle `velikosti` z pravidel se nenastavuje — kolik
+   hexů tvor zabírá, kniha neuvádí tabulkou)
 4. Obecné tokeny (NPC bez statů, předmět, překážka, značka) [M]
 5. Výběr více tokenů, hromadný pohyb, zamknout, vrstvy, duplikovat, Delete,
    kontextové menu, klávesové zkratky [M]
 6. Kreslení na mapu (čára, šipka, tvar, text; sdílené/jen PJ) [M]
 7. Měřidlo ve hře-jednotkách (body pohybu / metry) a šablony plošných kouzel
    (kruh, kužel) [S–M]
-8. Jednorázově změnit `svet_udalosti.typ` ENUM → VARCHAR (ruční SQL, viz
-   pravidlo v CLAUDE.md) — dělat spolu s bodem 2/3 [S]
+8. ✔ (v ručním SQL 0084) Jednorázově změnit `svet_udalosti.typ` ENUM → VARCHAR [S]
 
 *B. Souboj s pravidly (tím se Owlbearu vyrovná i předčí)*
 9. Dosah pohybu v tahu z pohyblivosti postavy (po naložení a únavě), spotřeba
@@ -700,7 +729,7 @@ PJ přepíná aktivní mapu. **Chybí / drhne:**
     iniciativou [M]
 12. Čitelné stavy na tokenu: pruh životů, ikony efektů, únava/přetížení (PJ)
     [S]
-13. PJ-info o únavě a naložení v panelu tokenu (už je na `druzina.php`) [S]
+13. ✔ PJ-info o únavě a naložení v panelu tokenu (už je na `druzina.php`) [S]
 
 *C. Svět a cesta*
 14. Pochod po mapě světa: měřítko mapy (km/px), PJ vyznačí trasu → výpočet z
@@ -724,6 +753,27 @@ PJ přepíná aktivní mapu. **Chybí / drhne:**
 22. Rozvržení na tabletu/telefonu (panely, toolbar) [M]
 23. Zkušební scénář „první ostrá hra“ (cca 12 kroků) a jeho projití na dvou
     zařízeních [S]
+
+*E. Vidění, světlo a stíny (přidáno 2026-10-14; zatím jen seznam, nic nestaví)*
+24. **Stíny za zdmi** — plný viditelnostní polygon z tokenu (zatemnění všeho, co
+    zdi zakrývají). Dnes je jen „levné v1“: mlha války odhaluje kolem postavy
+    buňky v okruhu 8 sáhů, pokud k nim vede volný paprsek přes zdi
+    (`includes/vtt_mlha.php`, `dracak_vtt_los_blokovana_zdi` v `includes/vtt.php`).
+    Plný polygon („v2“) je zmíněný jen v komentáři v `includes/vtt_mlha.php`;
+    v tomhle plánu dosud chyběl. [L]
+25. **Dveře** — zeď s přepínačem otevřeno/zavřeno (měnilo by `blokuje_pohyb`
+    a `blokuje_vystrel`; zmíněno v otevřených otázkách
+    `docs/vtt-datovy-model-navrh-v1.md`). [M]
+26. **Zdroje světla** na mapě (pochodeň, lucerna, kouzlo, slunce) s dosahem. Kniha
+    má **Tabulku světel** (h286/b3166: svíčka +1 … sluneční světlo +9), ze které
+    se dají odvodit úrovně osvětlení. [L]
+27. **Vidění ve tmě, které se pohybuje s postavou** (nápad uživatele): chová se
+    jako mlha války, ale „bublina“ vidění jde s tokenem postavy, která ve tmě
+    vidí — rasou nebo kouzlem. V pravidlech: trpasličí **infravidění** (v mlze
+    jen desetinový dosah b5663, vyřazuje ho Dokonalá tma b3601) a lupičovo
+    **noční vidění** (potřebuje aspoň trochu světla, v absolutní tmě nepomáhá,
+    h524/b5163). Před stavbou je potřeba z knihy dohledat dosahy v sázích
+    (nehádat). Navazuje na 24 a 26. [L]
 
 **Doporučené pořadí:** nejdřív blok A (1–3, 8), pak krátký zkušební
 večer, teprve potom B a C podle toho, co v praxi vadí nejvíc.

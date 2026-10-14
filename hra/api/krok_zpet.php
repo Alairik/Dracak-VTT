@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/../../includes/vtt.php';
+require_once __DIR__ . '/../../includes/vtt_mapa_stav.php';
 
 // Krok zpět (V1 rozsah, viz docs/vtt-datovy-model-navrh-v1.md, sekce
 // "Mechanismy" → "Krok zpět"): vezme JEDNU poslední událost v
@@ -11,6 +12,8 @@ require_once __DIR__ . '/../../includes/vtt.php';
 // další INSERT.
 //
 // Bezpečně vratné typy (a proč):
+//  - token_zmena (otočení, velikost, barva, zámek, název, obrázek,
+//    viditelnost, vrstva): payload nese "pred" — hodnoty před změnou.
 //  - token_presun: payload nese x_pred/y_pred přímo — doslova "hodnota
 //    před", přesně podle návrhu.
 //  - token_pridan, zed_pridana, efekt_aplikovan: vznik řádku. "Před" je
@@ -106,6 +109,20 @@ switch ($typ) {
         }
         break;
 
+    case 'token_zmena':
+        // Otočení, velikost, barva… — vrátit jde jen událost, která nese
+        // hodnoty před změnou ("pred"); starší záznamy je nemají.
+        $tokenId = (int)($payload['token_id'] ?? 0);
+        $stmt = $pdo->prepare('SELECT * FROM tokeny WHERE id = ? AND mapa_id = ?');
+        $stmt->execute([$tokenId, $mapaId]);
+        $token = $stmt->fetch();
+        if (!$token || !is_array($payload['pred'] ?? null) || !$payload['pred']) {
+            http_response_code(422);
+            echo json_encode(['error' => 'Tuhle změnu tokenu už nejde vrátit (token zmizel nebo se neuložilo původní nastavení).']);
+            exit;
+        }
+        break;
+
     case 'zed_pridana':
         $zedId = (int)($payload['id'] ?? 0);
         $stmt = $pdo->prepare('SELECT * FROM zdi WHERE id = ? AND mapa_id = ?');
@@ -151,6 +168,24 @@ try {
             'x_po' => $xPred, // stav po kroku zpět (= x_pred původní události)
             'y_po' => $yPred,
         ];
+    } elseif ($typ === 'token_zmena') {
+        $sety = [];
+        $params = [];
+        $pred = [];
+        foreach ($payload['pred'] as $klic => $hodnota) {
+            $sloupec = DRACAK_VTT_TOKEN_KLIC_NA_SLOUPEC[$klic] ?? null;
+            if ($sloupec === null || !array_key_exists($sloupec, $token)) {
+                continue;
+            }
+            $sety[] = "`$sloupec` = ?";
+            $params[] = is_bool($hodnota) ? (int)$hodnota : $hodnota;
+            $pred[$klic] = dracak_vtt_token_hodnota_klice($token, $klic); // stav před krokem zpět
+        }
+        if ($sety) {
+            $params[] = (int)$token['id'];
+            $pdo->prepare('UPDATE tokeny SET ' . implode(', ', $sety) . ' WHERE id = ?')->execute($params);
+        }
+        $revertPayload += ['token_id' => (int)$token['id'], 'zmeny' => $payload['pred'], 'pred' => $pred];
     } elseif ($typ === 'token_pridan') {
         $pdo->prepare('DELETE FROM tokeny WHERE id = ?')->execute([(int)$token['id']]);
         $revertPayload += ['token_id' => (int)$token['id'], 'nazev' => $payload['nazev'] ?? null];
