@@ -268,16 +268,13 @@ export function initSouboj(ctx) {
       }
     });
 
-    // Kdo se přidal a nemá hozeno
+    // Kdo se přidal uprostřed kola: akce dostane z iniciativy, tedy až v příštím kole
     const bez = ucastnici.filter((u) => !u.hozeno);
     if (bez.length) {
-      seznam.append(el('p', 'ini-napoveda', 'Bez iniciativy (do pořadí se zařadí po hodu):'));
+      seznam.append(el('p', 'ini-napoveda', 'Nastoupí v příštím kole (iniciativa se hází na jeho začátku):'));
       seskupit(bez, () => 'n').forEach((s) => {
-        const r = el('div', 'ini-radek');
+        const r = el('div', 'ini-radek hotovo');
         r.append(jmenoBunka(s));
-        const pr = el('span', 'ini-pravy');
-        if (s.radky.every((x) => x.ovladam)) pr.append(tlacitko('Hodit', 'btn-secondary ini-hodit', () => otevritHod(idSkupiny(s), nazevSkupiny(s), s.radky[0])));
-        r.append(pr);
         seznam.append(r);
       });
     }

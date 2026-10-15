@@ -10,6 +10,8 @@ require_once __DIR__ . '/../../includes/vtt_souboj.php';
 // Tělo: {mapa_id, token_ids: [..] | token_id, hod: 1..6, rucne?, bonus_ids?, jiny_bonus?}
 // PJ smí hodit jedním hodem za víc stejných nestvůr (h2336: nestvůry stejného
 // druhu házejí jednou) — token_ids pak musí být ze stejného druhu.
+// Hází se jen ve fázi iniciativy; uprostřed kola už ne (nový účastník nastoupí
+// v příštím kole).
 $data = dracak_vtt_souboj_vstup();
 $mapaId = (int)($data['mapa_id'] ?? 0);
 [$mapa, $svetId, $jePj, $user] = dracak_vtt_souboj_zacatek($mapaId);
@@ -51,6 +53,12 @@ try {
         $pdo->rollBack();
         dracak_vtt_souboj_chyba(422, 'Nejdřív se zadávají úmysly; PJ pak otevře hody na iniciativu.');
     }
+    if ($stav['faze'] === 'kolo') {
+        // Akce se dostávají z iniciativy, a ta se hází na začátku kola: kdo se
+        // přidal uprostřed kola, nemá akce, dokud se v dalším kole nezačne házet.
+        $pdo->rollBack();
+        dracak_vtt_souboj_chyba(422, 'Iniciativa se hází na začátku kola — kdo se přidal uprostřed, nastoupí v příštím kole.');
+    }
     $existuje = $pdo->prepare('SELECT 1 FROM kolo_iniciativa WHERE mapa_id = ? AND token_id = ?');
     $ucastnik = $pdo->prepare('SELECT * FROM kolo_ucastnik WHERE mapa_id = ? AND token_id = ?');
     $upsert = $pdo->prepare(
@@ -73,7 +81,7 @@ try {
         }
         $existuje->execute([$mapaId, $tokenId]);
         $uzHozeno = (bool)$existuje->fetchColumn();
-        if ($uzHozeno && ($stav['faze'] === 'kolo' || !$jePj)) {
+        if ($uzHozeno && !$jePj) {
             $pdo->rollBack();
             dracak_vtt_souboj_chyba(422, 'Iniciativa už je pro ' . $info[$tokenId]['label'] . ' hozená.');
         }
@@ -114,10 +122,6 @@ try {
         'rucne' => $rucne,
         'skryta' => $skryta,
     ], (int)$user['id']);
-    // Posunutí tahu: iniciativu hodil i někdo, kdo se přidal uprostřed kola.
-    if ($stav['faze'] === 'kolo' && $stav['aktivni_token_id'] === null) {
-        dracak_vtt_souboj_posun($pdo, $svetId, $mapaId, (int)$user['id']);
-    }
     $pdo->commit();
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) {

@@ -133,8 +133,10 @@ MariaDB.** Postup, který v session fungoval:
   znovu; hází se na začátku každého kola, h1622). Tvor s výsledkem ≤ 0 nehraje.
   **Hráč nevidí iniciativu ani úmysly nestvůr a postav ovládaných PJ** (ani v
   pořadí, ani v logu: události nesou `skryta` a `udalosti.php` je hráčům
-  nepošle); iniciativu postav hráčů vidí všichni. Pozdní účastník (přidaný
-  uprostřed kola) dostane hod v panelu, do pořadí se zařadí podle výsledku.
+  nepošle); iniciativu postav hráčů vidí všichni. Účastník přidaný uprostřed
+  kola nemá akce — akce plynou z iniciativy, která se hází na začátku kola — takže
+  v panelu stojí v seznamu „Nastoupí v příštím kole“ a hází až v dalším kole
+  (rozhodnutí uživatele, 2026-10-15; `souboj_hod.php` hod ve fázi tahů odmítne).
   V tomhle kroku „Provést akci“ jen odečte akci a zapíše ji do logu — pohyb po
   hexech, útok a obrana přijdou v krocích 2–3.
   Kód: `includes/vtt_souboj.php`, `hra/api/souboj_start|souboj_ucastnici|

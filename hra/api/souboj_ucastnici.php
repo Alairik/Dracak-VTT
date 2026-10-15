@@ -4,8 +4,8 @@ require_once __DIR__ . '/../../includes/vtt_souboj.php';
 
 // Úprava účastníků probíhajícího souboje (jen PJ): přidat / odebrat tokeny,
 // přehodit stranu, změnit překvapení (jen v 1. kole před tahy). Nový účastník
-// uprostřed kola nemá hod; PJ mu ho hodí v panelu souboje (jeho tah se zařadí
-// podle výsledku).
+// uprostřed kola (ve fázi tahů) nemá akce — iniciativa se hází na začátku kola,
+// takže nastoupí v příštím kole.
 // Tělo: {mapa_id, pridat: [{token_id, strana}], odebrat: [token_id],
 //        strany: {token_id: strana}, prekvapeni?}
 $data = dracak_vtt_souboj_vstup();
