@@ -37,16 +37,10 @@ ním čeká, dokud se to neprovede ručně.
 **Ruční DDL blok je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný soubor, ve
 kterém jsou všechny dosud neprovedené DDL příkazy; uživatel ho dostává jako
 text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-15):
-čeká blok `0085` — souboj, krok 1** (`kolo_stav.faze/polovina/prekvapeni`,
-tabulka `kolo_ucastnik`). Bloky pro `0065`–`0081`, `DROP TABLE` tří mrtvých
-tabulek z 0008 i `0084` (mapa) jsou na produkci provedené a `0082` (217
-položek ceníku) a `0083` proběhly samy přes `migrate.php`.
-**Soubor `database/migrations/0085_souboj_faze_ucastnici.sql` je záměrně zatím
-mimo repo** (deploy by na něm zastavil, dokud uživatel SQL nespustí); po jeho
-potvrzení se přidá se stejnými čtyřmi příkazy jako v ručním bloku (`ALTER … ADD
-COLUMN` × 3, `CREATE TABLE IF NOT EXISTS kolo_ucastnik`) — `migrate.php` je pak
-přeskočí (ověřeno na simulaci produkce pod DML-only účtem).
-Soubor s ručním SQL je prázdný, dokud nepřibude další CREATE/ALTER.
+nic nečeká.** Bloky pro `0065`–`0081`, `DROP TABLE` tří mrtvých tabulek z
+0008, `0084` (mapa) i `0085` (souboj, krok 1) jsou na produkci provedené
+a `0082` (217 položek ceníku) a `0083` proběhly samy přes `migrate.php`.
+Soubor je prázdný, dokud nepřibude další CREATE/ALTER.
 
 Kód je napsaný tak, že funguje i před ručními kroky (chybějící sloupce
 se berou jako "není"), jen se nic z toho nedá ukládat.
@@ -123,7 +117,7 @@ MariaDB.** Postup, který v session fungoval:
   měřítko px→sáh (`dracak_vtt_px_na_sah`).
 
 ### Boj
-- **Souboj s fázemi (blok B, krok 1; kód hotový, zapíná se ručním SQL 0085):**
+- **Souboj s fázemi (blok B, krok 1; hotový a zapnutý na produkci, ruční SQL 0085 proběhlo):**
   PJ klikne na „Zahájit souboj“ (meče v liště) a vybere účastníky, jejich strany
   (družina / nepřátelé) a překvapení (−6 k iniciativě v 1. kole, řádek
   „Překvapení“ z `iniciativa_bonusy`). Kolo má tři fáze (`kolo_stav.faze`):
@@ -800,8 +794,8 @@ PJ přepíná aktivní mapu. **Chybí / drhne:**
 souboje podle pravidel a návrh oken je v `docs/navrh-souboje-v1.md`, rozhodnutí
 uživatele (hody tlačítkem + 3D kostka, skrytá iniciativa nestvůr, deník nestvůr,
 hexy podle velikosti, iniciativa po třech a kolo ve dvou půlkách = HB) jsou tam
-zapsaná. Krok 1 (zahájení, úmysly, iniciativa, půlky kola) je v kódu hotový a čeká
-na ruční SQL 0085; další kroky 2–5 viz „Navržené pořadí stavby“ v návrhu.**
+zapsaná. Krok 1 (zahájení, úmysly, iniciativa, půlky kola) je hotový a zapnutý na
+produkci (ruční SQL 0085 proběhlo); další kroky 2–5 viz „Navržené pořadí stavby“ v návrhu.**
 9. Dosah pohybu v tahu z pohyblivosti postavy (po naložení a únavě), spotřeba
    bodů pohybu, varování při překročení, zákaz sprintu při únavě [M–L]
 10. Útok z tokenu: cíl → ÚČ vs OČ → hod → zranění → životy (navázat na
