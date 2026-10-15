@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-require_once __DIR__ . '/../../includes/vtt.php';
+require_once __DIR__ . '/../../includes/vtt_souboj.php';
 
 header('Content-Type: application/json; charset=utf-8');
 $user = dracak_require_login();
@@ -25,34 +25,7 @@ if (!dracak_vtt_je_pj_sveta($user, (int)$mapa['svet_id'])) {
 
 // Odpočítá trvání efektů jen entitám, co mají na téhle mapě token —
 // entita bez tokenu (např. postava mimo aktuální scénu) se netiká.
-$stmt = $pdo->prepare('SELECT DISTINCT typ_entity, entita_id FROM tokeny WHERE mapa_id = ?');
-$stmt->execute([$mapaId]);
-$entityPairs = $stmt->fetchAll();
-
-$expirovalo = 0;
-foreach ($entityPairs as $pair) {
-    $stmt = $pdo->prepare(
-        'SELECT ae.id, ae.zbyva_kol, e.nazev FROM aktivni_efekty ae JOIN efekty e ON e.id = ae.efekt_id
-         WHERE ae.typ_entity = ? AND ae.entita_id = ? AND ae.zbyva_kol IS NOT NULL'
-    );
-    $stmt->execute([$pair['typ_entity'], $pair['entita_id']]);
-    foreach ($stmt->fetchAll() as $ae) {
-        $noveKolo = (int)$ae['zbyva_kol'] - 1;
-        if ($noveKolo <= 0) {
-            $del = $pdo->prepare('DELETE FROM aktivni_efekty WHERE id = ?');
-            $del->execute([$ae['id']]);
-            dracak_vtt_log_event((int)$mapa['svet_id'], $mapaId, 'efekt_konci', [
-                'typ_entity' => $pair['typ_entity'],
-                'entita_id' => $pair['entita_id'],
-                'efekt_nazev' => $ae['nazev'],
-            ], (int)$user['id']);
-            $expirovalo++;
-        } else {
-            $upd = $pdo->prepare('UPDATE aktivni_efekty SET zbyva_kol = ? WHERE id = ?');
-            $upd->execute([$noveKolo, $ae['id']]);
-        }
-    }
-}
+$expirovalo = dracak_vtt_efekty_odpocet($pdo, (int)$mapa['svet_id'], $mapaId, (int)$user['id']);
 
 echo json_encode(['ok' => true, 'expirovalo' => $expirovalo]);
 

@@ -34,6 +34,11 @@ unset($u);
 // který jim mapa.php jinak aplikuje na počáteční SELECT.
 if (!$isPjOrAdmin) {
     $udalosti = array_values(array_filter($udalosti, function (array $u) use ($user): bool {
+        // Hody, úmysly a akce nestvůr a postav ovládaných PJ jsou tajné
+        // (payload.skryta = true, viz includes/vtt_souboj.php).
+        if (in_array($u['typ'], DRACAK_VTT_UDALOSTI_SKRYTE, true) && !empty($u['payload']['skryta'])) {
+            return false;
+        }
         if ($u['typ'] === 'kresba_pridana') {
             // Skrytá kresba (jen pro PJ) neputuje hráčům; autor ji vidí sám.
             return !empty($u['payload']['viditelne_hracum']) || (int)($u['payload']['ucet_id'] ?? 0) === (int)$user['id'];

@@ -23,7 +23,19 @@ if ($rozebrano === null) {
     exit;
 }
 
-$vysledek = dracak_vtt_hod_kostkou($rozebrano['pocet'], $rozebrano['typ'], $rozebrano['bonus']);
+// Hody, které ukázaly 3D kostky u hráče: čísla se berou jako hod (jen se hlídá
+// počet a rozsah). Bez nich (3D kostky nejdou načíst) hodí server.
+if (isset($data['hody']) && is_array($data['hody'])) {
+    $hody = array_map('intval', $data['hody']);
+    if (count($hody) !== $rozebrano['pocet'] || min($hody) < 1 || max($hody) > $rozebrano['typ']) {
+        http_response_code(422);
+        echo json_encode(['error' => 'Hozená čísla neodpovídají zápisu kostek.']);
+        exit;
+    }
+    $vysledek = ['hody' => array_values($hody), 'bonus' => $rozebrano['bonus'], 'celkem' => array_sum($hody) + $rozebrano['bonus']];
+} else {
+    $vysledek = dracak_vtt_hod_kostkou($rozebrano['pocet'], $rozebrano['typ'], $rozebrano['bonus']);
+}
 
 $eventId = dracak_vtt_log_event($svetId, $mapaId, 'kostka_hod', [
     'notace' => $notace,

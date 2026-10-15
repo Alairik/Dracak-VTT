@@ -2,6 +2,12 @@
 // Konfigurace a počáteční data předává PHP v window.MAPA — samotný skript
 // je statický soubor, aby se dal cachovat a upravovat bez PHP.
 
+// Moduly se načítají s číslem verze (čas změny souboru z PHP), aby je prohlížeč
+// po nasazení nové verze nebral ze staré mezipaměti.
+const VERZE_MODULU = window.MAPA.verzeModulu || '0';
+const {hodit3D, nactiKostky, kostky3DPripraveny} = await import('./kostky3d.js?v=' + VERZE_MODULU);
+const initSouboj = window.MAPA.funkce.souboj ? (await import('./souboj.js?v=' + VERZE_MODULU)).initSouboj : null;
+
 // --- Kamera: zoom a posun přes CSS transform na #mapWrap ---
 // Souřadnice mapy (pixely původního obrázku) se na obrazovku převádějí jen
 // tady — zbytek aplikace pracuje výhradně v souřadnicích mapy a pro vstup
@@ -971,6 +977,7 @@ if (nestvuraHledat) {
 let tokeny = CFG.stav.tokeny.slice();
 let koloStav = CFG.stav.kolo;
 let iniciativa = CFG.stav.iniciativa;
+let ucastnici = CFG.stav.ucastnici || [];
 let volnePostavy = CFG.stav.volne_postavy;
 let kresby = CFG.stav.kresby || [];
 const tokenEl = new Map();
@@ -1031,6 +1038,7 @@ function nakreslitToken(t) {
   el.classList.toggle('movable', t.owned && t.na_tahu && !t.zamceno);
   el.classList.toggle('zamceno', !!t.zamceno);
   el.classList.toggle('skryty', !t.viditelny);
+  el.classList.toggle('aktivni-tah', !!koloStav && koloStav.aktivni_token_id === t.id);
   el.classList.toggle('vybrany', typeof jeVybrany === 'function' && jeVybrany(t.id));
   const puck = el.querySelector('.puck');
   puck.style.backgroundColor = barvaTokenu(t);
@@ -1289,7 +1297,24 @@ if (modalObrazky) {
 const iniPanel = document.getElementById('panelIniciativa');
 const iniList = document.getElementById('iniciativaList');
 const iniTitle = document.getElementById('iniciativaTitle');
+// Souboj s fázemi (assets/js/souboj.js) — jen když je na serveru zapnutý
+// (ruční SQL 0085); jinak zůstává dnešní jednoduchá iniciativa.
+const souboj = initSouboj ? initSouboj({
+  mapaId: MAPA_ID,
+  jePj: IS_PJ_OR_ADMIN,
+  postJson,
+  logLine,
+  getTokeny: () => tokeny,
+  getVybrane: () => Array.from(vybrane),
+  vystredit: (x, y) => kamera.vystredit(x, y),
+  obnovitStav: () => obnovitStav(),
+  pohybAuto: POHYB_AUTO,
+  hodit3D,
+  nactiKostky,
+  kostky3DPripraveny,
+}) : null;
 function nakreslitIniciativu() {
+  if (souboj) { souboj.aplikuj({kolo: koloStav, iniciativa, ucastnici}); return; }
   if (!iniPanel) return;
   if (!koloStav) { iniPanel.style.display = 'none'; return; }
   iniPanel.style.display = '';
@@ -1308,7 +1333,7 @@ function nakreslitIniciativu() {
     iniList.appendChild(radek);
   });
 }
-if (iniList) {
+if (iniList && !FUNKCE.souboj) {
   iniList.addEventListener('click', (e) => {
     const radek = e.target.closest('.ini-radek');
     const t = radek ? tokenData(parseInt(radek.dataset.tokenId, 10)) : null;
@@ -1349,6 +1374,7 @@ function aplikujStav(s) {
   tokeny = s.tokeny;
   koloStav = s.kolo;
   iniciativa = s.iniciativa;
+  ucastnici = s.ucastnici || [];
   volnePostavy = s.volne_postavy;
   if (Array.isArray(s.kresby)) { kresby = s.kresby; nakreslitKresby(); }
   if (typeof ocistitVyber === 'function') ocistitVyber();
@@ -2435,25 +2461,33 @@ if (tbKrokZpet) {
   });
 }
 
-// --- Kostky (dice-box vizualizace + autoritativní server výsledek) ---
-let diceBox = null;
-import('./vendor/dice-box/dice-box.es.min.js').then((mod) => {
-  diceBox = new mod.default('#diceBoxContainer', {assetPath: new URL('../assets/js/vendor/dice-box/assets/', location.href).pathname});
-  diceBox.init().catch(() => { diceBox = null; });
-}).catch(() => { diceBox = null; });
+// --- Kostky ---
+// 3D kostky (assets/js/kostky3d.js): čísla, která kostky ukážou, jsou hod a
+// posílají se na server (ten hlídá jen rozsah). Bez 3D kostek hodí server.
+nactiKostky();
 
 const hoditBtn = document.getElementById('hoditBtn');
 if (hoditBtn) {
-  hoditBtn.addEventListener('click', () => {
+  const DOSTUPNE_3D = [4, 6, 8, 10, 12, 20];
+  hoditBtn.addEventListener('click', async () => {
     const notace = document.getElementById('kostkyNotace').value.trim();
     if (!notace) return;
-    postJson('api/kostka_hod.php', {svet_id: SVET_ID, mapa_id: MAPA_ID, notace})
-      .then(d => {
-        if (d.error) { logLine('Chyba: ' + d.error); return; }
-        logLine(d.hodil + ' hodil ' + d.notace + ': [' + d.hody.join(', ') + ']' + (d.bonus ? (d.bonus > 0 ? '+' : '') + d.bonus : '') + ' = ' + d.celkem);
-        posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
-        if (diceBox) { try { diceBox.roll(notace.replace(/k/gi, 'd')); } catch (e) {} }
-      });
+    hoditBtn.disabled = true;
+    try {
+      let hody = null;
+      const m = notace.toLowerCase().match(/^(\d*)k(\d+)([+-]\d+)?$/);
+      if (m) {
+        const pocet = m[1] === '' ? 1 : parseInt(m[1], 10);
+        const typ = parseInt(m[2], 10);
+        if (DOSTUPNE_3D.includes(typ) && pocet >= 1 && pocet <= 12) hody = await hodit3D(pocet, typ);
+      }
+      const d = await postJson('api/kostka_hod.php', Object.assign({svet_id: SVET_ID, mapa_id: MAPA_ID, notace}, hody ? {hody} : {}));
+      if (d.error) { logLine('Chyba: ' + d.error); return; }
+      logLine(d.hodil + ' hodil ' + d.notace + ': [' + d.hody.join(', ') + ']' + (d.bonus ? (d.bonus > 0 ? '+' : '') + d.bonus : '') + ' = ' + d.celkem);
+      posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
+    } finally {
+      hoditBtn.disabled = false;
+    }
   });
 }
 
@@ -2461,11 +2495,13 @@ if (hoditBtn) {
 // Události, po kterých se stav mapy znovu načte celý (token přibyl/zmizel,
 // efekty, pořadí tahů, použitý předmět…). Načte se "na místě" — nic se
 // nepřenačítá a nikomu nezmizí otevřené panely ani zoom.
-const UDALOSTI_OBNOVA_STAVU = ['token_pridan', 'token_smazan', 'efekt_aplikovan', 'efekt_konci', 'iniciativa_hozena', 'kolo_nove', 'tah_zmena', 'predmet_pouzit', 'predmet_loot', 'krok_zpet'];
+const UDALOSTI_OBNOVA_STAVU = ['token_pridan', 'token_smazan', 'efekt_aplikovan', 'efekt_konci', 'iniciativa_hozena', 'kolo_nove', 'tah_zmena', 'predmet_pouzit', 'predmet_loot', 'krok_zpet',
+  'souboj_start', 'souboj_faze', 'souboj_ucastnici', 'umysl_nastaven', 'akce_provedena', 'tah_konec', 'akce_uprava'];
 let obnovitMlhuPoPollu = false;
 
 function applyEvent(u) {
   const naTeteMape = u.mapa_id === null || u.mapa_id === undefined || u.mapa_id == MAPA_ID;
+  if (souboj && naTeteMape) souboj.logUdalost(u);
   if (u.typ === 'token_presun') {
     const t = tokenData(u.payload.token_id);
     if (t) {

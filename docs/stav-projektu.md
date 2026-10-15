@@ -36,11 +36,17 @@ ním čeká, dokud se to neprovede ručně.
 
 **Ruční DDL blok je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný soubor, ve
 kterém jsou všechny dosud neprovedené DDL příkazy; uživatel ho dostává jako
-text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-14):
-nic nečeká.** Bloky pro `0065`–`0081`, `DROP TABLE` tří mrtvých tabulek z
-0008 i `0084` (mapa) jsou na produkci provedené a `0082` (217 položek ceníku)
-a `0083` proběhly samy přes `migrate.php`.
-Soubor je prázdný, dokud nepřibude další CREATE/ALTER.
+text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-15):
+čeká blok `0085` — souboj, krok 1** (`kolo_stav.faze/polovina/prekvapeni`,
+tabulka `kolo_ucastnik`). Bloky pro `0065`–`0081`, `DROP TABLE` tří mrtvých
+tabulek z 0008 i `0084` (mapa) jsou na produkci provedené a `0082` (217
+položek ceníku) a `0083` proběhly samy přes `migrate.php`.
+**Soubor `database/migrations/0085_souboj_faze_ucastnici.sql` je záměrně zatím
+mimo repo** (deploy by na něm zastavil, dokud uživatel SQL nespustí); po jeho
+potvrzení se přidá se stejnými čtyřmi příkazy jako v ručním bloku (`ALTER … ADD
+COLUMN` × 3, `CREATE TABLE IF NOT EXISTS kolo_ucastnik`) — `migrate.php` je pak
+přeskočí (ověřeno na simulaci produkce pod DML-only účtem).
+Soubor s ručním SQL je prázdný, dokud nepřibude další CREATE/ALTER.
 
 Kód je napsaný tak, že funguje i před ručními kroky (chybějící sloupce
 se berou jako "není"), jen se nic z toho nedá ukládat.
@@ -117,6 +123,34 @@ MariaDB.** Postup, který v session fungoval:
   měřítko px→sáh (`dracak_vtt_px_na_sah`).
 
 ### Boj
+- **Souboj s fázemi (blok B, krok 1; kód hotový, zapíná se ručním SQL 0085):**
+  PJ klikne na „Zahájit souboj“ (meče v liště) a vybere účastníky, jejich strany
+  (družina / nepřátelé) a překvapení (−6 k iniciativě v 1. kole, řádek
+  „Překvapení“ z `iniciativa_bonusy`). Kolo má tři fáze (`kolo_stav.faze`):
+  **úmysly** (každý ohlásí, co zamýšlí; úmysl „kouzlení“ přidá automaticky bonus
+  +1) → **iniciativa** (u každého tlačítko „Hodit“ → 3D kostka, hodnota z kostky
+  je hod a posílá se na server; nebo ruční zápis z fyzické kostky; PJ hází jedním
+  hodem za nestvůry stejného druhu; únava, naložení, překvapení a kouzlení se
+  přičtou samy) → **tahy** ve dvou půlkách kola (HB, b10819): v 1. půlce každý
+  podle iniciativy odehraje větší půlku akcí, ve 2. zbytek; kvóta tahu se počítá
+  z aktuálního stavu (`dracak_vtt_souboj_kvota`), takže Rychlost (zdvojí zbývající
+  akce) a protoplazma (sníží na polovinu) fungují přes PJ tlačítka ×2 / ½ v řádku
+  tvora. Po 2. půlce kolo končí samo (odpočet efektů, číslo kola +1, fáze úmyslů
+  znovu; hází se na začátku každého kola, h1622). Tvor s výsledkem ≤ 0 nehraje.
+  **Hráč nevidí iniciativu ani úmysly nestvůr a postav ovládaných PJ** (ani v
+  pořadí, ani v logu: události nesou `skryta` a `udalosti.php` je hráčům
+  nepošle); iniciativu postav hráčů vidí všichni. Pozdní účastník (přidaný
+  uprostřed kola) dostane hod v panelu, do pořadí se zařadí podle výsledku.
+  V tomhle kroku „Provést akci“ jen odečte akci a zapíše ji do logu — pohyb po
+  hexech, útok a obrana přijdou v krocích 2–3.
+  Kód: `includes/vtt_souboj.php`, `hra/api/souboj_start|souboj_ucastnici|
+  souboj_faze|souboj_hod|umysl_nastavit|tah_akce|tah_konec|akce_uprava.php`,
+  klient `assets/js/souboj.js`. Bez ručního SQL zůstává dnešní jednoduchá
+  iniciativa (starý panel, `iniciativa_hod.php`, `dalsi_tah.php`).
+- **3D kostky (`assets/js/kostky3d.js`):** dřív se kostka ukázala v rohu 300×150 px
+  a její čísla s výsledkem v logu nesouhlasila (výsledek losoval server). Teď
+  plátno vyplní okno a běžný hod kostkami (`kostka_hod.php`) bere čísla z kostek
+  (server hlídá jen počet a rozsah); bez 3D kostek hodí server.
 - Iniciativa + pořadí tahů (`includes/vtt_iniciativa.php`), vynucení
   pořadí (`dracak_vtt_je_na_tahu`). **Počet akcí z iniciativy je HOMEBREW, po
   třech** (`ceil(výsledek / 3)`: 1–3 = 1 akce, 4–6 = 2, 7–9 = 3, 10–12 = 4 …;
@@ -765,14 +799,15 @@ PJ přepíná aktivní mapu. **Chybí / drhne:**
 *B. Souboj s pravidly (tím se Owlbearu vyrovná i předčí)* — **rozjednáno: popis průběhu
 souboje podle pravidel a návrh oken je v `docs/navrh-souboje-v1.md`, rozhodnutí
 uživatele (hody tlačítkem + 3D kostka, skrytá iniciativa nestvůr, deník nestvůr,
-hexy podle velikosti, iniciativa po třech = HB) jsou tam zapsaná; stavět se začne
-po povolení „jdi“**
+hexy podle velikosti, iniciativa po třech a kolo ve dvou půlkách = HB) jsou tam
+zapsaná. Krok 1 (zahájení, úmysly, iniciativa, půlky kola) je v kódu hotový a čeká
+na ruční SQL 0085; další kroky 2–5 viz „Navržené pořadí stavby“ v návrhu.**
 9. Dosah pohybu v tahu z pohyblivosti postavy (po naložení a únavě), spotřeba
    bodů pohybu, varování při překročení, zákaz sprintu při únavě [M–L]
 10. Útok z tokenu: cíl → ÚČ vs OČ → hod → zranění → životy (navázat na
     existující `hod_postavy.php`, `pouzij_predmet.php`) [L]
-11. Skupina nestvůr jedním tahem („5× goblin“) s číslováním a hromadnou
-    iniciativou [M]
+11. ✔ (krok 1) Skupina nestvůr: jeden úmysl a jeden hod iniciativy za stejné
+    nestvůry; tahy ale mají zatím každá zvlášť [M]
 12. Čitelné stavy na tokenu: pruh životů, ikony efektů, únava/přetížení (PJ)
     [S]
 13. ✔ PJ-info o únavě a naložení v panelu tokenu (už je na `druzina.php`) [S]

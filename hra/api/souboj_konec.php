@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-require_once __DIR__ . '/../../includes/vtt.php';
+require_once __DIR__ . '/../../includes/vtt_souboj.php';
 
 // Ukončí souboj na mapě (jen PJ/admin): smaže pořadí tahů i stav kola. Bez
 // aktivního souboje (kolo_stav) hráči zase volně chodí a otáčejí tokeny
@@ -42,6 +42,9 @@ if (!$koloStav) {
 $pdo->beginTransaction();
 try {
     $pdo->prepare('DELETE FROM kolo_iniciativa WHERE mapa_id = ?')->execute([$mapaId]);
+    if (dracak_vtt_souboj_funkce()) {
+        $pdo->prepare('DELETE FROM kolo_ucastnik WHERE mapa_id = ?')->execute([$mapaId]);
+    }
     $pdo->prepare('DELETE FROM kolo_stav WHERE mapa_id = ?')->execute([$mapaId]);
     $eventId = dracak_vtt_log_event($svetId, $mapaId, 'kolo_nove', [
         'souboj_konec' => true,

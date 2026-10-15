@@ -102,6 +102,13 @@ require_once __DIR__ . '/../includes/vtt_iniciativa.php';
 require_once __DIR__ . '/../includes/vtt_pohyblivost.php';
 $pohybNastaveni = dracak_vtt_svet_cestovani_nastaveni(dracak_db(), $svetId);
 $iniciativaBonusy = dracak_db()->query('SELECT id, popis, bonus FROM iniciativa_bonusy ORDER BY id')->fetchAll();
+// Souboj s fázemi (ruční SQL 0085): hody iniciativy jdou z panelu souboje, ne
+// z panelu tokenu. Překvapení a kouzlení se přičtou samy (podle zahájení
+// souboje a úmyslu), řádky pro základní systém tu nemají smysl.
+$souboj = dracak_vtt_tokeny_funkce()['souboj'];
+$hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b['popis'], [
+    'Překvapení', 'Kouzlení', 'Automatická iniciativa v základním systému', 'Automatická ztráta iniciativy v základním systému',
+], true)));
 
 ?>
 <!doctype html>
@@ -190,8 +197,13 @@ $iniciativaBonusy = dracak_db()->query('SELECT id, popis, bonus FROM iniciativa_
     <?php if ($isPjOrAdmin): ?>
       <button class="tbtn" type="button" id="tb-grid" title="Nastavení gridu"><?php dracak_icon('grid-2x2'); ?></button>
       <button class="tbtn" type="button" id="tb-mlha" title="Mlha války"><?php dracak_icon('cloud-fog'); ?></button>
+      <?php if ($souboj): ?>
+        <button class="tbtn" type="button" id="tb-souboj" title="Zahájit souboj"><?php dracak_icon('swords'); ?></button>
+      <?php endif; ?>
       <button class="tbtn" type="button" id="tb-kolo" title="Konec kola (odpočítat trvání efektů)"><?php dracak_icon('rotate-cw'); ?></button>
-      <button class="tbtn" type="button" id="tb-dalsi-tah" title="Další na tahu (iniciativa)"><?php dracak_icon('skip-forward'); ?></button>
+      <?php if (!$souboj): ?>
+        <button class="tbtn" type="button" id="tb-dalsi-tah" title="Další na tahu (iniciativa)"><?php dracak_icon('skip-forward'); ?></button>
+      <?php endif; ?>
       <button class="tbtn" type="button" id="tb-krok-zpet" title="Krok zpět (vrátit poslední akci)"><?php dracak_icon('undo-2'); ?></button>
     <?php endif; ?>
   </div>
@@ -205,9 +217,16 @@ $iniciativaBonusy = dracak_db()->query('SELECT id, popis, bonus FROM iniciativa_
 
   <div id="panelIniciativa" style="display:none;">
     <div class="ini-titul" id="iniciativaTitle">Pořadí tahů</div>
+    <div class="ini-faze" id="iniciativaFaze"></div>
     <div id="iniciativaList"></div>
+    <div id="souborAkce"></div>
     <?php if ($isPjOrAdmin): ?>
-      <button class="btn btn-ghost" type="button" id="souborjKonecBtn" style="width:100%;margin-top:8px;font-size:12px;" title="Smaže pořadí tahů; hráči se zase mohou volně hýbat">Ukončit souboj</button>
+      <div class="ini-pj" id="souborPj">
+        <?php if ($souboj): ?>
+          <button class="btn btn-ghost" type="button" id="souborUcastniciBtn" title="Přidat nebo odebrat účastníky, změnit strany a překvapení">Účastníci…</button>
+        <?php endif; ?>
+        <button class="btn btn-ghost" type="button" id="souborjKonecBtn" title="Smaže pořadí tahů; hráči se zase mohou volně hýbat">Ukončit souboj</button>
+      </div>
     <?php endif; ?>
   </div>
 
@@ -548,6 +567,7 @@ $iniciativaBonusy = dracak_db()->query('SELECT id, popis, bonus FROM iniciativa_
         <button class="btn btn-ghost" type="button" data-mag-delta="5">+5</button>
       </div>
     </div>
+    <?php if (!$souboj): ?>
     <div style="margin-top:10px;">
       <label style="font-size:11px;font-weight:600;">Iniciativa — bonusy/postihy (zaškrtni, co platí)</label>
       <div id="iniciativaAutoPozn" class="note" style="font-size:11px;margin:2px 0 4px;display:none;">U postavy se únava a naložení počítají samy podle jejího stavu.</div>
@@ -566,6 +586,7 @@ $iniciativaBonusy = dracak_db()->query('SELECT id, popis, bonus FROM iniciativa_
         <button class="btn btn-secondary" type="button" id="iniciativaHoditBtn" style="flex:1;">Hoď iniciativu</button>
       </div>
     </div>
+    <?php endif; ?>
     <?php if ($isPjOrAdmin && $rychleEfekty): ?>
       <label style="font-size:11px;font-weight:600;">Rychlé efekty</label>
       <div id="rychleEfektyChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
@@ -589,6 +610,62 @@ $iniciativaBonusy = dracak_db()->query('SELECT id, popis, bonus FROM iniciativa_
   </div>
 
   <div id="kontextMenu" class="kontext-menu" style="display:none;"></div>
+
+  <?php if ($souboj): ?>
+  <div id="modalSouboj" class="modal-obrazky" style="display:none;">
+    <div class="modal-obrazky-okno">
+      <button class="close-x" type="button" id="modalSoubojZavrit" title="Zavřít"><?php dracak_icon('x', 16); ?></button>
+      <h3 id="soubojNadpis">Zahájit souboj</h3>
+      <p class="note" style="margin-top:0;">Zaškrtni, kdo se souboje účastní, a na které straně stojí. Překvapená strana má v 1. kole −6 k iniciativě.</p>
+      <label class="vz-radek" for="soubojPrekvapeni" style="display:flex;"><span class="vz-popisek" style="min-width:90px;">Překvapení</span>
+        <select id="soubojPrekvapeni" class="input" style="flex:1;">
+          <option value="zadne">Nikdo (běžný začátek)</option>
+          <option value="druzina">Družina je překvapena</option>
+          <option value="nepratele">Nepřátelé jsou překvapeni</option>
+          <option value="obe">Obě strany jsou překvapeny</option>
+        </select>
+      </label>
+      <div id="soubojUcastnici" class="souboj-seznam"></div>
+      <div class="vz-radek" style="margin-top:10px;">
+        <button class="btn btn-secondary" type="button" id="soubojUlozit" style="flex:1;">Zahájit souboj</button>
+      </div>
+      <p class="note" id="soubojChyba" style="color:#ff9a8a;display:none;"></p>
+    </div>
+  </div>
+
+  <div id="modalHod" class="modal-obrazky" style="display:none;">
+    <div class="modal-obrazky-okno" style="width:min(420px,100%);">
+      <button class="close-x" type="button" id="modalHodZavrit" title="Zavřít"><?php dracak_icon('x', 16); ?></button>
+      <h3 id="hodNadpis">Iniciativa</h3>
+      <p class="note" id="hodPopis" style="margin-top:0;">Hoď 1k6. Únava, naložení, překvapení a kouzlení se přičtou samy.</p>
+      <details class="hod-bonusy">
+        <summary>Další bonusy a postihy</summary>
+        <div id="hodBonusyList" style="max-height:150px;overflow-y:auto;font-size:12px;margin:6px 0;">
+          <?php foreach ($hodBonusy as $b): ?>
+            <?php $autoSkupina = in_array($b['popis'], DRACAK_VTT_INICIATIVA_UNAVA, true) ? 'unava' : (in_array($b['popis'], DRACAK_VTT_INICIATIVA_NALOZENI, true) ? 'nalozeni' : ''); ?>
+            <label style="display:flex;align-items:center;gap:6px;font-weight:400;margin-bottom:2px;">
+              <input type="checkbox" class="hod-bonus-check" value="<?= (int)$b['id'] ?>"<?= $autoSkupina !== '' ? ' data-auto="' . $autoSkupina . '"' : '' ?>>
+              <?= htmlspecialchars($b['popis']) ?> (<?= $b['bonus'] >= 0 ? '+' . (int)$b['bonus'] : (int)$b['bonus'] ?>)
+            </label>
+          <?php endforeach; ?>
+        </div>
+        <div class="vz-radek"><label for="hodJinyBonus" style="font-size:11px;">jiný bonus:</label>
+          <input type="number" id="hodJinyBonus" value="0" class="input" style="width:70px;"></div>
+      </details>
+      <div class="hod-hlavni">
+        <button class="btn btn-secondary" type="button" id="hodKostkaBtn" style="flex:1;font-size:15px;padding:10px;"><?php dracak_icon('dices', 18); ?> Hodit kostkou</button>
+      </div>
+      <div id="hodVysledek" class="hod-vysledek" aria-live="polite"></div>
+      <div class="vz-radek hod-rucne">
+        <label for="hodRucne" style="font-size:12px;">Hodil jsem na vlastní kostku:</label>
+        <input type="number" id="hodRucne" min="1" max="6" class="input" style="width:64px;">
+        <button class="btn btn-ghost" type="button" id="hodRucneBtn">Zapsat</button>
+      </div>
+      <p class="note" id="hodChyba" style="color:#ff9a8a;display:none;"></p>
+    </div>
+  </div>
+  <?php endif; ?>
+
 
   <div id="modalObrazky" class="modal-obrazky" style="display:none;">
     <div class="modal-obrazky-okno">
@@ -615,6 +692,7 @@ window.MAPA = <?= json_encode([
     'jePj' => $isPjOrAdmin,
     'pohybAuto' => ['unava' => $pohybNastaveni['auto_unava'], 'nalozeni' => $pohybNastaveni['auto_naklad']],
     'funkce' => dracak_vtt_tokeny_funkce(),
+    'verzeModulu' => max((int)@filemtime(__DIR__ . '/../assets/js/souboj.js'), (int)@filemtime(__DIR__ . '/../assets/js/kostky3d.js')),
     'grid' => [
         'px' => (int)($mapa['grid_velikost_px'] ?? 0),
         'typ' => $mapa['grid_typ'] ?? 'ctverec',

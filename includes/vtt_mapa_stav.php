@@ -13,6 +13,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/vtt.php';
 require_once __DIR__ . '/vtt_iniciativa.php';
 require_once __DIR__ . '/vtt_kresby.php';
+require_once __DIR__ . '/vtt_souboj.php';
 
 // Stav ručně spouštěného SQL (migrace 0084) — jedna sada dotazů na
 // information_schema za požadavek. Mapa je napsaná tak, aby fungovala i
@@ -23,7 +24,7 @@ function dracak_vtt_ddl_mapa(): array
     if ($stav !== null) {
         return $stav;
     }
-    $stav = ['sloupce' => [], 'typ_entity' => '', 'udalosti_varchar' => false, 'tabulky' => []];
+    $stav = ['sloupce' => [], 'typ_entity' => '', 'udalosti_varchar' => false, 'tabulky' => [], 'kolo_sloupce' => []];
     try {
         $pdo = dracak_db();
         foreach ($pdo->query(
@@ -42,9 +43,15 @@ function dracak_vtt_ddl_mapa(): array
         $stav['udalosti_varchar'] = $typUdalosti !== false && strtolower((string)$typUdalosti) === 'varchar';
         foreach ($pdo->query(
             'SELECT TABLE_NAME FROM information_schema.TABLES
-             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ("svet_obrazky", "mapa_kresby")'
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ("svet_obrazky", "mapa_kresby", "kolo_ucastnik")'
         )->fetchAll(PDO::FETCH_COLUMN) as $tabulka) {
             $stav['tabulky'][$tabulka] = true;
+        }
+        foreach ($pdo->query(
+            'SELECT COLUMN_NAME FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = "kolo_stav"'
+        )->fetchAll(PDO::FETCH_COLUMN) as $sloupec) {
+            $stav['kolo_sloupce'][$sloupec] = true;
         }
     } catch (Throwable $e) {
         // information_schema nedostupné — nové funkce zůstanou vypnuté
@@ -74,6 +81,10 @@ function dracak_vtt_tokeny_funkce(): array
         'obecny' => str_contains($ddl['typ_entity'], 'obecny'),
         'kresby' => $udalosti && isset($ddl['tabulky']['mapa_kresby']),
         'udalosti' => $udalosti,
+        // Souboj s fázemi a půlkami kola (migrace 0085) — bez ručního SQL
+        // zůstává dnešní jednoduchá iniciativa.
+        'souboj' => $udalosti && isset($ddl['tabulky']['kolo_ucastnik'])
+            && isset($ddl['kolo_sloupce']['faze'], $ddl['kolo_sloupce']['polovina'], $ddl['kolo_sloupce']['prekvapeni']),
     ];
 }
 
@@ -209,7 +220,15 @@ function dracak_vtt_mapa_stav(PDO $pdo, array $user, array $mapa, bool $jePj): a
     // PJ nesmí prozradit ani přes iniciativu).
     $kolo = null;
     $iniciativa = [];
-    if ($koloStav) {
+    $ucastnici = [];
+    if ($koloStav && dracak_vtt_tokeny_funkce()['souboj']) {
+        // Souboj s fázemi (migrace 0085): hráč nevidí iniciativu a úmysly
+        // nestvůr ani postav ovládaných PJ.
+        $sb = dracak_vtt_souboj_klient($pdo, $user, $mapa, $jePj, dracak_vtt_souboj_nacti($pdo, $mapaId));
+        $kolo = $sb['kolo'];
+        $iniciativa = $sb['iniciativa'];
+        $ucastnici = $sb['ucastnici'];
+    } elseif ($koloStav) {
         $viditelneId = array_flip(array_column($tokeny, 'id'));
         foreach (dracak_vtt_iniciativa_poradi($pdo, $mapaId) as $r) {
             if (!$jePj && !isset($viditelneId[(int)$r['token_id']])) {
@@ -247,6 +266,7 @@ function dracak_vtt_mapa_stav(PDO $pdo, array $user, array $mapa, bool $jePj): a
         'tokeny' => $tokeny,
         'kolo' => $kolo,
         'iniciativa' => $iniciativa,
+        'ucastnici' => $ucastnici,
         'kresby' => dracak_vtt_kresby_pro_mapu($pdo, $mapaId, (int)$user['id'], $jePj),
         'volne_postavy' => array_map(fn($p) => ['id' => (int)$p['id'], 'nazev' => (string)$p['nazev']], $volnePostavy),
     ];

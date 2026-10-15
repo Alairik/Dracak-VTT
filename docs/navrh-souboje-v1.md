@@ -1,7 +1,9 @@
 # Návrh souboje (rozšířený soubojový systém) — podklad k odsouhlasení
 
-Stav: **návrh k odsouhlasení, nic z toho zatím není postavené** (blok B plánu
-„náhrada Owlbear Rodeo“, viz `docs/stav-projektu.md`). Sepsáno 2026-10-14 z textu
+Stav: **návrh odsouhlasený uživatelem; krok 1 stavby je v kódu hotový** (zahájení
+souboje, úmysly, iniciativa s hodem tlačítkem + 3D kostkou, tahy ve dvou půlkách;
+čeká na ruční SQL 0085), kroky 2–5 zbývají (blok B plánu „náhrada Owlbear Rodeo“,
+viz `docs/stav-projektu.md`). Sepsáno 2026-10-14 z textu
 pravidel v `content/pravidla-hrac.html` (h1604–h1629, h1685–h1686, h158–h159)
 a `content/pravidla-pj.html` (h2170, h2335–h2347).
 
@@ -153,8 +155,8 @@ Dnešní „Další na tahu“ předává tah po každé jedné akci; podle dom�
 
 ## Navržené pořadí stavby
 
-1. Zahájit souboj (překvapení −6), úmysly, iniciativa s tlačítkem hodu + 3D kostka
-   + ruční zápis, skrytá iniciativa pro hráče, tah po více akcích.
+1. ✔ Zahájit souboj (překvapení −6), úmysly, iniciativa s tlačítkem hodu + 3D kostka
+   + ruční zápis, skrytá iniciativa pro hráče, kolo ve dvou půlkách. (Hotovo v kódu.)
 2. Lišta akcí a pohyb po hexech (krok, otočka, čelo, 3 hexy před sebou, víc-hexoví tvorové).
 3. Útok / obrana / výsledek (hody tlačítkem), zranění automaticky + oprava, bojeschopnost,
    vyřazení.
