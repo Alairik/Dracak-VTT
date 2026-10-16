@@ -43,6 +43,7 @@ $pdo->beginTransaction();
 try {
     $pdo->prepare('DELETE FROM kolo_iniciativa WHERE mapa_id = ?')->execute([$mapaId]);
     if (dracak_vtt_souboj_funkce()) {
+        dracak_vtt_vyzva_zrus_vse($pdo, $mapaId);
         $pdo->prepare('DELETE FROM kolo_ucastnik WHERE mapa_id = ?')->execute([$mapaId]);
     }
     $pdo->prepare('DELETE FROM kolo_stav WHERE mapa_id = ?')->execute([$mapaId]);

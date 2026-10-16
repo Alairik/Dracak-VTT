@@ -330,6 +330,17 @@ export function initSouboj(ctx) {
     }
     return dosahPohybu('krok', token);
   }
+  // Kolik hexů smí plán obsahovat: bez dovednosti Běh na krátké vzdálenosti je čtvrtý hex sprintu navíc —
+  // povolí se, ale potvrzení nejdřív založí hod proti pasti (síla, střední; vidí ho i PJ) a pohyb se provede až po úspěchu.
+  const vyzvyZapnute = () => !!(window.MAPA && window.MAPA.funkce && window.MAPA.funkce.vyzvy);
+  function dosahPlanu(token) {
+    const zakazy = (kolo && kolo.aktivni_zakazy) || [];
+    const d = nejdalPohybu(token);
+    const sprint = POHYB.sprint;
+    if (vyzvyZapnute() && sprint && sprint.bonus_dovednost > 0 && !zakazy.includes('sprint') && !maDovednostBehu(token) && d === sprint.hexu) return d + 1;
+    return d;
+  }
+  const potrebujePast = () => !!plan && !plan.druhVynuceny && plan.cesta.length > plan.dosahBezPast;
   // Nejlevnější pohyb, který pokryje daný počet hexů (krok ≤ 1, běh ≤ 2 (+1), sprint).
   function modPohybu(m, token) {
     return MODY_POHYBU.find((mod) => POHYB[mod] && m <= dosahPohybu(mod, token)) || 'sprint';
@@ -392,7 +403,8 @@ export function initSouboj(ctx) {
     };
     plan.otoceniMax = (POHYB.krok || {}).otoceni_max || 270;
     plan.maxOtoceni = Math.floor(plan.otoceniMax / 60);
-    plan.dosah = plan.druhVynuceny ? 1 : nejdalPohybu(t);
+    plan.dosah = plan.druhVynuceny ? 1 : dosahPlanu(t);
+    plan.dosahBezPast = plan.druhVynuceny ? 1 : nejdalPohybu(t);
     plan.zabrane = obsazene(plan.tokenId);
     plan.zabraneSet = new Set(plan.zabrane.keys());
     kreslit();
@@ -516,8 +528,8 @@ export function initSouboj(ctx) {
     const zakazy = (kolo && kolo.aktivni_zakazy) || [];
     if (plan.druhVynuceny) return 'Obrana a krok vede jen na sousední hex.';
     if (zakazy.includes('sprint')) return 'Unavená postava nesmí sprintovat — dál než ' + popisHexu(plan.dosah) + ' nedojdeš.';
-    if (!maDovednostBehu(t) && (POHYB.sprint || {}).bonus_dovednost > 0) {
-      return 'Čtvrtý bod potřebuje dovednost Běh na krátké vzdálenosti — ověření (hod proti pasti) přijde v dalším kroku, zatím ji PJ nasazuje ručně jako efekt.';
+    if (!maDovednostBehu(t) && (POHYB.sprint || {}).bonus_dovednost > 0 && !vyzvyZapnute()) {
+      return 'Čtvrtý bod potřebuje dovednost Běh na krátké vzdálenosti — PJ ji nasazuje ručně jako efekt.';
     }
     return 'Víc bodů už nemáš — dál než ' + popisHexu(plan.dosah) + ' nedojdeš.';
   }
@@ -641,6 +653,9 @@ export function initSouboj(ctx) {
     if (plan.cesta.length || plan.orient !== null) {
       casti.push('Čelo na konci: ' + popisOrient(duchOrient()) + (plan.cesta.length && plan.orient === null ? ' (změníš klikem do těla tvora nebo ↶ ↷; stojí otočení)' : ''));
     }
+    if (potrebujePast()) {
+      casti.push('Čtvrtý hex: napřed hod na dovednost Běh na krátké vzdálenosti (síla, střední) — PJ ho vidí a může upravit. Nepovede-li se, nepůjdeš a akce se neutratí.');
+    }
     if (maUtok()) {
       const t = plan.cil ? tokenPodleId(plan.cil) : null;
       if (t) casti.push('Útok na: ' + t.label);
@@ -710,14 +725,17 @@ export function initSouboj(ctx) {
     postJson('api/tah_akce.php', Object.assign({mapa_id: mapaId}, telo)).then((d) => {
       if (d.error) { logLine('Chyba: ' + d.error); return; }
       plan = null;
+      if (d.ceka_na_hod) logLine('Čtvrtý hex sprintu: nejdřív se hází na dovednost Běh na krátké vzdálenosti.');
       obnovitStav();
     });
   }
 
   // --- Útok: klik na nepřítele naplánuje cestu k němu a útok ---
   const jeNepritel = (t) => {
+    // strana tokenu viditelného na mapě přichází i hráčům (nestvůry nejsou v seznamu účastníků, ten je tajný)
     const u = ucastnici.find((x) => x.token_id === t.id);
-    return !!u && !!plan.strana && u.strana !== plan.strana;
+    const strana = kolo && kolo.strany && kolo.strany[t.id] !== undefined ? kolo.strany[t.id] : (u ? u.strana : null);
+    return !!strana && !!plan.strana && strana !== plan.strana;
   };
   const jeVDosahuUtoku = (T, pivot, o) => {
     const telo = new Set(teloTokenu(T).map(klicBunky));
@@ -1230,6 +1248,280 @@ export function initSouboj(ctx) {
     if (plan && !vPoli && e.key === 'Enter' && planJeHotov()) { e.preventDefault(); odeslatPlan(); }
   });
 
+  // --- Výzvy k hodu (útok, obrana, past): karta dole uprostřed, vidí ji všichni u stolu ---
+  // Čísla (ÚČ/OČ, opravy, součty) počítá server; klient je jen ukazuje, hází kostkou nebo vezme
+  // hod z vlastní kostky a pošle ho (hra/api/vyzva_hod.php). PJ smí číslo před hodem upravit.
+  let vyzvy = [];
+  let vysledekKarta = null;
+  let vysledekTimer = null;
+  let vyzvaPodpis = '';
+  let hodiSe = false;
+  const vyzvaPanel = el('div', 'vyzva-panel');
+  vyzvaPanel.style.display = 'none';
+  document.body.appendChild(vyzvaPanel);
+
+  const ZNAMENKO = (n) => (n >= 0 ? '+' : '−') + Math.abs(n);
+  const BEZ_ZNAMENKA = (n) => (n < 0 ? '−' : '') + Math.abs(n);
+
+  // 1k6+ : po šestce se hází znovu (kniha, kap. Kostky b58). Bez načtené 3D kostky rozhodne prohlížeč.
+  async function hoditK6Plus() {
+    const hody = [];
+    const ok3d = await nactiKostky();
+    for (let i = 0; i < 30; i++) {
+      let h;
+      if (ok3d && kostky3DPripraveny()) {
+        const r = await hodit3D(1, 6);
+        if (!r) return null;
+        h = r[0];
+      } else {
+        h = 1 + Math.floor(Math.random() * 6);
+      }
+      hody.push(h);
+      if (h !== 6) break;
+    }
+    return hody;
+  }
+  async function hoditK10() {
+    const ok3d = await nactiKostky();
+    if (ok3d && kostky3DPripraveny()) {
+      const r = await hodit3D(1, 10);
+      return r ? [r[0]] : null;
+    }
+    return [1 + Math.floor(Math.random() * 10)];
+  }
+
+  async function odeslatHodVyzvy(v, hody, soucet) {
+    if (hodiSe) return;
+    hodiSe = true;
+    kreslitVyzvy(true);
+    try {
+      const telo = {vyzva_id: v.id};
+      if (hody) telo.hody = hody; else { telo.soucet = soucet; telo.rucne = true; }
+      const d = await volat('api/vyzva_hod.php', telo);
+      if (d && d.error) { /* chyba už je v logu */ }
+    } finally {
+      hodiSe = false;
+      kreslitVyzvy(true);
+    }
+  }
+  async function hoditKostkou(v) {
+    if (hodiSe) return;
+    hodiSe = true;
+    kreslitVyzvy(true);
+    const hody = v.kostka === 10 ? await hoditK10() : await hoditK6Plus();
+    hodiSe = false;
+    if (!hody) { logLine('Kostku se nepodařilo zobrazit — zapiš hod z vlastní kostky, nebo to zkus znovu.'); kreslitVyzvy(true); return; }
+    odeslatHodVyzvy(v, hody, null);
+  }
+  function upravitVyzvu(v, zmena) {
+    return volat('api/vyzva_uprava.php', Object.assign({vyzva_id: v.id}, zmena));
+  }
+
+  function poleCisla(hodnota, min, max, onChange, sirka) {
+    const i = el('input', 'input vyzva-cislo');
+    i.type = 'number';
+    i.min = String(min);
+    i.max = String(max);
+    i.value = hodnota === null || hodnota === undefined ? '' : String(hodnota);
+    if (sirka) i.style.width = sirka;
+    i.addEventListener('change', () => onChange(i.value === '' ? null : parseInt(i.value, 10)));
+    i.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') i.blur(); });
+    return i;
+  }
+
+  function nazevDruhu(v) {
+    return v.druh === 'utok' ? 'Útok' : (v.druh === 'obrana' ? 'Obrana' : 'Hod proti pasti');
+  }
+
+  function kartaVyzvy(v) {
+    const k = el('div', 'vyzva-karta vyzva-' + v.druh);
+    const hlava = el('div', 'vyzva-hlava');
+    const proti = v.druh === 'utok' ? ' → ' + (v.cil_label || '?') : (v.druh === 'obrana' ? ' (proti ' + (v.utocnik_label || '?') + ')' : '');
+    hlava.appendChild(el('strong', '', nazevDruhu(v) + ' — ' + v.label + proti));
+    k.appendChild(hlava);
+    if (v.druh === 'past' && v.popis) k.appendChild(el('div', 'vyzva-poznamka', v.popis + ' (' + (v.vlastnost || '') + ', ' + (v.nebezpecnost_nazev || '') + ')'));
+
+    // Už hozená výzva (útok čeká na obranu) se zmenší na výsledek hodu.
+    if (v.stav !== 'ceka') {
+      k.classList.add('hotovo');
+      k.appendChild(el('div', 'vyzva-radek vyzva-celkem', '') ).append(
+        el('span', '', (v.kostka === 10 ? '1k10 ' : '1k6+ ') + '[' + (v.hody || []).join(' + ') + ']' + (v.cislo === null ? '' : ' ' + ZNAMENKO(v.cislo))),
+        el('span', 'vyzva-hodnota', '= ' + BEZ_ZNAMENKA(v.celkem)));
+      k.appendChild(el('div', 'vyzva-poznamka', v.druh === 'utok' ? 'Čeká se na obranu ' + (v.cil_label || '') + '.' : 'Hozeno.'));
+      return k;
+    }
+
+    if (v.druh === 'obrana') {
+      k.appendChild(el('div', 'vyzva-poznamka', 'Útok ' + (v.utocnik_label || '?') + ': ' + (v.utok_celkem !== null && v.utok_celkem !== undefined ? v.utok_celkem : '?')
+        + (v.strana === 'bok' ? ' · útok z boku nebo zezadu' : '')));
+      if (v.stav === 'ceka') {
+        const volba = el('div', 'vyzva-volba');
+        const b1 = tlacitko('Bránit se (stojí akci)', 'btn ' + (v.volba === 'branit' ? 'btn-primary' : 'btn-ghost'), () => upravitVyzvu(v, {volba: 'branit'}),
+          v.muze_branit || v.je_pj ? 'Brání se zbraní — stojí jednu akci z tvého zbytku' : 'Tvor už nemá žádnou akci');
+        const b2 = tlacitko('Nebránit se (−3)', 'btn ' + (v.volba === 'nebranit' ? 'btn-primary' : 'btn-ghost'), () => upravitVyzvu(v, {volba: 'nebranit'}),
+          'Jen brněním, bez zbraně — postih −3 (z boku nebo zezadu dohromady −6)');
+        b1.disabled = !v.smi_volit || (!v.muze_branit && !v.je_pj);
+        b2.disabled = !v.smi_volit;
+        volba.append(b1, b2);
+        k.appendChild(volba);
+        if (!v.smi_volit && v.volba === null) k.appendChild(el('div', 'vyzva-poznamka', 'Čeká se, až se ' + v.label + ' rozhodne, jak se bude bránit.'));
+      }
+    }
+
+    // Složky čísla (u hodu nestvůry je hráč nevidí — jen hody a součet)
+    const tab = el('div', 'vyzva-slozky');
+    const skrytoSlozky = !v.je_pj && v.zaklad === null && v.cislo === null;
+    const radek = (nazev, hodnota, trida) => {
+      const r = el('div', 'vyzva-radek' + (trida ? ' ' + trida : ''));
+      r.append(el('span', '', nazev), el('span', 'vyzva-hodnota', hodnota));
+      return r;
+    };
+    if (skrytoSlozky) {
+      // nic — jen hody níž
+    } else if (v.druh === 'past') {
+      tab.appendChild(radek(v.zaklad_nazev || 'bonus vlastnosti', v.zaklad === null ? '—' : ZNAMENKO(v.zaklad)));
+    } else {
+      const r = el('div', 'vyzva-radek');
+      r.appendChild(el('span', '', v.zaklad_nazev || (v.druh === 'utok' ? 'ÚČ' : 'OČ')));
+      if (v.je_pj && v.stav === 'ceka') {
+        r.appendChild(poleCisla(v.zaklad, 0, 60, (n) => upravitVyzvu(v, {zaklad: n}), '64px'));
+      } else {
+        r.appendChild(el('span', 'vyzva-hodnota', v.zaklad === null ? '—' : String(v.zaklad)));
+      }
+      tab.appendChild(r);
+    }
+    (v.opravy || []).forEach((o) => tab.appendChild(radek(o.nazev, ZNAMENKO(o.hodnota))));
+    if (v.je_pj && v.stav === 'ceka') {
+      const r = el('div', 'vyzva-radek');
+      r.appendChild(el('span', '', v.druh === 'past' ? 'oprava (PJ)' : 'oprava (PJ)'));
+      r.appendChild(poleCisla(v.modifikator, -30, 30, (n) => upravitVyzvu(v, {modifikator: n === null ? 0 : n}), '64px'));
+      tab.appendChild(r);
+      if (v.druh === 'utok') {
+        const u = el('div', 'vyzva-radek');
+        u.appendChild(el('span', '', 'útočnost zbraně'));
+        u.appendChild(poleCisla(v.utocnost, -20, 20, (n) => upravitVyzvu(v, {utocnost: n === null ? 0 : n}), '64px'));
+        tab.appendChild(u);
+      }
+      if (v.druh === 'past') {
+        const u = el('div', 'vyzva-radek');
+        u.appendChild(el('span', '', 'obtížnost (' + (v.nebezpecnost_nazev || 'nebezpečnost') + ')'));
+        u.appendChild(poleCisla(v.nebezpecnost, -20, 60, (n) => upravitVyzvu(v, {nebezpecnost: n}), '64px'));
+        tab.appendChild(u);
+      }
+    } else if (v.modifikator) {
+      tab.appendChild(radek('oprava (PJ)', ZNAMENKO(v.modifikator)));
+    }
+    if (v.druh === 'utok' && v.varianty && v.varianty.length > 1 && v.stav === 'ceka' && (v.ovladam || v.je_pj)) {
+      const r = el('div', 'vyzva-radek');
+      r.appendChild(el('span', '', 'zbraň / útok'));
+      const sel = el('select', 'input');
+      v.varianty.forEach((z) => {
+        const o = el('option', '', z.nazev + ' (ÚČ ' + z.uc + ')');
+        o.value = String(z.id);
+        if (z.id === v.zbran_id) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.addEventListener('change', () => upravitVyzvu(v, {zbran_id: parseInt(sel.value, 10)}));
+      r.appendChild(sel);
+      tab.appendChild(r);
+    }
+    if (v.cislo !== null) {
+      tab.appendChild(radek('číslo bez hodu', BEZ_ZNAMENKA(v.cislo), 'vyzva-soucet'));
+    }
+    if (v.hody) {
+      tab.appendChild(radek('hod ' + (v.kostka === 10 ? '1k10' : '1k6+') + ' [' + v.hody.join(' + ') + ']', String(v.soucet_hodu)));
+      tab.appendChild(radek('celkem', BEZ_ZNAMENKA(v.celkem), 'vyzva-celkem'));
+    }
+    k.appendChild(tab);
+    (v.upozorneni || []).forEach((t) => k.appendChild(el('div', 'vyzva-varovani', t)));
+
+    // Akce
+    const akce = el('div', 'vyzva-akce');
+    if (v.stav === 'ceka') {
+      if (v.smi_hodit) {
+        const hod = tlacitko(hodiSe ? 'Kostka letí…' : (v.kostka === 10 ? 'Hodit 1k10' : 'Hodit 1k6+'), 'btn btn-primary', () => hoditKostkou(v));
+        hod.disabled = hodiSe;
+        akce.appendChild(hod);
+        const rucne = el('input', 'input vyzva-cislo');
+        rucne.type = 'number';
+        rucne.min = '1';
+        rucne.max = v.kostka === 10 ? '10' : '180';
+        rucne.placeholder = v.kostka === 10 ? '1–10' : 'součet';
+        rucne.title = v.kostka === 10 ? 'Hod 1k10 z vlastní kostky' : 'Součet z vlastní kostky; šestka se přehazuje, takže 6 + 3 zapiš jako 9';
+        rucne.disabled = hodiSe;
+        rucne.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') zapis.click(); });
+        const zapis = tlacitko('Zapsat vlastní hod', 'btn btn-ghost', () => {
+          const n = parseInt(rucne.value, 10);
+          if (!(n >= 1)) { logLine('Zapiš číslo z vlastní kostky.'); return; }
+          odeslatHodVyzvy(v, v.kostka === 10 ? [n] : null, n);
+        });
+        zapis.disabled = hodiSe;
+        akce.append(rucne, zapis);
+      } else if (v.cislo === null) {
+        akce.appendChild(el('span', 'vyzva-poznamka', v.je_pj ? 'Doplň číslo, jinak se nedá hodit.' : 'Čeká se, až PJ doplní číslo.'));
+      } else if (v.druh === 'obrana' && v.volba === null) {
+        // text o rozhodování je výš
+      } else if (v.druh === 'past' && !v.nebezpecnost_nastavena) {
+        akce.appendChild(el('span', 'vyzva-poznamka', v.je_pj ? 'Nastav obtížnost hodu.' : 'Čeká se, až PJ nastaví obtížnost hodu.'));
+      } else {
+        akce.appendChild(el('span', 'vyzva-poznamka', 'Čeká se na hod: ' + v.label));
+      }
+    } else {
+      akce.appendChild(el('span', 'vyzva-poznamka', v.druh === 'utok' ? 'Útok hozen — čeká se na obranu.' : 'Hozeno.'));
+    }
+    k.appendChild(akce);
+    return k;
+  }
+
+  function kartaVysledkuPasti(p) {
+    const k = el('div', 'vyzva-karta vyzva-vysledek ' + (p.uspech ? 'minuti' : 'zasah'));
+    k.appendChild(el('strong', '', (p.label || 'Postava') + ': Běh na krátké vzdálenosti — ' + (p.uspech ? 'úspěch' : 'neúspěch')));
+    k.appendChild(el('div', 'vyzva-poznamka', p.uspech ? 'Dovednost platí 3 kola: běh a sprint o hex dál, pohyb se provede.'
+      : 'Rychlost zůstává — sprint nejvýš o 3 hexy, akce se neutratila, naplánuj tah znovu.'));
+    k.appendChild(tlacitko('Zavřít', 'btn btn-ghost', () => { vysledekKarta = null; kreslitVyzvy(true); }));
+    return k;
+  }
+  function kartaVysledku(p) {
+    if (p.past) return kartaVysledkuPasti(p);
+    const k = el('div', 'vyzva-karta vyzva-vysledek ' + (p.zasah ? 'zasah' : 'minuti'));
+    const kdo = (p.label || 'Někdo') + ' → ' + (p.cil_label || 'někdo');
+    k.appendChild(el('strong', '', p.zasah ? 'Zásah! ' + kdo : 'Minul(a). ' + kdo));
+    k.appendChild(el('div', 'vyzva-poznamka', 'Útok ' + p.utok + ' proti obraně ' + p.obrana
+      + (p.zasah ? ' → zranění ' + p.zraneni : '')));
+    if (p.zasah && p.hp_nove !== null && p.hp_nove !== undefined) {
+      k.appendChild(el('div', '', (p.cil_label || 'Obránce') + ': ' + p.hp_nove + (p.max_hp ? '/' + p.max_hp : '') + ' životů'
+        + (p.vyrazen ? ' — VYŘAZEN(A) z boje' : '')));
+    }
+    const zavrit = tlacitko('Zavřít', 'btn btn-ghost', () => { vysledekKarta = null; kreslitVyzvy(true); });
+    k.appendChild(zavrit);
+    return k;
+  }
+
+  function kreslitVyzvy(vynutit) {
+    const podpis = JSON.stringify([vyzvy, vysledekKarta, hodiSe]);
+    if (!vynutit && podpis === vyzvaPodpis) return;
+    // Rozepsaný vlastní hod se nepřekresluje pod rukama (čísla v polích PJ se ukládají hned při změně).
+    const a = document.activeElement;
+    if (!vynutit && a && vyzvaPanel.contains(a) && a.matches('.vyzva-akce input') && a.value !== '') return;
+    vyzvaPodpis = podpis;
+    vyzvaPanel.textContent = '';
+    if (!vyzvy.length && !vysledekKarta) { vyzvaPanel.style.display = 'none'; return; }
+    vyzvy.forEach((v) => vyzvaPanel.appendChild(kartaVyzvy(v)));
+    if (vysledekKarta && !vyzvy.length) vyzvaPanel.appendChild(kartaVysledku(vysledekKarta));
+    if (jePj && vyzvy.length) {
+      vyzvaPanel.appendChild(tlacitko('PJ: zrušit hod a jít dál', 'btn btn-ghost vyzva-zrusit', () => {
+        if (window.confirm('Zrušit rozehraný hod? Nikdo neutrpí zranění, akce útočníka zůstává utracená.')) volat('api/vyzva_zrus.php', {});
+      }, 'Nikdo neutrpí zranění, tah jde dál'));
+    }
+    vyzvaPanel.style.display = '';
+  }
+  function ukazVysledek(p) {
+    vysledekKarta = p;
+    clearTimeout(vysledekTimer);
+    vysledekTimer = setTimeout(() => { vysledekKarta = null; kreslitVyzvy(true); }, 12000);
+    kreslitVyzvy(true);
+  }
+
   // --- Řádky v logu ---
   function logUdalost(u) {
     const p = u.payload || {};
@@ -1259,6 +1551,24 @@ export function initSouboj(ctx) {
         logLine(p.label + ': ' + p.druh_nazev + (p.pocet > 1 ? ' ×' + p.pocet : '') + (p.cil_label ? ' → ' + p.cil_label : '')
           + (p.unava_plus ? ' (+' + p.unava_plus + ' bod únavy' + (p.unava_nova !== null && p.unava_nova !== undefined ? ', celkem ' + p.unava_nova : '') + ')' : ''));
         break;
+      case 'vyzva_hod': {
+        const druh = p.druh === 'utok' ? 'útok' : (p.druh === 'obrana' ? 'obranu' : 'hod proti pasti');
+        const kdo = p.label || 'Někdo';
+        logLine((p.hodil || '?') + ' hodil(a) ' + druh + ' za ' + kdo + ': [' + (p.hody || []).join(' + ') + ']'
+          + (p.rucne ? ' (vlastní kostka)' : '') + (p.cislo !== undefined && p.cislo !== null ? ' ' + ZNAMENKO(p.cislo) : '') + ' = ' + p.celkem
+          + (p.druh === 'past' ? (p.uspech ? ' — úspěch' : ' — neúspěch') : ''));
+        if (p.druh === 'past') ukazVysledek({past: true, uspech: !!p.uspech, label: p.label});
+        break;
+      }
+      case 'souboj_vysledek':
+        logLine((p.zasah ? 'Zásah: ' : 'Minul(a): ') + (p.label || 'někdo') + ' → ' + (p.cil_label || 'někdo') + ' — útok ' + p.utok + ' proti obraně ' + p.obrana
+          + (p.zasah ? ', zranění ' + p.zraneni + (p.hp_nove !== null && p.hp_nove !== undefined ? ' (zbývá ' + p.hp_nove + (p.max_hp ? '/' + p.max_hp : '') + ' životů)' : '') : '')
+          + (p.vyrazen ? ' — VYŘAZEN(A)' : ''));
+        ukazVysledek(p);
+        break;
+      case 'vyzva_zrusena':
+        logLine('PJ zrušil(a) rozehraný hod.');
+        break;
       case 'tah_konec':
         logLine(p.label + ' ukončil(a) tah' + (p.propadlo ? ' (propadlo ' + p.propadlo + ')' : ''));
         break;
@@ -1280,6 +1590,8 @@ export function initSouboj(ctx) {
       kolo = stav.kolo;
       iniciativa = stav.iniciativa || [];
       ucastnici = stav.ucastnici || [];
+      vyzvy = stav.vyzvy || [];
+      kreslitVyzvy(false);
       // Plán akce platí jen pro toho, kdo je pořád na tahu, a jen když se nehnul.
       if (plan) {
         const t = aktivniToken();
@@ -1289,7 +1601,8 @@ export function initSouboj(ctx) {
       // Rozehraný plán drží krok se změnami: dosah (únava, dovednost) a obsazené hexy (ostatní se hýbou)
       if (plan) {
         const t = aktivniToken();
-        plan.dosah = plan.druhVynuceny ? 1 : nejdalPohybu(t);
+        plan.dosah = plan.druhVynuceny ? 1 : dosahPlanu(t);
+        plan.dosahBezPast = plan.druhVynuceny ? 1 : nejdalPohybu(t);
         plan.zabrane = obsazene(plan.tokenId);
         plan.zabraneSet = new Set(plan.zabrane.keys());
         if (plan.cesta.length && (plan.cesta.length > plan.dosah || !overPlan(plan.cesta, duchOrient()).ok)) {
@@ -1301,7 +1614,7 @@ export function initSouboj(ctx) {
         }
       }
       // Hexová mapa: plán začíná sám, jakmile je tvor na tahu (Esc ho do dalšího tahu vypne)
-      if (!plan && kolo && kolo.faze === 'kolo' && kolo.ovladam_aktivniho && kolo.aktivni_token_id !== null && jeHex() && !zruseno.has(klicTahu())) {
+      if (!plan && kolo && kolo.faze === 'kolo' && kolo.ovladam_aktivniho && kolo.aktivni_token_id !== null && jeHex() && !zruseno.has(klicTahu()) && !vyzvy.length) {
         const t = aktivniToken();
         if (t && jeTvor(t)) zahajitPlan(null);
       }

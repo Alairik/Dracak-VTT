@@ -122,7 +122,7 @@ function dracak_vtt_souboj_pohyb(PDO $pdo, array $mapa, array $token, array $inf
         if ($rezim['jen_pri_umyslu'] !== null && $umysl !== $rezim['jen_pri_umyslu']) {
             dracak_vtt_souboj_chyba(422, $rezim['nazev'] . ' je jen při úmyslu „Pohyb“ (ohlašuje se před hodem na iniciativu).');
         }
-        $dosah = (int)$rezim['hexu'] + ((int)$rezim['bonus_dovednost'] > 0 ? dracak_vtt_souboj_bonus_behu($pdo, $token) * (int)$rezim['bonus_dovednost'] : 0);
+        $dosah = (int)$rezim['hexu'] + ((int)$rezim['bonus_dovednost'] > 0 ? (!empty($vstup['predpokladej_beh']) ? 1 : dracak_vtt_souboj_bonus_behu($pdo, $token)) * (int)$rezim['bonus_dovednost'] : 0);
         $popisDosahu = $dosah === 1
             ? 'Krok vede na sousední hex (o víc hexů jen při Běhu a Sprintu).'
             : $rezim['nazev'] . ' vede nejvýš o ' . $dosah . ' ' . ($dosah >= 5 ? 'hexů' : 'hexy') . '.';

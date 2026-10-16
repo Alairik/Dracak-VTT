@@ -36,12 +36,15 @@ ním čeká, dokud se to neprovede ručně.
 
 **Ruční DDL blok je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný soubor, ve
 kterém jsou všechny dosud neprovedené DDL příkazy; uživatel ho dostává jako
-text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-16): nic nečeká.**
-Bloky pro `0065`–`0081`, `DROP TABLE` tří mrtvých tabulek z 0008, `0084` (mapa),
+text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-16): čeká jediný blok — tabulka
+`souboj_vyzva` (výzvy k hodu: útok, obrana, hod proti pasti; „tah v2“, etapa 2). Bez ní souboj funguje
+jako v etapě 1 (útok se jen zapíše do logu); po jejím vytvoření se hody zapnou samy. Po potvrzení
+uživatele se přidá `database/migrations/0088_souboj_vyzva.sql` a soubor se vyprázdní.**
+Dřívější bloky pro `0065`–`0081`, `DROP TABLE` tří mrtvých tabulek z 0008, `0084` (mapa),
 `0085` (souboj, krok 1) i `0086` (souboj, krok 2b: `tokeny.hexu`, tabulky
 `souboj_pohyb` se sloupcem `unava_bodu` a `tvary_tvoru`, efekt „Běh na krátké
 vzdálenosti“) jsou na produkci provedené a `0082` (217 položek ceníku) a `0083`
-proběhly samy přes `migrate.php`. Soubor je prázdný, dokud nepřibude další CREATE/ALTER.
+proběhly samy přes `migrate.php`.
 
 Kód je napsaný tak, že funguje i před ručními kroky (chybějící sloupce
 se berou jako "není"), jen se nic z toho nedá ukládat.
@@ -158,7 +161,48 @@ MariaDB.** Postup, který v session fungoval:
   prostém seznamu akcí. **Běh a Sprint jsou kdykoli** (úmysl Pohyb je nehlídá — migrace 0087),
   únava je omezuje (unavená postava max. běh, vyčerpaná jen krok). Plán se průběžně přepočítává
   (dosah, obsazené hexy). **Omezení:** cestu k nepříteli hledá jen nejkratšími trasami (bez
-  objížděk) a útok se zatím jen zapíše (hody a zranění přijdou v etapě 2).
+  objížděk).
+- **Hody a výsledek (blok B, „tah v2“, etapa 2; hotovo 2026-10-16, návrh `docs/navrh-tahu-v2.md`):**
+  **výzva k hodu** = čekající hod viditelný pro všechny u stolu (karta dole uprostřed mapy,
+  `assets/js/souboj.js`; stav v tabulce `souboj_vyzva` z ručního SQL — bez ní zůstává chování z etapy 1,
+  útok se jen zapíše). Hody se nikdy nehází samy: tlačítko „Hodit 1k6+“ (3D kostka, po šestce se
+  přehazuje a sčítá) nebo „Zapsat vlastní hod“ (součet z fyzické kostky); server hlídá řetěz šestek
+  (`dracak_vtt_hody_k6plus_over`) a čísla počítá sám. **Útok → obrana → výsledek:** potvrzený útok
+  (i „sprint a útok“) odehraje pohyb a založí výzvu „Útok“ — **tah se přeruší** (nejde další akce
+  ani konec tahu, dokud se hod nedohraje nebo ho PJ nezruší). ÚČ: postava z deníku (vybraná zbraň —
+  držená, jinak první s ÚČ), nestvůra z textu bestiáře (`dracak_vtt_nestvura_uc`: číslo za „=“, za lomítkem
+  útočnost; víc útoků v zápisu = výběr „zbraň / útok“; vzorec bez výsledku se nehádá a PJ číslo doplní).
+  Opravy server přidá sám: méně než 1/3 životů (bojeschopnost), −1 velké naložení, **rozdíl velikostí**
+  (tabulka h1610 b10702–b10708, `DRACAK_VTT_ROZDIL_VELIKOSTI`; u nejasné velikosti nestvůry „B až C“ jen
+  upozornění a PJ opraví ručně), **rozběh +1** (HB, dvě akce sprintu za sebou a útok — z událostí
+  `akce_provedena`, `dracak_vtt_souboj_sprinty_v_rade`). **PJ smí před hodem změnit** základ (ÚČ/OČ
+  nestvůry), útočnost a „opravu (PJ)“ (−30 až +30) — hráči u postav tu opravu vidí; **staty nestvůr (ÚČ, OČ,
+  opravy, útočnost, životy skrytého tvora) hráč nevidí** (jako bestiář), u hodu nestvůry má jen hody a celkový
+  součet. Po hodu útoku vznikne výzva
+  **„Obrana“** pro napadeného: „Bránit se (stojí akci)“ (obrana zbraně OZ, bez zbraně −3; z boku nebo zezadu
+  navíc −4) nebo „Nebránit se (−3)“ (z boku nebo zezadu dohromady −6) — h1611 a h1623; bránit se akcí smí jen
+  ten, kdo má ještě akci (PJ smí vždy), a obrana akcí mu jednu akci vezme. Strana útoku se pozná z čela
+  obránce (`dracak_vtt_utok_strana`). Volí hráč napadené postavy, nebo PJ za něj (bez časovače). Po hodu
+  obrany server vyhodnotí: zásah = útok ≥ obrana, zranění = rozdíl + útočnost zbraně (aspoň 1), odečte
+  životy (`postavy.aktualni_hp` / `nestvura_instance.aktualni_hp`, událost `hp_zmena`, nejníž na 0),
+  zapíše `souboj_vysledek` a tah útočníka pokračuje (`dracak_vtt_souboj_posun`). **Vyřazený tvor**
+  (životy na mezi vyřazení nebo pod ní, `dracak_vtt_souboj_vyrazen`) **tah přeskočí** a hráč za něj nemůže
+  jednat. PJ vidí navíc „PJ: zrušit hod a jít dál“ (nikdo neutrpí zranění, akce útočníka zůstává utracená).
+  **Čtvrtý hex sprintu bez dovednosti Běh na krátké vzdálenosti:** plán o čtyřech hexech se smí naplánovat;
+  potvrzení cestu ověří, ale neprovede — založí výzvu **„Hod proti pasti“** (1k10 + bonus za sílu ≥ obtížnost,
+  h1686/h1698, skill `zvlastni_schopnosti` 229); PJ ji vidí a nastaví obtížnost (hráč ji nevidí; číslo
+  „střední“ kniha v textu nepřevádí, takže se předvyplní z posledního hodu stejné obtížnosti ve světě).
+  Úspěch → efekt „Běh na krátké vzdálenosti“ (3 kola, efekt 120) a uložený pohyb se provede; neúspěch → nic se
+  nepohne a akce se neutratí. Kód: `includes/vtt_souboj_utok.php` (výzvy, ÚČ/OČ, zranění),
+  `includes/vtt_souboj_past.php`, `includes/vtt_souboj_akce.php` (provedení akce, společné pro `tah_akce.php`
+  a pokračování po hodu proti pasti), `hra/api/vyzva_uprava|vyzva_hod|vyzva_zrus.php`. **Hráči se v etapě 1
+  nedalo útočit klikem na nestvůru** (strana nestvůry nebyla v seznamu účastníků, který je pro hráče tajný) —
+  opraveno: `kolo.strany` nese stranu všech tokenů viditelných na mapě.
+  **Omezení / další kroky (viz návrh):** OČ a ÚČ nestvůr, které se z textu nespočítají (třeba Goblin: „+1 + síla
+  zbraně“), doplňuje PJ před každým hodem — to vyřeší až malý deník nestvůry (krok 4); postava bez držené
+  zbraně útočí první zbraní s ÚČ (výběr zbraně přijde v etapě 4); neřeší se „obrana a krok“, vícenásobné
+  útoky, útok na vyřazeného / neviditelného / nehybného, čtyřstupňová škála hodu na dovednost (fatální
+  úspěch / neúspěch — v přepisu pravidel chybí).
 - **Akce na hexové mapě (blok B, krok 2a; hotový, bez ručního SQL):** lišta akcí
   u tvora na tahu (Krok, Otočka, Útok, Krok a útok, Otočka a útok, Obrana, Obrana a
   krok, Čekání, Jiná činnost, Kouzlení). Akce s mapovou částí se plánují klikem na
@@ -895,11 +939,13 @@ uživatele (hody tlačítkem + 3D kostka, skrytá iniciativa nestvůr, deník ne
 hexy podle velikosti, iniciativa po třech a kolo ve dvou půlkách = HB) jsou tam
 zapsaná. Krok 1 (zahájení, úmysly, iniciativa, půlky kola) a 2a (akce na hexové mapě)
 jsou hotové a na produkci, stejně tak 2b (tvorové na více hexech, Běh, Sprint; ruční SQL 0086
-proběhlo) a 2c (plánování cesty po bodech); další kroky 3–5 viz „Navržené pořadí stavby“ v návrhu.**
+proběhlo) a 2c (plánování cesty po bodech); krok 3 (útok, obrana, zranění, hod proti pasti) je hotový
+v kódu jako „tah v2, etapa 2“ a čeká na ruční SQL `souboj_vyzva`; další kroky 4–5 viz „Navržené pořadí
+stavby“ v návrhu.**
 9. Dosah pohybu v tahu z pohyblivosti postavy (po naložení a únavě), spotřeba
    bodů pohybu, varování při překročení, zákaz sprintu při únavě [M–L]
-10. Útok z tokenu: cíl → ÚČ vs OČ → hod → zranění → životy (navázat na
-    existující `hod_postavy.php`, `pouzij_predmet.php`) [L]
+10. ✔ (tah v2, etapa 2; čeká na ruční SQL `souboj_vyzva`) Útok z tokenu: cíl → ÚČ vs OČ → hod →
+    zranění → životy [L]
 11. ✔ (krok 1) Skupina nestvůr: jeden úmysl a jeden hod iniciativy za stejné
     nestvůry; tahy ale mají zatím každá zvlášť [M]
 12. Čitelné stavy na tokenu: pruh životů, ikony efektů, únava/přetížení (PJ)

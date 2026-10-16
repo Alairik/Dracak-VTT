@@ -173,7 +173,8 @@ Dnešní „Další na tahu“ předává tah po každé jedné akci; podle dom�
    - **2c ✔ (hotovo)**: plánování cesty klikáním na body A, B, C (s dovedností D) s automatickým
      natáčením po směru cesty a rozpočtem otáčení 270° za akci; přepínač „držet čelo“, dvojklik
      nebo tlačítko potvrdí (viz `docs/stav-projektu.md`).
-3. Útok / obrana / výsledek (hody tlačítkem), zranění automaticky + oprava, bojeschopnost,
+3. ✔ (kód hotový jako „tah v2, etapa 2“, čeká na ruční SQL `souboj_vyzva`; viz `docs/navrh-tahu-v2.md`)
+   Útok / obrana / výsledek (hody tlačítkem), zranění automaticky + oprava, bojeschopnost,
    vyřazení.
 4. Malý deník nestvůry (staty z čísel v zápisu), kořist.
 5. Kouzlení po akcích, střelba, útěk, zvláštní případy, později finty.

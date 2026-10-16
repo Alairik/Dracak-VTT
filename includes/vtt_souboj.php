@@ -252,6 +252,14 @@ function dracak_vtt_souboj_nove_kolo(PDO $pdo, int $svetId, int $mapaId, int $uc
 // ['kolo_konec' => bool, 'aktivni_token_id' => ?int, 'polovina' => int, 'cislo_kola' => int].
 function dracak_vtt_souboj_posun(PDO $pdo, int $svetId, int $mapaId, int $ucetId): array
 {
+    // Vyřazený tvor (životy na mezi vyřazení nebo pod ní, h1610) tah přeskočí.
+    $info = dracak_vtt_souboj_tokeny_info($pdo, $svetId, $mapaId);
+    $muzeJednat = function (array $r, int $polovina) use ($pdo, $info): bool {
+        if (dracak_vtt_souboj_kvota($r['akce_celkem'], $r['akce_zbyvajici'], $polovina) <= 0) {
+            return false;
+        }
+        return !isset($info[$r['token_id']]) || !dracak_vtt_souboj_vyrazen($pdo, $info[$r['token_id']]);
+    };
     for ($pokus = 0; $pokus < 3; $pokus++) {
         $stav = dracak_vtt_souboj_nacti($pdo, $mapaId, true);
         $poradi = dracak_vtt_iniciativa_poradi($pdo, $mapaId);
@@ -264,12 +272,11 @@ function dracak_vtt_souboj_posun(PDO $pdo, int $svetId, int $mapaId, int $ucetId
                 break;
             }
         }
-        if ($aktivni !== null && $idx >= 0
-            && dracak_vtt_souboj_kvota($poradi[$idx]['akce_celkem'], $poradi[$idx]['akce_zbyvajici'], $polovina) > 0) {
+        if ($aktivni !== null && $idx >= 0 && $muzeJednat($poradi[$idx], $polovina)) {
             return ['kolo_konec' => false, 'aktivni_token_id' => $aktivni, 'polovina' => $polovina, 'cislo_kola' => $stav['cislo_kola']];
         }
         for ($i = $idx + 1; $i < count($poradi); $i++) {
-            if (dracak_vtt_souboj_kvota($poradi[$i]['akce_celkem'], $poradi[$i]['akce_zbyvajici'], $polovina) > 0) {
+            if ($muzeJednat($poradi[$i], $polovina)) {
                 $novy = $poradi[$i]['token_id'];
                 $pdo->prepare('UPDATE kolo_stav SET aktivni_token_id = ? WHERE mapa_id = ?')->execute([$novy, $mapaId]);
                 dracak_vtt_log_event($svetId, $mapaId, 'tah_zmena', [
@@ -443,8 +450,17 @@ function dracak_vtt_souboj_klient(PDO $pdo, array $user, array $mapa, bool $jePj
         $k = $kiPoTokenu[$aktivniId];
         $kvotaAktivniho = dracak_vtt_souboj_kvota($k['akce_celkem'], $k['akce_zbyvajici'], $polovina);
     }
+    // Na které straně kdo stojí — i u nestvůr, které hráč v pořadí tahů nevidí (iniciativa a úmysly jsou
+    // tajné, strana ne): bez toho by hráč neviděl, na koho smí útočit. Jen tokeny viditelné na mapě.
+    $strany = [];
+    foreach ($info as $tokenId => $i) {
+        if (isset($ucastniciDb[$tokenId]) && ($jePj || $i['viditelny'])) {
+            $strany[$tokenId] = (string)$ucastniciDb[$tokenId]['strana'];
+        }
+    }
     $kolo = [
         'cislo_kola' => $stav['cislo_kola'],
+        'strany' => $strany ?: new stdClass(),
         'aktivni_token_id' => $aktivniViditelny ? $aktivniId : null,
         'aktivni_label' => $aktivniViditelny ? $info[$aktivniId]['label'] : null,
         'aktivni_skryty' => $aktivniId !== null && !$aktivniViditelny,
@@ -461,7 +477,10 @@ function dracak_vtt_souboj_klient(PDO $pdo, array $user, array $mapa, bool $jePj
         'aktivni_zakazy' => $aktivniId !== null && isset($info[$aktivniId])
             ? dracak_vtt_souboj_zakazy_pohybu($pdo, $info[$aktivniId]['typ_entity'], $info[$aktivniId]['entita_id']) : [],
     ];
-    return ['kolo' => $kolo, 'iniciativa' => $iniciativa, 'ucastnici' => $ucastnici];
+    return [
+        'kolo' => $kolo, 'iniciativa' => $iniciativa, 'ucastnici' => $ucastnici,
+        'vyzvy' => dracak_vtt_vyzva_funkce() ? dracak_vtt_vyzvy_klient($pdo, $user, $jePj, $info, $mapaId) : [],
+    ];
 }
 
 // Pohybové akce, které únava postavě zakazuje (tabulka únavy h1634: unavená nesmí
@@ -478,3 +497,6 @@ function dracak_vtt_souboj_zakazy_pohybu(PDO $pdo, string $typEntity, int $entit
     $stupen = $postava ? dracak_vtt_postava_unava_stupen($postava) : null;
     return $stupen === null ? [] : array_values(array_intersect(['beh', 'sprint'], $stupen['zakazy']));
 }
+
+// Výzvy k hodu (útok, obrana, past) — funkce volají souboj_klient a posun výše.
+require_once __DIR__ . '/vtt_souboj_utok.php';

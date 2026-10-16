@@ -383,8 +383,16 @@ knihou a opraví najednou. Pravidlo je v `CLAUDE.md`.
 - [ ] Příklad b10839 (Roxan, iniciativa 4 = dvě akce, „postupně až 4 hexy daleko“) odpovídá pravidlu z knihy (krok o dva hexy); podle HB je běh 2 hexy a sprint 3 (dvě akce sprintu = 6 hexů). Ponecháno podle knihy, při korektuře přepsat.
 - [ ] Překlep v b10838 (Pohyb): „přídel akcí“ → „příděl akcí“ — ponecháno podle knihy.
 - [x] Otočení při pohybu: HB **celkem 270° za akci** (před pohybem, mezi hexy i po nich) — potvrzeno uživatelem 2026-10-16. U jednohexového tvora rozpočet nikdy nepřekáží (čisté otočení je nejvýš 180°), omezuje větší těla mezi překážkami.
-- [x] Bonus za rozběh: HB, uživatel 2026-10-16 — dvě akce sprintu za sebou a následný útok = +1 ÚČ; zapsáno do knihy (b93089–b93090). V kódu přijde s hody na útok (tah v2, etapa 2).
+- [x] Bonus za rozběh: HB, uživatel 2026-10-16 — dvě akce sprintu za sebou a následný útok = +1 ÚČ; zapsáno do knihy (b93089–b93090). V kódu hotovo s hody na útok (tah v2, etapa 2, 2026-10-16).
 - [x] Cena: krok, běh i sprint s útokem = 1 akce (kniha h1623 u kroku a útoku, HB u běhu a sprintu — uživatel 2026-10-16); běh a sprint kdykoli, kromě únavy (kniha h1625 je vázala na úmysl Pohyb).
 - [ ] Sprint: +1 bod únavy za použití (HB, 2026-10-16); „unavená postava nesmí sprintovat, vyčerpaná ani běhat“ beru z tabulky únavy (h1634) a uplatňuji jen u postav s vyplněnou odolností. Potvrdit, jestli PJ smí zákaz obejít (teď smí).
 - [ ] Běh a sprint jsem v kódu vázal na úmysl „Pohyb“ (kniha h1625: při úmyslu Pohyb se krok smí protáhnout na dva hexy). Potvrdit, jestli má běh/sprint jít i mimo tento úmysl.
 - [ ] Útok zvířecí C (2 hexy): v kódu 3 hexy před hlavou, jak u jednohexového tvora. Potvrdit proti tomu, jak se to hraje.
+
+**Souboj — hody a výsledek (tah v2, etapa 2, 2026-10-16)**
+- [ ] **Číslo pro obtížnost „střední“** u dovedností (Běh na krátké vzdálenosti: síla, střední, h1698) není v přepsaném textu knihy — chybí tabulka „lehká / střední / těžká = nebezpečnost N“. Teď ho před hodem nastavuje PJ (systém si ho pamatuje). **Potřeba: foto / doplnění z knihy.**
+- [ ] **Čtyřstupňová škála výsledku** (fatální neúspěch / neúspěch / úspěch / fatální úspěch) — pravidlo „Fatální neúspěch“ a „Totální úspěch“ je v knize poznamenané jako „zatím nepřečteno“ (PPZ str. 82, PPP str. 5); u hodu na dovednost se zatím vyhodnocuje jen úspěch a neúspěch. U Běhu na krátké vzdálenosti znamená fatální neúspěch pád (nemůže příští směnu sprintovat). **Potřeba: foto / doplnění z knihy.**
+- [ ] Tabulka rozdílu velikostí (h1610, b10702–b10708) je přepsaná podle knihy, ale má zvláštní hodnoty v řádku A0 (útočník D = 0, E = −2) a ve sloupcích D a E řádků A, B (D: 0 / +2, E: −1 / 0) — odpovídá příkladům z textu (Turih A proti drakovi E −4; drak E proti Turihovi A −1); ponecháno beze změny, ověřit proti knize.
+- [ ] Bez zbraně (postava nemá drženou zbraň): ÚČ kniha nedefinuje jednoznačně (SZ chybí) — systém bere první zbraň s ÚČ z inventáře, jinak PJ doplní číslo; v obraně bez držené zbraně platí −3.
+- [ ] OZ (obrana zbraně) nestvůr bestiář nerozepisuje — při „bránit se“ ji PJ připíše do opravy.
+- [ ] „Obrana a krok“ (h1623) a vícenásobné útoky (válečník, nestvůry) zatím nejsou v útoku zohledněné.

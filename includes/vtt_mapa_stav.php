@@ -43,7 +43,7 @@ function dracak_vtt_ddl_mapa(): array
         $stav['udalosti_varchar'] = $typUdalosti !== false && strtolower((string)$typUdalosti) === 'varchar';
         foreach ($pdo->query(
             'SELECT TABLE_NAME FROM information_schema.TABLES
-             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ("svet_obrazky", "mapa_kresby", "kolo_ucastnik")'
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ("svet_obrazky", "mapa_kresby", "kolo_ucastnik", "souboj_vyzva")'
         )->fetchAll(PDO::FETCH_COLUMN) as $tabulka) {
             $stav['tabulky'][$tabulka] = true;
         }
@@ -85,6 +85,10 @@ function dracak_vtt_tokeny_funkce(): array
         // Souboj s fázemi a půlkami kola (migrace 0085) — bez ručního SQL
         // zůstává dnešní jednoduchá iniciativa.
         'souboj' => $udalosti && isset($ddl['tabulky']['kolo_ucastnik'])
+            && isset($ddl['kolo_sloupce']['faze'], $ddl['kolo_sloupce']['polovina'], $ddl['kolo_sloupce']['prekvapeni']),
+        // Výzvy k hodu (útok, obrana, past; tabulka souboj_vyzva z ručního SQL) — bez nich se útok
+        // jen zapíše do logu.
+        'vyzvy' => $udalosti && isset($ddl['tabulky']['kolo_ucastnik'], $ddl['tabulky']['souboj_vyzva'])
             && isset($ddl['kolo_sloupce']['faze'], $ddl['kolo_sloupce']['polovina'], $ddl['kolo_sloupce']['prekvapeni']),
     ];
 }
@@ -224,6 +228,7 @@ function dracak_vtt_mapa_stav(PDO $pdo, array $user, array $mapa, bool $jePj): a
     $kolo = null;
     $iniciativa = [];
     $ucastnici = [];
+    $vyzvy = [];
     if ($koloStav && dracak_vtt_tokeny_funkce()['souboj']) {
         // Souboj s fázemi (migrace 0085): hráč nevidí iniciativu a úmysly
         // nestvůr ani postav ovládaných PJ.
@@ -231,6 +236,7 @@ function dracak_vtt_mapa_stav(PDO $pdo, array $user, array $mapa, bool $jePj): a
         $kolo = $sb['kolo'];
         $iniciativa = $sb['iniciativa'];
         $ucastnici = $sb['ucastnici'];
+        $vyzvy = $sb['vyzvy'];
     } elseif ($koloStav) {
         $viditelneId = array_flip(array_column($tokeny, 'id'));
         foreach (dracak_vtt_iniciativa_poradi($pdo, $mapaId) as $r) {
@@ -270,6 +276,7 @@ function dracak_vtt_mapa_stav(PDO $pdo, array $user, array $mapa, bool $jePj): a
         'kolo' => $kolo,
         'iniciativa' => $iniciativa,
         'ucastnici' => $ucastnici,
+        'vyzvy' => $vyzvy,
         'kresby' => dracak_vtt_kresby_pro_mapu($pdo, $mapaId, (int)$user['id'], $jePj),
         'volne_postavy' => array_map(fn($p) => ['id' => (int)$p['id'], 'nazev' => (string)$p['nazev']], $volnePostavy),
     ];

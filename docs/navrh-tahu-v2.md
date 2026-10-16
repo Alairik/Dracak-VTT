@@ -71,8 +71,9 @@ uprostřed, přeskočí rovnou na výsledek. Server je autorita (klient jen navr
    rozpoznání akce (včetně „běh/sprint a útok“, vše za 1 akci), běh a sprint bez vazby na úmysl,
    lišta akcí zmizí (zbude „Další akce…“), plovoucí potvrzení. Útok se zatím jen zapíše (cíl),
    hody přijdou v etapě 2.
-2. **Hody a výsledek:** výzva k hodu (PJ vidí a upraví), útok proti obraně, okno Obrana, zranění,
-   bojeschopnost; hod proti pasti u 4. hexu; bonus za rozběh (+1 ÚČ).
+2. **Hody a výsledek (hotovo v kódu 2026-10-16, čeká na ruční SQL `souboj_vyzva`):** výzva k hodu
+   (PJ vidí a upraví), útok proti obraně, okno Obrana, zranění, bojeschopnost a vyřazení; hod proti
+   pasti u 4. hexu; bonus za rozběh (+1 ÚČ). Podrobně „Poznámky k etapě 2“ dole.
 3. **Animace a efekty:** přesun po hexech, výpad a číslo zranění, efekty s trváním (hoření,
    kyselina…) na začátku tahu, přeskočit.
 4. **Zbraň a dosah:** výběr zbraně / kouzla při útoku, dlouhé zbraně, střelba (≥ 2 hexy, volná dráha).
@@ -90,8 +91,14 @@ uprostřed, přeskočí rovnou na výsledek. Server je autorita (klient jen navr
 
 ## Otevřené věci
 
-- Jak přesně vypadá past „na sílu“ u dovednosti Běh na krátké vzdálenosti (nebezpečnost „střední“ z
-  tabulky pastí h1686) — dohledat, než se postaví hod (etapa 2).
+- **Číslo pro obtížnost „střední“** u dovedností (Běh na krátké vzdálenosti: síla, střední) kniha v
+  přepsaném textu nemá (`pasti.obtiznost` je volný text, `zvlastni_schopnosti.mechanika` jen „Obtížnost:
+  střední“). Do doplnění z knihy ho před hodem nastavuje PJ a systém si ho pamatuje (příští hod stejné obtížnosti
+  se předvyplní). Stejně chybí čtyřstupňová škála výsledku (fatální neúspěch / úspěch / fatální úspěch —
+  `vysledky_testu`, h `Fatální neúspěch a Totální úspěch` „zatím nepřečteno“): vyhodnocuje se jen úspěch a neúspěch.
+- ÚČ / OČ nestvůr z textu bestiáře: u zápisů s výsledkem („(+1 + 3) = 4“) se čísla vezmou sama, u vzorců
+  bez výsledku („+1 + síla zbraně“, „kvalita zbroje + štít“) je doplňuje PJ před každým hodem — vyřeší malý
+  deník nestvůry (krok 4).
 
 ## Poznámky k etapě 1 (co je hotové a jaká jsou omezení)
 
@@ -102,3 +109,25 @@ uprostřed, přeskočí rovnou na výsledek. Server je autorita (klient jen navr
   hledá nejméně hexů, pak nejméně otáčení; když nedosáhne, naplánuje cestu co nejblíž a řekne proč.
 - Omezení: auto-trasa k nepříteli jde jen nejkratšími cestami (bez objížděk); PJ, který chce tokenem
   volně hýbat, musí plánování vypnout (Esc); útok se zatím jen zapíše.
+
+## Poznámky k etapě 2 (hody a výsledek)
+
+- **Výzva k hodu** (`souboj_vyzva`: mapa, druh `utok` / `obrana` / `past`, stav `ceka` → `hozeno` → `hotovo` /
+  `zruseno`, kdo hází, protivník, JSON s čísly) je jediné místo, kde čeká hod; klienti ji dostávají v
+  `mapa_stav.php` (`vyzvy`) a o změně se dozvědí událostí (`vyzva_nova`, `vyzva_zmena`, `vyzva_hod`,
+  `souboj_vysledek`, `vyzva_zrusena`). Skrytý tvor (token skrytý hráčům) nikdy nevyzradí jméno; událost je
+  skrytá jen tehdy, když jsou skrytí oba (útočník i obránce). Staty nestvůr (ÚČ, OČ, opravy, útočnost) hráč
+  nevidí — u hodu nestvůry dostane jen hody a celkový součet (bestiář je tajný), do veřejné události výsledku
+  nepatří ani útočnost zbraně, ani životy skrytého obránce.
+- **Průběh útoku:** `tah_akce.php` odehraje pohyb a založí výzvu „Útok“ (tah se nepřeposouvá) →
+  `vyzva_uprava.php` (PJ: oprava, ÚČ/OČ, útočnost; vlastník: zbraň, volba obrany) → `vyzva_hod.php` →
+  po hodu útoku vznikne „Obrana“ → po hodu obrany vyhodnocení (zásah, zranění, životy, akce obránce) →
+  tah útočníka pokračuje. `vyzva_zrus.php` (jen PJ) zruší vše rozehrané.
+- **Pravidla:** zásah a zranění h1612; obrana h1611 a h1623 (bránit se akcí stojí akci, bez zbraně −3, z boku nebo
+  zezadu −4 / dohromady −6); opravy útoku h1610 (bojeschopnost, −1 velké naložení, rozdíl velikostí); rozběh = HB.
+- **Čtvrtý hex:** `tah_akce` ověří cestu o 4 hexech, jako by dovednost platila, ale neprovede ji — založí
+  „past“ s uloženým požadavkem; po úspěchu `dracak_vtt_past_vyhodnot` nasadí efekt a požadavek provede znovu
+  (v téže transakci, jako původní zadavatel).
+- **Vyřazený tvor** tah přeskočí a hráč za něj nejedná; PJ ano.
+- **Nezapomenout dál (etapa 4 a později):** výběr zbraně při útoku, dlouhé zbraně, střelba, „obrana a krok“,
+  vícenásobné útoky, zvláštní útoky (neviditelný, nehybný, na vyřazeného), malý deník nestvůry.

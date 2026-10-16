@@ -287,3 +287,35 @@ body { -webkit-tap-highlight-color:transparent; }
 .akce-btn.mapova::after { content:" •"; color:#6bbf7a; }
 .tah-plan { margin-top:8px; padding:8px; border-radius:8px; background:rgba(107,191,122,.1); border:1px solid rgba(107,191,122,.35); }
 .tah-plan .ini-napoveda { margin:3px 0; }
+
+/* Výzvy k hodu (útok, obrana, past) — karta dole uprostřed, vidí ji všichni (assets/js/souboj.js) */
+.vyzva-panel { position:fixed; left:50%; bottom:76px; transform:translateX(-50%); z-index:180; width:min(440px, calc(100vw - 24px));
+  display:flex; flex-direction:column; gap:8px; max-height:calc(100vh - 160px); overflow-y:auto; }
+.vyzva-karta { background:rgba(24,20,16,.96); border:1px solid rgba(232,201,168,.45); border-radius:10px; padding:10px 12px; color:#eee;
+  box-shadow:0 6px 24px rgba(0,0,0,.5); font-size:13px; }
+.vyzva-karta.vyzva-utok { border-color:#d98a6c; }
+.vyzva-karta.vyzva-obrana { border-color:#7fb0d9; }
+.vyzva-karta.vyzva-past { border-color:#c9b36c; }
+.vyzva-karta.vyzva-vysledek.zasah { border-color:#e0705c; }
+.vyzva-karta.vyzva-vysledek.minuti { border-color:#8fbf8f; }
+.vyzva-hlava { margin-bottom:6px; font-size:14px; }
+.vyzva-poznamka { color:#bbb; font-size:12px; margin:4px 0; }
+.vyzva-varovani { color:#e8c9a8; font-size:12px; margin:4px 0; }
+.vyzva-volba { display:flex; gap:6px; margin:6px 0; flex-wrap:wrap; }
+.vyzva-volba .btn { flex:1; min-width:140px; }
+.vyzva-slozky { border-top:1px solid rgba(255,255,255,.12); margin-top:6px; padding-top:6px; }
+.vyzva-radek { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:1px 0; }
+.vyzva-hodnota { font-variant-numeric:tabular-nums; font-weight:600; }
+.vyzva-soucet { border-top:1px dashed rgba(255,255,255,.18); margin-top:3px; padding-top:3px; }
+.vyzva-celkem { font-size:17px; color:#e8c9a8; }
+.vyzva-cislo { text-align:right; }
+.vyzva-akce { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:8px; }
+.vyzva-akce .vyzva-cislo { width:84px; }
+.vyzva-zrusit { align-self:flex-end; font-size:12px; }
+.vyzva-panel .btn { color:#f1e6d8; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.28); }
+.vyzva-panel .btn:hover:not(:disabled) { background:rgba(255,255,255,.16); }
+.vyzva-panel .btn.btn-primary { background:#e8c9a8; color:#2a1d12; border-color:#e8c9a8; font-weight:600; }
+.vyzva-panel .btn:disabled { opacity:.45; cursor:not-allowed; }
+.vyzva-panel input.input, .vyzva-panel select { background:#2b251f; color:#f1e6d8; border:1px solid rgba(255,255,255,.28); border-radius:6px; padding:4px 6px; width:auto; }
+.vyzva-karta.hotovo { padding:8px 12px; }
+.vyzva-karta.hotovo .vyzva-hlava { margin-bottom:2px; }

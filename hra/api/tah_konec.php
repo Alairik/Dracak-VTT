@@ -20,6 +20,10 @@ try {
         dracak_vtt_souboj_chyba(422, 'Teď nikdo není na tahu.');
     }
     $tokenId = $stav['aktivni_token_id'];
+    if (dracak_vtt_vyzva_otevrene($pdo, $mapaId, true)) {
+        $pdo->rollBack();
+        dracak_vtt_souboj_chyba(422, 'Nejdřív se musí dohrát rozehraný hod (nebo ho PJ zruší).');
+    }
     if (!isset($info[$tokenId]) || !dracak_vtt_souboj_ovlada($user, $jePj, $info[$tokenId])) {
         $pdo->rollBack();
         dracak_vtt_souboj_chyba(403, 'Tah ukončit nesmíš.');

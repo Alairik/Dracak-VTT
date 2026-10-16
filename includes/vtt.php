@@ -275,7 +275,8 @@ function dracak_vtt_prvni_cislo_se_znamenkem(?string $text): ?int
 
 // Události, které se hráčům nesmí poslat, patří-li skryté postavě (nestvůra,
 // postava ovládaná PJ): hody a úmysly PJ jsou tajné.
-const DRACAK_VTT_UDALOSTI_SKRYTE = ['iniciativa_hozena', 'umysl_nastaven', 'akce_provedena', 'tah_konec', 'akce_uprava'];
+const DRACAK_VTT_UDALOSTI_SKRYTE = ['iniciativa_hozena', 'umysl_nastaven', 'akce_provedena', 'tah_konec', 'akce_uprava',
+    'vyzva_nova', 'vyzva_zmena', 'vyzva_hod', 'vyzva_zrusena', 'souboj_vysledek'];
 
 // Zápis události do logu — vždy stejný tvar, ať se na to nezapomíná
 // u jednotlivých endpointů (viz docs/vtt-datovy-model-navrh-v1.md).

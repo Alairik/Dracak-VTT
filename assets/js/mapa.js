@@ -987,6 +987,7 @@ let tokeny = CFG.stav.tokeny.slice();
 let koloStav = CFG.stav.kolo;
 let iniciativa = CFG.stav.iniciativa;
 let ucastnici = CFG.stav.ucastnici || [];
+let vyzvy = CFG.stav.vyzvy || [];
 let volnePostavy = CFG.stav.volne_postavy;
 let kresby = CFG.stav.kresby || [];
 const tokenEl = new Map();
@@ -1411,7 +1412,7 @@ const souboj = initSouboj ? initSouboj({
   soubojSvg: document.getElementById('soubojSvg'),
 }) : null;
 function nakreslitIniciativu() {
-  if (souboj) { souboj.aplikuj({kolo: koloStav, iniciativa, ucastnici}); return; }
+  if (souboj) { souboj.aplikuj({kolo: koloStav, iniciativa, ucastnici, vyzvy}); return; }
   if (!iniPanel) return;
   if (!koloStav) { iniPanel.style.display = 'none'; return; }
   iniPanel.style.display = '';
@@ -1472,6 +1473,7 @@ function aplikujStav(s) {
   koloStav = s.kolo;
   iniciativa = s.iniciativa;
   ucastnici = s.ucastnici || [];
+  vyzvy = s.vyzvy || [];
   volnePostavy = s.volne_postavy;
   if (Array.isArray(s.kresby)) { kresby = s.kresby; nakreslitKresby(); }
   if (typeof ocistitVyber === 'function') ocistitVyber();
@@ -2600,7 +2602,8 @@ if (hoditBtn) {
 // efekty, pořadí tahů, použitý předmět…). Načte se "na místě" — nic se
 // nepřenačítá a nikomu nezmizí otevřené panely ani zoom.
 const UDALOSTI_OBNOVA_STAVU = ['token_pridan', 'token_smazan', 'efekt_aplikovan', 'efekt_konci', 'iniciativa_hozena', 'kolo_nove', 'tah_zmena', 'predmet_pouzit', 'predmet_loot', 'krok_zpet',
-  'souboj_start', 'souboj_faze', 'souboj_ucastnici', 'umysl_nastaven', 'akce_provedena', 'tah_konec', 'akce_uprava'];
+  'souboj_start', 'souboj_faze', 'souboj_ucastnici', 'umysl_nastaven', 'akce_provedena', 'tah_konec', 'akce_uprava',
+  'vyzva_nova', 'vyzva_zmena', 'vyzva_hod', 'vyzva_zrusena', 'souboj_vysledek'];
 let obnovitMlhuPoPollu = false;
 
 function applyEvent(u) {
