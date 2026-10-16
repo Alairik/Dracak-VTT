@@ -337,6 +337,43 @@ Tohle jsou místa, která agent při sweepu označil, ale po bližším pohledu 
 
 ---
 
+## F. Efekty ve VTT — co boj z efektů nevyhodnotí (stav 2026-10-16)
+
+Každý efekt má v DB `mechanika_stav`; co není `auto`, boj sám nevyhodnotí a PJ ho posoudí podle popisu (v panelu tokenu je
+označený ✋, částečně vyhodnocené ◐, chybějící údaj ❓). Mechanika (složky) se doplňuje jen tam, kde kniha říká jasný dopad
+v boji — ostatní se nehádá. Podrobnosti o stavu a složkách: `docs/stav-projektu.md`, sekce „Efekty s opravdovou mechanikou“.
+
+**Zpracované (`auto`, `cast`):** Rychlost (lektvar, kouzlo), Protoplazma, Spánek, Ochromení, Ochromení Černou zhoubou, Krvácení
+a Ochromení trollobijce, Sražen na zem, Zastrašen (útěk, totální úspěch), Berserk, Regenerace (lektvar, Prasiolit), Běh na krátké
+vzdálenosti. U `cast` zůstává na PJ: chování (útěk, berserk bez krytí a dvojnásobný bonus za sílu), přenos ztracených akcí do
+dalšího kola (Ochromení trollobijce, Sražen na zem, má-li cíl akcí méně než 2), regenerace mimo boj.
+
+**`past` — navazují na pasti a jedy (hody proti pasti se zatím nevyhodnocují):** trollobijcovo Připíchnutí, Chycen v lovecké pasti,
+pasti (Rozdrcen padající zátěží, Šipková past, Výbuch pasti mírně / těžce, Klíč exploduje, Zámek zajištěn kouzelnou pastí),
+všech 11 Otrav a 16 Protijedů.
+
+**`ceka` — v knize chybí údaj (nehádá se):** Zesílený sluch, Neviditelnost (lektvar), Noční vidění, Řeč se zvířaty (lektvar) —
+„odvozeno z názvu, přesný text zdroje nedostupný“; Oslepení (Malé oko) a Nutkání mluvit pravdu (Pravdomluv) — chybí síla
+a nebezpečnost jedu; **Strach** — chybí číslo postihu k ÚČ a bonusu k OČ (kniha: „postih k ÚČ a bonus k OČ“, bez hodnoty).
+
+**`pj` — bez mechaniky v boji (informace, chování, vlastnosti, pozice, aury, drahokamy…):** Vyděšen přítomností trollobijce
+(„−3 ÚČ / +1 OČ po prvních 2 akcích útěku“ je podmíněné), Posměch zastrašení (+1 ÚČ a OČ jen proti zastrašovateli — podmínka
+„vůči komu“ se ve VTT nedá vyjádřit), Odhozen, Odkopnut, Chycen (drapnutí: „nemožnost útoku / obrany / pohybu“, ale kniha
+dovoluje pokus o vykroucení — nesedí na nehybného), Okouzlení a Zmatek (chování), Drak splní žádost, Zabit ranou ze zálohy,
+Polichocen, Následek Brány, drahokamy Jaspis až Diamant (24 hodin, mimo kola), Obří síla, Zmenšení, Železná kůže, Antigravitační
+cloumák a ostatní lektvary / svitky s hodinovým nebo směnovým trváním, Postoje jeřába, Vějířová obrana, Aury (paladin),
+Éteričnost, Mlhová podoba, Ohnivá podoba, Lezení po zdech, bariéry, Zeslabení zbroje, Živlové posílení zranění / léčení (kostky
+bere položka, ne efekt), Trvalé posílení vlastnosti. Ke každému je v knize popis, který PJ vyhodnotí ručně; pokud se něco z toho
+začne hrát často, přidá se mu složka (nový řádek v `efekt_slozky`, bez změny kódu u stávajících druhů složek).
+
+**Otevřené rozhodnutí o hře (čeká na odpověď uživatele):**
+- [ ] Lektvar Rychlosti: počítá se kolo vypití do 5 kol? Kniha (h1626 b10848) říká „kolo seslání se do trvání nepočítá“ jen o kouzlech;
+  kouzlo a lektvar Rychlosti se ale podle popisu sčítají (trvání, ne účinek). Zatím: u kouzla se kolo nepočítá, u lektvaru ano.
+- [ ] Spící tvor jako „vyřazený“: kniha (h1613 b10736–b10737, příklad se spícím Krwellem) násobí zranění úrovní obránce
+  (postavy nejvýš 9, nestvůry životaschopností). Zatím Spánek dává jen „nehybný“ (h1613 b10733); násobek zranění se nepočítá.
+- [ ] Kouzlo se hodem proti pasti cíle (Protoplazma, Spánek, Zadrž osobu…): efekt po seslání nenasadí sám, PJ ho přidá po hodu cíle.
+  Vlastní výzva pro hod cíle proti pasti zatím chybí.
+
 ## Na kontrolu při proofreadingu (stav 2026-10-14)
 
 Sem patří věci, kde jsem **převzal údaj z knihy tak, jak je** (při rozporu

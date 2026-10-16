@@ -89,7 +89,12 @@ $rychleEfekty = [];
 $hraciVeSvete = [];
 if ($isPjOrAdmin) {
     $nestvuryKatalog = dracak_db()->query('SELECT id, nazev FROM nestvury ORDER BY nazev')->fetchAll();
-    $efektyKatalog = dracak_db()->query('SELECT id, nazev, typ FROM efekty ORDER BY nazev')->fetchAll();
+    // Poškození a Léčení nejsou trvalé efekty (jednorázová změna životů přes kouzlo / lektvar) — v nabídce nejsou.
+    $efektyMech = dracak_vtt_tokeny_funkce()['efekty_mech'];
+    $efektyKatalog = array_values(array_filter(
+        dracak_db()->query('SELECT id, nazev, typ, cil' . ($efektyMech ? ', mechanika_stav, trvani_kol' : '') . ' FROM efekty ORDER BY nazev')->fetchAll(),
+        fn($e) => dracak_vtt_hp_znamenko($e) === null
+    ));
     $rychleEfekty = dracak_db()->query('SELECT id, nazev FROM efekty WHERE rychla_volba = 1 ORDER BY nazev')->fetchAll();
     // Pro popover "Mlha" — výběr, čí mlhu PJ nahlíží/upravuje (viz
     // hra/api/mlha_nahled.php, hra/api/mlha_uprava.php).
@@ -603,12 +608,17 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
         <?php endforeach; ?>
       </div>
     <?php endif; ?>
+    <div id="spravovatEfekty" class="panel-sekce" style="display:none;"></div>
     <?php if ($isPjOrAdmin && $efektyKatalog): ?>
       <label style="font-size:11px;font-weight:600;">Aplikovat efekt</label>
+      <?php $efektZnacky = ['auto' => '⚙', 'cast' => '◐', 'pj' => '✋', 'past' => '✋', 'ceka' => '❓']; ?>
       <select id="efektSelect">
-        <?php foreach ($efektyKatalog as $e): ?><option value="<?= (int)$e['id'] ?>"><?= htmlspecialchars($e['nazev']) ?> (<?= htmlspecialchars($e['typ']) ?>)</option><?php endforeach; ?>
+        <?php foreach ($efektyKatalog as $e): ?><option value="<?= (int)$e['id'] ?>" data-trvani="<?= isset($e['trvani_kol']) && $e['trvani_kol'] !== null ? (int)$e['trvani_kol'] : '' ?>" data-stav="<?= htmlspecialchars((string)($e['mechanika_stav'] ?? '')) ?>"><?= $efektyMech ? ($efektZnacky[$e['mechanika_stav']] ?? '✋') . ' ' : '' ?><?= htmlspecialchars($e['nazev']) ?> (<?= htmlspecialchars($e['typ']) ?>)</option><?php endforeach; ?>
       </select>
-      <input type="number" id="efektKola" placeholder="kol (prázdné = trvalé)">
+      <input type="number" id="efektKola" min="0" placeholder="kol (prázdné = výchozí, 0 = bez limitu)">
+      <?php if ($efektyMech): ?>
+        <div class="note" id="efektNapoveda" style="font-size:11px;margin:2px 0 6px;">⚙ boj vyhodnotí sám · ◐ čísla a akce boj, zbytek PJ · ✋ jen PJ podle popisu · ❓ v knize chybí údaj</div>
+      <?php endif; ?>
       <button class="btn btn-secondary" type="button" id="efektBtn" style="width:100%;">Aplikovat efekt</button>
     <?php endif; ?>
     <div id="spravovatInventar" style="margin-top:14px;"></div>

@@ -53,6 +53,11 @@ try {
     if ($v['druh'] === 'past') {
         $hody = dracak_vtt_hody_k10_over($data['hody'] ?? (isset($data['soucet']) ? [$data['soucet']] : null));
         $chybaHodu = 'Hod proti pasti je 1k10, tedy jedno číslo 1 až 10.';
+    } elseif ($v['druh'] === 'tik') {
+        $hody = isset($data['hody'])
+            ? dracak_vtt_hody_kostky_over($data['hody'], (int)$d['pocet'], (int)$d['typ'])
+            : (isset($data['soucet']) ? dracak_vtt_hody_kostky_soucet((int)$data['soucet'], (int)$d['pocet'], (int)$d['typ']) : null);
+        $chybaHodu = 'Hod je ' . $d['pocet'] . 'k' . $d['typ'] . ' — ' . ($d['pocet'] > 1 ? 'každá kostka 1 až ' . $d['typ'] . ', ruční součet ' . $d['pocet'] . ' až ' . ($d['pocet'] * $d['typ']) . '.' : 'jedno číslo 1 až ' . $d['typ'] . '.');
     } else {
         $hody = isset($data['hody']) ? dracak_vtt_hody_k6plus_over($data['hody']) : (isset($data['soucet']) ? dracak_vtt_hody_z_souctu((int)$data['soucet']) : null);
         $chybaHodu = 'Hod 1k6+ je číslo 1 až 6; šestka se přehazuje a sčítá, takže součet nemůže končit šestkou (6 + 3 = 9, ale 6 samotná ne).';
@@ -100,6 +105,8 @@ try {
         }
         $vysledek = dracak_vtt_utok_vyhodnot($pdo, $mapa, $info, $utok, $v, $uid);
         $posun = dracak_vtt_souboj_posun($pdo, $svetId, $mapaId, $uid);
+    } elseif ($v['druh'] === 'tik') {
+        $vysledek = dracak_vtt_tik_vyhodnot($pdo, $mapa, $info, $v, $uid);
     } elseif ($v['druh'] === 'past') {
         require_once __DIR__ . '/../../includes/vtt_souboj_past.php';
         $vysledek = dracak_vtt_past_vyhodnot($pdo, $mapa, $info, $v, $user);

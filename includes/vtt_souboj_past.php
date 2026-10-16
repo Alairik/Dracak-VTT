@@ -99,22 +99,13 @@ function dracak_vtt_past_vyhodnot(PDO $pdo, array $mapa, array $info, array $vyz
     $q->execute([DRACAK_VTT_PAST_BEH['nazev']]);
     $efektId = $q->fetchColumn();
     if ($efektId !== false) {
-        $q = $pdo->prepare(
-            'SELECT id FROM aktivni_efekty WHERE typ_entity = ? AND entita_id = ? AND efekt_id = ? LIMIT 1'
-        );
-        $q->execute([$t['typ_entity'], $t['entita_id'], $efektId]);
-        $existujici = $q->fetchColumn();
-        if ($existujici !== false) {
-            $pdo->prepare('UPDATE aktivni_efekty SET zbyva_kol = ? WHERE id = ?')->execute([DRACAK_VTT_PAST_BEH['trvani_kol'], $existujici]);
-            $aktivniId = (int)$existujici;
-        } else {
-            $pdo->prepare('INSERT INTO aktivni_efekty (typ_entity, entita_id, efekt_id, zbyva_kol) VALUES (?, ?, ?, ?)')
-                ->execute([$t['typ_entity'], $t['entita_id'], $efektId, DRACAK_VTT_PAST_BEH['trvani_kol']]);
-            $aktivniId = (int)$pdo->lastInsertId();
-        }
+        // Společná funkce efektů: trvání 3 kola (jedno ověření dovednosti za 3 kola), obnovení, když efekt ještě běží.
+        $v = dracak_vtt_efekt_aplikuj($pdo, (int)$mapa['id'], $t['typ_entity'], (int)$t['entita_id'], (int)$efektId,
+            ['zbyva_kol' => DRACAK_VTT_PAST_BEH['trvani_kol']]);
         dracak_vtt_log_event((int)$mapa['svet_id'], (int)$mapa['id'], 'efekt_aplikovan', [
-            'typ_entity' => $t['typ_entity'], 'entita_id' => $t['entita_id'], 'aktivni_efekt_id' => $aktivniId,
-            'efekt_id' => (int)$efektId, 'efekt_nazev' => DRACAK_VTT_PAST_BEH['nazev'], 'zbyva_kol' => DRACAK_VTT_PAST_BEH['trvani_kol'],
+            'typ_entity' => $t['typ_entity'], 'entita_id' => $t['entita_id'], 'aktivni_efekt_id' => $v['aktivni_efekt_id'],
+            'efekt_id' => (int)$efektId, 'efekt_nazev' => DRACAK_VTT_PAST_BEH['nazev'], 'zbyva_kol' => $v['zbyva_kol'],
+            'obnoveno' => $v['obnoveno'], 'zbyva_pred' => $v['zbyva_pred'],
         ], (int)$user['id']);
     }
     // Pohyb se provede jako od toho, kdo ho zadal (únava, práva).

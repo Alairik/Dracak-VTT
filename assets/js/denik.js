@@ -275,12 +275,24 @@
       telo.cil_typ_entity = cTyp;
       telo.cil_entita_id = Number(cId);
     }
-    const d = await volej('api/pouzij_predmet.php', telo);
+    let d = await volej('api/pouzij_predmet.php', telo);
+    if (d && d.potrebuje_trvani) {
+      // Trvání efektu kouzla si volí sesilatel (Rychlost podle magenergie…) — zeptáme se a pošleme znovu.
+      const kola = window.prompt(d.polozka_nazev + ': na kolik kol má platit efekt „' + d.efekt + '“? (0 = bez limitu)', '');
+      if (kola === null || kola.trim() === '' || isNaN(Number(kola)) || Number(kola) < 0) return;
+      telo.zbyva_kol = Math.floor(Number(kola));
+      d = await volej('api/pouzij_predmet.php', telo);
+    }
     if (!d) return;
     const radky = [(tl.dataset.pouzij === 'kouzlo' ? 'Seslal(a) jsi ' : 'Použil(a) jsi ') + d.polozka_nazev];
     if (d.kostka) radky.push('[' + d.kostka.hody.join(' + ') + (d.kostka.bonus ? ' ' + znam(d.kostka.bonus) : '') + ']  =  ' + d.kostka.celkem);
     if (d.hp) radky.push((d.hp.delta > 0 ? 'Léčení ' : 'Zranění ') + Math.abs(d.hp.delta) + ' → životy ' + d.hp.nove_hp + '/' + d.hp.max_hp);
-    (d.efekty || []).filter(e => e.hp_delta === undefined).forEach(e => radky.push('Efekt: ' + e.nazev));
+    (d.efekty || []).filter(e => e.hp_delta === undefined).forEach(e => {
+      radky.push('Efekt: ' + e.nazev + (e.zbyva_kol ? ' (' + e.zbyva_kol + ' kol)' : '') + (e.obnoveno ? ' – prodlouženo' : '')
+        + (e.shrnuti && e.shrnuti.length ? ' — ' + e.shrnuti.join(', ') : ''));
+      if (e.akce) radky.push('Akce ' + e.akce.pred[1] + ' → ' + e.akce.po[1]);
+    });
+    (d.ceka_na_past || []).forEach(e => radky.push('Cíl se brání hodem proti pasti (' + e.past + '). Při neúspěchu mu PJ přidá efekt ' + e.nazev + '.'));
     if (d.magenergie) radky.push('Magenergie −' + d.magenergie.cena + ' → ' + d.magenergie.nova_magenergie + '/' + d.magenergie.max_magenergie);
     hlaska(radky.join('\n'), true);
     await obnov();

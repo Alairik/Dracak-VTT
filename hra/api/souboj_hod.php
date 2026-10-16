@@ -87,7 +87,7 @@ try {
         }
         $m = dracak_vtt_iniciativa_modifikator($pdo, $info[$tokenId], $bonusIds, $jinyBonus, dracak_vtt_souboj_auto_popisy($stav, $u));
         $vysledek = $hod + $m['modifikator'];
-        $akce = dracak_vtt_iniciativa_akce($vysledek);
+        $akce = $m['bez_akci'] !== null ? 0 : dracak_vtt_iniciativa_akce($vysledek);
         $upsert->execute([$mapaId, $tokenId, $hod, $m['modifikator'], $vysledek, $akce, $akce]);
         $vysledky[] = [
             'token_id' => $tokenId,

@@ -110,6 +110,10 @@ try {
             $pdo->rollBack();
             dracak_vtt_souboj_chyba(422, 'Obrana je buď "bránit se", nebo "nebránit se".');
         }
+        if ($volba === 'branit' && !empty($d['duvod_nebrani'])) {
+            $pdo->rollBack();
+            dracak_vtt_souboj_chyba(422, 'Tvor se nemůže bránit zbraní (efekt ' . $d['duvod_nebrani'] . ') — jen nebránit se. PJ může efekt sundat.');
+        }
         if ($volba === 'branit' && empty($d['muze_branit']) && !$jePj) {
             $pdo->rollBack();
             dracak_vtt_souboj_chyba(422, 'Bránit se akcí nejde — tvor už nemá žádnou akci. Zbývá jen nebránit se (−3).');

@@ -1077,7 +1077,15 @@ function nakreslitToken(t) {
   const fx = el.querySelector('.fx');
   fx.textContent = (t.efekty || []).join(', ');
   fx.style.display = t.efekty && t.efekty.length ? '' : 'none';
+  fx.title = (t.efekty_detail || []).map(popisEfektu).join('\n');
   el.title = t.label + (!t.na_tahu && t.owned ? ' (není na tahu)' : '') + (t.zamceno ? ' (zamčený)' : '');
+}
+
+// Jeden řádek o efektu pro tooltip: název, zbývající trvání, co boj sám dělá (nebo že to nechá na PJ).
+function popisEfektu(e) {
+  const kola = e.zbyva_kol === null || e.zbyva_kol === undefined ? 'bez limitu' : e.zbyva_kol + ' ' + (e.zbyva_kol === 1 ? 'kolo' : (e.zbyva_kol < 5 ? 'kola' : 'kol'));
+  const co = e.shrnuti && e.shrnuti.length ? e.shrnuti.join(', ') : (e.stav_nazev || '');
+  return e.nazev + ' (' + kola + ')' + (co ? ' — ' + co : '') + (e.stav === 'pj' || e.stav === 'past' || e.stav === 'ceka' ? ' [vyhodnotí PJ]' : (e.stav === 'cast' ? ' [zbytek PJ]' : ''));
 }
 
 // Tělo tvora na více hexech: průsvitné hexy kolem otočného hexu (tam leží střed
@@ -1549,12 +1557,51 @@ function obnovPanelSpravovat() {
   const txt = document.getElementById('spravovatMagenergieText');
   if (txt && t.max_magenergie !== null) txt.textContent = (t.magenergie ?? 0) + '/' + t.max_magenergie;
   obnovVzhledSekci();
+  vykresliEfektyPanelu(t);
   if (hpZmena) {
     renderInventar(); renderKorist();
     if (IS_PJ_OR_ADMIN && t.typ_entity === 'nestvura_instance' && denikNestvuryEl && denikNestvuryEl.style.display !== 'none'
       && !denikNestvuryEl.contains(document.activeElement)) nactiDenikNestvury(t.id);
   }
 }
+// Aktivní efekty vybraného tvora v panelu: co boj sám dělá, kolik kol zbývá, PJ efekt může sundat.
+function vykresliEfektyPanelu(t) {
+  const cont = document.getElementById('spravovatEfekty');
+  if (!cont) return;
+  const efekty = t.efekty_detail || [];
+  cont.textContent = '';
+  if (!efekty.length) { cont.style.display = 'none'; return; }
+  cont.style.display = '';
+  const h = document.createElement('h4');
+  h.className = 'panel-h4';
+  h.textContent = 'Aktivní efekty';
+  cont.appendChild(h);
+  efekty.forEach((e) => {
+    const r = document.createElement('div');
+    r.className = 'efekt-radek';
+    const txt = document.createElement('div');
+    txt.className = 'efekt-text';
+    txt.textContent = popisEfektu(e);
+    if (e.text) txt.title = e.text;
+    r.appendChild(txt);
+    if (IS_PJ_OR_ADMIN) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn btn-ghost efekt-sundat';
+      b.textContent = '✕';
+      b.title = 'Sundat efekt';
+      b.addEventListener('click', () => {
+        postJson('api/efekt_odebrat.php', {mapa_id: MAPA_ID, aktivni_efekt_id: e.id}).then((d) => {
+          if (d.error) { logLine('Chyba: ' + d.error); return; }
+          obnovitStav();
+        });
+      });
+      r.appendChild(b);
+    }
+    cont.appendChild(r);
+  });
+}
+
 // --- Deník nestvůry (jen PJ): přehled z bestiáře + čísla pro boj, uložená pro celý druh ve světě ---
 // Bestiář je tajný, proto jen PJ; čísla (útoky s ÚČ a útočností, OČ, OZ, velikost, odolnost) PJ doplní jednou
 // a hody je berou samy (hra/api/nestvura_denik.php, includes/vtt_nestvury.php).
@@ -2475,14 +2522,34 @@ if (efektBtn) {
     const efektId = parseInt(document.getElementById('efektSelect').value, 10);
     const kola = document.getElementById('efektKola').value;
     postJson('api/efekt_pridat.php', {mapa_id: MAPA_ID, typ_entity: spravovanyToken.typEntity, entita_id: spravovanyToken.entitaId, efekt_id: efektId, zbyva_kol: kola})
-      .then(d => { if (d.error) { logLine('Chyba: ' + d.error); return; } obnovitStav(); });
+      .then(d => {
+        if (d.error) { logLine('Chyba: ' + d.error); return; }
+        // Co boj neumí, to PJovi řekne rovnou (efekt je jen štítek s popisem).
+        ((d.efekt && d.efekt.upozorneni) || []).forEach((u) => logLine(d.efekt.nazev + ': ' + u));
+        obnovitStav();
+      });
   });
+}
+const efektSelectEl = document.getElementById('efektSelect');
+if (efektSelectEl) {
+  // Výchozí trvání vybraného efektu se ukáže v poli „kol“, ať PJ ví, co dostane, když ho nechá prázdné.
+  const ukazVychoziTrvani = () => {
+    const o = efektSelectEl.selectedOptions[0];
+    const kola = document.getElementById('efektKola');
+    if (!o || !kola) return;
+    kola.placeholder = o.dataset.trvani ? 'kol (prázdné = ' + o.dataset.trvani + ')' : 'kol (prázdné = bez limitu)';
+  };
+  efektSelectEl.addEventListener('change', ukazVychoziTrvani);
+  ukazVychoziTrvani();
 }
 document.querySelectorAll('.chip-efekt').forEach(chip => {
   chip.addEventListener('click', () => {
     if (!spravovanyToken) return;
-    document.getElementById('efektSelect').value = chip.dataset.efektId;
-    document.getElementById('efektKola').value = '3';
+    const sel = document.getElementById('efektSelect');
+    sel.value = chip.dataset.efektId;
+    // Má-li efekt výchozí trvání, platí to; jinak rychlá volba dá 3 kola (dřívější chování).
+    const o = sel.selectedOptions[0];
+    document.getElementById('efektKola').value = o && o.dataset.trvani ? '' : '3';
     document.getElementById('efektBtn').click();
   });
 });
@@ -2530,17 +2597,26 @@ function pouzitPolozku(p) {
     typ_polozky: p.typ_polozky, polozka_id: p.polozka_id, mapa_id: MAPA_ID,
   };
   if (cil) { body.cil_typ_entity = cil.typEntity; body.cil_entita_id = cil.entitaId; }
-  postJson('api/pouzij_predmet.php', body).then(d => {
+  const odeslat = (b) => postJson('api/pouzij_predmet.php', b).then(d => {
+    if (d.potrebuje_trvani) {
+      // Trvání efektu kouzla si volí sesilatel (Rychlost podle magenergie…) — zeptáme se a pošleme znovu.
+      const kola = prompt(d.polozka_nazev + ': na kolik kol má platit efekt „' + d.efekt + '“? (0 = bez limitu)', '');
+      if (kola === null || kola.trim() === '' || isNaN(Number(kola)) || Number(kola) < 0) return;
+      return odeslat(Object.assign({}, b, {zbyva_kol: Math.floor(Number(kola))}));
+    }
     if (d.error) { logLine('Chyba: ' + d.error); return; }
     let zprava = document.getElementById('spravovatNazev').textContent + ' použil(a) ' + p.nazev;
     if (d.kostka) zprava += ': [' + d.kostka.hody.join(', ') + ']' + (d.kostka.bonus ? (d.kostka.bonus > 0 ? '+' : '') + d.kostka.bonus : '') + ' = ' + d.kostka.celkem;
     if (d.hp) zprava += ' (' + (d.hp.delta > 0 ? '+' : '') + d.hp.delta + ' život)';
     if (d.magenergie) zprava += ' (-' + d.magenergie.cena + ' magenergie, zbývá ' + d.magenergie.nova_magenergie + '/' + d.magenergie.max_magenergie + ')';
     logLine(zprava);
+    (d.efekty || []).filter(e => e.upozorneni && e.upozorneni.length).forEach(e => e.upozorneni.forEach(u => logLine(e.nazev + ': ' + u)));
+    (d.ceka_na_past || []).forEach(e => logLine('Cíl se brání hodem proti pasti (' + e.past + '). Při neúspěchu přidej efekt ' + e.nazev + ' v panelu cíle.'));
     posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
     obnovitStav();
     nactiInventar();
   });
+  odeslat(body);
 }
 
 // --- Kořist z mrtvé nestvůry: "Předat" na každé položce vybavy ---

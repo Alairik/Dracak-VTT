@@ -62,19 +62,14 @@ function dracak_vtt_souboj_obsazene(PDO $pdo, int $mapaId, array $roz, int $krom
     return $obsazene;
 }
 
-// +hexů za dovednost Běh na krátké vzdálenosti: PJ po úspěšném ověření nasadí
-// postavě stejnojmenný efekt (aktivni_efekty).
+// +hexů k běhu a sprintu z aktivních efektů tvora (složka beh_hexu — dovednost Běh na krátké vzdálenosti: PJ nebo
+// úspěšný hod proti pasti u 4. hexu sprintu nasadí efekt na 3 kola). Bez ručního SQL se efekt pozná podle názvu.
 function dracak_vtt_souboj_bonus_behu(PDO $pdo, array $token): int
 {
     if (!in_array($token['typ_entity'], ['postava', 'nestvura_instance'], true)) {
         return 0;
     }
-    $q = $pdo->prepare(
-        'SELECT COUNT(*) FROM aktivni_efekty ae JOIN efekty e ON e.id = ae.efekt_id
-         WHERE ae.typ_entity = ? AND ae.entita_id = ? AND e.nazev = ?'
-    );
-    $q->execute([$token['typ_entity'], (int)$token['entita_id'], DRACAK_VTT_EFEKT_BEH_NA_KRATKO]);
-    return $q->fetchColumn() > 0 ? 1 : 0;
+    return max(0, dracak_vtt_efekty_souhrn($pdo, $token['typ_entity'], (int)$token['entita_id'])['beh_hexu']);
 }
 
 // Všechny buňky těla jsou volné (kromě těch, které obsazují jiní)?

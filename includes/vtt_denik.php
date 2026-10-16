@@ -423,13 +423,18 @@ function dracak_vtt_jazyky_postavy(PDO $pdo, array $postava): array
 
 function dracak_vtt_aktivni_efekty_postavy(PDO $pdo, int $postavaId): array
 {
-    $stmt = $pdo->prepare(
-        "SELECT e.nazev, e.typ, e.tooltip_text, ae.zbyva_kol
-         FROM aktivni_efekty ae JOIN efekty e ON e.id = ae.efekt_id
-         WHERE ae.typ_entity = 'postava' AND ae.entita_id = ? ORDER BY ae.id"
-    );
-    $stmt->execute([$postavaId]);
-    return $stmt->fetchAll();
+    // Včetně toho, co boj z efektu sám dělá (složky) a zda zbytek zůstává na PJ (includes/vtt_efekty.php).
+    require_once __DIR__ . '/vtt_efekty.php';
+    $vystup = [];
+    foreach (dracak_vtt_efekty_aktivni($pdo, 'postava', $postavaId) as $ae) {
+        $vystup[] = [
+            'nazev' => $ae['nazev'], 'typ' => $ae['typ'], 'tooltip_text' => $ae['tooltip_text'], 'zbyva_kol' => $ae['zbyva_kol'],
+            'stav' => dracak_vtt_efekty_funkce() ? $ae['mechanika_stav'] : null,
+            'stav_nazev' => dracak_vtt_efekty_funkce() ? (DRACAK_VTT_EFEKT_STAVY[$ae['mechanika_stav']] ?? null) : null,
+            'shrnuti' => dracak_vtt_efekt_shrnuti($ae['slozky']),
+        ];
+    }
+    return $vystup;
 }
 
 // Volný inventář s váhou (předměty a lektvary). Předměty uložené v kontejnerech

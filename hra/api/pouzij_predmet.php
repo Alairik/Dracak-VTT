@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/../../includes/vtt_predmety.php';
+require_once __DIR__ . '/../../includes/vtt_efekty.php';
 
 header('Content-Type: application/json; charset=utf-8');
 $user = dracak_require_login();
@@ -17,6 +18,10 @@ $cilTypEntity = ($data['cil_typ_entity'] ?? '') === 'nestvura_instance' ? 'nestv
     : (($data['cil_typ_entity'] ?? '') === 'postava' ? 'postava' : $typEntity);
 $cilEntitaId = !empty($data['cil_entita_id']) ? (int)$data['cil_entita_id'] : $entitaId;
 $pozadovanaMapaId = !empty($data['mapa_id']) ? (int)$data['mapa_id'] : null;
+// Trvání efektu v kolech, když ho nese sesílání (Rychlost: podle dodané magenergie); jinak výchozí trvání efektu.
+// 0 = bez limitu (výslovně), prázdné / chybí = klient nic nezadal.
+$zbyvaKolZadano = array_key_exists('zbyva_kol', $data) && $data['zbyva_kol'] !== '' && $data['zbyva_kol'] !== null;
+$zbyvaKolVstup = $zbyvaKolZadano && (int)$data['zbyva_kol'] > 0 ? (int)$data['zbyva_kol'] : null;
 
 $cfg = dracak_vtt_polozka_config($typPolozky);
 if (!$cfg) {
@@ -45,6 +50,13 @@ if ($svetMapa['svet_id'] === 0 || !dracak_vtt_svet_access($user, $svetMapa['svet
 if (!dracak_vtt_can_edit_hp($user, $typEntity, $entity)) {
     http_response_code(403);
     echo json_encode(['error' => 'Tenhle předmět použít nesmíš.']);
+    exit;
+}
+// Trvání efektu si u kouzla volí sesilatel (podle dodané magenergie), VTT magenergii za kola nehlídá — hráč tedy
+// nastaví nejvýš 20 kol (překlep se nezamění za nekonečno), víc smí zadat jen PJ.
+if ($zbyvaKolVstup !== null && $zbyvaKolVstup > 20 && !dracak_vtt_je_pj_sveta($user, (int)$svetMapa['svet_id'])) {
+    http_response_code(422);
+    echo json_encode(['error' => 'Hráč může nastavit trvání nejvýš na 20 kol — delší trvání nastaví PJ.'], JSON_UNESCAPED_UNICODE);
     exit;
 }
 // Pořadí tahů (viz includes/vtt.php, dracak_vtt_je_na_tahu) — stejná
@@ -166,6 +178,21 @@ if ($typPolozky === 'kouzlo' && $typEntity === 'postava' && dracak_vtt_ma_magene
     }
 }
 
+// Efekt kouzla, jehož trvání si sesilatel volí (Rychlost podle dodané magenergie, Protoplazma 2–7 kol…): bez
+// zadaného počtu kol se zeptáme, než se cokoliv utratí — klient ho doplní a pošle znovu ("zbyva_kol", 0 = bez limitu).
+if (dracak_vtt_efekty_funkce() && !$zbyvaKolZadano && ($typPolozky !== 'kouzlo' || dracak_vtt_kouzlo_past_text($katalog) === null)) {
+    foreach (dracak_vtt_polozka_efekty($typPolozky, $polozkaId) as $efektPre) {
+        if (dracak_vtt_hp_znamenko($efektPre) !== null) {
+            continue;
+        }
+        $radekPre = dracak_vtt_efekt_radek($pdo, (int)$efektPre['id']);
+        if ($radekPre && $radekPre['kolo_se_nepocita'] === 1 && $radekPre['trvani_kol'] === null && in_array($radekPre['mechanika_stav'], ['auto', 'cast'], true)) {
+            echo json_encode(['ok' => false, 'potrebuje_trvani' => true, 'efekt' => $radekPre['nazev'], 'polozka_nazev' => $katalog['nazev']], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+    }
+}
+
 $pdo->beginTransaction();
 try {
     // Spotřeba: jen lektvar (vypitý kus mizí). Předmět (zbraň/zbroj/
@@ -192,6 +219,16 @@ try {
     $efekty = dracak_vtt_polozka_efekty($typPolozky, $polozkaId);
     $hpVysledek = null;
     $aplikovaneEfekty = [];
+    $cekajiNaPast = [];
+    $efektMapaId = $pozadovanaMapaId ?? $svetMapa['mapa_id'] ?? $cilSvetMapa['mapa_id'];
+    // Kouzlo s hodem proti pasti (cíl si hází): stavový efekt se sám nenasadí, dokud PJ nerozhodne podle hodu cíle.
+    $pastKouzla = $typPolozky === 'kouzlo' ? dracak_vtt_kouzlo_past_text($katalog) : null;
+    // Kostky položky (lektvar Regenerace „1k6+5 za kolo“) si nasazený efekt pamatuje pro tik každé kolo.
+    $kostkyZdroje = null;
+    if (!empty($katalog['pocet_kostek']) && !empty($katalog['typ_kostky'])) {
+        $kostkyZdroje = dracak_vtt_kostky_text((int)$katalog['pocet_kostek'], (string)$katalog['typ_kostky'], (int)($katalog['pevny_bonus'] ?? 0));
+    }
+    $akceZmenenyUcastnik = false;
     foreach ($efekty as $efekt) {
         $znamenko = dracak_vtt_hp_znamenko($efekt);
         if ($znamenko !== null) {
@@ -209,22 +246,38 @@ try {
             $cilEntity['aktualni_hp'] = $noveHp;
             $hpVysledek = ['delta' => $delta, 'nove_hp' => $noveHp, 'max_hp' => $maxHp];
             $aplikovaneEfekty[] = ['efekt_id' => (int)$efekt['id'], 'nazev' => $efekt['nazev'], 'hp_delta' => $delta];
+        } elseif ($pastKouzla !== null) {
+            $cekajiNaPast[] = ['efekt_id' => (int)$efekt['id'], 'nazev' => $efekt['nazev'], 'past' => $pastKouzla];
         } else {
             // Běžný stavový efekt (buff/debuff/dot/hot/modifikator/imunita/
-            // zranitelnost/odolnost jiný než Poškození/Léčení) — zapiš jako
-            // aktivní efekt na cílovou entitu stejně jako efekt_pridat.php.
-            // Trvání v kolech odsud neznáme (žádný vstup uživatele u "použij
-            // předmět", efekty.trvani je jen volný text) — necháváme
-            // zbyva_kol NULL (trvá, dokud ho PJ ručně nesundá).
-            $ins = $pdo->prepare('INSERT INTO aktivni_efekty (typ_entity, entita_id, efekt_id, zbyva_kol) VALUES (?, ?, ?, NULL)');
-            $ins->execute([$cilTypEntity, $cilEntitaId, (int)$efekt['id']]);
+            // zranitelnost/odolnost jiný než Poškození/Léčení) — nasadí se
+            // společnou funkcí (includes/vtt_efekty.php): výchozí trvání
+            // efektu nebo trvání ze sesílání, okamžité změny akcí, obnovení
+            // trvání, když efekt na cíli už je.
+            $volby = ['kostky' => $kostkyZdroje];
+            if ($zbyvaKolZadano) {
+                $volby['zbyva_kol'] = $zbyvaKolVstup;
+            }
+            $v = dracak_vtt_efekt_aplikuj($pdo, $efektMapaId !== null ? (int)$efektMapaId : null, $cilTypEntity, $cilEntitaId, (int)$efekt['id'], $volby);
             $aplikovaneEfekty[] = [
                 'efekt_id' => (int)$efekt['id'],
                 'nazev' => $efekt['nazev'],
-                'aktivni_efekt_id' => (int)$pdo->lastInsertId(),
-                'zbyva_kol' => null,
+                'aktivni_efekt_id' => $v['aktivni_efekt_id'],
+                'zbyva_kol' => $v['zbyva_kol'],
+                'zbyva_pred' => $v['zbyva_pred'],
+                'obnoveno' => $v['obnoveno'],
+                'stav' => $v['stav'],
+                'shrnuti' => $v['shrnuti'],
+                'akce' => $v['akce'],
+                'upozorneni' => $v['upozorneni'],
             ];
+            if ($v['akce'] !== null) {
+                $akceZmenenyUcastnik = true;
+            }
         }
+    }
+    if ($akceZmenenyUcastnik && $efektMapaId !== null) {
+        dracak_vtt_efekt_posun_po_nasazeni($pdo, (int)$svetMapa['svet_id'], (int)$efektMapaId, (int)$user['id']);
     }
 
     // Magenergie se strhává seslateli ($entity/$typEntity), ne cíli kouzla
@@ -247,6 +300,7 @@ try {
         'kostka' => $kostka,
         'hp' => $hpVysledek,
         'efekty' => $aplikovaneEfekty,
+        'ceka_na_past' => $cekajiNaPast,
         'magenergie' => $magenergieVysledek,
         'pouzil' => $user['jmeno'],
     ], (int)$user['id']);
@@ -264,5 +318,6 @@ echo json_encode([
     'kostka' => $kostka,
     'hp' => $hpVysledek,
     'efekty' => $aplikovaneEfekty,
+    'ceka_na_past' => $cekajiNaPast,
     'magenergie' => $magenergieVysledek,
 ], JSON_UNESCAPED_UNICODE);

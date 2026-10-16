@@ -36,13 +36,17 @@ ním čeká, dokud se to neprovede ručně.
 
 **Ruční DDL blok je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný soubor, ve
 kterém jsou všechny dosud neprovedené DDL příkazy; uživatel ho dostává jako
-text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-16): nic nečeká.** Tabulky `souboj_vyzva` (migrace `0088`, výzvy k hodu) a `nestvura_staty_sveta`
+text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-16): čeká blok „Efekty s opravdovou
+mechanikou“** (4 sloupce `efekty`, tabulka `efekt_slozky`, 2 sloupce `aktivni_efekty`; bez něj jsou efekty dál jen
+štítky). Po potvrzení, že proběhl, se přesunou **připravené migrace `0091` (zrcadlo DDL) a `0092` (data efektů)** z
+`docs/pripravene-migrace/` do `database/migrations/` (postup v tamním README) — dřív ne, `0092` by na produkci spadla
+a zastavila další migrace. Dosud provedené: tabulky `souboj_vyzva` (migrace `0088`, výzvy k hodu) a `nestvura_staty_sveta`
 (migrace `0090`, malý deník nestvůry) jsou na produkci provedené, hody i deník nestvůry jsou zapnuté.
 Bloky pro `0065`–`0081`, `DROP TABLE` tří mrtvých tabulek z 0008, `0084` (mapa),
 `0085` (souboj, krok 1) i `0086` (souboj, krok 2b: `tokeny.hexu`, tabulky
 `souboj_pohyb` se sloupcem `unava_bodu` a `tvary_tvoru`, efekt „Běh na krátké
 vzdálenosti“) jsou na produkci provedené a `0082` (217 položek ceníku) a `0083`
-proběhly samy přes `migrate.php` (stejně tak `0089` — řádky vícenásobných útoků do iniciativy). Soubor je prázdný, dokud nepřibude další CREATE/ALTER.
+proběhly samy přes `migrate.php` (stejně tak `0089` — řádky vícenásobných útoků do iniciativy).
 
 Kód je napsaný tak, že funguje i před ručními kroky (chybějící sloupce
 se berou jako "není"), jen se nic z toho nedá ukládat.
@@ -199,7 +203,7 @@ MariaDB.** Postup, který v session fungoval:
   **Omezení / další kroky (viz návrh):** OČ a ÚČ nestvůr, které se z textu nespočítají (třeba Goblin: „+1 + síla
   zbraně“), doplňuje PJ před každým hodem — to vyřeší až malý deník nestvůry (krok 4); postava bez držené
   zbraně útočí první zbraní s ÚČ (výběr zbraně přijde v etapě 4); neřeší se „obrana a krok“ (kniha neříká, kdy
-  se krok udělá — čeká na rozhodnutí), útok na vyřazeného / neviditelného / nehybného, čtyřstupňová škála hodu na dovednost (fatální
+  se krok udělá — čeká na rozhodnutí), útok na vyřazeného / neviditelného / kouzlícího (nehybný obránce se řeší jen z efektů — Spánek, Ochromení), čtyřstupňová škála hodu na dovednost (fatální
   úspěch / neúspěch — v přepisu pravidel chybí). **Vícenásobné útoky se v rozšířeném systému řeší bonusem
   k iniciativě** (Tabulka vícenásobných útoků v pravidlech PJ — bestiář; každý útok i obrana = jedna akce), takže
   v útoku nic zvláštního nechybí; kniha jen dodává, že nestvůra s víc druhy útoku je střídá v uvedeném pořadí.
@@ -214,6 +218,35 @@ MariaDB.** Postup, který v session fungoval:
   Jen PJ (bestiář je tajný), endpoint `hra/api/nestvura_denik.php`. Bez tabulky je panel jen přehled s vypnutým uložením.
   **Zbývá:** kořist, vybavení nestvůry z katalogu (ÚČ/OČ dopočtem ze zbraně a zbroje), inteligence / charisma /
   pohyblivost / vytrvalost jako hratelná data, kouzla nestvůr, automatický bonus k iniciativě podle „N× za kolo“.
+- **Efekty s opravdovou mechanikou (blok B, krok 5; v kódu hotové a otestované, zapne se ručním SQL, viz „Čeká na ruční spuštění“):**
+  dřív byl efekt jen text (název, popis, „+2 Iniciativa“ jako věta) a boj ho ignoroval — lektvar Rychlosti na postavě
+  nedělal nic. Teď má každý efekt v DB `mechanika_stav` (`auto` boj vyhodnotí všechno sám · `cast` čísla a akce boj, zbytek
+  PJ · `pj` jen štítek s popisem · `past` navazuje na pasti a jedy · `ceka` v knize chybí údaj), výchozí `trvani_kol`,
+  `kolo_se_nepocita` (kolo seslání se do trvání nepočítá, h1626 b10848), `opakovani` (`secti` = opakované seslání trvání sčítá,
+  účinek ne — Rychlost, Protoplazma) a **složky v tabulce `efekt_slozky`** (co přesně dělá): `akce_zdvojit`, `akce_pulit`,
+  `akce_zmena`, `ini_radek` (řádek Tabulky bonusů a postihů k iniciativě: Kouzlo Rychlost +6, Kouzlo Protoplazma −3, v dalších
+  kolech), `ini_bonus`, `uc_bonus`, `oc_bonus`, `beh_hexu`, `nemuze_jednat`, `nemuze_branit`, `nehybny` (h1613) a `tik_zivoty`
+  (kostky na začátku každého kola). Kód: **`includes/vtt_efekty.php`** (jediné místo, které zapisuje do `aktivni_efekty`:
+  `dracak_vtt_efekt_aplikuj`; souhrn mechaniky tvora `dracak_vtt_efekty_souhrn`; odpočet trvání; tiky), napojení v
+  `vtt_souboj.php` (iniciativa: efektové bonusy se přičtou samy a ručně zaškrtnutý stejný řádek se nezapočítá podruhé;
+  `nemuze_jednat` = 0 akcí a přeskočený tah), `vtt_souboj_utok.php` (ÚČ/OČ z efektů; **nehybný obránce**: místo bonusu za
+  obratnost −5, −3 bez zbraně, bez štítu a bez oprav za velikost a zezadu; tvor, který se nemůže bránit, nemá volbu „bránit se“
+  ani pro PJ), `vtt_souboj_pohyb.php` (+hex k běhu ze složky `beh_hexu`). Vstupy: `efekt_pridat.php` (PJ; prázdné „kol“ =
+  výchozí trvání, 0 = bez limitu), `efekt_odebrat.php` (nové, ✕ v panelu tokenu), `pouzij_predmet.php` (kouzlo / lektvar;
+  Rychlost kouzlem se zeptá na počet kol, než se utratí magenergie), hod proti pasti u 4. hexu sprintu. Změna akcí při nasazení
+  (Rychlost ×2, Protoplazma ½ dolů, −2 akce) se zapíše do události, takže „krok zpět“ ji vrátí. **Kouzlo s hodem proti pasti**
+  (Protoplazma, spánek, ochromení…) stavový efekt samo nenasadí — odpověď řekne „cíl se brání hodem proti pasti (…)“ a PJ efekt
+  po neúspěchu cíle přidá v panelu tokenu (hody cílů proti pasti zatím nemají vlastní výzvu). **Tiky** (krvácení, regenerace):
+  na začátku kola vznikne tvoru výzva „tik“ — tlačítko → 3D kostka, nebo hod z vlastní kostky; tik tah nezdržuje a PJ ho
+  smí zrušit. UI: panel tokenu ukazuje aktivní efekty (zbývá kol, co boj dělá, ✕ sundat), nabídka efektů má značky ⚙ ◐ ✋ ❓
+  a výchozí trvání, odznak na tokenu má tooltip, deník postavy ukazuje, co efekt dělá.
+  **Co je zpracované (17 efektů):** Rychlost (lektvar, kouzlo), Protoplazma, Spánek, Ochromení, Ochromení Černou zhoubou,
+  Krvácení a Ochromení trollobijce, Sražen na zem, Zastrašen (útěk, i totální úspěch), Berserk (+6 iniciativa),
+  Regenerace (lektvar, Prasiolit), Běh na krátké vzdálenosti. Ostatních ~100 zůstává `pj` / `past` / `ceka` — kniha u nich
+  nemá jasný mechanický dopad v boji (aury, drahokamy, vlastnosti, informace), nebo ten dopad závisí na tom, co VTT nezná
+  (chování, podmínky); seznam s důvody je v `docs/kontrolni-seznam-neuplnych-mist.md`. Bez ručního SQL beze změny
+  (efekty jsou štítky, jen Běh se pozná podle názvu). Testy: `efekty_api`, `efekty_kouzla`, `efekty_ui`, `efekty_deg` (+ celé
+  regresní sady souboje a hexů), ověřeno i na kopii produkce s DML-only účtem a `migrate.php`.
 - **Akce na hexové mapě (blok B, krok 2a; hotový, bez ručního SQL):** lišta akcí
   u tvora na tahu (Krok, Otočka, Útok, Krok a útok, Otočka a útok, Obrana, Obrana a
   krok, Čekání, Jiná činnost, Kouzlení). Akce s mapovou částí se plánují klikem na

@@ -42,7 +42,7 @@ $auto = ['upozorneni' => $m['upozorneni']];
 $hozeno = dracak_vtt_hod_kostkou(1, 6, 0);
 $hod = $hozeno['hody'][0];
 $vysledek = $hod + $modifikator;
-$akce = dracak_vtt_iniciativa_akce($vysledek);
+$akce = $m['bez_akci'] !== null ? 0 : dracak_vtt_iniciativa_akce($vysledek);
 
 $pdo->beginTransaction();
 try {

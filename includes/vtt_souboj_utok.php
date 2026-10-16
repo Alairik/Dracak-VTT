@@ -82,23 +82,25 @@ function dracak_vtt_vyzva_uloz(PDO $pdo, int $id, array $data, ?string $stav = n
 }
 
 // Otevřené (nevyřešené) výzvy mapy, od nejstarší.
-function dracak_vtt_vyzva_otevrene(PDO $pdo, int $mapaId, bool $zamknout = false): array
+// $bezTiku: bez tiků efektů (krvácení, regenerace) — ty tah nezastavují, vyřídí se, kdy se to hodí.
+function dracak_vtt_vyzva_otevrene(PDO $pdo, int $mapaId, bool $zamknout = false, bool $bezTiku = false): array
 {
     if (!dracak_vtt_vyzva_funkce()) {
         return [];
     }
-    $q = $pdo->prepare('SELECT * FROM souboj_vyzva WHERE mapa_id = ? AND stav IN ("ceka", "hozeno") ORDER BY id' . ($zamknout ? ' FOR UPDATE' : ''));
+    $q = $pdo->prepare('SELECT * FROM souboj_vyzva WHERE mapa_id = ? AND stav IN ("ceka", "hozeno")'
+        . ($bezTiku ? ' AND druh <> "tik"' : '') . ' ORDER BY id' . ($zamknout ? ' FOR UPDATE' : ''));
     $q->execute([$mapaId]);
     return array_map('dracak_vtt_vyzva_radek', $q->fetchAll());
 }
 
 // Zruší všechny otevřené výzvy mapy (PJ přeskočil, souboj skončil).
-function dracak_vtt_vyzva_zrus_vse(PDO $pdo, int $mapaId): int
+function dracak_vtt_vyzva_zrus_vse(PDO $pdo, int $mapaId, bool $bezTiku = false): int
 {
     if (!dracak_vtt_vyzva_funkce()) {
         return 0;
     }
-    $q = $pdo->prepare('UPDATE souboj_vyzva SET stav = "zruseno" WHERE mapa_id = ? AND stav IN ("ceka", "hozeno")');
+    $q = $pdo->prepare('UPDATE souboj_vyzva SET stav = "zruseno" WHERE mapa_id = ? AND stav IN ("ceka", "hozeno")' . ($bezTiku ? ' AND druh <> "tik"' : ''));
     $q->execute([$mapaId]);
     return $q->rowCount();
 }
@@ -195,7 +197,10 @@ function dracak_vtt_souboj_bojovnik(PDO $pdo, array $infoTokenu): array
         'typ' => $infoTokenu['typ_entity'], 'entita_id' => $infoTokenu['entita_id'], 'label' => $infoTokenu['label'],
         'velikost' => null, 'odolnost' => null, 'hp' => 0, 'max_hp' => 0, 'bojeschopnost' => null,
         'nalozeni_velke' => false, 'zbrane' => [], 'oc' => null, 'stit' => false, 'oz' => null, 'oz_nazev' => null,
-        'uc_text' => null, 'oc_text' => null,
+        'uc_text' => null, 'oc_text' => null, 'bonus_obratnost' => null,
+        'efekty' => dracak_vtt_efekty_souhrn(
+            $pdo, (string)$infoTokenu['typ_entity'], (int)$infoTokenu['entita_id']
+        ),
     ];
     if ($infoTokenu['typ_entity'] === 'postava') {
         $q = $pdo->prepare('SELECT * FROM postavy WHERE id = ?');
@@ -224,6 +229,7 @@ function dracak_vtt_souboj_bojovnik(PDO $pdo, array $infoTokenu): array
         if ($d['obrana']) {
             $b['oc'] = $d['obrana']['oc'];
             $b['stit'] = $d['obrana']['bonus_stit'] > 0;
+            $b['bonus_obratnost'] = (int)$d['obrana']['bonus_obratnost'];
         }
         return $b;
     }
@@ -314,8 +320,18 @@ function dracak_vtt_obrana_opravy(array $d): array
     if (!empty($d['nalozeni_velke'])) {
         $o[] = dracak_vtt_oprava('velké naložení', -1);
     }
+    foreach (($d['efekt_opravy'] ?? []) as $x) {
+        if ((int)$x['hodnota'] !== 0) {
+            $o[] = dracak_vtt_oprava((string)$x['nazev'], (int)$x['hodnota']);
+        }
+    }
     $volba = $d['volba'] ?? null;
-    $bok = ($d['strana'] ?? 'predni') === 'bok';
+    $nehybny = !empty($d['nehybny']);
+    $bok = !$nehybny && ($d['strana'] ?? 'predni') === 'bok';
+    if ($nehybny) {
+        // h1613: nehybný obránce — místo bonusu za obratnost postih −5 (tedy odečíst bonus za obratnost a ještě 5).
+        $o[] = dracak_vtt_oprava('nehybný (' . $d['nehybny'] . '): místo bonusu za obratnost −5', -((int)($d['bonus_obratnost'] ?? 0) + 5));
+    }
     if ($volba === 'branit') {
         if (($d['oz_znamo'] ?? false) === true) {
             $o[] = $d['oz'] === null ? dracak_vtt_oprava('bez zbraně', -3) : dracak_vtt_oprava('obrana zbraně (OZ ' . ($d['oz_nazev'] ?? '') . ')', (int)$d['oz']);
@@ -411,7 +427,15 @@ function dracak_vtt_utok_priprav(PDO $pdo, array $utocnik, array $cil, bool $roz
     if ($utocnik['nalozeni_velke']) {
         $opravy[] = dracak_vtt_oprava('velké naložení', -1);
     }
-    if ($utocnik['velikost'] !== null && $cil['velikost'] !== null) {
+    foreach ($utocnik['efekty']['opravy_uc'] as $x) {
+        if ((int)$x['hodnota'] !== 0) {
+            $opravy[] = dracak_vtt_oprava((string)$x['nazev'], (int)$x['hodnota']);
+        }
+    }
+    if ($cil['efekty']['nehybny'] !== null) {
+        // h1613: na nehybnou postavu se nevztahují opravy za rozdíl velikostí.
+        $upozorneni[] = $cil['label'] . ' je nehybný (' . $cil['efekty']['nehybny'] . ') — bez opravy za rozdíl velikostí, obrana jen s postihem (h1613).';
+    } elseif ($utocnik['velikost'] !== null && $cil['velikost'] !== null) {
         $rozdil = DRACAK_VTT_ROZDIL_VELIKOSTI[$cil['velikost']][$utocnik['velikost']];
         if ($rozdil !== 0) {
             $opravy[] = dracak_vtt_oprava('rozdíl velikostí (' . $utocnik['velikost'] . ' proti ' . $cil['velikost'] . ')', $rozdil);
@@ -511,8 +535,17 @@ function dracak_vtt_obrana_zaloz(PDO $pdo, array $mapa, array $info, array $utok
     $q = $pdo->prepare('SELECT akce_zbyvajici FROM kolo_iniciativa WHERE mapa_id = ? AND token_id = ?');
     $q->execute([$mapaId, $obrId]);
     $akce = $q->fetchColumn();
-    $muzeBranit = $akce !== false && (int)$akce > 0;
+    $ef = $obr['efekty'];
+    $nehybny = $ef['nehybny'];
+    $duvodNebrani = $nehybny ?? $ef['nemuze_branit'] ?? $ef['nemuze_jednat'];
+    $muzeBranit = $duvodNebrani === null && $akce !== false && (int)$akce > 0;
     $upozorneni = [];
+    if ($duvodNebrani !== null) {
+        $upozorneni[] = $obr['label'] . ' se nemůže bránit zbraní (efekt ' . $duvodNebrani . ').';
+    }
+    if ($nehybny !== null && $obr['typ'] !== 'postava') {
+        $upozorneni[] = 'Nehybná nestvůra: odečten postih −5 (v OČ nestvůry nevím, kolik je bonus za obratnost) — uprav v opravě, kdyby to bylo jinak.';
+    }
     $hintDenik = dracak_vtt_tokeny_funkce()['denik_nestvur'] ? ' (nejlíp v deníku nestvůry v panelu tokenu, pak platí pro celý druh)' : '';
     if ($obr['oc'] === null) {
         $upozorneni[] = $obr['typ'] === 'postava'
@@ -528,13 +561,17 @@ function dracak_vtt_obrana_zaloz(PDO $pdo, array $mapa, array $info, array $utok
         'obrance_label' => $info[$obrId]['label'],
         'zaklad' => $obr['oc'],
         'zaklad_nazev' => 'OČ',
-        'stit' => $obr['stit'],
+        'stit' => $nehybny !== null ? false : $obr['stit'],
+        'nehybny' => $nehybny,
+        'bonus_obratnost' => $obr['bonus_obratnost'],
+        'efekt_opravy' => $ef['opravy_oc'],
+        'duvod_nebrani' => $duvodNebrani,
         'oz' => $obr['oz'],
         'oz_nazev' => $obr['oz_nazev'],
         'oz_znamo' => $ozZnamo,
         'postih_zivoty' => $obr['bojeschopnost']['postih_aktualni'] ?? 0,
         'nalozeni_velke' => $obr['nalozeni_velke'],
-        'strana' => (string)($utokVyzva['data']['strana'] ?? 'predni'),
+        'strana' => $nehybny !== null ? 'predni' : (string)($utokVyzva['data']['strana'] ?? 'predni'),
         'volba' => $muzeBranit ? null : 'nebranit',
         'muze_branit' => $muzeBranit,
         'modifikator' => 0,
@@ -672,7 +709,7 @@ function dracak_vtt_vyzvy_klient(PDO $pdo, array $user, bool $jePj, array $info,
             'modifikator' => (int)($d['modifikator'] ?? 0),
             'cislo' => $cislo,
             'upozorneni' => $d['upozorneni'] ?? [],
-            'kostka' => $v['druh'] === 'past' ? 10 : 6,
+            'kostka' => $v['druh'] === 'past' ? 10 : ($v['druh'] === 'tik' ? (int)($d['typ'] ?? 6) : 6),
             'hody' => $d['hody'] ?? null,
             'soucet_hodu' => $d['soucet_hodu'] ?? null,
             'celkem' => $d['celkem'] ?? null,
@@ -687,10 +724,16 @@ function dracak_vtt_vyzvy_klient(PDO $pdo, array $user, bool $jePj, array $info,
         } elseif ($v['druh'] === 'obrana') {
             $radek['volba'] = $d['volba'] ?? null;
             $radek['muze_branit'] = !empty($d['muze_branit']);
+            $radek['duvod_nebrani'] = $d['duvod_nebrani'] ?? null;
+            $radek['nehybny'] = !empty($d['nehybny']);
             $radek['utok_celkem'] = $d['utok_celkem'] ?? null;
             $radek['utocnik_label'] = $jePj || ($c !== null && $cViditelny) ? ($d['utocnik_label'] ?? null) : 'Neznámý tvor';
             $radek['smi_volit'] = $ovlada && $v['stav'] === 'ceka';
             $radek['oz_znamo'] = !empty($d['oz_znamo']);
+        } elseif ($v['druh'] === 'tik') {
+            $radek['pocet_kostek'] = (int)($d['pocet'] ?? 1);
+            $radek['efekt_nazev'] = $d['efekt_nazev'] ?? null;
+            $radek['znamenko'] = (int)($d['znamenko'] ?? -1);
         } elseif ($v['druh'] === 'past') {
             $radek['nebezpecnost'] = $jePj ? ($d['nebezpecnost'] ?? null) : null;
             $radek['nebezpecnost_nastavena'] = ($d['nebezpecnost'] ?? null) !== null;

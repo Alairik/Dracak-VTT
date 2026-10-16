@@ -343,3 +343,8 @@ body { -webkit-tap-highlight-color:transparent; }
 #denikNestvury .dn-varovani { font-size:11.5px; color:#e8c9a8; margin:4px 0; }
 #denikNestvury .dn-akce { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
 #denikNestvury .dn-akce .btn { flex:1 1 auto; font-size:12px; }
+
+/* Aktivní efekty tvora v panelu Spravovat */
+.efekt-radek { display: flex; gap: 6px; align-items: center; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+.efekt-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.efekt-sundat { padding: 2px 8px; font-size: 12px; }

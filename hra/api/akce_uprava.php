@@ -31,25 +31,11 @@ try {
         $pdo->rollBack();
         dracak_vtt_souboj_chyba(422, 'Tenhle tvor nemá hozenou iniciativu.');
     }
-    $celkem = (int)$ki['akce_celkem'];
-    $zbyva = (int)$ki['akce_zbyvajici'];
-    if ($op === 'rychlost') {
-        $celkem += $zbyva;
-        $zbyva *= 2;
-    } elseif ($op === 'protoplazma') {
-        $nove = intdiv($zbyva, 2);
-        $celkem -= $zbyva - $nove;
-        $zbyva = $nove;
-    } elseif ($op === 'delta') {
-        $d = max(-9, min(9, (int)($data['delta'] ?? 0)));
-        $zbyva = max(0, $zbyva + $d);
-        $celkem = max($zbyva, $celkem + $d);
-    } else {
+    if (!in_array($op, ['delta', 'rychlost', 'protoplazma'], true)) {
         $pdo->rollBack();
         dracak_vtt_souboj_chyba(422, 'Neplatná úprava.');
     }
-    $celkem = max(0, min(200, $celkem));
-    $zbyva = max(0, min($celkem, $zbyva));
+    [$celkem, $zbyva] = dracak_vtt_souboj_akce_prepocet((int)$ki['akce_celkem'], (int)$ki['akce_zbyvajici'], $op, (int)($data['delta'] ?? 0));
     $pdo->prepare('UPDATE kolo_iniciativa SET akce_celkem = ?, akce_zbyvajici = ? WHERE mapa_id = ? AND token_id = ?')
         ->execute([$celkem, $zbyva, $mapaId, $tokenId]);
     $eventId = dracak_vtt_log_event($svetId, $mapaId, 'akce_uprava', [

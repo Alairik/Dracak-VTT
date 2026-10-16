@@ -351,6 +351,9 @@ $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' =>
               <li class="dn-efekt <?= $e($ef['typ']) ?>" title="<?= $e($ef['tooltip_text']) ?>">
                 <strong><?= $e($ef['nazev']) ?></strong> <span class="dn-stitek"><?= $e($ef['typ']) ?></span>
                 <span class="dn-efekt-kola"><?= $ef['zbyva_kol'] !== null ? (int)$ef['zbyva_kol'] . ' kol' : 'trvale' ?></span>
+                <?php if (!empty($ef['shrnuti']) || !empty($ef['stav_nazev'])): ?>
+                  <small class="note"><?= $e($ef['shrnuti'] ? implode(', ', $ef['shrnuti']) : $ef['stav_nazev']) ?><?= $ef['shrnuti'] && in_array($ef['stav'], ['cast'], true) ? ' · zbytek posoudí PJ' : '' ?></small>
+                <?php endif; ?>
               </li>
             <?php endforeach; ?>
           </ul>

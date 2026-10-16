@@ -1290,6 +1290,13 @@ export function initSouboj(ctx) {
     return [1 + Math.floor(Math.random() * 10)];
   }
 
+  // Obecné kostky (tik efektu: 1k4, 2k6…): kolik kostek, kolik stěn.
+  async function hoditKostky(pocet, typ) {
+    const ok3d = await nactiKostky();
+    if (ok3d && kostky3DPripraveny()) return hodit3D(pocet, typ);
+    return Array.from({length: pocet}, () => 1 + Math.floor(Math.random() * typ));
+  }
+
   async function odeslatHodVyzvy(v, hody, soucet) {
     if (hodiSe) return;
     hodiSe = true;
@@ -1308,7 +1315,8 @@ export function initSouboj(ctx) {
     if (hodiSe) return;
     hodiSe = true;
     kreslitVyzvy(true);
-    const hody = v.kostka === 10 ? await hoditK10() : await hoditK6Plus();
+    const hody = v.druh === 'tik' ? await hoditKostky(v.pocet_kostek || 1, v.kostka)
+      : (v.kostka === 10 ? await hoditK10() : await hoditK6Plus());
     hodiSe = false;
     if (!hody) { logLine('Kostku se nepodařilo zobrazit — zapiš hod z vlastní kostky, nebo to zkus znovu.'); kreslitVyzvy(true); return; }
     odeslatHodVyzvy(v, hody, null);
@@ -1330,7 +1338,7 @@ export function initSouboj(ctx) {
   }
 
   function nazevDruhu(v) {
-    return v.druh === 'utok' ? 'Útok' : (v.druh === 'obrana' ? 'Obrana' : 'Hod proti pasti');
+    return v.druh === 'utok' ? 'Útok' : (v.druh === 'obrana' ? 'Obrana' : (v.druh === 'tik' ? (v.efekt_nazev || 'Efekt') : 'Hod proti pasti'));
   }
 
   function kartaVyzvy(v) {
@@ -1339,6 +1347,7 @@ export function initSouboj(ctx) {
     const proti = v.druh === 'utok' ? ' → ' + (v.cil_label || '?') : (v.druh === 'obrana' ? ' (proti ' + (v.utocnik_label || '?') + ')' : '');
     hlava.appendChild(el('strong', '', nazevDruhu(v) + ' — ' + v.label + proti));
     k.appendChild(hlava);
+    if (v.druh === 'tik' && v.popis) k.appendChild(el('div', 'vyzva-poznamka', v.popis + ' — hoď ' + (v.pocet_kostek || 1) + 'k' + v.kostka + ', na začátku kola'));
     if (v.druh === 'past' && v.popis) k.appendChild(el('div', 'vyzva-poznamka', v.popis + ' (' + (v.vlastnost || '') + ', ' + (v.nebezpecnost_nazev || '') + ')'));
 
     // Už hozená výzva (útok čeká na obranu) se zmenší na výsledek hodu.
@@ -1354,13 +1363,15 @@ export function initSouboj(ctx) {
     if (v.druh === 'obrana') {
       k.appendChild(el('div', 'vyzva-poznamka', 'Útok ' + (v.utocnik_label || '?') + ': ' + (v.utok_celkem !== null && v.utok_celkem !== undefined ? v.utok_celkem : '?')
         + (v.strana === 'bok' ? ' · útok z boku nebo zezadu' : '')));
+      if (v.duvod_nebrani) k.appendChild(el('div', 'vyzva-poznamka', 'Nemůže se bránit zbraní: ' + v.duvod_nebrani + (v.nehybny ? ' (platí jako nehybný)' : '')));
       if (v.stav === 'ceka') {
         const volba = el('div', 'vyzva-volba');
         const b1 = tlacitko('Bránit se (stojí akci)', 'btn ' + (v.volba === 'branit' ? 'btn-primary' : 'btn-ghost'), () => upravitVyzvu(v, {volba: 'branit'}),
           v.muze_branit || v.je_pj ? 'Brání se zbraní — stojí jednu akci z tvého zbytku' : 'Tvor už nemá žádnou akci');
         const b2 = tlacitko('Nebránit se (−3)', 'btn ' + (v.volba === 'nebranit' ? 'btn-primary' : 'btn-ghost'), () => upravitVyzvu(v, {volba: 'nebranit'}),
           'Jen brněním, bez zbraně — postih −3 (z boku nebo zezadu dohromady −6)');
-        b1.disabled = !v.smi_volit || (!v.muze_branit && !v.je_pj);
+        b1.disabled = !v.smi_volit || (!v.muze_branit && !v.je_pj) || !!v.duvod_nebrani;
+        if (v.duvod_nebrani) b1.title = 'Nemůže se bránit zbraní — ' + v.duvod_nebrani;
         b2.disabled = !v.smi_volit;
         volba.append(b1, b2);
         k.appendChild(volba);
@@ -1429,7 +1440,7 @@ export function initSouboj(ctx) {
       tab.appendChild(radek('číslo bez hodu', BEZ_ZNAMENKA(v.cislo), 'vyzva-soucet'));
     }
     if (v.hody) {
-      tab.appendChild(radek('hod ' + (v.kostka === 10 ? '1k10' : '1k6+') + ' [' + v.hody.join(' + ') + ']', String(v.soucet_hodu)));
+      tab.appendChild(radek('hod ' + (v.druh === 'tik' ? (v.pocet_kostek || 1) + 'k' + v.kostka : (v.kostka === 10 ? '1k10' : '1k6+')) + ' [' + v.hody.join(' + ') + ']', String(v.soucet_hodu)));
       tab.appendChild(radek('celkem', BEZ_ZNAMENKA(v.celkem), 'vyzva-celkem'));
     }
     k.appendChild(tab);
@@ -1439,21 +1450,25 @@ export function initSouboj(ctx) {
     const akce = el('div', 'vyzva-akce');
     if (v.stav === 'ceka') {
       if (v.smi_hodit) {
-        const hod = tlacitko(hodiSe ? 'Kostka letí…' : (v.kostka === 10 ? 'Hodit 1k10' : 'Hodit 1k6+'), 'btn btn-primary', () => hoditKostkou(v));
+        const popisKostky = v.druh === 'tik' ? (v.pocet_kostek || 1) + 'k' + v.kostka : (v.kostka === 10 ? '1k10' : '1k6+');
+        const hod = tlacitko(hodiSe ? 'Kostka letí…' : 'Hodit ' + popisKostky, 'btn btn-primary', () => hoditKostkou(v));
         hod.disabled = hodiSe;
         akce.appendChild(hod);
         const rucne = el('input', 'input vyzva-cislo');
         rucne.type = 'number';
         rucne.min = '1';
-        rucne.max = v.kostka === 10 ? '10' : '180';
-        rucne.placeholder = v.kostka === 10 ? '1–10' : 'součet';
-        rucne.title = v.kostka === 10 ? 'Hod 1k10 z vlastní kostky' : 'Součet z vlastní kostky; šestka se přehazuje, takže 6 + 3 zapiš jako 9';
+        const tikPocet = v.druh === 'tik' ? (v.pocet_kostek || 1) : 1;
+        rucne.max = v.druh === 'tik' ? String(tikPocet * v.kostka) : (v.kostka === 10 ? '10' : '180');
+        rucne.min = v.druh === 'tik' ? String(tikPocet) : '1';
+        rucne.placeholder = v.druh === 'tik' ? tikPocet + '–' + (tikPocet * v.kostka) : (v.kostka === 10 ? '1–10' : 'součet');
+        rucne.title = v.druh === 'tik' ? 'Součet z vlastních kostek (' + popisKostky + ')'
+          : (v.kostka === 10 ? 'Hod 1k10 z vlastní kostky' : 'Součet z vlastní kostky; šestka se přehazuje, takže 6 + 3 zapiš jako 9');
         rucne.disabled = hodiSe;
         rucne.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') zapis.click(); });
         const zapis = tlacitko('Zapsat vlastní hod', 'btn btn-ghost', () => {
           const n = parseInt(rucne.value, 10);
           if (!(n >= 1)) { logLine('Zapiš číslo z vlastní kostky.'); return; }
-          odeslatHodVyzvy(v, v.kostka === 10 ? [n] : null, n);
+          odeslatHodVyzvy(v, v.kostka === 10 && v.druh !== 'tik' ? [n] : null, n);
         });
         zapis.disabled = hodiSe;
         akce.append(rucne, zapis);
@@ -1468,6 +1483,9 @@ export function initSouboj(ctx) {
       }
     } else {
       akce.appendChild(el('span', 'vyzva-poznamka', v.druh === 'utok' ? 'Útok hozen — čeká se na obranu.' : 'Hozeno.'));
+    }
+    if (v.druh === 'tik' && jePj && v.stav === 'ceka') {
+      akce.appendChild(tlacitko('Zrušit', 'btn btn-ghost', () => volat('api/vyzva_zrus.php', {vyzva_id: v.id}), 'PJ: tenhle tik se nehodí (tvor mezitím zemřel, efekt skončil…)'));
     }
     k.appendChild(akce);
     return k;
@@ -1552,7 +1570,7 @@ export function initSouboj(ctx) {
           + (p.unava_plus ? ' (+' + p.unava_plus + ' bod únavy' + (p.unava_nova !== null && p.unava_nova !== undefined ? ', celkem ' + p.unava_nova : '') + ')' : ''));
         break;
       case 'vyzva_hod': {
-        const druh = p.druh === 'utok' ? 'útok' : (p.druh === 'obrana' ? 'obranu' : 'hod proti pasti');
+        const druh = p.druh === 'utok' ? 'útok' : (p.druh === 'obrana' ? 'obranu' : (p.druh === 'tik' ? 'hod za efekt' : 'hod proti pasti'));
         const kdo = p.label || 'Někdo';
         logLine((p.hodil || '?') + ' hodil(a) ' + druh + ' za ' + kdo + ': [' + (p.hody || []).join(' + ') + ']'
           + (p.rucne ? ' (vlastní kostka)' : '') + (p.cislo !== undefined && p.cislo !== null ? ' ' + ZNAMENKO(p.cislo) : '') + ' = ' + p.celkem
@@ -1569,6 +1587,22 @@ export function initSouboj(ctx) {
       case 'vyzva_zrusena':
         logLine('PJ zrušil(a) rozehraný hod.');
         break;
+      case 'efekt_tik':
+        logLine((p.label || 'Někdo') + ': ' + p.efekt_nazev + ' — ' + (p.znamenko < 0 ? '−' : '+') + p.castka + ' životů'
+          + (p.hp_nove !== null && p.hp_nove !== undefined ? ' (zbývá ' + p.hp_nove + (p.max_hp ? '/' + p.max_hp : '') + ')' : '') + (p.vyrazen ? ' — VYŘAZEN(A)' : ''));
+        break;
+      case 'efekt_aplikovan': {
+        const t = getTokeny().find((x) => x.typ_entity === p.typ_entity && x.entita_id === p.entita_id);
+        const kdo = t ? t.label : 'Tvor';
+        logLine(kdo + ': efekt ' + p.efekt_nazev + (p.obnoveno ? ' obnoven' : '') + (p.zbyva_kol ? ' na ' + p.zbyva_kol + ' ' + (p.zbyva_kol === 1 ? 'kolo' : (p.zbyva_kol < 5 ? 'kola' : 'kol')) : '')
+          + (p.akce ? ' — akce ' + p.akce.pred[1] + ' → ' + p.akce.po[1] : '') + (p.shrnuti && p.shrnuti.length ? ' (' + p.shrnuti.join(', ') + ')' : ''));
+        break;
+      }
+      case 'efekt_konci': {
+        const t = getTokeny().find((x) => x.typ_entity === p.typ_entity && x.entita_id === p.entita_id);
+        logLine((t ? t.label : 'Tvor') + ': efekt ' + p.efekt_nazev + (p.duvod === 'odebran' ? ' sundán' : ' skončil'));
+        break;
+      }
       case 'tah_konec':
         logLine(p.label + ' ukončil(a) tah' + (p.propadlo ? ' (propadlo ' + p.propadlo + ')' : ''));
         break;

@@ -60,11 +60,17 @@ function dracak_vtt_souboj_proved_akci(PDO $pdo, array $mapa, bool $jePj, array 
             $konec(422, 'Tenhle tvor teď není na tahu.');
         }
         // Při pokračování po hodu proti pasti čeká v tabulce právě tahle výzva (stav "hozeno"), jinak nesmí čekat žádná.
-        if (!$vTransakci && dracak_vtt_vyzva_otevrene($pdo, $mapaId, true)) {
+        if (!$vTransakci && dracak_vtt_vyzva_otevrene($pdo, $mapaId, true, true)) {
             $konec(422, 'Nejdřív se musí dohrát rozehraný hod (nebo ho PJ zruší).');
         }
         if (!$jePj && dracak_vtt_souboj_vyrazen($pdo, $info[$tokenId])) {
             $konec(422, 'Vyřazený tvor už nemůže jednat.');
+        }
+        if (!$jePj && in_array($info[$tokenId]['typ_entity'], ['postava', 'nestvura_instance'], true)) {
+            $blok = dracak_vtt_efekty_souhrn($pdo, $info[$tokenId]['typ_entity'], (int)$info[$tokenId]['entita_id'])['nemuze_jednat'];
+            if ($blok !== null) {
+                $konec(422, 'Tvor nemůže jednat (efekt ' . $blok . ').');
+            }
         }
         $q = $pdo->prepare('SELECT akce_celkem, akce_zbyvajici FROM kolo_iniciativa WHERE mapa_id = ? AND token_id = ? FOR UPDATE');
         $q->execute([$mapaId, $tokenId]);

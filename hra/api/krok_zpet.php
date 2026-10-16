@@ -231,7 +231,24 @@ try {
         $pdo->prepare('DELETE FROM zdi WHERE id = ?')->execute([(int)$zed['id']]);
         $revertPayload += ['id' => (int)$zed['id'], 'viditelna_hracum' => (bool)$zed['viditelna_hracum']];
     } elseif ($typ === 'efekt_aplikovan') {
-        $pdo->prepare('DELETE FROM aktivni_efekty WHERE id = ?')->execute([(int)$aktivniEfekt['id']]);
+        if (!empty($payload['obnoveno'])) {
+            // Efekt už na tvoru byl a událost mu jen upravila trvání — vrátí se předchozí trvání, efekt zůstává.
+            $pdo->prepare('UPDATE aktivni_efekty SET zbyva_kol = ? WHERE id = ?')
+                ->execute([isset($payload['zbyva_pred']) ? (int)$payload['zbyva_pred'] : null, (int)$aktivniEfekt['id']]);
+        } else {
+            $pdo->prepare('DELETE FROM aktivni_efekty WHERE id = ?')->execute([(int)$aktivniEfekt['id']]);
+        }
+        // Změna akcí z nasazení (Rychlost ×2…) se vrátí, jen pokud tvor má pořád přesně ty akce, které z ní vzešly.
+        $akceZmena = $payload['akce'] ?? null;
+        if (is_array($akceZmena) && isset($akceZmena['token_id'], $akceZmena['pred'], $akceZmena['po'])) {
+            $q = $pdo->prepare('SELECT akce_celkem, akce_zbyvajici FROM kolo_iniciativa WHERE mapa_id = ? AND token_id = ? FOR UPDATE');
+            $q->execute([$mapaId, (int)$akceZmena['token_id']]);
+            $ki = $q->fetch();
+            if ($ki && [(int)$ki['akce_celkem'], (int)$ki['akce_zbyvajici']] === array_map('intval', $akceZmena['po'])) {
+                $pdo->prepare('UPDATE kolo_iniciativa SET akce_celkem = ?, akce_zbyvajici = ? WHERE mapa_id = ? AND token_id = ?')
+                    ->execute([(int)$akceZmena['pred'][0], (int)$akceZmena['pred'][1], $mapaId, (int)$akceZmena['token_id']]);
+            }
+        }
         $revertPayload += [
             'typ_entity' => $aktivniEfekt['typ_entity'],
             'entita_id' => (int)$aktivniEfekt['entita_id'],

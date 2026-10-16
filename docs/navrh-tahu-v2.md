@@ -59,7 +59,7 @@ kola) — jinak nabídne aspoň samotný pohyb.
    vidí výzvu a může před hodem upravit obtížnost.
 5. **Obrana** napadeného (okno „bránit se / nebránit se“; PJ může rozhodnout za hráče).
 6. **Výsledek** (zásah, zranění, životy) + animace úderu.
-7. **Efekty** (hoření, kyselina, spánek…) — tikají na začátku tahu postavy, ukazují se na tokenu.
+7. **Efekty** (hoření, kyselina, spánek…) — tikají na začátku tahu postavy, ukazují se na tokenu. *Hotovo 2026-10-16* (po ručním SQL): efekty mají opravdovou mechaniku v DB (`efekt_slozky`), tiky životů se hází na začátku kola jako výzva k hodu, bonusy a zákazy jednat se čtou z aktivních efektů — viz `docs/stav-projektu.md`, „Efekty s opravdovou mechanikou“.
 8. **Další postava** (PJ smí přeskočit).
 
 Každý krok je událost na serveru; klienti přehrávají animace z událostí a kdo se připojí

@@ -190,36 +190,25 @@ function dracak_vtt_souboj_kvota(int $celkem, int $zbyva, int $polovina): int
     return max(0, $zbyva - intdiv($celkem, 2));
 }
 
-// Odpočítá trvání efektů všem entitám, které mají na mapě token; efekt, kterému
-// došlo trvání, se smaže. Vrací počet skončených efektů. Společné pro konec
-// kola v souboji a ruční tlačítko "Konec kola" (hra/api/kolo_konec.php).
-function dracak_vtt_efekty_odpocet(PDO $pdo, int $svetId, int $mapaId, int $ucetId): int
+// Přepočet akcí tvora v rozehraném kole (h1626): Rychlost zdvojí akce, které tvor právě má, Protoplazma je sníží
+// na polovinu (dolů), ruční úprava / efekt přidá nebo ubere. Vrací [akce_celkem, akce_zbyvajici].
+function dracak_vtt_souboj_akce_prepocet(int $celkem, int $zbyva, string $op, int $delta = 0): array
 {
-    $stmt = $pdo->prepare('SELECT DISTINCT typ_entity, entita_id FROM tokeny WHERE mapa_id = ?');
-    $stmt->execute([$mapaId]);
-    $expirovalo = 0;
-    foreach ($stmt->fetchAll() as $pair) {
-        $q = $pdo->prepare(
-            'SELECT ae.id, ae.zbyva_kol, e.nazev FROM aktivni_efekty ae JOIN efekty e ON e.id = ae.efekt_id
-             WHERE ae.typ_entity = ? AND ae.entita_id = ? AND ae.zbyva_kol IS NOT NULL'
-        );
-        $q->execute([$pair['typ_entity'], $pair['entita_id']]);
-        foreach ($q->fetchAll() as $ae) {
-            $noveKolo = (int)$ae['zbyva_kol'] - 1;
-            if ($noveKolo <= 0) {
-                $pdo->prepare('DELETE FROM aktivni_efekty WHERE id = ?')->execute([$ae['id']]);
-                dracak_vtt_log_event($svetId, $mapaId, 'efekt_konci', [
-                    'typ_entity' => $pair['typ_entity'],
-                    'entita_id' => $pair['entita_id'],
-                    'efekt_nazev' => $ae['nazev'],
-                ], $ucetId);
-                $expirovalo++;
-            } else {
-                $pdo->prepare('UPDATE aktivni_efekty SET zbyva_kol = ? WHERE id = ?')->execute([$noveKolo, $ae['id']]);
-            }
-        }
+    if ($op === 'rychlost') {
+        $celkem += $zbyva;
+        $zbyva *= 2;
+    } elseif ($op === 'protoplazma') {
+        $nove = intdiv($zbyva, 2);
+        $celkem -= $zbyva - $nove;
+        $zbyva = $nove;
+    } elseif ($op === 'delta') {
+        $d = max(-9, min(9, $delta));
+        $zbyva = max(0, $zbyva + $d);
+        $celkem = max($zbyva, $celkem + $d);
     }
-    return $expirovalo;
+    $celkem = max(0, min(200, $celkem));
+    $zbyva = max(0, min($celkem, $zbyva));
+    return [$celkem, $zbyva];
 }
 
 // Konec kola: čísla kola +1, další kolo začíná úmysly, iniciativa a úmysly se
@@ -234,7 +223,9 @@ function dracak_vtt_souboj_nove_kolo(PDO $pdo, int $svetId, int $mapaId, int $uc
     )->execute([$nove, $mapaId]);
     $pdo->prepare('DELETE FROM kolo_iniciativa WHERE mapa_id = ?')->execute([$mapaId]);
     $pdo->prepare('UPDATE kolo_ucastnik SET umysl = NULL, umysl_cil_token_id = NULL WHERE mapa_id = ?')->execute([$mapaId]);
-    $efekty = dracak_vtt_efekty_odpocet($pdo, $svetId, $mapaId, $ucetId);
+    $efekty = dracak_vtt_efekty_odpocet($pdo, $svetId, $mapaId, $ucetId, $stav['cislo_kola']);
+    // Krvácení, regenerace… : na začátku kola se každému takovému tvoru založí hod kostkou (výzva „tik“).
+    dracak_vtt_efekty_tiky_zaloz($pdo, $svetId, $mapaId, $ucetId);
     dracak_vtt_log_event($svetId, $mapaId, 'kolo_nove', [
         'predchozi_kolo' => $stav['cislo_kola'],
         'nove_kolo' => $nove,
@@ -258,7 +249,16 @@ function dracak_vtt_souboj_posun(PDO $pdo, int $svetId, int $mapaId, int $ucetId
         if (dracak_vtt_souboj_kvota($r['akce_celkem'], $r['akce_zbyvajici'], $polovina) <= 0) {
             return false;
         }
-        return !isset($info[$r['token_id']]) || !dracak_vtt_souboj_vyrazen($pdo, $info[$r['token_id']]);
+        if (!isset($info[$r['token_id']])) {
+            return true;
+        }
+        // Spánek, ochromení a podobné efekty tah také přeskočí.
+        $t = $info[$r['token_id']];
+        if (in_array($t['typ_entity'], ['postava', 'nestvura_instance'], true)
+            && dracak_vtt_efekty_souhrn($pdo, $t['typ_entity'], (int)$t['entita_id'])['nemuze_jednat'] !== null) {
+            return false;
+        }
+        return !dracak_vtt_souboj_vyrazen($pdo, $t);
     };
     for ($pokus = 0; $pokus < 3; $pokus++) {
         $stav = dracak_vtt_souboj_nacti($pdo, $mapaId, true);
@@ -320,6 +320,16 @@ function dracak_vtt_iniciativa_modifikator(PDO $pdo, array $token, array $bonusI
             $auto = dracak_vtt_iniciativa_auto_bonusy($pdo, $postavaRow);
         }
     }
+    // Aktivní efekty tvora: řádky tabulky bonusů z efektů (Rychlost +6, Protoplazma −3) se přičtou samy a ručně
+    // zaškrtnutý stejný řádek se nezapočítá podruhé; číselné bonusy (strach, berserk…) a „nemůže jednat“ také.
+    $ef = in_array($token['typ_entity'], ['postava', 'nestvura_instance'], true)
+        ? dracak_vtt_efekty_souhrn($pdo, $token['typ_entity'], (int)$token['entita_id']) : null;
+    if ($ef !== null) {
+        $navic = array_merge($navic, $ef['ini_radky']);
+        if ($ef['nemuze_jednat'] !== null) {
+            $auto['upozorneni'][] = 'Efekt ' . $ef['nemuze_jednat'] . ': tvor nemůže jednat, v tomhle kole nemá žádné akce.';
+        }
+    }
     $vybrane = [];
     $ignorovane = [];
     if ($bonusIds) {
@@ -348,11 +358,14 @@ function dracak_vtt_iniciativa_modifikator(PDO $pdo, array $token, array $bonusI
     $vsechny = array_merge($vybrane, $automaticke);
     $popisy = array_merge(array_column($vybrane, 'popis'), array_map(fn($b) => $b['popis'] . ' (automaticky)', $automaticke));
     // TINYINT sloupec (-128..127) — jen ochrana proti přetečení, ne pravidlová hranice.
-    $modifikator = max(-100, min(100, (int)array_sum(array_column($vsechny, 'bonus')) + $jinyBonus));
+    $efektyBonus = $ef !== null ? $ef['ini_bonus'] : 0;
+    $efektyDuvody = $ef !== null ? $ef['ini_duvody'] : [];
+    $modifikator = max(-100, min(100, (int)array_sum(array_column($vsechny, 'bonus')) + $jinyBonus + $efektyBonus));
     return [
         'modifikator' => $modifikator,
-        'popisy' => $popisy,
-        'automaticke' => array_column($automaticke, 'popis'),
+        'popisy' => array_merge($popisy, array_map(fn($t) => $t . ' (automaticky)', $efektyDuvody)),
+        'bez_akci' => $ef['nemuze_jednat'] ?? null,
+        'automaticke' => array_merge(array_column($automaticke, 'popis'), $efektyDuvody),
         'ignorovano' => $ignorovane,
         'upozorneni' => $auto['upozorneni'],
     ];
@@ -500,3 +513,5 @@ function dracak_vtt_souboj_zakazy_pohybu(PDO $pdo, string $typEntity, int $entit
 
 // Výzvy k hodu (útok, obrana, past) — funkce volají souboj_klient a posun výše.
 require_once __DIR__ . '/vtt_souboj_utok.php';
+// Efekty s mechanikou (odpočet trvání, souhrn bonusů, okamžité změny akcí).
+require_once __DIR__ . '/vtt_efekty.php';

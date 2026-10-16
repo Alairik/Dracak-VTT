@@ -24,7 +24,7 @@ function dracak_vtt_ddl_mapa(): array
     if ($stav !== null) {
         return $stav;
     }
-    $stav = ['sloupce' => [], 'typ_entity' => '', 'udalosti_varchar' => false, 'tabulky' => [], 'kolo_sloupce' => []];
+    $stav = ['sloupce' => [], 'typ_entity' => '', 'udalosti_varchar' => false, 'tabulky' => [], 'kolo_sloupce' => [], 'efekty_sloupce' => []];
     try {
         $pdo = dracak_db();
         foreach ($pdo->query(
@@ -43,7 +43,7 @@ function dracak_vtt_ddl_mapa(): array
         $stav['udalosti_varchar'] = $typUdalosti !== false && strtolower((string)$typUdalosti) === 'varchar';
         foreach ($pdo->query(
             'SELECT TABLE_NAME FROM information_schema.TABLES
-             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ("svet_obrazky", "mapa_kresby", "kolo_ucastnik", "souboj_vyzva", "nestvura_staty_sveta")'
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ("svet_obrazky", "mapa_kresby", "kolo_ucastnik", "souboj_vyzva", "nestvura_staty_sveta", "efekt_slozky")'
         )->fetchAll(PDO::FETCH_COLUMN) as $tabulka) {
             $stav['tabulky'][$tabulka] = true;
         }
@@ -52,6 +52,13 @@ function dracak_vtt_ddl_mapa(): array
              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = "kolo_stav"'
         )->fetchAll(PDO::FETCH_COLUMN) as $sloupec) {
             $stav['kolo_sloupce'][$sloupec] = true;
+        }
+        foreach ($pdo->query(
+            'SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ("efekty", "aktivni_efekty")
+               AND COLUMN_NAME IN ("mechanika_stav", "trvani_kol", "kolo_se_nepocita", "opakovani", "nasazeno_kolo", "kostky")'
+        )->fetchAll(PDO::FETCH_NUM) as [$tabulka, $sloupec]) {
+            $stav['efekty_sloupce'][$tabulka . '.' . $sloupec] = true;
         }
     } catch (Throwable $e) {
         // information_schema nedostupné — nové funkce zůstanou vypnuté
@@ -92,6 +99,12 @@ function dracak_vtt_tokeny_funkce(): array
         'denik_nestvur' => isset($ddl['tabulky']['nestvura_staty_sveta']),
         'vyzvy' => $udalosti && isset($ddl['tabulky']['kolo_ucastnik'], $ddl['tabulky']['souboj_vyzva'])
             && isset($ddl['kolo_sloupce']['faze'], $ddl['kolo_sloupce']['polovina'], $ddl['kolo_sloupce']['prekvapeni']),
+        // Efekty s mechanikou (tabulka efekt_slozky + nové sloupce efektů a nasazených efektů z ručního SQL):
+        // bez nich jsou efekty jen štítky.
+        'efekty_mech' => isset($ddl['tabulky']['efekt_slozky'])
+            && isset($ddl['efekty_sloupce']['efekty.mechanika_stav'], $ddl['efekty_sloupce']['efekty.trvani_kol'],
+                $ddl['efekty_sloupce']['efekty.kolo_se_nepocita'], $ddl['efekty_sloupce']['efekty.opakovani'],
+                $ddl['efekty_sloupce']['aktivni_efekty.nasazeno_kolo'], $ddl['efekty_sloupce']['aktivni_efekty.kostky']),
     ];
 }
 
@@ -202,26 +215,15 @@ function dracak_vtt_mapa_stav(PDO $pdo, array $user, array $mapa, bool $jePj): a
             $entity[$t['typ_entity'] . ':' . $t['entita_id']] = [$t['typ_entity'], $t['entita_id']];
         }
     }
-    $efekty = [];
-    if ($entity) {
-        $where = implode(' OR ', array_fill(0, count($entity), '(ae.typ_entity = ? AND ae.entita_id = ?)'));
-        $params = [];
-        foreach ($entity as [$te, $ei]) {
-            $params[] = $te;
-            $params[] = $ei;
-        }
-        $stmt = $pdo->prepare(
-            "SELECT ae.typ_entity, ae.entita_id, ae.zbyva_kol, e.nazev FROM aktivni_efekty ae
-             JOIN efekty e ON e.id = ae.efekt_id WHERE $where"
-        );
-        $stmt->execute($params);
-        foreach ($stmt->fetchAll() as $ae) {
-            $efekty[$ae['typ_entity'] . ':' . $ae['entita_id']][] =
-                $ae['nazev'] . ($ae['zbyva_kol'] !== null ? ' (' . $ae['zbyva_kol'] . ' kol)' : '');
-        }
-    }
+    $efektyDetail = dracak_vtt_efekty_mapy($pdo, array_values($entity));
     foreach ($tokeny as &$t) {
-        $t['efekty'] = $efekty[$t['typ_entity'] . ':' . $t['entita_id']] ?? [];
+        $detail = $efektyDetail[$t['typ_entity'] . ':' . $t['entita_id']] ?? [];
+        // Texty pro odznak na tokenu ("Název (N kol)") + podrobnosti pro tooltip a panel PJ.
+        $t['efekty'] = array_map(
+            static fn(array $e): string => $e['nazev'] . ($e['zbyva_kol'] !== null ? ' (' . $e['zbyva_kol'] . ' kol)' : ''),
+            $detail
+        );
+        $t['efekty_detail'] = $detail;
     }
     unset($t);
 
