@@ -39,6 +39,15 @@ body { -webkit-tap-highlight-color:transparent; }
 .vtt-token .face::before { content:""; position:absolute; left:calc(var(--d) / 2 - 3px); top:-7px; width:0; height:0;
                            border-left:12px solid #ffd166; border-top:7px solid transparent; border-bottom:7px solid transparent;
                            filter:drop-shadow(0 0 2px rgba(0,0,0,.85)); }
+/* Tělo tvora na více hexech (HB): průsvitné hexy + žlutá čelní hrana (D, E, F) */
+.vtt-token svg.telo { position:absolute; left:0; top:0; width:1px; height:1px; overflow:visible; }
+.telo-hex { fill-opacity:.6; stroke:rgba(255,255,255,.9); stroke-width:2.5; vector-effect:non-scaling-stroke; }
+.telo-hex.otocny { fill-opacity:.8; }
+.telo-hex.hlava { fill-opacity:.8; }
+.telo-celo { fill:none; stroke:#ffd166; stroke-width:5; stroke-linecap:round; stroke-linejoin:round; vector-effect:non-scaling-stroke;
+             filter:drop-shadow(0 0 2px rgba(0,0,0,.85)); }
+.vtt-token.dead svg.telo, .vtt-token.skryty svg.telo { opacity:.5; }
+.vtt-token.vybrany .telo-hex { stroke:#ffd166; }
 .vtt-token.movable { cursor:grab; }
 .vtt-token.tahnuty { cursor:grabbing; opacity:.85; }
 .vtt-token.not-turn { cursor:not-allowed; }
@@ -255,6 +264,11 @@ body { -webkit-tap-highlight-color:transparent; }
 .sb-sipka.mozna { fill:rgba(255,255,255,.55); }
 .sb-sipka.zakazana { fill:rgba(255,255,255,.12); }
 .sb-sipka.vybrana { fill:#ffd166; stroke:#fff; stroke-width:1.5; vector-effect:non-scaling-stroke; }
+.sb-duch-bunka { fill:rgba(255,255,255,.14); stroke:#fff; stroke-width:2; stroke-dasharray:5 4; vector-effect:non-scaling-stroke; }
+.sb-duch-bunka.otocny { fill:rgba(255,255,255,.26); }
+.sb-duch-celo { fill:none; stroke:#ffd166; stroke-width:5; stroke-linecap:round; stroke-linejoin:round; vector-effect:non-scaling-stroke; }
+.sb-terc-telo { fill:none; stroke:rgba(255,120,90,.9); stroke-width:3; vector-effect:non-scaling-stroke; }
+.sb-terc-telo.vybrany { fill:rgba(255,90,60,.28); stroke:#ff5a3c; stroke-width:4; }
 .sb-terc { fill:none; stroke:rgba(255,120,90,.9); stroke-width:3; vector-effect:non-scaling-stroke; }
 .sb-terc.vybrany { fill:rgba(255,90,60,.28); stroke:#ff5a3c; stroke-width:4; }
 .akce-lista { display:grid; grid-template-columns:repeat(2, 1fr); gap:5px; margin:8px 0 6px; }

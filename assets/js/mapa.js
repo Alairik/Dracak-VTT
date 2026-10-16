@@ -146,6 +146,14 @@ const SVET_ID = CFG.svetId;
 const MAPA_ID = CFG.mapaId;
 const POHYB_AUTO = CFG.pohybAuto;
 const FUNKCE = CFG.funkce; // které nové funkce tokenů jsou v DB (otočení, velikost…)
+// Tvorové na více hexech (HB): tvary a pravidla pohybu posílá server (tabulky
+// tvary_tvoru, souboj_pohyb, nebo výchozí hodnoty z PHP), viz includes/vtt_souboj_pravidla.php.
+const PRAVIDLA_SOUBOJE = CFG.pravidla || null;
+const TVAR_JEDEN = {typ_otaceni: 'smer', utok: 'predni3', bunky: [[0, 0]], predni: [[0, 0]]};
+function tvarTokenu(t) {
+  if (!FUNKCE.hexy || !PRAVIDLA_SOUBOJE || !(t.hexu > 1)) return TVAR_JEDEN;
+  return PRAVIDLA_SOUBOJE.tvary[t.hexu] || TVAR_JEDEN;
+}
 // Grid konsty jsou "let", ne "const" — grid panel (viz níž) je mění živě
 // při náhledu ještě před uložením, a po uložení/po eventu od jiného
 // klienta se přepíšou na novou trvalou hodnotu.
@@ -1018,7 +1026,7 @@ function vytvorTokenEl(t) {
   const el = document.createElement('div');
   el.className = 'vtt-token';
   el.dataset.id = String(t.id);
-  el.innerHTML = '<div class="face"></div><div class="puck"><span></span></div><div class="hp"></div><div class="fx"></div>';
+  el.innerHTML = '<svg class="telo" width="1" height="1"></svg><div class="face"></div><div class="puck"><span></span></div><div class="hp"></div><div class="fx"></div>';
   mapWrap.appendChild(el);
   return el;
 }
@@ -1057,6 +1065,7 @@ function nakreslitToken(t) {
   const face = el.querySelector('.face');
   face.style.display = FUNKCE.smer ? '' : 'none';
   face.style.transform = 'rotate(' + (t.smer || 0) + 'deg)';
+  nakreslitTelo(t, el);
   const hp = el.querySelector('.hp');
   if (t.hp !== null) {
     hp.style.display = '';
@@ -1068,6 +1077,57 @@ function nakreslitToken(t) {
   fx.textContent = (t.efekty || []).join(', ');
   fx.style.display = t.efekty && t.efekty.length ? '' : 'none';
   el.title = t.label + (!t.na_tahu && t.owned ? ' (není na tahu)' : '') + (t.zamceno ? ' (zamčený)' : '');
+}
+
+// Tělo tvora na více hexech: průsvitné hexy kolem otočného hexu (tam leží střed
+// tokenu) a tlustá žlutá čára na čelní hraně (u tvarů s čelní hranou, D a větší).
+// SVG je uvnitř elementu tokenu, takže se s ním hýbe a řadí na mapě.
+const SVGNS = 'http://www.w3.org/2000/svg';
+function hexBod(cx, cy, size, i) {
+  const a = Math.PI / 180 * (60 * i - 30);
+  return [cx + size * Math.cos(a), cy + size * Math.sin(a)];
+}
+function nakreslitTelo(t, el) {
+  const svg = el.querySelector('svg.telo');
+  if (!svg) return;
+  const tvar = tvarTokenu(t);
+  const maTelo = FUNKCE.hexy && GRID_PX > 0 && GRID_TYPE === 'hex' && t.hexu > 1;
+  const klicTela = maTelo ? [t.hexu, t.smer || 0, GRID_PX, GRID_OFFSET_X, GRID_OFFSET_Y, t.x, t.y, t.barva || '', t.typ_entity].join('|') : '';
+  if (svg.dataset.klic === klicTela) return;
+  svg.dataset.klic = klicTela;
+  svg.innerHTML = '';
+  if (!maTelo) return;
+  const pivot = hexBunka(t.x, t.y);
+  const orient = hexy.orientace(tvar, t.smer || 0);
+  // Souřadnice jsou vůči středu tokenu (t.x, t.y); body hexů vůči středu buňky otočného hexu.
+  const px = pivot.x - t.x, py = pivot.y - t.y;
+  const barva = barvaTokenu(t);
+  const g = document.createElementNS(SVGNS, 'g');
+  g.setAttribute('class', 'telo-skup');
+  const cely = hexy.bunkyTvaru(tvar, pivot, orient);
+  const predni = new Set(hexy.bunkyTvaru(tvar, pivot, orient, 'predni').map(hexy.klic));
+  cely.forEach((b) => {
+    const st = mlhaBunkaStred(b.row, b.col);
+    const pts = [0, 1, 2, 3, 4, 5].map((i) => hexBod(st.x - pivot.x + px, st.y - pivot.y + py, GRID_PX * 0.97, i).map((v) => v.toFixed(1)).join(',')).join(' ');
+    const poly = document.createElementNS(SVGNS, 'polygon');
+    poly.setAttribute('points', pts);
+    poly.setAttribute('class', 'telo-hex' + (hexy.klic(b) === hexy.klic(pivot) ? ' otocny' : '') + (tvar.typ_otaceni === 'smer' && predni.has(hexy.klic(b)) ? ' hlava' : ''));
+    poly.style.fill = barva;
+    g.appendChild(poly);
+  });
+  if (tvar.typ_otaceni === 'hrana') {
+    // Čelo = vnější strany obou horních hexů (sousedé ve směrech 4+orient a 5+orient)
+    hexy.bunkyTvaru(tvar, pivot, orient, 'predni').forEach((b) => {
+      const st = mlhaBunkaStred(b.row, b.col);
+      const cx = st.x - pivot.x + px, cy = st.y - pivot.y + py;
+      const body = hexy.celniHranaBody(cx, cy, GRID_PX * 0.97, orient).map((v) => v.map((n) => n.toFixed(1)).join(','));
+      const cara = document.createElementNS(SVGNS, 'polyline');
+      cara.setAttribute('points', body.join(' '));
+      cara.setAttribute('class', 'telo-celo');
+      g.appendChild(cara);
+    });
+  }
+  svg.appendChild(g);
 }
 
 function nakreslitTokeny() {
@@ -1108,6 +1168,8 @@ function ocistitVyber() {
 // musí být každý tvor obrácen čelem k jedné ze šesti stran hexu, h1621),
 // čtverec = 8 směrů (45°), bez gridu po 15°.
 function krokOtoceni() { return GRID_PX > 0 ? (GRID_TYPE === 'hex' ? 60 : 45) : 15; }
+// Tvary s čelní hranou (D a E) hledí na střed hrany: 30° + násobky 60° (nahoru = 270°).
+function posunOtoceni(t) { return GRID_PX > 0 && GRID_TYPE === 'hex' ? hexy.zakladSmeru(tvarTokenu(t)) % 60 : 0; }
 // V souboji s fázemi na hexové mapě se hráči hýbou a otáčejí akcemi (Krok,
 // Otočka — assets/js/souboj.js), tažením tokenu volně smí jen PJ.
 function volnyPohyb() {
@@ -1133,6 +1195,12 @@ kamera.naPosluch(() => aktualizujRotacniUchyt());
 // Změna se hned projeví lokálně (optimisticky) a odešle na server; při chybě
 // se stav načte znovu ze serveru.
 function pouzitZmenyTokenu(t, zmeny) {
+  if ('hexu' in zmeny && PRAVIDLA_SOUBOJE && !('smer' in zmeny)) {
+    // Čelo musí odpovídat novému tvaru (stejně jako na serveru, hra/api/token_uprava.php).
+    const stary = tvarTokenu(t);
+    const novy = PRAVIDLA_SOUBOJE.tvary[zmeny.hexu] || TVAR_JEDEN;
+    t.smer = hexy.smerZOrientace(novy, stary.typ_otaceni === novy.typ_otaceni ? hexy.orientace(stary, t.smer || 0) : 0);
+  }
   for (const [klic, hodnota] of Object.entries(zmeny)) {
     if (klic === 'nazev') continue; // jméno závisí na entitě — řeší obnova stavu
     t[klic] = hodnota;
@@ -1147,6 +1215,7 @@ function upravToken(t, zmeny) {
     .then((d) => {
       if (d.error) { logLine('Chyba: ' + d.error); obnovitStav(); return null; }
       if ('nazev' in zmeny || 'viditelny' in zmeny) obnovitStav();
+      if ('hexu' in zmeny && typeof d.zmeny?.smer === 'number') { t.smer = d.zmeny.smer; nakreslitToken(t); aktualizujRotacniUchyt(); if (souboj) souboj.prekreslitOverlay(); }
       return d;
     })
     .catch(() => { logLine('Změna se nepodařila odeslat.'); obnovitStav(); return null; });
@@ -1167,6 +1236,7 @@ const vzhledEl = {
   nazevRadek: document.getElementById('vzhledNazevRadek'), nazev: document.getElementById('vzhledNazev'),
   barvaRadek: document.getElementById('vzhledBarvaRadek'), barvy: document.getElementById('vzhledBarvy'),
   velikostRadek: document.getElementById('vzhledVelikostRadek'), velikost: document.getElementById('vzhledVelikost'),
+  hexuRadek: document.getElementById('vzhledHexuRadek'), hexu: document.getElementById('vzhledHexu'),
   otoceniRadek: document.getElementById('vzhledOtoceniRadek'),
   obrazekRadek: document.getElementById('vzhledObrazekRadek'), obrazekNahled: document.getElementById('vzhledObrazekNahled'),
   zamcenoRadek: document.getElementById('vzhledZamcenoRadek'), zamceno: document.getElementById('vzhledZamceno'),
@@ -1183,6 +1253,7 @@ function obnovVzhledSekci() {
     [vzhledEl.nazevRadek, pj && FUNKCE.nazev && t.typ_entity !== 'postava'],
     [vzhledEl.barvaRadek, pj && FUNKCE.barva],
     [vzhledEl.velikostRadek, pj && FUNKCE.velikost],
+    [vzhledEl.hexuRadek, pj && FUNKCE.hexy && GRID_PX > 0 && GRID_TYPE === 'hex' && ['postava', 'nestvura_instance'].includes(t.typ_entity)],
     [vzhledEl.otoceniRadek, smiMenitSmer(t)],
     [vzhledEl.obrazekRadek, smiObrazek],
     [vzhledEl.zamcenoRadek, pj && FUNKCE.zamek],
@@ -1193,6 +1264,7 @@ function obnovVzhledSekci() {
   if (vzhledEl.nazev && document.activeElement !== vzhledEl.nazev) vzhledEl.nazev.value = t.typ_entity === 'obecny' ? t.label : (t.label || '');
   vzhledEl.barvy.querySelectorAll('.vz-barva').forEach((b) => b.classList.toggle('aktivni', (b.dataset.barva || '') === (t.barva || '')));
   vzhledEl.velikost.querySelectorAll('button').forEach((b) => b.classList.toggle('aktivni', parseFloat(b.dataset.velikost) === (t.velikost || 1)));
+  if (vzhledEl.hexu) vzhledEl.hexu.querySelectorAll('button').forEach((b) => b.classList.toggle('aktivni', parseInt(b.dataset.hexu, 10) === (t.hexu || 1)));
   if (vzhledEl.zamceno) vzhledEl.zamceno.checked = !!t.zamceno;
   if (vzhledEl.skryty) vzhledEl.skryty.checked = !t.viditelny;
   if (vzhledEl.obrazekNahled) {
@@ -1214,6 +1286,16 @@ if (vzhledEl.sekce) {
     const t = spravovanyTokenData();
     if (b && t) upravToken(t, {velikost: parseFloat(b.dataset.velikost)});
   });
+  if (vzhledEl.hexu && PRAVIDLA_SOUBOJE) {
+    // Kolik hexů tvor zabírá (HB, tabulka tvary_tvoru): 1, 2 (zvířecí C), 3 (D), 5 (E)
+    vzhledEl.hexu.innerHTML = Object.keys(PRAVIDLA_SOUBOJE.tvary).map((h) => '<button type="button" class="btn btn-ghost" data-hexu="' + h
+      + '" title="' + esc(PRAVIDLA_SOUBOJE.tvary[h].popis) + '">' + h + '</button>').join('');
+    vzhledEl.hexu.addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      const t = spravovanyTokenData();
+      if (b && t) upravToken(t, {hexu: parseInt(b.dataset.hexu, 10)});
+    });
+  }
   document.getElementById('vzhledOtocL').addEventListener('click', () => { const t = spravovanyTokenData(); if (t) otocitTokenO(t, -krokOtoceni()); });
   document.getElementById('vzhledOtocR').addEventListener('click', () => { const t = spravovanyTokenData(); if (t) otocitTokenO(t, krokOtoceni()); });
   vzhledEl.zamceno.addEventListener('change', () => { const t = spravovanyTokenData(); if (t) upravToken(t, {zamceno: vzhledEl.zamceno.checked}); });
@@ -1323,6 +1405,8 @@ const souboj = initSouboj ? initSouboj({
   hexBunka: (x, y) => hexBunka(x, y),
   hexStred: (col, row) => mlhaBunkaStred(row, col),
   gridPx: () => GRID_PX,
+  pravidla: PRAVIDLA_SOUBOJE,
+  tvarTokenu,
   getZdi: () => zdiList,
   soubojSvg: document.getElementById('soubojSvg'),
 }) : null;
@@ -1688,7 +1772,8 @@ viewport.addEventListener('pointermove', (e) => {
       if (!t) break;
       const uhel = Math.atan2(m.y - t.y, m.x - t.x) * 180 / Math.PI;
       const krok = e.shiftKey ? 1 : krokOtoceni();
-      t.smer = (((Math.round(uhel / krok) * krok) % 360) + 360) % 360;
+      const posun = e.shiftKey ? 0 : posunOtoceni(t);
+      t.smer = (((Math.round((uhel - posun) / krok) * krok + posun) % 360) + 360) % 360;
       nakreslitToken(t);
       aktualizujRotacniUchyt();
       break;

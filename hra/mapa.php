@@ -100,6 +100,7 @@ if ($isPjOrAdmin) {
 
 require_once __DIR__ . '/../includes/vtt_iniciativa.php';
 require_once __DIR__ . '/../includes/vtt_pohyblivost.php';
+require_once __DIR__ . '/../includes/vtt_souboj_pravidla.php';
 $pohybNastaveni = dracak_vtt_svet_cestovani_nastaveni(dracak_db(), $svetId);
 $iniciativaBonusy = dracak_db()->query('SELECT id, popis, bonus FROM iniciativa_bonusy ORDER BY id')->fetchAll();
 // Souboj s fázemi (ruční SQL 0085): hody iniciativy jdou z panelu souboje, ne
@@ -529,6 +530,10 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
         <span class="vz-popisek">Velikost</span>
         <div id="vzhledVelikost" class="vz-seg"></div>
       </div>
+      <div id="vzhledHexuRadek" class="vz-radek" style="display:none;">
+        <span class="vz-popisek" title="Kolik hexů tvor zabírá na hexové mapě (1, zvířecí C = 2, D = 3, E = 5)">Zabírá hexů</span>
+        <div id="vzhledHexu" class="vz-seg"></div>
+      </div>
       <div id="vzhledOtoceniRadek" class="vz-radek" style="display:none;">
         <span class="vz-popisek">Otočení</span>
         <div class="vz-seg">
@@ -693,6 +698,7 @@ window.MAPA = <?= json_encode([
     'jePj' => $isPjOrAdmin,
     'pohybAuto' => ['unava' => $pohybNastaveni['auto_unava'], 'nalozeni' => $pohybNastaveni['auto_naklad']],
     'funkce' => dracak_vtt_tokeny_funkce(),
+    'pravidla' => dracak_vtt_souboj_pravidla(),
     'verzeModulu' => max((int)@filemtime(__DIR__ . '/../assets/js/souboj.js'), (int)@filemtime(__DIR__ . '/../assets/js/kostky3d.js'), (int)@filemtime(__DIR__ . '/../assets/js/hexy.js')),
     'grid' => [
         'px' => (int)($mapa['grid_velikost_px'] ?? 0),

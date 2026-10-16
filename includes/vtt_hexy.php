@@ -97,3 +97,77 @@ function dracak_vtt_hex_predni(array $b, int $smer): array
         dracak_vtt_hex_soused($b, $smer + 1),
     ];
 }
+
+// --- Tvorové na více hexech (HB, content/pravidla-hrac.html h1623) ---
+// Tvar je seznam osových offsetů [q, r] vůči "otočnému hexu" (hex, kolem
+// kterého se tvor otáčí a kde stojí jeho token) při orientaci 0. Orientace
+// 0..5 je počet šedesátistupňových otočení po směru hodinových ručiček.
+//  - typ_otaceni "smer" (1 a 2 hexy): orientace = směr čelem 0..5, tvar je
+//    nakreslený čelem na východ (zvířecí C: otočný hex = zadek, hlava před ním)
+//  - typ_otaceni "hrana" (3 a 5 hexů): čelo je hrana obou horních hexů,
+//    tvar je nakreslený čelem nahoru; směr v tokeny.smer je pak úhel středu
+//    čelní hrany (270° = nahoru, každá orientace +60°)
+// "predni" jsou pohledové hexy (hexy čelní hrany; u 1 a 2 hexů hlava).
+
+// Otočí osový offset o $kroky šedesátistupňových kroků po směru hodinových ručiček.
+function dracak_vtt_hex_otoc_os(array $qr, int $kroky): array
+{
+    $k = (($kroky % 6) + 6) % 6;
+    [$q, $r] = $qr;
+    for ($i = 0; $i < $k; $i++) {
+        [$q, $r] = [-$r, $q + $r];
+    }
+    return [$q, $r];
+}
+
+// Buňky tvaru ($klic = "bunky" celé tělo, "predni" pohledové hexy) pro daný
+// otočný hex a orientaci: seznam [col, row].
+function dracak_vtt_hex_bunky_tvaru(array $tvar, array $pivot, int $orientace, string $klic = 'bunky'): array
+{
+    [$pq, $pr] = dracak_vtt_hex_na_osy($pivot);
+    $vysledek = [];
+    foreach ($tvar[$klic] as $o) {
+        [$dq, $dr] = dracak_vtt_hex_otoc_os([(int)$o[0], (int)$o[1]], $orientace);
+        $vysledek[] = dracak_vtt_hex_z_os($pq + $dq, $pr + $dr);
+    }
+    return $vysledek;
+}
+
+// Základní úhel tvaru: kolik stupňů má tokeny.smer při orientaci 0.
+function dracak_vtt_hex_zaklad_smeru(array $tvar): int
+{
+    return ($tvar['typ_otaceni'] ?? 'smer') === 'hrana' ? 270 : 0;
+}
+
+// tokeny.smer (stupně) -> orientace 0..5, a zpět.
+function dracak_vtt_hex_orientace(array $tvar, float $smerStupne): int
+{
+    return dracak_vtt_hex_smer_idx($smerStupne - dracak_vtt_hex_zaklad_smeru($tvar));
+}
+function dracak_vtt_hex_smer_z_orientace(array $tvar, int $orientace): int
+{
+    return (((dracak_vtt_hex_zaklad_smeru($tvar) + 60 * $orientace) % 360) + 360) % 360;
+}
+
+// Hexy, na které smí tvor útočit (h1623): "predni3" = 3 hexy před pohledovým
+// hexem (u 1 a 2 hexů), "okoli" = všechny hexy sousedící s pohledovými hexy
+// (u tvorů s čelní hranou). Vlastní tělo je vyloučené.
+function dracak_vtt_hex_dosah_utoku(array $tvar, array $pivot, int $orientace): array
+{
+    $telo = [];
+    foreach (dracak_vtt_hex_bunky_tvaru($tvar, $pivot, $orientace, 'bunky') as $b) {
+        $telo[$b[0] . ',' . $b[1]] = true;
+    }
+    $dosah = [];
+    foreach (dracak_vtt_hex_bunky_tvaru($tvar, $pivot, $orientace, 'predni') as $c) {
+        $smery = ($tvar['utok'] ?? 'predni3') === 'okoli' ? [0, 1, 2, 3, 4, 5] : [$orientace - 1, $orientace, $orientace + 1];
+        foreach ($smery as $k) {
+            $n = dracak_vtt_hex_soused($c, $k);
+            $klic = $n[0] . ',' . $n[1];
+            if (!isset($telo[$klic])) {
+                $dosah[$klic] = $n;
+            }
+        }
+    }
+    return array_values($dosah);
+}

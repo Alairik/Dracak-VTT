@@ -28203,6 +28203,52 @@ Roj může v jednom celém kole 4x zaútočit nebo 4x bránit či libovolně kom
 <p data-blk="1" data-part="hrac" data-sec="h1621" id="b10797">Rozšířený soubojový systém se odehrává na šestiúhelníkovaném papíře (arch tohoto papíru je součástí pravidel jako příloha). Šestiúhelníky jsou totiž mnohem lepší než čtverečky na měření vzdálenosti mezi dvěma místy. Šestiúhelníkům na šestiúhelníkovaném papíru říkáme hexy a o používání papíru mluvíme jako o hexovém papíru.</p>
 <p data-blk="1" data-part="hrac" data-sec="h1621" id="b10798">Hexový papír musí mít nějaké měřítko, tj. musí být určeno, jak velkou vzdálenost představuje jeden hex; pro souboj platí, že jeden hex vždy odpovídá jednomu sáhu.</p>
 <p data-blk="1" data-part="hrac" data-sec="h1621" id="b10799">Na jednom hexu může být v jedné chvíli nejvýše jeden tvor (s výjimkou tvorů velikosti A0), ale někteří tvorové zabírají více než 1 hex. Na postavu na jednom hexu může tedy najednou útočit nejvýše šest protivníků. Na hex také není možné umístit postavu zcela libovolně — každý tvor musí být obrácen čelem k jedné ze šesti stran hexu.</p>
+<p class="hb-src" data-blk="1" data-hb="1" data-part="hrac" data-sec="h1621" id="b93079"><em>(Homebrew · domácí úprava pro hru na mapě, upřesňuje, které hexy tvor zabírá, kolem kterého se otáčí a kam útočí · upraveno 16. 10. 2026)</em></p>
+<p data-blk="1" data-hb="1" data-part="hrac" data-sec="h1621" id="b93085"><strong>Tvorové na více hexech</strong> — tvor třídy A0, A a B zabírá jeden hex, stejně tak humanoidní tvorové třídy C. Zvířecí tvorové třídy C zabírají dva hexy za sebou, tvorové třídy D tři hexy u sebe a tvorové třídy E pět hexů. Všechny hexy těla musí být volné — jiný tvor se do nich nevejde.</p>
+<p data-blk="1" data-hb="1" data-part="hrac" data-sec="h1621" id="b93080"><strong>TVARY TVORŮ NA VÍCE HEXECH</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr data-hb="1" data-part="hrac">
+<th>třída velikosti</th>
+<th>hexů</th>
+<th>tvar a otočný hex</th>
+<th>čelo</th>
+<th>útok lze vést na</th>
+</tr>
+</thead>
+<tbody>
+<tr data-blk="1" data-hb="1" data-part="hrac" data-sec="h1621" id="b93081">
+<td>A0, A, B a humanoidní C</td>
+<td>1</td>
+<td>jeden hex</td>
+<td>jedna ze šesti stran hexu</td>
+<td>3 hexy před tvorem</td>
+</tr>
+<tr data-blk="1" data-hb="1" data-part="hrac" data-sec="h1621" id="b93082">
+<td>zvířecí C</td>
+<td>2</td>
+<td>dva hexy za sebou; otočný je zadní hex</td>
+<td>hlava — hex před zadním hexem hledí vpřed</td>
+<td>3 hexy před hlavou</td>
+</tr>
+<tr data-blk="1" data-hb="1" data-part="hrac" data-sec="h1621" id="b93083">
+<td>D</td>
+<td>3</td>
+<td>trojúhelník: nahoře dva hexy a pod nimi spodní hex, který je otočný</td>
+<td>hrana obou horních hexů</td>
+<td>všechny hexy sousedící s horními hexy</td>
+</tr>
+<tr data-blk="1" data-hb="1" data-part="hrac" data-sec="h1621" id="b93084">
+<td>E</td>
+<td>5</td>
+<td>nahoře dva hexy a pod nimi řada tří hexů; otočný je prostřední hex</td>
+<td>hrana obou horních hexů</td>
+<td>všechny hexy sousedící s horními hexy</td>
+</tr>
+</tbody>
+</table></div>
+<p data-blk="1" data-hb="1" data-part="hrac" data-sec="h1621" id="b93086"><strong>Čelo a otáčení</strong> — tvor na více hexech se vždy otáčí kolem svého <em>otočného hexu</em>: ten zůstává na místě a tělo se otočí o násobky 60°. U tvorů třídy D a E hledí tvor „nahoru“ — čelem je hrana obou horních hexů (každý z nich se dívá na dvě své strany) a při otáčení se čelo stáčí k další dvojici hexů. U zvířecí třídy C je čelem hlava, tedy hex před otočným (zadním) hexem.</p>
+<p data-blk="1" data-hb="1" data-part="hrac" data-sec="h1621" id="b93087"><strong>Pohyb a útok většího tvora</strong> — při kroku, běhu i sprintu se celé tělo posouvá hex po hexu a všechny hexy, kterými by se tělo muselo protáhnout, i cílové hexy musí být volné. Útok lze vést na všechny hexy, které sousedí s horními (čelními) hexy, kromě hexů vlastního těla; protivník je v dosahu, stojí-li v dosahu kterýkoli z hexů jeho těla.</p>
 <p data-blk="1" data-part="hrac" data-sec="h1621" id="b10800">V podzemí vzniká problém s umístěním pravoúhlých místností na hexový papír — rovná zeď se nahrazuje lomenou zdí (viz arch v příloze).</p>
 <p data-blk="1" data-part="hrac" data-sec="h1621" id="b10801"><strong>Figurky</strong> — K rozšířenému soubojovému systému dále potřebuješ figurky představující dobrodruhy a nestvůry (nejlépe cínové figurky k Dračímu doupěti, ale poslouží i figurky k Člověče, nezlob se nebo barevné knoflíky — podmínkou je, aby se na figurce dalo poznat, kde má předek a kde zadek).</p>
 <h4 id="h1622">Hod na iniciativu</h4>
@@ -28266,7 +28312,12 @@ Roj může v jednom celém kole 4x zaútočit nebo 4x bránit či libovolně kom
 <p data-blk="1" data-part="hrac" data-sec="h1623" id="b10824"><strong>Čekání</strong> — nulová akce, slouží hlavně k zabíjení času.</p>
 <p data-blk="1" data-part="hrac" data-sec="h1623" id="b10825"><strong>Útok</strong> — probíhá stejně jako útok v základním systému. Nepřítel se musí nalézat na jednom ze 3 sousedních hexů, ke kterým stojí útočník čelem. Má-li útočník dlouhou zbraň, může útočit i na vzdálenější hexy před sebou (viz "Dosah zbraní" níže).</p>
 <p data-blk="1" data-part="hrac" data-sec="h1623" id="b10826"><strong>Obrana</strong> — probíhá stejně jako v základním systému. Při útoku zezadu nebo z boku má obránce postih −4 k hodu na obranu (pokud se nebrání, tj. nepoužívá akci <em>obrana</em>, má postih −6, který zahrnuje jak nepočítanou OZ, tak útok zezadu).</p>
-<p data-blk="1" data-part="hrac" data-sec="h1623" id="b10827"><strong>Krok</strong> — přesun na libovolný volný sousední hex; během kroku se postava může otočit až o 120° podle úvahy hráče.</p>
+<p class="hb-src" data-blk="1" data-hb="1" data-part="hrac" data-sec="h1623" id="b93073"><em>(Homebrew · domácí úprava, nahrazuje pravidlo z Pravidel pro začátečníky „během kroku se postava může otočit až o 120°“ · upraveno 16. 10. 2026)</em></p>
+<p data-blk="1" data-hb="1" data-part="hrac" data-sec="h1623" id="b10827"><strong>Krok</strong> — přesun na libovolný volný sousední hex; během kroku se postava může otočit až o 270° podle úvahy hráče (tedy k libovolné z šesti stran). Tvor na více hexech se přesune celým tělem o jeden hex.</p>
+<p class="hb-src" data-blk="1" data-hb="1" data-part="hrac" data-sec="h1623" id="b93074"><em>(Homebrew · domácí úprava, běh a sprint jako samostatné pohybové akce vedle kroku · upraveno 16. 10. 2026)</em></p>
+<p data-blk="1" data-hb="1" data-part="hrac" data-sec="h1623" id="b93075"><strong>Běh</strong> — přesun až o dva hexy za jednu akci. Použít ho lze při úmyslu <em>Pohyb</em> (viz <em>Pohyb</em> níže). Během běhu se postava otáčí stejně jako při kroku.</p>
+<p data-blk="1" data-hb="1" data-part="hrac" data-sec="h1623" id="b93076"><strong>Sprint</strong> — přesun až o tři hexy za jednu akci, stejně jako běh při úmyslu <em>Pohyb</em>. Otáčení jako při kroku.</p>
+<p data-blk="1" data-hb="1" data-part="hrac" data-sec="h1623" id="b93077">Dovednost <em>Běh na krátké vzdálenosti</em> přidává při běhu a sprintu +1 hex (běh tedy až o tři hexy, sprint až o čtyři).</p>
 <p data-blk="1" data-part="hrac" data-sec="h1623" id="b10828"><strong>Otočka</strong> — pootočení o libovolný úhel doleva nebo doprava; podmínkou je, že na konci stojí postava čelem k některé z šesti stran svého hexu.</p>
 <p data-blk="1" data-part="hrac" data-sec="h1623" id="b10829"><strong>Krok a útok</strong> / <strong>Otočka a útok</strong> / <strong>Obrana a krok</strong> — spojení dvou dílčích akcí do jedné akce (na rozdíl od jejich provedení jako dvou samostatných akcí).</p>
 <p data-blk="1" data-part="hrac" data-sec="h1623" id="b10830"><strong>Jiná činnost a Kouzlení</strong> — jinou činností je například útok střelnou zbraní, výměna zbraní, vyjednávání atd.; tyto činnosti vesměs trvají jedno kolo a vyžadují dvě akce <em>jiná činnost</em> na každé kolo, jaké si vyžádají. Akce <em>kouzlení</em> je vysvětlena níže.</p>
@@ -28279,7 +28330,8 @@ Roj může v jednom celém kole 4x zaútočit nebo 4x bránit či libovolně kom
 <p data-blk="1" data-part="hrac" data-sec="h1624" id="b10836"><strong>Útok zezadu</strong> — nyní je možné jej realisticky zorganizovat v situaci popsané u akce <em>obrana</em> (viz odpovídající postihy výše).</p>
 <h4 id="h1625">Jiné činnosti</h4>
 <p data-blk="1" data-part="hrac" data-sec="h1625" id="b10837"><strong>Střelecký souboj</strong> — výstřel probíhá jako každý útok, s podmínkou, že cíl střelby musí být alespoň dva hexy daleko a střela musí mít volnou dráhu (spojnice hexů nesmí procházet žádným obsazeným hexem — hranou může). Výstřel nebo vržení zbraně trvá zpravidla dvě po sobě jdoucí akce (normální hod na útok). Věnuje-li postava útoku jen jednu akci, má postih −2; věnuje-li víc než dvě akce, má bonus +1 za každou akci navíc (jednorázový bonus). Postava se střelnou zbraní se může bránit; OZ střelných zbraní je −2, ale každá akce <em>obrana</em> ruší dosavadní proces míření (akce vrh se musí počítat znovu od jedné). Proti střelným a vrhacím zbraním se nelze bránit zbraní (OZ = 0), postih −4 za střelbu zezadu se stále počítá.</p>
-<p data-blk="1" data-part="hrac" data-sec="h1625" id="b10838"><strong>Pohyb</strong> — postava se může před začátkem kola rozhodnout, že nebude bojovat, ale pokusí se zaujmout výhodnější postavení. Hodí si na iniciativu obvyklým způsobem a dostane přídel akcí, z nichž na první akci a nejméně polovinu akcí v daném kole musí použít toliko akce <em>otočka</em> nebo <em>krok</em>. <em>Krok</em> má tu výhodu, že se postava může posunout až o dva hexy. Takový pohyb se nepovažuje za bojovou akci — válečník si při něm nemůže započítávat bonusy za vícenásobné útoky.</p>
+<p class="hb-src" data-blk="1" data-hb="1" data-part="hrac" data-sec="h1625" id="b93078"><em>(Homebrew · domácí úprava, nahrazuje větu „Krok má tu výhodu, že se postava může posunout až o dva hexy“ (běh až o dva hexy, sprint až o tři) · upraveno 16. 10. 2026)</em></p>
+<p data-blk="1" data-hb="1" data-part="hrac" data-sec="h1625" id="b10838"><strong>Pohyb</strong> — postava se může před začátkem kola rozhodnout, že nebude bojovat, ale pokusí se zaujmout výhodnější postavení. Hodí si na iniciativu obvyklým způsobem a dostane přídel akcí, z nichž na první akci a nejméně polovinu akcí v daném kole musí použít toliko akce <em>otočka</em>, <em>krok</em>, <em>běh</em> nebo <em>sprint</em>. <em>Krok</em> vede na sousední hex, <em>běh</em> posune postavu až o dva hexy a <em>sprint</em> až o tři hexy. Takový pohyb se nepovažuje za bojovou akci — válečník si při něm nemůže započítávat bonusy za vícenásobné útoky.</p>
 <p class="cb cb-example" data-blk="1" data-part="hrac" data-sec="h1625" id="b10839"><em>PŘÍKLAD:</em> Roxan se rozhodne diskrétně se z bojiště vzdálit. Hodí na iniciativu a padne mu 4 (dvě akce) — až na něj přijde řada, může se postupně přesunout až 4 hexy daleko.</p>
 <p data-blk="1" data-part="hrac" data-sec="h1625" id="b10840"><strong>Jiné činnosti</strong> — zahrnují zejména pití lektvarů a výměnu zbraní. Každá taková činnost zabere dvě po sobě jdoucí akce a nelze ji přerušit; zaútočí-li někdo mezi první a druhou akcí, postava se nemůže bránit zbraní (postih −3). Pije-li postava lektvar a je úspěšně zasažena (ztratí alespoň jeden život), je 1–3 na 1k6 šance, že jí nevypitý lektvar vypadne z ruky a rozbije se.</p>
 <p data-blk="1" data-part="hrac" data-sec="h1625" id="b10841"><strong>Zranění</strong> — nemá žádný vliv na schopnost podnikat různé akce, kromě toho, co bylo popsáno v základním systému (bojeschopnost, vyřazení, zabití).</p>

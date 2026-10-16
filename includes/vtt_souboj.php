@@ -22,6 +22,7 @@ require_once __DIR__ . '/vtt_iniciativa.php';
 require_once __DIR__ . '/vtt_pohyblivost.php';
 require_once __DIR__ . '/vtt_mapa_stav.php';
 require_once __DIR__ . '/vtt_hexy.php';
+require_once __DIR__ . '/vtt_souboj_pravidla.php';
 
 const DRACAK_VTT_UMYSLY = [
     'kouzleni' => 'Kouzlení',
@@ -39,7 +40,7 @@ const DRACAK_VTT_PREKVAPENI = ['zadne', 'druzina', 'nepratele', 'obe'];
 const DRACAK_VTT_AKCE_DRUHY = [
     'cekani' => 'čekání', 'utok' => 'útok', 'obrana' => 'obrana', 'krok' => 'krok', 'otocka' => 'otočka',
     'krok_utok' => 'krok a útok', 'otocka_utok' => 'otočka a útok', 'obrana_krok' => 'obrana a krok',
-    'jina' => 'jiná činnost', 'kouzleni' => 'kouzlení',
+    'jina' => 'jiná činnost', 'kouzleni' => 'kouzlení', 'beh' => 'běh', 'sprint' => 'sprint',
 ];
 function dracak_vtt_souboj_funkce(): bool
 {

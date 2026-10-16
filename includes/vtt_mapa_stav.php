@@ -78,6 +78,7 @@ function dracak_vtt_tokeny_funkce(): array
         'zamek' => isset($sl['zamceno']) && $udalosti,
         'nazev' => isset($sl['nazev']) && $udalosti,
         'obrazek' => isset($sl['obrazek_id']) && $udalosti && isset($ddl['tabulky']['svet_obrazky']),
+        'hexy' => isset($sl['hexu']) && $udalosti,
         'obecny' => str_contains($ddl['typ_entity'], 'obecny'),
         'kresby' => $udalosti && isset($ddl['tabulky']['mapa_kresby']),
         'udalosti' => $udalosti,
@@ -93,6 +94,7 @@ function dracak_vtt_tokeny_funkce(): array
 const DRACAK_VTT_TOKEN_KLIC_NA_SLOUPEC = [
     'smer' => 'smer',
     'velikost' => 'velikost_sahu',
+    'hexu' => 'hexu',
     'barva' => 'barva',
     'zamceno' => 'zamceno',
     'nazev' => 'nazev',
@@ -110,7 +112,7 @@ function dracak_vtt_token_hodnota_klice(array $radek, string $klic)
     }
     $h = $radek[$sloupec];
     return match ($klic) {
-        'smer', 'z' => (int)$h,
+        'smer', 'z', 'hexu' => (int)$h,
         'velikost' => (float)$h,
         'zamceno', 'viditelny' => (bool)$h,
         'obrazek_id' => $h === null ? null : (int)$h,
@@ -180,6 +182,7 @@ function dracak_vtt_mapa_stav(PDO $pdo, array $user, array $mapa, bool $jePj): a
             'efekty' => [],
             'smer' => isset($t['smer']) ? (int)$t['smer'] : 0,
             'velikost' => isset($t['velikost_sahu']) ? (float)$t['velikost_sahu'] : 1.0,
+            'hexu' => isset($t['hexu']) ? max(1, (int)$t['hexu']) : 1,
             'barva' => isset($t['barva']) && $t['barva'] !== null && $t['barva'] !== '' ? (string)$t['barva'] : null,
             'zamceno' => isset($t['zamceno']) ? (bool)$t['zamceno'] : false,
             'obrazek_id' => isset($t['obrazek_id']) && $t['obrazek_id'] !== null ? (int)$t['obrazek_id'] : null,

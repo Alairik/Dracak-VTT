@@ -147,8 +147,8 @@ Dnešní „Další na tahu“ předává tah po každé jedné akci; podle dom�
 
 ## Otevřené věci
 
-- Hexy: kotva víc-hexového tvora (který hex je „přední“ pro útok na 3 hexy před
-  sebou). Velikost F neexistuje (potvrzeno), největší je E = 5 hexů.
+- ~~Hexy: kotva víc-hexového tvora~~ — vyřešeno 2026-10-16 (viz „2b“ níže): otočný hex,
+  čelo = hrana obou horních hexů (D, E), hlava (zvířecí C). Velikost F neexistuje.
 - Co hráč vidí z pořadí (rozhodnuto): iniciativu **hráčských** postav vidí všichni
   hráči (jejich vlastní i ostatních), iniciativu nestvůr a PJ-ovládaných postav ne;
   nestvůra na tahu je jen zvýrazněná na mapě.
@@ -161,8 +161,14 @@ Dnešní „Další na tahu“ předává tah po každé jedné akci; podle dom�
    - **2a ✔ (hotovo)**: jednohexoví tvorové — krok (i o dva hexy při úmyslu „Pohyb“),
      otočka, výběr cíle útoku ve 3 hexech před tvorem, hexová geometrie v PHP i JS,
      hráč se v souboji hýbe jen akcemi.
-   - **2b**: tvorové zabírající víc hexů (zvířecí C = 2, D = 3, E = 5) — čeká na
-     odsouhlasení tvarů a otáčení.
+   - **2b ✔ (hotovo v kódu, čeká na ruční SQL 0086)**: tvorové zabírající víc hexů
+     (zvířecí C = 2, D = 3, E = 5) s otočným hexem a čelem, Běh (2 hexy) a Sprint (3 hexy)
+     při úmyslu Pohyb, +1 hex s dovedností Běh na krátké vzdálenosti, otočení při pohybu
+     až o 270° (vše HB, rozhodnutí 2026-10-16). Tvary: **D** = trojúhelník (dva hexy
+     nahoře, spodní hex je otočný), **E** = 5 hexů (dva nahoře, pod nimi řada tří, otočný
+     prostřední), čelo = hrana obou horních hexů, útok na všechny hexy sousedící s horními;
+     **zvířecí C** = 2 hexy za sebou, otáčí se kolem zadního, hlava hledí vpřed, útok na
+     3 hexy před hlavou. Stav a detaily: `docs/stav-projektu.md`, kniha h1621/h1623/h1625.
 3. Útok / obrana / výsledek (hody tlačítkem), zranění automaticky + oprava, bojeschopnost,
    vyřazení.
 4. Malý deník nestvůry (staty z čísel v zápisu), kořist.

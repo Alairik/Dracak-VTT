@@ -151,6 +151,38 @@ if ($vzhled) {
     $pdo->prepare("UPDATE tokeny SET $sety WHERE id = ?")->execute([...array_values($vzhled), $tokenId]);
 }
 
+// Kolik hexů nestvůra zabírá (HB, h1623): stejně jako poslední kus téhož druhu ve
+// světě (PJ to nastavuje jednou), jinak podle třídy velikosti z bestiáře — D = 3,
+// E = 5, ostatní 1 (zvířecí C má 2 hexy; to z textu bestiáře nepoznám, PJ
+// si ho přepne u tokenu). Čelo musí odpovídat tvaru (tvary s čelní hranou hledí nahoru).
+if ($dbTypEntity === 'nestvura_instance' && $funkceVzhled['hexy']) {
+    $q = $pdo->prepare(
+        "SELECT t.hexu FROM tokeny t
+         JOIN nestvura_instance ni ON ni.id = t.entita_id AND t.typ_entity = 'nestvura_instance'
+         JOIN mapy mm ON mm.id = ni.mapa_id
+         WHERE ni.nestvura_id = ? AND mm.svet_id = ? AND t.id <> ? ORDER BY t.id DESC LIMIT 1"
+    );
+    $q->execute([$nestvuraId, (int)$mapa['svet_id'], $tokenId]);
+    $predchoziHexu = $q->fetchColumn();
+    if ($predchoziHexu !== false) {
+        $hexu = max(1, (int)$predchoziHexu);
+    } else {
+        $trida = preg_match('/^\s*(A0|A|B|C|D|E)(?![A-Za-z0-9])/u', (string)($nestvura['velikost'] ?? ''), $m) ? $m[1] : '';
+        $hexu = ['D' => 3, 'E' => 5][$trida] ?? 1;
+    }
+    if ($hexu > 1) {
+        $tvar = dracak_vtt_souboj_tvar($hexu);
+        $sety = ['hexu = ?'];
+        $hodnoty = [$hexu];
+        if (dracak_vtt_tokeny_ma_sloupec('smer')) {
+            $sety[] = 'smer = ?';
+            $hodnoty[] = dracak_vtt_hex_smer_z_orientace($tvar, 0);
+        }
+        $hodnoty[] = $tokenId;
+        $pdo->prepare('UPDATE tokeny SET ' . implode(', ', $sety) . ' WHERE id = ?')->execute($hodnoty);
+    }
+}
+
 // Mlha se odhaluje jen pro postavy (viz dracak_vtt_mlha_odhal_kolem_bodu)
 // — nestvůra hráčům vidění nepřidává.
 if ($dbTypEntity === 'postava') {

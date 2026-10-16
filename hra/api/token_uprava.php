@@ -84,6 +84,24 @@ foreach ($zmeny as $klic => $hodnota) {
             $sloupce['velikost_sahu'] = $v;
             $vysledek['velikost'] = $v;
             break;
+        case 'hexu':
+            if (!$funkce['hexy']) token_uprava_chyba(409, 'Tvorové na více hexech ještě nejsou zapnutí (chybí ruční SQL).');
+            $hexu = (int)$hodnota;
+            $tvary = dracak_vtt_souboj_pravidla()['tvary'];
+            if (!isset($tvary[$hexu])) token_uprava_chyba(422, 'Tvor může zabírat ' . implode(', ', array_keys($tvary)) . ' hexů.');
+            $sloupce['hexu'] = $hexu;
+            $vysledek['hexu'] = $hexu;
+            // Čelo musí odpovídat tvaru: stejný druh otáčení zachová orientaci, jiný ji vrátí na výchozí.
+            if ($funkce['smer']) {
+                $starySmer = (float)($token['smer'] ?? 0);
+                $staryTvar = dracak_vtt_souboj_tvar(max(1, (int)($token['hexu'] ?? 1)));
+                $novyTvar = $tvary[$hexu];
+                $orientace = $staryTvar['typ_otaceni'] === $novyTvar['typ_otaceni'] ? dracak_vtt_hex_orientace($staryTvar, $starySmer) : 0;
+                $novySmer = dracak_vtt_hex_smer_z_orientace($novyTvar, $orientace);
+                $sloupce['smer'] = $novySmer;
+                $vysledek['smer'] = $novySmer;
+            }
+            break;
         case 'barva':
             if (!$funkce['barva']) token_uprava_chyba(409, 'Barvy tokenů ještě nejsou zapnuté (chybí ruční SQL).');
             if ($hodnota === null || $hodnota === '') {

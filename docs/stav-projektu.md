@@ -36,11 +36,16 @@ ním čeká, dokud se to neprovede ručně.
 
 **Ruční DDL blok je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný soubor, ve
 kterém jsou všechny dosud neprovedené DDL příkazy; uživatel ho dostává jako
-text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-15):
-nic nečeká.** Bloky pro `0065`–`0081`, `DROP TABLE` tří mrtvých tabulek z
-0008, `0084` (mapa) i `0085` (souboj, krok 1) jsou na produkci provedené
-a `0082` (217 položek ceníku) a `0083` proběhly samy přes `migrate.php`.
-Soubor je prázdný, dokud nepřibude další CREATE/ALTER.
+text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-16):
+čeká blok `0086` (souboj, krok 2b — tvorové na více hexech, Běh/Sprint): sloupec
+`tokeny.hexu`, tabulky `souboj_pohyb` a `tvary_tvoru`, efekt „Běh na krátké
+vzdálenosti“.** Bez něj souboj funguje (běh, sprint i tvary se berou z výchozích
+hodnot v `includes/vtt_souboj_pravidla.php`), jen PJ nemůže tvorovi nastavit počet
+hexů. Bloky pro `0065`–`0081`, `DROP TABLE` tří mrtvých tabulek z 0008, `0084`
+(mapa) i `0085` (souboj, krok 1) jsou na produkci provedené a `0082` (217 položek
+ceníku) a `0083` proběhly samy přes `migrate.php`. Soubor `database/migrations/
+0086_souboj_tvary_pohyb.sql` se do repa přidá až po potvrzení, že ruční SQL proběhlo
+(jinak by deploy zastavil na prvním DDL); pak se ruční blok vyprázdní.
 
 Kód je napsaný tak, že funguje i před ručními kroky (chybějící sloupce
 se berou jako "není"), jen se nic z toho nedá ukládat.
@@ -163,10 +168,45 @@ MariaDB.** Postup, který v session fungoval:
   Geometrie: `includes/vtt_hexy.php` a `assets/js/hexy.js` (stejná matematika,
   shoda ověřena porovnáním výstupů na mřížce buněk; směry čelem 0–5 po 60°, od
   východu po směru hodinových ručiček).
-  **Co ještě chybí v kroku 2:** tvorové zabírající víc hexů (návrh čeká na
-  odsouhlasení uživatelem), dosah dlouhých zbraní (spojí se s krokem 3 — bere se ze
-  zbraně v ruce), pravidlo A0 (tvorové velikosti A0 smí sdílet hex; zatím
-  se neuplatňuje, protože tokeny velikost nenesou) a „Útěk“.
+- **Tvorové na více hexech, Běh a Sprint (blok B, krok 2b; hotový v kódu, čeká na
+  ruční SQL 0086, rozhodnutí uživatele 2026-10-16):**
+  - **Tvary** (tabulka `tvary_tvoru`, výchozí hodnoty v `includes/vtt_souboj_pravidla.php`):
+    1 hex (A0, A, B a humanoidní C), 2 hexy (zvířecí C: otáčí se kolem **zadního** hexu,
+    hlava je před ním), 3 hexy (D: trojúhelník, **spodní** hex je otočný) a 5 hexů
+    (E: nahoře dva hexy, pod nimi řada tří, otočný je prostřední). Čelo tvarů D a E je
+    **hrana obou horních hexů**; zvířecí C a jednohexoví hledí na jednu ze šesti stran.
+    Velikost F neexistuje (potvrzeno), v DB ani v nabídce není. Počet hexů se nastavuje
+    u tokenu (**PJ: panel tokenu → „Zabírá hexů“**; `token_uprava.php` klíč `hexu`);
+    nestvůra přidaná na mapu ho dědí od posledního kusu téhož druhu, jinak podle třídy
+    velikosti z bestiáře (D = 3, E = 5), zvířecí C (2 hexy) musí PJ přepnout ručně.
+  - **Model v kódu:** `tokeny.x/y` = střed otočného hexu, `tokeny.smer` = úhel čela
+    (u tvarů s čelní hranou úhel středu čelní hrany: 270° = nahoru, každá další
+    orientace +60°), tvar = osové offsety vůči otočnému hexu při orientaci 0.
+    Geometrie je v PHP (`includes/vtt_hexy.php`) i JS (`assets/js/hexy.js`), shoda ověřena.
+  - **Pohyb** (tabulka `souboj_pohyb`): Krok 1 hex, **Běh 2 hexy a Sprint 3 hexy** (jen při
+    úmyslu „Pohyb“ — v knize h1625 smí při úmyslu Pohyb krok o dva hexy; sprint = HB),
+    **+1 hex k běhu i sprintu s dovedností Běh na krátké vzdálenosti** (h1698; PJ ji po
+    úspěšném ověření nasadí postavě jako efekt „Běh na krátké vzdálenosti“ na 3 kola,
+    souboj ji pozná podle efektu), **otočení v rámci pohybu až o 270°** (HB; kniha 120°).
+    Celé tělo postupuje hex po hexu přes volné hexy (zeď zastaví hráče, ne PJ), cílový hex
+    i všechny hexy těla v cíli musí být volné. Otočka = otočení kolem otočného hexu.
+  - **Útok:** jednohexový a zvířecí C (2 hexy) útočí na 3 hexy před hlavou; D a E na
+    **všechny hexy sousedící s oběma horními (čelními) hexy** mimo vlastní tělo. Cíl je
+    v dosahu, stojí-li v dosahu kterýkoli hex jeho těla.
+  - **Mapa:** tělo tvora se kreslí průsvitnými hexy kolem otočného hexu a žlutou čarou na
+    čelní hraně (SVG uvnitř elementu tokenu, `assets/js/mapa.js` `nakreslitTelo`). Plánovač
+    akcí (`assets/js/souboj.js`) ukazuje zeleně, kam smí otočný hex, náhled těla a čela po
+    pohybu, šipky čela (u D/E k hranám), tlačítka ↶ ↷ pro otočení po 60° a v liště akcí
+    Běh a Sprint (zamčené, dokud tvor nemá úmysl Pohyb). Rotační úchyt tokenu D/E se
+    přichytává na 30° + 60°.
+  - **Kniha** (`/pravidla.php`): HB bloky b93073–b93078 (krok 270°, běh, sprint, dovednost,
+    Pohyb), b93079–b93087 (tvary, otočný hex, čelo, útok) a PJ b94004 + přepsaný b17388
+    (velikosti hexů).
+  - **Co ještě chybí v kroku 2:** dosah dlouhých zbraní (spojí se s krokem 3 — bere se ze
+    zbraně v ruce), pravidlo A0 (tvorové velikosti A0 smí sdílet hex; zatím se neuplatňuje,
+    protože tokeny velikost nenesou), „Útěk“, omezení běhu/sprintu naložením a únavou,
+    Rozený sprinter (trollobijec, b1507) a větší tvary z knihy (nosorožec 1×4, slon 2×5,
+    drak).
 - **3D kostky (`assets/js/kostky3d.js`):** dřív se kostka ukázala v rohu 300×150 px
   a její čísla s výsledkem v logu nesouhlasila (výsledek losoval server). Teď
   plátno vyplní okno a běžný hod kostkami (`kostka_hod.php`) bere čísla z kostek
@@ -820,8 +860,9 @@ PJ přepíná aktivní mapu. **Chybí / drhne:**
 souboje podle pravidel a návrh oken je v `docs/navrh-souboje-v1.md`, rozhodnutí
 uživatele (hody tlačítkem + 3D kostka, skrytá iniciativa nestvůr, deník nestvůr,
 hexy podle velikosti, iniciativa po třech a kolo ve dvou půlkách = HB) jsou tam
-zapsaná. Krok 1 (zahájení, úmysly, iniciativa, půlky kola) je hotový a zapnutý na
-produkci (ruční SQL 0085 proběhlo); další kroky 2–5 viz „Navržené pořadí stavby“ v návrhu.**
+zapsaná. Krok 1 (zahájení, úmysly, iniciativa, půlky kola) a 2a (akce na hexové mapě)
+jsou hotové a na produkci, krok 2b (tvorové na více hexech, Běh, Sprint) je hotový v kódu
+a čeká na ruční SQL 0086; další kroky 3–5 viz „Navržené pořadí stavby“ v návrhu.**
 9. Dosah pohybu v tahu z pohyblivosti postavy (po naložení a únavě), spotřeba
    bodů pohybu, varování při překročení, zákaz sprintu při únavě [M–L]
 10. Útok z tokenu: cíl → ÚČ vs OČ → hod → zranění → životy (navázat na
