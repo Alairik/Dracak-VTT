@@ -161,7 +161,7 @@ Dnešní „Další na tahu“ předává tah po každé jedné akci; podle dom�
    - **2a ✔ (hotovo)**: jednohexoví tvorové — krok (i o dva hexy při úmyslu „Pohyb“),
      otočka, výběr cíle útoku ve 3 hexech před tvorem, hexová geometrie v PHP i JS,
      hráč se v souboji hýbe jen akcemi.
-   - **2b ✔ (hotovo v kódu, čeká na ruční SQL 0086)**: tvorové zabírající víc hexů
+   - **2b ✔ (hotovo, na produkci)**: tvorové zabírající víc hexů
      (zvířecí C = 2, D = 3, E = 5) s otočným hexem a čelem, Běh (2 hexy) a Sprint (3 hexy)
      při úmyslu Pohyb, +1 hex s dovedností Běh na krátké vzdálenosti, otočení při pohybu
      celkem až o 270° za akci (před pohybem, mezi hexy i po nich), sprint stojí 1 bod

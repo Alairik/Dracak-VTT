@@ -36,17 +36,12 @@ ním čeká, dokud se to neprovede ručně.
 
 **Ruční DDL blok je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný soubor, ve
 kterém jsou všechny dosud neprovedené DDL příkazy; uživatel ho dostává jako
-text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-16):
-čeká blok `0086` (souboj, krok 2b — tvorové na více hexech, Běh/Sprint): sloupec
-`tokeny.hexu`, tabulky `souboj_pohyb` (i se sloupcem `unava_bodu` — bod únavy za
-sprint) a `tvary_tvoru`, efekt „Běh na krátké vzdálenosti“.** Kdo starší verzi bloku už
-spustil, pustí ho znovu — doplní jen sloupec `unava_bodu`. Bez něj souboj funguje (běh, sprint i tvary se berou z výchozích
-hodnot v `includes/vtt_souboj_pravidla.php`), jen PJ nemůže tvorovi nastavit počet
-hexů. Bloky pro `0065`–`0081`, `DROP TABLE` tří mrtvých tabulek z 0008, `0084`
-(mapa) i `0085` (souboj, krok 1) jsou na produkci provedené a `0082` (217 položek
-ceníku) a `0083` proběhly samy přes `migrate.php`. Soubor `database/migrations/
-0086_souboj_tvary_pohyb.sql` se do repa přidá až po potvrzení, že ruční SQL proběhlo
-(jinak by deploy zastavil na prvním DDL); pak se ruční blok vyprázdní.
+text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-16): nic nečeká.**
+Bloky pro `0065`–`0081`, `DROP TABLE` tří mrtvých tabulek z 0008, `0084` (mapa),
+`0085` (souboj, krok 1) i `0086` (souboj, krok 2b: `tokeny.hexu`, tabulky
+`souboj_pohyb` se sloupcem `unava_bodu` a `tvary_tvoru`, efekt „Běh na krátké
+vzdálenosti“) jsou na produkci provedené a `0082` (217 položek ceníku) a `0083`
+proběhly samy přes `migrate.php`. Soubor je prázdný, dokud nepřibude další CREATE/ALTER.
 
 Kód je napsaný tak, že funguje i před ručními kroky (chybějící sloupce
 se berou jako "není"), jen se nic z toho nedá ukládat.
@@ -169,8 +164,8 @@ MariaDB.** Postup, který v session fungoval:
   Geometrie: `includes/vtt_hexy.php` a `assets/js/hexy.js` (stejná matematika,
   shoda ověřena porovnáním výstupů na mřížce buněk; směry čelem 0–5 po 60°, od
   východu po směru hodinových ručiček).
-- **Tvorové na více hexech, Běh a Sprint (blok B, krok 2b; hotový v kódu, čeká na
-  ruční SQL 0086, rozhodnutí uživatele 2026-10-16):**
+- **Tvorové na více hexech, Běh a Sprint (blok B, krok 2b; hotový a na produkci, ruční
+  SQL 0086 proběhlo; rozhodnutí uživatele 2026-10-16):**
   - **Tvary** (tabulka `tvary_tvoru`, výchozí hodnoty v `includes/vtt_souboj_pravidla.php`):
     1 hex (A0, A, B a humanoidní C), 2 hexy (zvířecí C: otáčí se kolem **zadního** hexu,
     hlava je před ním), 3 hexy (D: trojúhelník, **spodní** hex je otočný) a 5 hexů
@@ -874,7 +869,7 @@ uživatele (hody tlačítkem + 3D kostka, skrytá iniciativa nestvůr, deník ne
 hexy podle velikosti, iniciativa po třech a kolo ve dvou půlkách = HB) jsou tam
 zapsaná. Krok 1 (zahájení, úmysly, iniciativa, půlky kola) a 2a (akce na hexové mapě)
 jsou hotové a na produkci, krok 2b (tvorové na více hexech, Běh, Sprint) je hotový v kódu
-a čeká na ruční SQL 0086; další kroky 3–5 viz „Navržené pořadí stavby“ v návrhu.**
+(ruční SQL 0086 proběhlo); další kroky 3–5 viz „Navržené pořadí stavby“ v návrhu.**
 9. Dosah pohybu v tahu z pohyblivosti postavy (po naložení a únavě), spotřeba
    bodů pohybu, varování při překročení, zákaz sprintu při únavě [M–L]
 10. Útok z tokenu: cíl → ÚČ vs OČ → hod → zranění → životy (navázat na
