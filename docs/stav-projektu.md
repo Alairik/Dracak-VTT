@@ -201,11 +201,22 @@ MariaDB.** Postup, který v session fungoval:
     **všechny hexy sousedící s oběma horními (čelními) hexy** mimo vlastní tělo. Cíl je
     v dosahu, stojí-li v dosahu kterýkoli hex jeho těla.
   - **Mapa:** tělo tvora se kreslí průsvitnými hexy kolem otočného hexu a žlutou čarou na
-    čelní hraně (SVG uvnitř elementu tokenu, `assets/js/mapa.js` `nakreslitTelo`). Plánovač
-    akcí (`assets/js/souboj.js`) ukazuje zeleně, kam smí otočný hex, náhled těla a čela po
-    pohybu, šipky čela (u D/E k hranám), tlačítka ↶ ↷ pro otočení po 60° a v liště akcí
-    Běh a Sprint (zamčené, dokud tvor nemá úmysl Pohyb). Rotační úchyt tokenu D/E se
-    přichytává na 30° + 60°.
+    čelní hraně (SVG uvnitř elementu tokenu, `assets/js/mapa.js` `nakreslitTelo`). Rotační
+    úchyt tokenu D/E se přichytává na 30° + 60°.
+  - **Plánování cesty (2c, 2026-10-16):** u Kroku, Běhu a Sprintu hráč/PJ **klikáním zadává
+    body cesty A, B, C (s dovedností až D)** — každý bod je hex hned vedle předchozího, vzdálenější
+    hex se doplní nejkratší trasou (z nejkratších vybere tu s nejmenším otáčením). Tvor se po
+    cestě **sám natáčí ve směru kroku** (u D/E ke dvěma čelům nejblíž současnému), otočení se
+    počítá do rozpočtu 270° (ukazuje „Otočení celkem: 120° z 270°“); přepínač **„Držet čelo“**
+    (pamatuje si ho prohlížeč) vypne natáčení — couvání, úkroky. Konečné čelo po posledním bodu
+    jde změnit klikem do těla nebo ↶ ↷ (stojí otočení). **Dvojklik na posledním bodu** nebo
+    „Potvrdit“ pohyb provede, **„↩ Bod“ / Backspace** vrátí poslední bod, **Enter** potvrdí.
+    Klient posílá `cesta: [{col,row,smer}]` + `smer` (čelo na konci); server ověří stejnou funkcí
+    (`dracak_vtt_hex_over_cestu` = `hexy.overCestu`, shoda ověřena na 400 náhodných případech):
+    sousedství bodů, volná těla v každé poloze i při otáčení na místě, zeď (hráče zastaví),
+    dosah akce a rozpočet otočení. Starší tvar požadavku `cil` + `smer` (server si cestu najde
+    sám, `dracak_vtt_hex_dosazitelne_stavy`) zůstává pro API a testy. Šipky čela a náhled těla
+    na konci cesty se kreslí jako dřív.
   - **Kniha** (`/pravidla.php`): HB bloky b93073–b93078 (krok a otáčení celkem 270° za akci, běh,
     sprint + bod únavy, dovednost, Pohyb), b93079–b93087 (tvary, otočný hex, čelo, útok) a PJ b94004 + přepsaný b17388
     (velikosti hexů).
@@ -868,8 +879,8 @@ souboje podle pravidel a návrh oken je v `docs/navrh-souboje-v1.md`, rozhodnut�
 uživatele (hody tlačítkem + 3D kostka, skrytá iniciativa nestvůr, deník nestvůr,
 hexy podle velikosti, iniciativa po třech a kolo ve dvou půlkách = HB) jsou tam
 zapsaná. Krok 1 (zahájení, úmysly, iniciativa, půlky kola) a 2a (akce na hexové mapě)
-jsou hotové a na produkci, krok 2b (tvorové na více hexech, Běh, Sprint) je hotový v kódu
-(ruční SQL 0086 proběhlo); další kroky 3–5 viz „Navržené pořadí stavby“ v návrhu.**
+jsou hotové a na produkci, stejně tak 2b (tvorové na více hexech, Běh, Sprint; ruční SQL 0086
+proběhlo) a 2c (plánování cesty po bodech); další kroky 3–5 viz „Navržené pořadí stavby“ v návrhu.**
 9. Dosah pohybu v tahu z pohyblivosti postavy (po naložení a únavě), spotřeba
    bodů pohybu, varování při překročení, zákaz sprintu při únavě [M–L]
 10. Útok z tokenu: cíl → ÚČ vs OČ → hod → zranění → životy (navázat na

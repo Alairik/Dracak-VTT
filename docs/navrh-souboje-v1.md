@@ -170,6 +170,9 @@ Dnešní „Další na tahu“ předává tah po každé jedné akci; podle dom�
      prostřední), čelo = hrana obou horních hexů, útok na všechny hexy sousedící s horními;
      **zvířecí C** = 2 hexy za sebou, otáčí se kolem zadního, hlava hledí vpřed, útok na
      3 hexy před hlavou. Stav a detaily: `docs/stav-projektu.md`, kniha h1621/h1623/h1625.
+   - **2c ✔ (hotovo)**: plánování cesty klikáním na body A, B, C (s dovedností D) s automatickým
+     natáčením po směru cesty a rozpočtem otáčení 270° za akci; přepínač „držet čelo“, dvojklik
+     nebo tlačítko potvrdí (viz `docs/stav-projektu.md`).
 3. Útok / obrana / výsledek (hody tlačítkem), zranění automaticky + oprava, bojeschopnost,
    vyřazení.
 4. Malý deník nestvůry (staty z čísel v zápisu), kořist.

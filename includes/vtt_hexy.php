@@ -234,3 +234,93 @@ function dracak_vtt_hex_dosazitelne_stavy(array $tvar, array $odkud, int $orient
     }
     return $vysledek;
 }
+
+// Kolik 60° otočení stojí otočit tělo na místě z orientace $o1 na $o2: nejkratší
+// cestou, a když na ní překáží cizí tvor (těla v mezipolohách musí být na volných
+// hexech), druhou stranou. null = nejde. Stejnou funkci má klient (hexy.js).
+function dracak_vtt_hex_otoceni_mezi(array $tvar, array $pivot, int $o1, int $o2, array $obsazene): ?int
+{
+    $o1 = (($o1 % 6) + 6) % 6;
+    $o2 = (($o2 % 6) + 6) % 6;
+    if ($o1 === $o2) {
+        return 0;
+    }
+    $nejlepsi = null;
+    foreach ([1, -1] as $strana) {
+        $kroku = ((($o2 - $o1) * $strana) % 6 + 6) % 6;
+        $jde = true;
+        for ($i = 1; $i <= $kroku && $jde; $i++) {
+            $o = ((($o1 + $strana * $i) % 6) + 6) % 6;
+            foreach (dracak_vtt_hex_bunky_tvaru($tvar, $pivot, $o) as $b) {
+                if (isset($obsazene[$b[0] . ',' . $b[1]])) {
+                    $jde = false;
+                    break;
+                }
+            }
+        }
+        if ($jde && ($nejlepsi === null || $kroku < $nejlepsi)) {
+            $nejlepsi = $kroku;
+        }
+    }
+    return $nejlepsi;
+}
+
+// Ověří cestu zadanou po bodech (HB, pohyb s plánováním cesty): $cesta = [[col, row,
+// orientace], …] — každý bod je hex hned vedle předchozího a orientace je čelo, se
+// kterým do něj tvor vstupuje (před posunem se na místě otočí z předchozí orientace na
+// tuhle); $oKonec je čelo po posledním bodu. Tělo musí v každé poloze a mezipoloze stát
+// na volných hexech, zeď (je-li $zed) posun zastaví, bodů je nejvýš $dosah a všechna
+// otočení dohromady nejvýš $maxOtoceni (kroků po 60°). Vrací
+//   ['ok' => true, 'otoceni' => kroků po 60°, 'pivot' => [col, row], 'orientace' => int]
+//   ['ok' => false, 'chyba' => prazdna|dlouha|beze_zmeny|nesousedi|telo|zed|otoceni_blokovane|otoceni_rozpocet,
+//    'krok' => index bodu (u otočení na konci počet bodů)]
+// Stejnou funkci má klient (hexy.js overCestu).
+function dracak_vtt_hex_over_cestu(array $tvar, array $odkud, int $o0, array $cesta, int $oKonec, array $obsazene, ?callable $zed, int $dosah, int $maxOtoceni): array
+{
+    if (!$cesta) {
+        return ['ok' => false, 'chyba' => 'prazdna', 'krok' => 0];
+    }
+    if (count($cesta) > $dosah) {
+        return ['ok' => false, 'chyba' => 'dlouha', 'krok' => $dosah];
+    }
+    $p = $odkud;
+    $o = (($o0 % 6) + 6) % 6;
+    $otoceni = 0;
+    foreach (array_values($cesta) as $i => $bod) {
+        $n = [(int)$bod[0], (int)$bod[1]];
+        $oi = (((int)$bod[2]) % 6 + 6) % 6;
+        if (dracak_vtt_hex_vzdalenost($p, $n) !== 1) {
+            return ['ok' => false, 'chyba' => 'nesousedi', 'krok' => $i];
+        }
+        $t = dracak_vtt_hex_otoceni_mezi($tvar, $p, $o, $oi, $obsazene);
+        if ($t === null) {
+            return ['ok' => false, 'chyba' => 'otoceni_blokovane', 'krok' => $i];
+        }
+        $otoceni += $t;
+        if ($otoceni > $maxOtoceni) {
+            return ['ok' => false, 'chyba' => 'otoceni_rozpocet', 'krok' => $i];
+        }
+        foreach (dracak_vtt_hex_bunky_tvaru($tvar, $n, $oi) as $b) {
+            if (isset($obsazene[$b[0] . ',' . $b[1]])) {
+                return ['ok' => false, 'chyba' => 'telo', 'krok' => $i];
+            }
+        }
+        if ($zed !== null && $zed($p, $n)) {
+            return ['ok' => false, 'chyba' => 'zed', 'krok' => $i];
+        }
+        $p = $n;
+        $o = $oi;
+    }
+    if ($p === $odkud) {
+        return ['ok' => false, 'chyba' => 'beze_zmeny', 'krok' => count($cesta) - 1];
+    }
+    $t = dracak_vtt_hex_otoceni_mezi($tvar, $p, $o, $oKonec, $obsazene);
+    if ($t === null) {
+        return ['ok' => false, 'chyba' => 'otoceni_blokovane', 'krok' => count($cesta)];
+    }
+    $otoceni += $t;
+    if ($otoceni > $maxOtoceni) {
+        return ['ok' => false, 'chyba' => 'otoceni_rozpocet', 'krok' => count($cesta)];
+    }
+    return ['ok' => true, 'otoceni' => $otoceni, 'pivot' => $p, 'orientace' => (($oKonec % 6) + 6) % 6];
+}

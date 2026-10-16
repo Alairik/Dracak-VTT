@@ -66,44 +66,65 @@ export function celniHranaBody(cx, cy, size, orient) {
   });
 }
 
-// Kam se tvor dostane jednou pohybovou akcí (krok / běh / sprint, HB): nejvýš `dosah`
-// posunů otočného hexu na sousední hex a v kterémkoli okamžiku (před pohybem, mezi
-// posuny, po nich) se smí otáčet po 60° — dohromady nejvýš `maxOtoceni` takových otočení
-// (270° = 4 kroky po 60°). Tělo musí v každé poloze a orientaci stát na volných hexech
-// (`obsazene`: Set klíčů "col,row"). `zed(a, b)` vrací true, když posun z a na b brání zeď.
-// Vrací Map "col,row,orientace" -> nejmenší počet 60° otočení; stav bez posunu mezi výsledky není.
-// Stejná funkce je v PHP (includes/vtt_hexy.php, dracak_vtt_hex_dosazitelne_stavy).
-export function dosazitelneStavy(tvar, odkud, orientace, dosah, maxOtoceni, obsazene, zed) {
-  const volne = (pivot, o) => bunkyTvaru(tvar, pivot, o).every((b) => !obsazene.has(klic(b)));
-  const otoc = (patro) => {
-    for (let pruchod = 0; pruchod < 6; pruchod++) {
-      for (const [k, t] of Array.from(patro.entries())) {
-        const [c, r, o] = k.split(',').map(Number);
-        for (const d of [-1, 1]) {
-          const o2 = (((o + d) % 6) + 6) % 6;
-          const t2 = t + 1;
-          const k2 = c + ',' + r + ',' + o2;
-          if (t2 <= maxOtoceni && (!patro.has(k2) || t2 < patro.get(k2)) && volne({col: c, row: r}, o2)) patro.set(k2, t2);
-        }
-      }
+// Kolik 60° otočení stojí otočit tělo na místě z orientace o1 na o2: nejkratší cestou, a když
+// na ní překáží cizí tvor (těla v mezipolohách musí být na volných hexech), druhou stranou.
+// null = nejde. `obsazene` = Set klíčů "col,row". Stejná funkce je v PHP (includes/vtt_hexy.php).
+export function otoceniMezi(tvar, pivot, o1, o2, obsazene) {
+  o1 = ((o1 % 6) + 6) % 6;
+  o2 = ((o2 % 6) + 6) % 6;
+  if (o1 === o2) return 0;
+  let nejlepsi = null;
+  for (const strana of [1, -1]) {
+    const kroku = ((((o2 - o1) * strana) % 6) + 6) % 6;
+    let jde = true;
+    for (let i = 1; i <= kroku && jde; i++) {
+      const o = (((o1 + strana * i) % 6) + 6) % 6;
+      if (bunkyTvaru(tvar, pivot, o).some((b) => obsazene.has(klic(b)))) jde = false;
     }
-    return patro;
-  };
-  const vysledek = new Map();
-  let patro = otoc(new Map([[odkud.col + ',' + odkud.row + ',' + orientace, 0]]));
-  for (let posun = 1; posun <= dosah; posun++) {
-    const dalsi = new Map();
-    patro.forEach((t, k) => {
-      const [c, r, o] = k.split(',').map(Number);
-      for (let s = 0; s < 6; s++) {
-        const n = soused({col: c, row: r}, s);
-        if (!volne(n, o) || (zed && zed({col: c, row: r}, n))) continue;
-        const k2 = n.col + ',' + n.row + ',' + o;
-        if (!dalsi.has(k2) || t < dalsi.get(k2)) dalsi.set(k2, t);
-      }
-    });
-    patro = otoc(dalsi);
-    patro.forEach((t, k) => { if (!vysledek.has(k) || t < vysledek.get(k)) vysledek.set(k, t); });
+    if (jde && (nejlepsi === null || kroku < nejlepsi)) nejlepsi = kroku;
   }
-  return vysledek;
+  return nejlepsi;
+}
+
+// Ověří cestu zadanou po bodech (pohyb s plánováním cesty): cesta = [{col, row, o}, …] — každý bod je
+// hex hned vedle předchozího a o je čelo, se kterým do něj tvor vstupuje (před posunem se na místě
+// otočí z předchozí orientace na tuhle); oKonec je čelo po posledním bodu. Tělo musí v každé poloze
+// a mezipoloze stát na volných hexech, zeď (je-li zed(a, b)) posun zastaví, bodů je nejvýš dosah
+// a všechna otočení dohromady nejvýš maxOtoceni (kroků po 60°). Vrací {ok: true, otoceni, pivot, orient}
+// nebo {ok: false, chyba, krok}; chyby: prazdna, dlouha, beze_zmeny, nesousedi, telo, zed,
+// otoceni_blokovane, otoceni_rozpocet. Stejná funkce je v PHP (dracak_vtt_hex_over_cestu).
+export function overCestu(tvar, odkud, o0, cesta, oKonec, obsazene, zed, dosah, maxOtoceni) {
+  if (!cesta.length) return {ok: false, chyba: 'prazdna', krok: 0};
+  if (cesta.length > dosah) return {ok: false, chyba: 'dlouha', krok: dosah};
+  let p = {col: odkud.col, row: odkud.row};
+  let o = ((o0 % 6) + 6) % 6;
+  let otoceni = 0;
+  for (let i = 0; i < cesta.length; i++) {
+    const n = {col: cesta[i].col, row: cesta[i].row};
+    const oi = ((cesta[i].o % 6) + 6) % 6;
+    if (vzdalenost(p, n) !== 1) return {ok: false, chyba: 'nesousedi', krok: i};
+    const t = otoceniMezi(tvar, p, o, oi, obsazene);
+    if (t === null) return {ok: false, chyba: 'otoceni_blokovane', krok: i};
+    otoceni += t;
+    if (otoceni > maxOtoceni) return {ok: false, chyba: 'otoceni_rozpocet', krok: i};
+    if (bunkyTvaru(tvar, n, oi).some((b) => obsazene.has(klic(b)))) return {ok: false, chyba: 'telo', krok: i};
+    if (zed && zed(p, n)) return {ok: false, chyba: 'zed', krok: i};
+    p = n;
+    o = oi;
+  }
+  if (p.col === odkud.col && p.row === odkud.row) return {ok: false, chyba: 'beze_zmeny', krok: cesta.length - 1};
+  const t = otoceniMezi(tvar, p, o, oKonec, obsazene);
+  if (t === null) return {ok: false, chyba: 'otoceni_blokovane', krok: cesta.length};
+  otoceni += t;
+  if (otoceni > maxOtoceni) return {ok: false, chyba: 'otoceni_rozpocet', krok: cesta.length};
+  return {ok: true, otoceni, pivot: p, orient: ((oKonec % 6) + 6) % 6};
+}
+
+// Čelo při chůzi po cestě: tvor se natáčí ve směru kroku (směr 0..5 = k hexu v tom směru).
+// U tvarů s jednou stranou (jeden a dva hexy) je to přímo orientace = směr kroku; u tvarů s čelní
+// hranou (D, E) leží směr kroku mezi dvěma čely — vybere se to, které je od současného čela blíž.
+export function orientDoSmeru(tvar, smerKroku, oAktualni) {
+  if (tvar.typ_otaceni !== 'hrana') return ((smerKroku % 6) + 6) % 6;
+  const kandidati = [smerKroku + 1, smerKroku + 2].map((k) => ((k % 6) + 6) % 6);
+  return kandidati.sort((a, b) => rozdilSmeru(oAktualni, a) - rozdilSmeru(oAktualni, b))[0];
 }

@@ -120,21 +120,10 @@ function dracak_vtt_souboj_pohyb(PDO $pdo, array $mapa, array $token, array $inf
             dracak_vtt_souboj_chyba(422, $rezim['nazev'] . ' je jen při úmyslu „Pohyb“ (ohlašuje se před hodem na iniciativu).');
         }
         $dosah = (int)$rezim['hexu'] + ((int)$rezim['bonus_dovednost'] > 0 ? dracak_vtt_souboj_bonus_behu($pdo, $token) * (int)$rezim['bonus_dovednost'] : 0);
-        $cil = $vstup['cil'] ?? null;
-        if (!is_array($cil) || !isset($cil['col'], $cil['row'])) {
-            dracak_vtt_souboj_chyba(422, $rezim['nazev'] . ' potřebuje cílový hex.');
-        }
-        $kam = [(int)$cil['col'], (int)$cil['row']];
-        $dist = dracak_vtt_hex_vzdalenost($odkud, $kam);
-        if ($dist < 1 || $dist > $dosah) {
-            dracak_vtt_souboj_chyba(422, $dosah === 1
-                ? 'Krok vede na sousední hex (o víc hexů jen při Běhu a Sprintu).'
-                : $rezim['nazev'] . ' vede nejvýš o ' . $dosah . ' ' . ($dosah >= 5 ? 'hexů' : 'hexy') . '.');
-        }
-        // Vedení: tělo postupuje hex po hexu přes volná místa a na cestě se smí otáčet
-        // (před pohybem, mezi posuny, po nich) — celkem nejvýš $otoceniMax stupňů za akci;
-        // hráčům do cesty nesmí vstoupit zeď (PJ smí všude, jako při tažení).
-        $orientaceCil = isset($vstup['smer']) ? dracak_vtt_hex_orientace($tvar, (float)$vstup['smer']) : $orientacePred;
+        $popisDosahu = $dosah === 1
+            ? 'Krok vede na sousední hex (o víc hexů jen při Běhu a Sprintu).'
+            : $rezim['nazev'] . ' vede nejvýš o ' . $dosah . ' ' . ($dosah >= 5 ? 'hexů' : 'hexy') . '.';
+        // Zdi hráčům do cesty nevstoupí (PJ smí všude, jako při tažení).
         $zedFn = null;
         if (!$jePj) {
             $q = $pdo->prepare('SELECT x1, y1, x2, y2 FROM zdi WHERE mapa_id = ? AND blokuje_pohyb = 1');
@@ -157,32 +146,81 @@ function dracak_vtt_souboj_pohyb(PDO $pdo, array $mapa, array $token, array $inf
                 return $pamet[$klic];
             };
         }
-        $stavy = dracak_vtt_hex_dosazitelne_stavy($tvar, $odkud, $orientacePred, $dosah, intdiv($otoceniMax, 60), $obsazene, $zedFn);
-        if (!isset($stavy[$kam[0] . ',' . $kam[1] . ',' . $orientaceCil])) {
-            // Proč ne: cíl (tělem) obsazený, v cestě tvor či zeď, nebo by to vyžadovalo víc otočení, než akce dovolí.
-            $polohaJde = false;
-            for ($o = 0; $o < 6 && !$polohaJde; $o++) {
-                $polohaJde = isset($stavy[$kam[0] . ',' . $kam[1] . ',' . $o]);
-            }
-            $vsechnyObsazene = true;
-            for ($o = 0; $o < 6; $o++) {
-                if (dracak_vtt_souboj_telo_volne(dracak_vtt_hex_bunky_tvaru($tvar, $kam, $o), $obsazene)) {
-                    $vsechnyObsazene = false;
-                    break;
+        $orientaceCil = isset($vstup['smer']) ? dracak_vtt_hex_orientace($tvar, (float)$vstup['smer']) : $orientacePred;
+
+        if (isset($vstup['cesta']) && is_array($vstup['cesta'])) {
+            // Cesta zadaná po bodech A, B, C… (plánování cesty): každý bod je hex vedle předchozího a "smer"
+            // je čelo, se kterým do něj tvor vstupuje (neuvedené = čelo se nemění); "smer" těla požadavku je čelo
+            // po posledním bodu (neuvedené = čelo posledního bodu). Otočení se počítají do rozpočtu akce.
+            $cesta = [];
+            $oCur = $orientacePred;
+            foreach (array_values($vstup['cesta']) as $bod) {
+                if (!is_array($bod) || !isset($bod['col'], $bod['row'])) {
+                    dracak_vtt_souboj_chyba(422, 'Bod cesty potřebuje hex (col, row).');
                 }
+                $oCur = isset($bod['smer']) ? dracak_vtt_hex_orientace($tvar, (float)$bod['smer']) : $oCur;
+                $cesta[] = [(int)$bod['col'], (int)$bod['row'], $oCur];
             }
-            if ($polohaJde) {
-                if (!dracak_vtt_souboj_telo_volne(dracak_vtt_hex_bunky_tvaru($tvar, $kam, $orientaceCil), $obsazene)) {
-                    dracak_vtt_souboj_chyba(422, 'Na tom hexu už někdo stojí (tělo by v tomhle natočení zasahovalo do cizího hexu).');
+            if (count($cesta) > $dosah) {
+                dracak_vtt_souboj_chyba(422, $popisDosahu);
+            }
+            $oKonec = isset($vstup['smer']) ? $orientaceCil : $oCur;
+            $v = dracak_vtt_hex_over_cestu($tvar, $odkud, $orientacePred, $cesta, $oKonec, $obsazene, $zedFn, $dosah, intdiv($otoceniMax, 60));
+            if (!$v['ok']) {
+                $bod = isset($cesta[$v['krok']]) ? 'bod ' . chr(65 + $v['krok']) : 'konec cesty';
+                $chyby = [
+                    'prazdna' => $rezim['nazev'] . ' potřebuje aspoň jeden bod cesty.',
+                    'dlouha' => $popisDosahu,
+                    'beze_zmeny' => 'Cesta končí tam, kde začala — to není pohyb.',
+                    'nesousedi' => 'Cesta musí jít hex po hexu — ' . $bod . ' neleží vedle předchozího.',
+                    'telo' => 'Na cestě (' . $bod . ') už někdo stojí — tělo by zasahovalo do cizího hexu.',
+                    'zed' => 'Na cestě (' . $bod . ') stojí zeď, kterou nejde projít.',
+                    'otoceni_blokovane' => 'U místa „' . $bod . '“ se tělo nemůže otočit — překáží cizí tvor.',
+                    'otoceni_rozpocet' => 'Tvor se při pohybu otočí celkem nejvýš o ' . $otoceniMax . '° (součet všech otočení před pohybem, během něj i po něm) — víc je k ' . $bod . '.',
+                ];
+                dracak_vtt_souboj_chyba(422, $chyby[$v['chyba']] ?? 'Cesta není přípustná.');
+            }
+            $kam = $v['pivot'];
+            $orientace = $v['orientace'];
+        } else {
+            $cil = $vstup['cil'] ?? null;
+            if (!is_array($cil) || !isset($cil['col'], $cil['row'])) {
+                dracak_vtt_souboj_chyba(422, $rezim['nazev'] . ' potřebuje cílový hex.');
+            }
+            $kam = [(int)$cil['col'], (int)$cil['row']];
+            $dist = dracak_vtt_hex_vzdalenost($odkud, $kam);
+            if ($dist < 1 || $dist > $dosah) {
+                dracak_vtt_souboj_chyba(422, $popisDosahu);
+            }
+            // Bez zadané cesty (jen cíl a čelo) server cestu najde sám: tělo postupuje hex po hexu
+            // přes volná místa a na cestě se smí otáčet — celkem nejvýš $otoceniMax stupňů za akci.
+            $stavy = dracak_vtt_hex_dosazitelne_stavy($tvar, $odkud, $orientacePred, $dosah, intdiv($otoceniMax, 60), $obsazene, $zedFn);
+            if (!isset($stavy[$kam[0] . ',' . $kam[1] . ',' . $orientaceCil])) {
+                // Proč ne: cíl (tělem) obsazený, v cestě tvor či zeď, nebo by to vyžadovalo víc otočení, než akce dovolí.
+                $polohaJde = false;
+                for ($o = 0; $o < 6 && !$polohaJde; $o++) {
+                    $polohaJde = isset($stavy[$kam[0] . ',' . $kam[1] . ',' . $o]);
                 }
-                dracak_vtt_souboj_chyba(422, 'Tvor se při pohybu otočí celkem nejvýš o ' . $otoceniMax . '° (součet všech otočení před pohybem, během něj i po něm).');
+                $vsechnyObsazene = true;
+                for ($o = 0; $o < 6; $o++) {
+                    if (dracak_vtt_souboj_telo_volne(dracak_vtt_hex_bunky_tvaru($tvar, $kam, $o), $obsazene)) {
+                        $vsechnyObsazene = false;
+                        break;
+                    }
+                }
+                if ($polohaJde) {
+                    if (!dracak_vtt_souboj_telo_volne(dracak_vtt_hex_bunky_tvaru($tvar, $kam, $orientaceCil), $obsazene)) {
+                        dracak_vtt_souboj_chyba(422, 'Na tom hexu už někdo stojí (tělo by v tomhle natočení zasahovalo do cizího hexu).');
+                    }
+                    dracak_vtt_souboj_chyba(422, 'Tvor se při pohybu otočí celkem nejvýš o ' . $otoceniMax . '° (součet všech otočení před pohybem, během něj i po něm).');
+                }
+                if (!dracak_vtt_souboj_telo_volne(dracak_vtt_hex_bunky_tvaru($tvar, $kam, $orientacePred), $obsazene) || $vsechnyObsazene) {
+                    dracak_vtt_souboj_chyba(422, 'Na tom hexu už někdo stojí' . ($tvar['bunky'] && count($tvar['bunky']) > 1 ? ' (tělo by zasahovalo do cizího hexu).' : '.'));
+                }
+                dracak_vtt_souboj_chyba(422, 'Tam se po cestě nedostaneš — stojí v ní tvor nebo zeď, kterou nejde projít.');
             }
-            if (!dracak_vtt_souboj_telo_volne(dracak_vtt_hex_bunky_tvaru($tvar, $kam, $orientacePred), $obsazene) || $vsechnyObsazene) {
-                dracak_vtt_souboj_chyba(422, 'Na tom hexu už někdo stojí' . ($tvar['bunky'] && count($tvar['bunky']) > 1 ? ' (tělo by zasahovalo do cizího hexu).' : '.'));
-            }
-            dracak_vtt_souboj_chyba(422, 'Tam se po cestě nedostaneš — stojí v ní tvor nebo zeď, kterou nejde projít.');
+            $orientace = $orientaceCil;
         }
-        $orientace = $orientaceCil;
     }
 
     if ($maOtocku) {
