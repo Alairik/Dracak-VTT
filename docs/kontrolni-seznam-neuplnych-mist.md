@@ -395,4 +395,5 @@ knihou a opraví najednou. Pravidlo je v `CLAUDE.md`.
 - [ ] Tabulka rozdílu velikostí (h1610, b10702–b10708) je přepsaná podle knihy, ale má zvláštní hodnoty v řádku A0 (útočník D = 0, E = −2) a ve sloupcích D a E řádků A, B (D: 0 / +2, E: −1 / 0) — odpovídá příkladům z textu (Turih A proti drakovi E −4; drak E proti Turihovi A −1); ponecháno beze změny, ověřit proti knize.
 - [ ] Bez zbraně (postava nemá drženou zbraň): ÚČ kniha nedefinuje jednoznačně (SZ chybí) — systém bere první zbraň s ÚČ z inventáře, jinak PJ doplní číslo; v obraně bez držené zbraně platí −3.
 - [ ] OZ (obrana zbraně) nestvůr bestiář nerozepisuje — při „bránit se“ ji PJ připíše do opravy.
-- [ ] „Obrana a krok“ (h1623) a vícenásobné útoky (válečník, nestvůry) zatím nejsou v útoku zohledněné.
+- [ ] „Obrana a krok“ (h1623): kniha neříká, kdy se krok udělá (před hodem na obranu, nebo až po vyhodnocení zásahu) ani kam smí; zatím jen „bránit se“. Čeká na rozhodnutí.
+- [x] Vícenásobné útoky: v rozšířeném systému jsou bonus k iniciativě (Tabulka vícenásobných útoků v bestiáři; +3 / +6 / +9 / +12 / +15 / +18), každý útok = 1 akce — v útoku nic navíc není potřeba. Do výběru bonusů k iniciativě chyběly řádky +9 až +18 (doplněno migrací 0089).

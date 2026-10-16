@@ -36,15 +36,13 @@ ním čeká, dokud se to neprovede ručně.
 
 **Ruční DDL blok je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný soubor, ve
 kterém jsou všechny dosud neprovedené DDL příkazy; uživatel ho dostává jako
-text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-16): čeká jediný blok — tabulka
-`souboj_vyzva` (výzvy k hodu: útok, obrana, hod proti pasti; „tah v2“, etapa 2). Bez ní souboj funguje
-jako v etapě 1 (útok se jen zapíše do logu); po jejím vytvoření se hody zapnou samy. Po potvrzení
-uživatele se přidá `database/migrations/0088_souboj_vyzva.sql` a soubor se vyprázdní.**
-Dřívější bloky pro `0065`–`0081`, `DROP TABLE` tří mrtvých tabulek z 0008, `0084` (mapa),
+text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-16): nic nečeká.** Tabulka `souboj_vyzva` (výzvy k hodu; migrace `0088`) je na produkci
+provedená a hody v souboji jsou zapnuté.
+Bloky pro `0065`–`0081`, `DROP TABLE` tří mrtvých tabulek z 0008, `0084` (mapa),
 `0085` (souboj, krok 1) i `0086` (souboj, krok 2b: `tokeny.hexu`, tabulky
 `souboj_pohyb` se sloupcem `unava_bodu` a `tvary_tvoru`, efekt „Běh na krátké
 vzdálenosti“) jsou na produkci provedené a `0082` (217 položek ceníku) a `0083`
-proběhly samy přes `migrate.php`.
+proběhly samy přes `migrate.php`. Soubor je prázdný, dokud nepřibude další CREATE/ALTER.
 
 Kód je napsaný tak, že funguje i před ručními kroky (chybějící sloupce
 se berou jako "není"), jen se nic z toho nedá ukládat.
@@ -162,7 +160,7 @@ MariaDB.** Postup, který v session fungoval:
   únava je omezuje (unavená postava max. běh, vyčerpaná jen krok). Plán se průběžně přepočítává
   (dosah, obsazené hexy). **Omezení:** cestu k nepříteli hledá jen nejkratšími trasami (bez
   objížděk).
-- **Hody a výsledek (blok B, „tah v2“, etapa 2; hotovo 2026-10-16, návrh `docs/navrh-tahu-v2.md`):**
+- **Hody a výsledek (blok B, „tah v2“, etapa 2; hotovo a na produkci 2026-10-16, návrh `docs/navrh-tahu-v2.md`):**
   **výzva k hodu** = čekající hod viditelný pro všechny u stolu (karta dole uprostřed mapy,
   `assets/js/souboj.js`; stav v tabulce `souboj_vyzva` z ručního SQL — bez ní zůstává chování z etapy 1,
   útok se jen zapíše). Hody se nikdy nehází samy: tlačítko „Hodit 1k6+“ (3D kostka, po šestce se
@@ -200,9 +198,11 @@ MariaDB.** Postup, který v session fungoval:
   opraveno: `kolo.strany` nese stranu všech tokenů viditelných na mapě.
   **Omezení / další kroky (viz návrh):** OČ a ÚČ nestvůr, které se z textu nespočítají (třeba Goblin: „+1 + síla
   zbraně“), doplňuje PJ před každým hodem — to vyřeší až malý deník nestvůry (krok 4); postava bez držené
-  zbraně útočí první zbraní s ÚČ (výběr zbraně přijde v etapě 4); neřeší se „obrana a krok“, vícenásobné
-  útoky, útok na vyřazeného / neviditelného / nehybného, čtyřstupňová škála hodu na dovednost (fatální
-  úspěch / neúspěch — v přepisu pravidel chybí).
+  zbraně útočí první zbraní s ÚČ (výběr zbraně přijde v etapě 4); neřeší se „obrana a krok“ (kniha neříká, kdy
+  se krok udělá — čeká na rozhodnutí), útok na vyřazeného / neviditelného / nehybného, čtyřstupňová škála hodu na dovednost (fatální
+  úspěch / neúspěch — v přepisu pravidel chybí). **Vícenásobné útoky se v rozšířeném systému řeší bonusem
+  k iniciativě** (Tabulka vícenásobných útoků v pravidlech PJ — bestiář; každý útok i obrana = jedna akce), takže
+  v útoku nic zvláštního nechybí; kniha jen dodává, že nestvůra s víc druhy útoku je střídá v uvedeném pořadí.
 - **Akce na hexové mapě (blok B, krok 2a; hotový, bez ručního SQL):** lišta akcí
   u tvora na tahu (Krok, Otočka, Útok, Krok a útok, Otočka a útok, Obrana, Obrana a
   krok, Čekání, Jiná činnost, Kouzlení). Akce s mapovou částí se plánují klikem na
@@ -940,11 +940,11 @@ hexy podle velikosti, iniciativa po třech a kolo ve dvou půlkách = HB) jsou t
 zapsaná. Krok 1 (zahájení, úmysly, iniciativa, půlky kola) a 2a (akce na hexové mapě)
 jsou hotové a na produkci, stejně tak 2b (tvorové na více hexech, Běh, Sprint; ruční SQL 0086
 proběhlo) a 2c (plánování cesty po bodech); krok 3 (útok, obrana, zranění, hod proti pasti) je hotový
-v kódu jako „tah v2, etapa 2“ a čeká na ruční SQL `souboj_vyzva`; další kroky 4–5 viz „Navržené pořadí
+v kódu i na produkci jako „tah v2, etapa 2“ (ruční SQL `souboj_vyzva` proběhlo); další kroky 4–5 viz „Navržené pořadí
 stavby“ v návrhu.**
 9. Dosah pohybu v tahu z pohyblivosti postavy (po naložení a únavě), spotřeba
    bodů pohybu, varování při překročení, zákaz sprintu při únavě [M–L]
-10. ✔ (tah v2, etapa 2; čeká na ruční SQL `souboj_vyzva`) Útok z tokenu: cíl → ÚČ vs OČ → hod →
+10. ✔ (tah v2, etapa 2, na produkci) Útok z tokenu: cíl → ÚČ vs OČ → hod →
     zranění → životy [L]
 11. ✔ (krok 1) Skupina nestvůr: jeden úmysl a jeden hod iniciativy za stejné
     nestvůry; tahy ale mají zatím každá zvlášť [M]

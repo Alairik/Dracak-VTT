@@ -71,7 +71,7 @@ uprostřed, přeskočí rovnou na výsledek. Server je autorita (klient jen navr
    rozpoznání akce (včetně „běh/sprint a útok“, vše za 1 akci), běh a sprint bez vazby na úmysl,
    lišta akcí zmizí (zbude „Další akce…“), plovoucí potvrzení. Útok se zatím jen zapíše (cíl),
    hody přijdou v etapě 2.
-2. **Hody a výsledek (hotovo v kódu 2026-10-16, čeká na ruční SQL `souboj_vyzva`):** výzva k hodu
+2. **Hody a výsledek (hotovo a na produkci 2026-10-16):** výzva k hodu
    (PJ vidí a upraví), útok proti obraně, okno Obrana, zranění, bojeschopnost a vyřazení; hod proti
    pasti u 4. hexu; bonus za rozběh (+1 ÚČ). Podrobně „Poznámky k etapě 2“ dole.
 3. **Animace a efekty:** přesun po hexech, výpad a číslo zranění, efekty s trváním (hoření,
@@ -80,7 +80,8 @@ uprostřed, přeskočí rovnou na výsledek. Server je autorita (klient jen navr
 
 ## Na co nezapomenout
 
-- Vícenásobné útoky (válečník, nestvůry) a zvláštní útoky (zezadu −4/−6, na vyřazeného, neviditelného,
+- Vícenásobné útoky jsou v rozšířeném systému bonus k iniciativě (víc akcí, každý útok = 1 akce); nestvůra s víc druhy
+  útoku je střídá v uvedeném pořadí (PJ-kniha). Zvláštní útoky (zezadu −4/−6, na vyřazeného, neviditelného,
   naplocho, předstíraný výpad).
 - Útok přeruší tah (h1623, b10821): fronta událostí a stav „čeká na obranu“.
 - Zpět před hodem ano, po hodu ne (zůstává „Krok zpět“ pro PJ).
@@ -129,5 +130,5 @@ uprostřed, přeskočí rovnou na výsledek. Server je autorita (klient jen navr
   „past“ s uloženým požadavkem; po úspěchu `dracak_vtt_past_vyhodnot` nasadí efekt a požadavek provede znovu
   (v téže transakci, jako původní zadavatel).
 - **Vyřazený tvor** tah přeskočí a hráč za něj nejedná; PJ ano.
-- **Nezapomenout dál (etapa 4 a později):** výběr zbraně při útoku, dlouhé zbraně, střelba, „obrana a krok“,
-  vícenásobné útoky, zvláštní útoky (neviditelný, nehybný, na vyřazeného), malý deník nestvůry.
+- **Nezapomenout dál (etapa 4 a později):** výběr zbraně při útoku, dlouhé zbraně, střelba, „obrana a krok“
+  (čeká na pravidlo, kdy se krok udělá), zvláštní útoky (neviditelný, nehybný, na vyřazeného), malý deník nestvůry.
