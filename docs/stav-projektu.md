@@ -150,10 +150,9 @@ MariaDB.** Postup, který v session fungoval:
   **na hexy** (body cesty A, B, C…), **na nepřítele** (systém sám naplánuje cestu k hexu, odkud
   dosáhne, a útok), **do vlastního těla** nebo ↶ ↷ (čelo na konci). Systém z toho pozná akci a cenu
   (`druhPlanu()` v `assets/js/souboj.js`): 1 hex Krok, 2 Běh, 3 Sprint (4 s dovedností), s útokem
-  **Krok a útok = 1 akce, Běh / Sprint a útok = 2 akce** (nové druhy `beh_utok`, `sprint_utok`,
-  `DRACAK_VTT_AKCE_CENA`), bez pohybu Útok / Otočka a útok / Otočka. Plán ukazuje „Sprint a útok · 2
-  akce (zbývá N)“; stojí-li víc, než zbývá v tomhle tahu (kvóta půlky kola), Potvrdit se zamkne a
-  nabídne se „Bez útoku“; „Bez pohybu“ zaútočí z místa. Potvrzení: plovoucí ✓ u konce cesty,
+  **Krok, Běh i Sprint a útok = vždy 1 akce** (nové druhy `beh_utok`, `sprint_utok`; oprava
+  uživatele 2026-10-16), bez pohybu Útok / Otočka a útok / Otočka. Plán ukazuje „Sprint a útok · 1
+  akce (v tomhle tahu zbývá N)“; „Bez útoku“ nechá jen pohyb, „Bez pohybu“ zaútočí z místa. Potvrzení: plovoucí ✓ u konce cesty,
   „Potvrdit“, Enter, nebo dvojklik (na posledním bodu / cíli útoku). Zbylé akce (Čekání, Obrana,
   Obrana a krok, Jiná činnost, Kouzlení) jsou v menu „Další akce…“; čtvercová mapa zůstává na
   prostém seznamu akcí. **Běh a Sprint jsou kdykoli** (úmysl Pohyb je nehlídá — migrace 0087),

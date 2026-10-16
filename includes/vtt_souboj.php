@@ -43,9 +43,8 @@ const DRACAK_VTT_AKCE_DRUHY = [
     'jina' => 'jiná činnost', 'kouzleni' => 'kouzlení', 'beh' => 'běh', 'sprint' => 'sprint',
     'beh_utok' => 'běh a útok', 'sprint_utok' => 'sprint a útok',
 ];
-// Kolik akcí stojí jedno provedení (ostatní 1): krok a útok je podle knihy jedna akce, běh nebo sprint
-// a útok jsou dvě (pohyb + útok; rozhodnutí uživatele 2026-10-16, docs/navrh-tahu-v2.md).
-const DRACAK_VTT_AKCE_CENA = ['beh_utok' => 2, 'sprint_utok' => 2];
+// Cena v akcích: každé provedení stojí jednu akci — i krok, běh nebo sprint spojený s útokem
+// (rozhodnutí uživatele 2026-10-16, docs/navrh-tahu-v2.md).
 function dracak_vtt_souboj_funkce(): bool
 {
     return dracak_vtt_tokeny_funkce()['souboj'];

@@ -309,9 +309,8 @@ export function initSouboj(ctx) {
   const jeHex = () => !!(jeHexMapa && jeHexMapa());
   const aktivniToken = () => (kolo && kolo.aktivni_token_id !== null ? tokenPodleId(kolo.aktivni_token_id) : null);
   const MODY_POHYBU = ['krok', 'beh', 'sprint'];
-  // Co se z plánu pošle serveru: druh pohybu + útok → druh akce (běh nebo sprint a útok stojí 2 akce).
+  // Co se z plánu pošle serveru: druh pohybu + útok → druh akce (každá stojí jednu akci).
   const DRUH_S_UTOKEM = {krok: 'krok_utok', beh: 'beh_utok', sprint: 'sprint_utok'};
-  const CENA_DRUHU = {beh_utok: 2, sprint_utok: 2};
 
   function popisHexu(n) { return n === 1 ? '1 hex' : n + (n <= 4 ? ' hexy' : ' hexů'); }
   function popisAkci(n) { return n + ' ' + akci(n); }
@@ -363,7 +362,7 @@ export function initSouboj(ctx) {
       const box = el('div', 'akce-lista');
       AKCE_PROSTE.forEach((k) => {
         box.append(tlacitko(AKCE_DRUHY[k], 'btn-ghost akce-btn', () => volat('api/tah_akce.php', {token_id: kolo.aktivni_token_id, druh: k}),
-          'Odečte ' + popisAkci(CENA_DRUHU[k] || 1)));
+          'Odečte ' + popisAkci(1)));
       });
       akceEl.append(box);
       akceEl.append(tlacitko('Ukončit tah', 'btn-ghost', () => volat('api/tah_konec.php', {}), 'Zbylé akce tohoto tahu propadnou jako čekání.'));
@@ -603,9 +602,9 @@ export function initSouboj(ctx) {
   const SIPKY_HRANA = ['↑', '↗', '↘', '↓', '↙', '↖'];
   const popisOrient = (o) => (plan.tvar.typ_otaceni === 'hrana' ? SIPKY_HRANA[o] : SMER_SIPKY[o]);
 
-  // --- Co z plánu vychází: druh akce a cena ---
-  // Pohyb o 1 hex = krok, 2 = běh, 3 = sprint (nebo 4 s dovedností); s útokem krok a útok (1 akce),
-  // běh / sprint a útok (2 akce); bez pohybu útok, otočka a útok, nebo jen otočka.
+  // --- Co z plánu vychází: druh akce (vždy za jednu akci) ---
+  // Pohyb o 1 hex = krok, 2 = běh, 3 = sprint (nebo 4 s dovedností); s útokem krok / běh / sprint a útok;
+  // bez pohybu útok, otočka a útok, nebo jen otočka.
   function druhPlanu() {
     const m = plan.cesta.length;
     if (plan.druhVynuceny) return m === 1 ? plan.druhVynuceny : null;
@@ -619,12 +618,11 @@ export function initSouboj(ctx) {
     if (utok) return otoceni ? 'otocka_utok' : 'utok';
     return otoceni ? 'otocka' : null;
   }
-  const cenaDruhu = (druh) => CENA_DRUHU[druh] || 1;
   function planJeHotov() {
     const druh = druhPlanu();
     if (!druh) return false;
     if (plan.cesta.length && !overPlan(plan.cesta, duchOrient()).ok) return false;
-    if (kolo && kolo.kvota !== null && kolo.kvota !== undefined && cenaDruhu(druh) > kolo.kvota) return false;
+    if (kolo && kolo.kvota !== null && kolo.kvota !== undefined && kolo.kvota < 1) return false;
     return true;
   }
 
@@ -647,10 +645,6 @@ export function initSouboj(ctx) {
       const t = plan.cil ? tokenPodleId(plan.cil) : null;
       if (t) casti.push('Útok na: ' + t.label);
       else if (plan.cesta.length) casti.push('Útok: klikni na nepřítele v oranžových hexech (nebo potvrď jen pohyb).');
-    }
-    const cena = druh ? cenaDruhu(druh) : 0;
-    if (druh && kolo && kolo.kvota !== null && kolo.kvota !== undefined && cena > kolo.kvota) {
-      casti.push('Tohle stojí ' + popisAkci(cena) + ', v tomhle tahu máš ještě ' + popisAkci(kolo.kvota) + '. Zruš útok („Bez útoku“) a udělej jen pohyb.');
     }
     return casti;
   }
@@ -677,8 +671,7 @@ export function initSouboj(ctx) {
     const hlavicka = el('b', '', druh ? AKCE_DRUHY[druh] : 'Tah');
     box.append(hlavicka);
     if (druh) {
-      const cena = cenaDruhu(druh);
-      box.append(el('span', 'tah-cena', ' · ' + popisAkci(cena) + (kolo && kolo.kvota ? ' (zbývá ' + kolo.kvota + ')' : '')));
+      box.append(el('span', 'tah-cena', ' · ' + popisAkci(1) + (kolo && kolo.kvota ? ' (v tomhle tahu zbývá ' + kolo.kvota + ')' : '')));
     }
     popisPlanu().forEach((t) => box.append(el('p', 'ini-napoveda', t)));
     const drzet = tlacitko(plan.drzetCelo ? 'Držet čelo' : 'Otáčet se po cestě', 'btn-ghost akce-btn' + (plan.drzetCelo ? ' aktivni' : ''), prepniDrzetCelo,

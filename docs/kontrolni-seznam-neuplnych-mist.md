@@ -383,8 +383,8 @@ knihou a opraví najednou. Pravidlo je v `CLAUDE.md`.
 - [ ] Příklad b10839 (Roxan, iniciativa 4 = dvě akce, „postupně až 4 hexy daleko“) odpovídá pravidlu z knihy (krok o dva hexy); podle HB je běh 2 hexy a sprint 3 (dvě akce sprintu = 6 hexů). Ponecháno podle knihy, při korektuře přepsat.
 - [ ] Překlep v b10838 (Pohyb): „přídel akcí“ → „příděl akcí“ — ponecháno podle knihy.
 - [x] Otočení při pohybu: HB **celkem 270° za akci** (před pohybem, mezi hexy i po nich) — potvrzeno uživatelem 2026-10-16. U jednohexového tvora rozpočet nikdy nepřekáží (čisté otočení je nejvýš 180°), omezuje větší těla mezi překážkami.
-- [ ] Bonus za rozběh: uživatel 2026-10-16 „při sprintu, myslím, pokud sprintuji alespoň 2 akce, dostávám +1 ÚČ“. Obecné pravidlo v knize není (jen zmínky u kouzel a povolání, např. b6374, b7079) — potvrdit znění (2 akce sprintu za sebou těsně před útokem?) a postavit až s hody na útok (tah v2, etapa 2).
-- [ ] Cena: krok a útok = 1 akce (kniha), běh nebo sprint a útok = 2 akce (rozhodnutí uživatele 2026-10-16); běh a sprint kdykoli, kromě únavy (kniha h1625 je vázala na úmysl Pohyb).
+- [x] Bonus za rozběh: HB, uživatel 2026-10-16 — dvě akce sprintu za sebou a následný útok = +1 ÚČ; zapsáno do knihy (b93089–b93090). V kódu přijde s hody na útok (tah v2, etapa 2).
+- [x] Cena: krok, běh i sprint s útokem = 1 akce (kniha h1623 u kroku a útoku, HB u běhu a sprintu — uživatel 2026-10-16); běh a sprint kdykoli, kromě únavy (kniha h1625 je vázala na úmysl Pohyb).
 - [ ] Sprint: +1 bod únavy za použití (HB, 2026-10-16); „unavená postava nesmí sprintovat, vyčerpaná ani běhat“ beru z tabulky únavy (h1634) a uplatňuji jen u postav s vyplněnou odolností. Potvrdit, jestli PJ smí zákaz obejít (teď smí).
 - [ ] Běh a sprint jsem v kódu vázal na úmysl „Pohyb“ (kniha h1625: při úmyslu Pohyb se krok smí protáhnout na dva hexy). Potvrdit, jestli má běh/sprint jít i mimo tento úmysl.
 - [ ] Útok zvířecí C (2 hexy): v kódu 3 hexy před hlavou, jak u jednohexového tvora. Potvrdit proti tomu, jak se to hraje.

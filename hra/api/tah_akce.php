@@ -19,9 +19,9 @@ $druh = (string)($data['druh'] ?? 'jina');
 if (!isset(DRACAK_VTT_AKCE_DRUHY[$druh])) {
     $druh = 'jina';
 }
-// Cena v akcích: počet provedení × cena druhu (běh nebo sprint a útok = 2 akce, ostatní 1).
+// Každé provedení stojí jednu akci (i krok, běh nebo sprint spojený s útokem).
 $opakovani = max(1, min(9, (int)($data['pocet'] ?? 1)));
-$pocet = $opakovani * (DRACAK_VTT_AKCE_CENA[$druh] ?? 1);
+$pocet = $opakovani;
 
 $info = dracak_vtt_souboj_tokeny_info($pdo, $svetId, $mapaId);
 if (!isset($info[$tokenId]) || !dracak_vtt_souboj_ovlada($user, $jePj, $info[$tokenId])) {
@@ -113,7 +113,6 @@ try {
         'druh' => $druh,
         'druh_nazev' => DRACAK_VTT_AKCE_DRUHY[$druh],
         'pocet' => $opakovani,
-        'cena' => $pocet,
         'akce_zbyvajici' => (int)$ki['akce_zbyvajici'] - $pocet,
         'cil_token_id' => $pohyb['mapove'] ? $pohyb['cil_token_id'] : null,
         'cil_label' => $pohyb['mapove'] ? $pohyb['cil_label'] : null,

@@ -7,12 +7,13 @@ provede přesun, hod, obranu a výsledek. Podrobný průběh a rozhodnutí uživ
 
 ## Rozhodnuto (uživatel, 2026-10-16)
 
-- **Krok, běh i sprint stojí jednu akci** (veškerý běžný pohyb). „Krok a útok“ zůstává
-  jedna akce (kniha h1623). **Běh nebo sprint a útok = 2 akce** (pohyb + útok).
+- **Krok, běh i sprint stojí jednu akci** (veškerý běžný pohyb) a **i s následným útokem je to
+  pořád jedna akce** (krok a útok z knihy h1623, běh a útok a sprint a útok jako HB). Oprava
+  uživatele 2026-10-16 — dřív jsem u běhu / sprintu a útoku počítal 2 akce, to neplatí.
 - **Běh a sprint smí kdykoli**, kromě únavy (unavená postava nesmí sprintovat, vyčerpaná
   ani běhat — tabulka únavy h1634). Úmysl „Pohyb“ ovlivňuje jen iniciativu.
-- **Bonus za rozběh:** sprintuje-li tvor aspoň 2 akce (za sebou), dostane k následujícímu
-  útoku **+1 ÚČ** (uživatel „myslím“ — ověřit proti knize, viz otevřené věci).
+- **Bonus za rozběh (HB, zapsáno do knihy b93089–b93090):** sprintuje-li tvor dvě akce za sebou
+  a následně zaútočí (útok smí být spojený s druhým sprintem), má k tomu útoku **+1 ÚČ**.
 - **Čtvrtý hex (sprint s dovedností Běh na krátké vzdálenosti):** při pokusu o 4 hexy bez
   platné dovednosti systém nabídne **hod proti pasti** (past na sílu, střední obtížnost, h1698
   a h1686). Úspěch = dovednost platí 3 kola (+1 hex k běhu a sprintu), neúspěch = nejvýš 3 hexy.
@@ -20,7 +21,7 @@ provede přesun, hod, obranu a výsledek. Podrobný průběh a rozhodnutí uživ
   před hodem změnit obtížnost. Obecný mechanismus „výzva k hodu“ pro všechna místa v
   pravidlech, kde se něco hází; kolik jich bude, zatím nevíme.
 - **Plán se potvrzuje jedním potvrzením** (plovoucí tlačítko u posledního bodu, dvojklik je
-  jen zkratka). Systém vždy ukáže, co vybral („Sprint + Útok = 2 akce“), a jde to změnit
+  jen zkratka). Systém vždy ukáže, co vybral („Sprint a útok · 1 akce“), a jde to změnit
   („jen pohyb“, „jen útok“).
 - **PJ může vynutit a ovládat vše,** včetně přeskočení na dalšího v pořadí; čekání na
   obránce nemá časovač, PJ rozhodne za hráče tlačítkem.
@@ -39,7 +40,7 @@ provede přesun, hod, obranu a výsledek. Podrobný průběh a rozhodnutí uživ
 | nepřítel v dosahu | Útok | 1 |
 | nepřítel v dosahu po otočení | Otočka a útok | 1 |
 | nepřítel 1 hex dál | Krok a útok | 1 |
-| nepřítel 2–4 hexy dál | Běh / Sprint a útok | 2 |
+| nepřítel 2–4 hexy dál | Běh / Sprint a útok | 1 |
 | klik do těla tvora / ↶ ↷ | Otočka (čelo) | 1 |
 | „Další akce…“ | Čekání, Obrana, Obrana a krok, Jiná činnost, Kouzlení | podle akce |
 
@@ -67,7 +68,7 @@ uprostřed, přeskočí rovnou na výsledek. Server je autorita (klient jen navr
 ## Etapy
 
 1. **Klikací tah (hotovo 2026-10-16):** plán cesty + útok na nepřítele z jednoho gesta, automatické
-   rozpoznání akce a ceny (včetně „běh/sprint a útok“ za 2 akce), běh a sprint bez vazby na úmysl,
+   rozpoznání akce (včetně „běh/sprint a útok“, vše za 1 akci), běh a sprint bez vazby na úmysl,
    lišta akcí zmizí (zbude „Další akce…“), plovoucí potvrzení. Útok se zatím jen zapíše (cíl),
    hody přijdou v etapě 2.
 2. **Hody a výsledek:** výzva k hodu (PJ vidí a upraví), útok proti obraně, okno Obrana, zranění,
@@ -89,17 +90,15 @@ uprostřed, přeskočí rovnou na výsledek. Server je autorita (klient jen navr
 
 ## Otevřené věci
 
-- **Bonus za rozběh:** „aspoň 2 akce sprintu“ znamená 2 akce sprintu za sebou těsně před útokem? Obecné
-  pravidlo v knize není (jen zmínky u kouzel a povolání), potřebuji text nebo potvrzení.
 - Jak přesně vypadá past „na sílu“ u dovednosti Běh na krátké vzdálenosti (nebezpečnost „střední“ z
   tabulky pastí h1686) — dohledat, než se postaví hod (etapa 2).
 
 ## Poznámky k etapě 1 (co je hotové a jaká jsou omezení)
 
-- Server: druhy `beh_utok` a `sprint_utok` (cena 2), cena se násobí v `hra/api/tah_akce.php`; bod únavy
-  za sprint se přičítá jednou i u „sprint a útok“; `souboj_pohyb.jen_pri_umyslu` je pro běh a sprint
+- Server: druhy `beh_utok` a `sprint_utok` (stojí 1 akci jako ostatní); bod únavy za sprint se
+  přičítá jednou i u „sprint a útok“; `souboj_pohyb.jen_pri_umyslu` je pro běh a sprint
   NULL (migrace 0087), takže je nehlídá úmysl.
-- Klient: jediný plán „tah“ (`assets/js/souboj.js`), `druhPlanu()` a `cenaDruhu()`; klik na nepřítele
+- Klient: jediný plán „tah“ (`assets/js/souboj.js`), `druhPlanu()`; klik na nepřítele
   hledá nejméně hexů, pak nejméně otáčení; když nedosáhne, naplánuje cestu co nejblíž a řekne proč.
 - Omezení: auto-trasa k nepříteli jde jen nejkratšími cestami (bez objížděk); PJ, který chce tokenem
   volně hýbat, musí plánování vypnout (Esc); útok se zatím jen zapíše.
