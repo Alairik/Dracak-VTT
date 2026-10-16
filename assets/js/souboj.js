@@ -15,14 +15,9 @@ const UMYSLY = {
 const UMYSLY_S_CILEM = ['kouzleni', 'strelba', 'utok'];
 const AKCE_DRUHY = {
   utok: 'Útok', obrana: 'Obrana', krok: 'Krok', beh: 'Běh', sprint: 'Sprint', otocka: 'Otočka', krok_utok: 'Krok a útok',
+  beh_utok: 'Běh a útok', sprint_utok: 'Sprint a útok',
   otocka_utok: 'Otočka a útok', obrana_krok: 'Obrana a krok', kouzleni: 'Kouzlení', jina: 'Jiná činnost', cekani: 'Čekání',
 };
-// Pořadí tlačítek v liště akcí (h1623).
-const AKCE_LISTA = ['krok', 'beh', 'sprint', 'otocka', 'utok', 'krok_utok', 'otocka_utok', 'obrana', 'obrana_krok', 'cekani', 'jina', 'kouzleni'];
-// Které akce mají část na mapě (krok / otočka / cíl útoku), viz includes/vtt_souboj_pohyb.php.
-const S_KROKEM = ['krok', 'krok_utok', 'obrana_krok', 'beh', 'sprint'];
-const S_OTOCKOU = ['otocka', 'otocka_utok'];
-const S_UTOKEM = ['utok', 'krok_utok', 'otocka_utok'];
 const SMER_SIPKY = ['→', '↘', '↙', '←', '↖', '↗'];
 // Pohyb a tvary tvorů: data posílá server (tabulky souboj_pohyb, tvary_tvoru; jinak výchozí hodnoty),
 // tohle jsou jen záložní hodnoty, kdyby je stránka nedodala.
@@ -303,56 +298,82 @@ export function initSouboj(ctx) {
     }
   }
 
-  // --- Lišta akcí (h1623) a plánování akcí na mapě ---
-  // Na hexové mapě mají Krok, Otočka a Útok (i jejich spojení) mapovou část:
-  // klikáš na hexy (zeleně kam smíš, oranžově 3 hexy před tvorem) a až poté se
-  // akce potvrdí. Ostatní akce (Čekání, Obrana, Jiná činnost, Kouzlení) se
-  // odečtou hned. Na čtvercové mapě se odečte vše hned.
+  // --- Tah na hexové mapě: jedno gesto místo hlášení akcí (docs/navrh-tahu-v2.md) ---
+  // Tvor na tahu jen klikne na mapu: na hexy (body cesty A, B, C…), na nepřítele (cesta k němu + útok),
+  // do vlastního těla (čelo). Z toho systém pozná akci (krok / běh / sprint / otočka / útok a jejich
+  // spojení), spočítá cenu v akcích a po potvrzení ji pošle serveru. Plán začíná sám, jakmile je tvor
+  // na tahu; Esc ho do dalšího tahu vypne. Na čtvercové mapě zůstává prosté odečítání akcí.
   let plan = null;
+  const zruseno = new Set(); // tahy (tvor:kolo:půlka), kde hráč plánování vypnul
+  const klicTahu = () => (kolo ? kolo.aktivni_token_id + ':' + kolo.cislo_kola + ':' + kolo.polovina : '');
   const jeHex = () => !!(jeHexMapa && jeHexMapa());
   const aktivniToken = () => (kolo && kolo.aktivni_token_id !== null ? tokenPodleId(kolo.aktivni_token_id) : null);
+  const MODY_POHYBU = ['krok', 'beh', 'sprint'];
+  // Co se z plánu pošle serveru: druh pohybu + útok → druh akce (běh nebo sprint a útok stojí 2 akce).
+  const DRUH_S_UTOKEM = {krok: 'krok_utok', beh: 'beh_utok', sprint: 'sprint_utok'};
+  const CENA_DRUHU = {beh_utok: 2, sprint_utok: 2};
 
   function popisHexu(n) { return n === 1 ? '1 hex' : n + (n <= 4 ? ' hexy' : ' hexů'); }
-  const BEH_ZAMEK = (k) => {
-    const r = POHYB[REZIM[k]];
-    return r && r.jen_pri_umyslu ? r : null;
-  };
+  function popisAkci(n) { return n + ' ' + akci(n); }
 
-  // Kolik hexů smí tvor v této pohybové akci (krok 1, běh 2, sprint 3; dovednost Běh na krátké
-  // vzdálenosti přidá hex k běhu a sprintu — PJ ji nasazuje jako efekt).
-  function dosahPohybu(druh, token) {
-    const r = POHYB[REZIM[druh]] || POHYB.krok;
-    const maDovednost = token && (token.efekty || []).some((e) => String(e).startsWith(EFEKT_BEH_NA_KRATKO));
-    return r.hexu + (r.bonus_dovednost > 0 && maDovednost ? r.bonus_dovednost : 0);
+  // Kolik hexů smí tvor v pohybové akci (krok 1, běh 2, sprint 3; dovednost Běh na krátké vzdálenosti
+  // přidá hex k běhu a sprintu — PJ ji nasazuje jako efekt).
+  const maDovednostBehu = (token) => !!token && (token.efekty || []).some((e) => String(e).startsWith(EFEKT_BEH_NA_KRATKO));
+  function dosahPohybu(mod, token) {
+    const r = POHYB[mod] || POHYB.krok;
+    return r.hexu + (r.bonus_dovednost > 0 && maDovednostBehu(token) ? r.bonus_dovednost : 0);
+  }
+  // Nejvíc hexů, které tvor smí v jedné akci: nejrychlejší pohyb, který mu únava nezakazuje.
+  function nejdalPohybu(token) {
+    const zakazy = (kolo && kolo.aktivni_zakazy) || [];
+    for (const mod of ['sprint', 'beh']) {
+      if (POHYB[mod] && !zakazy.includes(mod)) return dosahPohybu(mod, token);
+    }
+    return dosahPohybu('krok', token);
+  }
+  // Nejlevnější pohyb, který pokryje daný počet hexů (krok ≤ 1, běh ≤ 2 (+1), sprint).
+  function modPohybu(m, token) {
+    return MODY_POHYBU.find((mod) => POHYB[mod] && m <= dosahPohybu(mod, token)) || 'sprint';
   }
 
-  function kreslitListuAkci() {
+  // Menu „Další akce…“: akce bez mapové části se jen odečtou (čekání, obrana, jiná činnost, kouzlení).
+  let dalsiOtevrene = false;
+  function kreslitDalsiAkce() {
+    const d = document.createElement('details');
+    d.className = 'dalsi-akce';
+    d.open = dalsiOtevrene;
+    d.addEventListener('toggle', () => { dalsiOtevrene = d.open; });
+    d.append(el('summary', '', 'Další akce…'));
     const box = el('div', 'akce-lista');
-    const aktivni = aktivniToken();
-    const u = ucastnici.find((x) => x.token_id === kolo.aktivni_token_id);
-    AKCE_LISTA.forEach((k) => {
-      if (REZIM[k] && !POHYB[REZIM[k]]) return;
-      const mapova = jeHex() && (S_KROKEM.includes(k) || S_OTOCKOU.includes(k) || S_UTOKEM.includes(k));
-      const zamek = BEH_ZAMEK(k);
-      const zamceno = !!zamek && (!u || u.umysl !== zamek.jen_pri_umyslu);
-      const pohybova = k === 'beh' || k === 'sprint';
-      const unavaZakaz = pohybova && (kolo.aktivni_zakazy || []).includes(k);
-      const unavaBodu = pohybova && POHYB[k] ? POHYB[k].unava_bodu || 0 : 0;
-      const text = pohybova && jeHex() ? AKCE_DRUHY[k] + ' · ' + popisHexu(dosahPohybu(k, aktivni)) : AKCE_DRUHY[k];
-      const b = tlacitko(text, 'btn-ghost akce-btn' + (mapova ? ' mapova' : ''), () => {
-        if (mapova) zahajitPlan(k);
-        else volat('api/tah_akce.php', {token_id: kolo.aktivni_token_id, druh: k});
-      }, zamceno ? AKCE_DRUHY[k] + ' je jen při úmyslu „' + UMYSLY[zamek.jen_pri_umyslu] + '“ (ohlašuje se před hodem na iniciativu)'
-        : unavaZakaz ? 'Únava: ' + AKCE_DRUHY[k].toLowerCase() + ' postava nesmí'
-          : (mapova ? 'Vybereš na mapě' : 'Odečte jednu akci') + (unavaBodu ? ' · stojí ' + unavaBodu + ' bod únavy za každé použití' : ''));
-      if (zamceno || unavaZakaz) b.disabled = true;
-      box.append(b);
+    [['cekani', 'Čekání'], ['obrana', 'Obrana'], ['jina', 'Jiná činnost'], ['kouzleni', 'Kouzlení']].forEach(([k, text]) => {
+      box.append(tlacitko(text, 'btn-ghost akce-btn', () => volat('api/tah_akce.php', {token_id: kolo.aktivni_token_id, druh: k}), 'Odečte jednu akci'));
     });
-    akceEl.append(box);
+    if (jeHex()) {
+      box.append(tlacitko('Obrana a krok', 'btn-ghost akce-btn mapova', () => zahajitPlan('obrana_krok'), 'Obrana a krok na sousední hex (1 akce) — vybereš na mapě'));
+    }
+    d.append(box);
+    akceEl.append(d);
     akceEl.append(tlacitko('Ukončit tah', 'btn-ghost', () => volat('api/tah_konec.php', {}), 'Zbylé akce tohoto tahu propadnou jako čekání.'));
-    akceEl.append(el('p', 'ini-napoveda', jeHex()
-      ? 'Akce s tečkou (Krok, Běh, Sprint, Otočka, Útok…) vybíráš klikem na mapě; u pohybu klikáš body cesty A, B, C… a dvojklik na posledním bodu ji potvrdí. Obrana a Kouzlení se zatím jen odečtou; hody a zranění přijdou v dalších krocích.'
-      : 'Na této mapě není hexový grid, akce se jen odečtou a zapíšou do logu.'));
+  }
+
+  // Čtvercová mapa (bez hexů): bez plánování, každá akce se jen odečte a zapíše do logu.
+  const AKCE_PROSTE = ['krok', 'beh', 'sprint', 'otocka', 'utok', 'krok_utok', 'otocka_utok', 'beh_utok', 'sprint_utok', 'obrana', 'obrana_krok', 'cekani', 'jina', 'kouzleni'];
+  function kreslitListuAkci() {
+    if (!jeHex()) {
+      const box = el('div', 'akce-lista');
+      AKCE_PROSTE.forEach((k) => {
+        box.append(tlacitko(AKCE_DRUHY[k], 'btn-ghost akce-btn', () => volat('api/tah_akce.php', {token_id: kolo.aktivni_token_id, druh: k}),
+          'Odečte ' + popisAkci(CENA_DRUHU[k] || 1)));
+      });
+      akceEl.append(box);
+      akceEl.append(tlacitko('Ukončit tah', 'btn-ghost', () => volat('api/tah_konec.php', {}), 'Zbylé akce tohoto tahu propadnou jako čekání.'));
+      akceEl.append(el('p', 'ini-napoveda', 'Na této mapě není hexový grid, akce se jen odečtou a zapíšou do logu.'));
+      return;
+    }
+    // Hexová mapa: plánování vypnuté (Esc) — jedním tlačítkem se zapne znovu.
+    akceEl.append(tlacitko('Plánovat tah', 'btn-secondary', () => { zruseno.delete(klicTahu()); zahajitPlan(null); },
+      'Klikáním na mapu naplánuješ pohyb a útok'));
+    kreslitDalsiAkce();
   }
 
   // Přepínač „držet čelo“ (při chůzi po cestě se tvor nenatáčí, třeba při ústupu čelem k nepříteli) si prohlížeč pamatuje.
@@ -360,33 +381,28 @@ export function initSouboj(ctx) {
   const ctiDrzetCelo = () => { try { return localStorage.getItem(DRZET_CELO_KLIC) === '1'; } catch (e) { return false; } };
   const ulozDrzetCelo = (v) => { try { localStorage.setItem(DRZET_CELO_KLIC, v ? '1' : '0'); } catch (e) { /* bez paměti prohlížeče */ } };
 
-  function zahajitPlan(druh) {
+  // druhVynuceny: null = volný tah (pohyb, útok, čelo), 'obrana_krok' = obrana a krok (jen jeden hex, bez útoku)
+  function zahajitPlan(druhVynuceny) {
     const t = aktivniToken();
-    if (!t) return;
-    const zamek = BEH_ZAMEK(druh);
+    if (!t || !jeHex()) return;
     const u = ucastnici.find((x) => x.token_id === t.id);
-    if (zamek && (!u || u.umysl !== zamek.jen_pri_umyslu)) {
-      logLine(AKCE_DRUHY[druh] + ' je jen při úmyslu „' + UMYSLY[zamek.jen_pri_umyslu] + '“.');
-      return;
-    }
     plan = {
-      druh, tokenId: t.id, odkud: pivotTokenu(t), tvar: tvarDe(t), orientPred: orientTokenu(t),
-      umysl: u ? u.umysl : null, kam: null, orient: null, cil: null, x: t.x, y: t.y, smer0: t.smer || 0, hexu0: t.hexu || 1,
-      cesta: [], drzetCelo: ctiDrzetCelo(), posledniKlik: {t: 0, kl: '', x: 0, y: 0},
+      druhVynuceny: druhVynuceny || null, tokenId: t.id, odkud: pivotTokenu(t), tvar: tvarDe(t), orientPred: orientTokenu(t),
+      strana: u ? u.strana : null, kam: null, orient: null, cil: null, x: t.x, y: t.y, smer0: t.smer || 0, hexu0: t.hexu || 1,
+      cesta: [], drzetCelo: ctiDrzetCelo(), posledniKlik: {t: 0, kl: '', x: 0, y: 0}, bublina: null,
     };
-    plan.krok = S_KROKEM.includes(druh);
-    plan.otocka = S_OTOCKOU.includes(druh);
-    plan.utok = S_UTOKEM.includes(druh);
-    plan.otoceniMax = plan.krok ? (POHYB[REZIM[druh]] || POHYB.krok).otoceni_max : 360;
+    plan.otoceniMax = (POHYB.krok || {}).otoceni_max || 270;
     plan.maxOtoceni = Math.floor(plan.otoceniMax / 60);
-    plan.dosah = plan.krok ? dosahPohybu(druh, t) : 0;
+    plan.dosah = plan.druhVynuceny ? 1 : nejdalPohybu(t);
     plan.zabrane = obsazene(plan.tokenId);
     plan.zabraneSet = new Set(plan.zabrane.keys());
     kreslit();
     prekreslitOverlay();
   }
+  // Vypnutí plánování (Esc, „Zrušit“): do dalšího tahu nebo do stisku „Plánovat tah“ se sám nezapne.
   function zrusitPlan() {
     if (!plan) return;
+    zruseno.add(klicTahu());
     plan = null;
     kreslit();
     prekreslitOverlay();
@@ -434,7 +450,7 @@ export function initSouboj(ctx) {
     return (getZdi() || []).some((z) => z.blokuje_pohyb && usecky(sa.x, sa.y, sb.x, sb.y, z.x1, z.y1, z.x2, z.y2));
   }
 
-  // --- Plánování cesty (pohyb: krok / běh / sprint) ---
+  // --- Plánování cesty ---
   // Cesta je řada bodů A, B, C… (u sprintu s dovedností až D): každý bod je hex hned vedle předchozího
   // (vzdálenější hex se doplní nejkratší trasou). Tvor se po cestě sám natáčí ve směru kroku (kdo chce
   // couvat nebo uhýbat bokem, zapne „držet čelo“) a každé otočení se počítá do rozpočtu akce (270°).
@@ -442,6 +458,7 @@ export function initSouboj(ctx) {
   const PISMENA = 'ABCDEFGH';
   const oPoCeste = () => (plan.cesta.length ? plan.cesta[plan.cesta.length - 1].o : plan.orientPred);
   const konecCesty = () => (plan.cesta.length ? plan.cesta[plan.cesta.length - 1] : plan.odkud);
+  const maUtok = () => plan.druhVynuceny === null;
   function overPlan(cesta, oKonec) {
     return hexy.overCestu(plan.tvar, plan.odkud, plan.orientPred, cesta, oKonec, plan.zabraneSet, zedVPrekazi, plan.dosah, plan.maxOtoceni);
   }
@@ -450,6 +467,17 @@ export function initSouboj(ctx) {
     const d = [0, 1, 2, 3, 4, 5].find((k) => stejnaBunka(hexy.soused(cur, k), n));
     const o = drzet ? oCur : hexy.orientDoSmeru(plan.tvar, d, oCur);
     return {col: n.col, row: n.row, o};
+  }
+  // Body z hexů od hexu cur s čelem oCur
+  function bodyZeHexu(cur, oCur, hexyTrasy, drzet) {
+    const body = [];
+    for (const n of hexyTrasy) {
+      const b = sestavBod(cur, oCur, n, drzet);
+      body.push(b);
+      cur = n;
+      oCur = b.o;
+    }
+    return body;
   }
   // Všechny nejkratší řady hexů z cur do cíle (každý krok zmenší vzdálenost o 1; nejvýš pár možností).
   function nejkratsiTrasy(cur, cil) {
@@ -462,10 +490,19 @@ export function initSouboj(ctx) {
     }
     return trasy;
   }
+  // Všechny hexy do vzdálenosti r od b (včetně b).
+  function hexyVPoloměru(b, r) {
+    const [q0, r0] = hexy.naOsy(b);
+    const out = [];
+    for (let dq = -r; dq <= r; dq++) {
+      for (let dr = Math.max(-r, -dq - r); dr <= Math.min(r, -dq + r); dr++) out.push(hexy.zOsy(q0 + dq, r0 + dr));
+    }
+    return out;
+  }
   const popisChyby = (v, body) => {
     const bod = body[v.krok] ? 'bod ' + PISMENA[v.krok] : 'konec cesty';
     switch (v.chyba) {
-      case 'dlouha': return 'Víc bodů už nemáš — ' + POHYB_NAZEV(plan.druh) + ' vede nejvýš o ' + popisHexu(plan.dosah) + '.';
+      case 'dlouha': return 'Víc bodů už nemáš — dál než ' + popisHexu(plan.dosah) + ' nedojdeš.';
       case 'telo': return 'Do hexu (' + bod + ') se tělo nevejde — stojí tam nebo zasahuje cizí tvor.';
       case 'zed': return 'Přes zeď se do hexu (' + bod + ') nedostaneš.';
       case 'otoceni_blokovane': return 'U místa „' + bod + '“ se tělo nemůže otočit — překáží cizí tvor.';
@@ -474,12 +511,22 @@ export function initSouboj(ctx) {
       default: return 'Tudy cesta nevede.';
     }
   };
-  const POHYB_NAZEV = (druh) => (POHYB[REZIM[druh]] || POHYB.krok).nazev;
+  // Proč plán nesahá dál než k plan.dosah hexům: únava, nebo chybějící dovednost na čtvrtý hex.
+  function textMeze() {
+    const t = tokenPodleId(plan.tokenId);
+    const zakazy = (kolo && kolo.aktivni_zakazy) || [];
+    if (plan.druhVynuceny) return 'Obrana a krok vede jen na sousední hex.';
+    if (zakazy.includes('sprint')) return 'Unavená postava nesmí sprintovat — dál než ' + popisHexu(plan.dosah) + ' nedojdeš.';
+    if (!maDovednostBehu(t) && (POHYB.sprint || {}).bonus_dovednost > 0) {
+      return 'Čtvrtý bod potřebuje dovednost Běh na krátké vzdálenosti — ověření (hod proti pasti) přijde v dalším kroku, zatím ji PJ nasazuje ručně jako efekt.';
+    }
+    return 'Víc bodů už nemáš — dál než ' + popisHexu(plan.dosah) + ' nedojdeš.';
+  }
 
   // Přidá bod (nebo trasu k bodu) na konec cesty; vrací text chyby nebo null.
   function pridejDoHexu(c) {
     const cur = konecCesty();
-    if (plan.cesta.length >= plan.dosah) return 'Víc bodů už nemáš — ' + POHYB_NAZEV(plan.druh) + ' vede nejvýš o ' + popisHexu(plan.dosah) + '.';
+    if (plan.cesta.length >= plan.dosah) return textMeze();
     const zbyva = plan.dosah - plan.cesta.length;
     const d = hexy.vzdalenost(cur, c);
     if (d === 0) return null;
@@ -501,19 +548,8 @@ export function initSouboj(ctx) {
     plan.kam = {col: c.col, row: c.row};
     return null;
   }
-  // Body z hexů od hexu cur s čelem oCur
-  function bodyZeHexu(cur, oCur, hexyTrasy, drzet) {
-    const body = [];
-    for (const n of hexyTrasy) {
-      const b = sestavBod(cur, oCur, n, drzet);
-      body.push(b);
-      cur = n;
-      oCur = b.o;
-    }
-    return body;
-  }
   function zpetOBod() {
-    if (!plan || !plan.krok || !plan.cesta.length) return;
+    if (!plan || !plan.cesta.length) return;
     plan.cesta.pop();
     plan.kam = plan.cesta.length ? {col: konecCesty().col, row: konecCesty().row} : null;
     if (plan.orient !== null && plan.cesta.length && !overPlan(plan.cesta, plan.orient).ok) plan.orient = null;
@@ -523,7 +559,7 @@ export function initSouboj(ctx) {
   }
   // Přepnutí „po směru cesty“ / „držet čelo“: cesta se přepočítá ze stejných hexů.
   function prepniDrzetCelo() {
-    if (!plan || !plan.krok) return;
+    if (!plan) return;
     const nove = !plan.drzetCelo;
     if (plan.cesta.length) {
       const body = bodyZeHexu(plan.odkud, plan.orientPred, plan.cesta.map((p) => ({col: p.col, row: p.row})), nove);
@@ -540,7 +576,7 @@ export function initSouboj(ctx) {
   // Hexy vedle konce cesty, kam lze udělat další krok (v aktuálním režimu otáčení).
   function dalsiKroky() {
     const m = new Map();
-    if (!plan.krok || plan.cesta.length >= plan.dosah) return m;
+    if (plan.cesta.length >= plan.dosah) return m;
     const cur = konecCesty(), oCur = oPoCeste();
     for (let k = 0; k < 6; k++) {
       const n = hexy.soused(cur, k);
@@ -555,55 +591,77 @@ export function initSouboj(ctx) {
   const duchOrient = () => (plan.orient !== null ? plan.orient : oPoCeste());
 
   function orientPovolena(o) {
-    if (plan.otocka && o === plan.orientPred) return false;
-    if (plan.krok && plan.cesta.length) return overPlan(plan.cesta, o).ok;
-    if (plan.krok && hexy.rozdilSmeru(plan.orientPred, o) > plan.maxOtoceni) return false;
-    return teloVolne(hexy.bunkyTvaru(plan.tvar, duchBunka(), o), plan.zabrane);
+    if (plan.cesta.length) return overPlan(plan.cesta, o).ok;
+    // bez cesty je to otočka na místě: libovolný úhel, tělo se ale cestou nesmí střetnout s cizím tvorem
+    return hexy.otoceniMezi(plan.tvar, plan.odkud, plan.orientPred, o, plan.zabraneSet) !== null;
   }
   function duvodZakazuOrient(o) {
-    if (plan.otocka && o === plan.orientPred) return 'Tímhle směrem už hledíš.';
     if (!teloVolne(hexy.bunkyTvaru(plan.tvar, duchBunka(), o), plan.zabrane)) return 'Tak otočené by tělo zasahovalo do cizího hexu.';
+    if (!plan.cesta.length) return 'Otočit se tam nejde — cestou překáží cizí tvor.';
     return 'Při pohybu se tvor otočí celkem nejvýš o ' + plan.otoceniMax + '° (součet všech otočení před pohybem, během něj i po něm).';
   }
   const SIPKY_HRANA = ['↑', '↗', '↘', '↓', '↙', '↖'];
   const popisOrient = (o) => (plan.tvar.typ_otaceni === 'hrana' ? SIPKY_HRANA[o] : SMER_SIPKY[o]);
 
-  function popisPlanu() {
-    const casti = [];
-    if (plan.krok) {
-      if (!plan.cesta.length) {
-        casti.push('Klikej na hexy, kudy půjdeš: bod A, B, C… (až ' + popisHexu(plan.dosah) + ', každý hned vedle předchozího; vzdálenější hex doplní nejkratší trasu).');
-      } else {
-        casti.push('Cesta: ' + plan.cesta.map((p, i) => PISMENA[i]).join(' → ') + ' (' + plan.cesta.length + ' z ' + popisHexu(plan.dosah) + ')');
-        const v = overPlan(plan.cesta, duchOrient());
-        if (v.ok) casti.push('Otočení celkem: ' + v.otoceni * 60 + '° z ' + plan.otoceniMax + '°');
-      }
+  // --- Co z plánu vychází: druh akce a cena ---
+  // Pohyb o 1 hex = krok, 2 = běh, 3 = sprint (nebo 4 s dovedností); s útokem krok a útok (1 akce),
+  // běh / sprint a útok (2 akce); bez pohybu útok, otočka a útok, nebo jen otočka.
+  function druhPlanu() {
+    const m = plan.cesta.length;
+    if (plan.druhVynuceny) return m === 1 ? plan.druhVynuceny : null;
+    const t = tokenPodleId(plan.tokenId);
+    const utok = plan.cil !== null;
+    if (m >= 1) {
+      const mod = modPohybu(m, t);
+      return utok ? DRUH_S_UTOKEM[mod] : mod;
     }
-    if (plan.krok || plan.otocka) {
-      casti.push(plan.orient !== null ? 'Čelo na konci: ' + popisOrient(plan.orient)
-        : (plan.otocka ? 'Klikni do těla tvora směrem, kam se otočí (nebo použij tlačítka ↶ ↷)'
-          : 'Čelo na konci: ' + popisOrient(duchOrient()) + (plan.cesta.length ? ' (změníš klikem do těla tvora nebo ↶ ↷; stojí otočení)' : '')));
-    }
-    if (plan.krok && plan.cesta.length && !plan.utok) casti.push('Dvojklik na posledním bodu nebo „Potvrdit“ pohyb provede.');
-    if (plan.utok) {
-      const t = plan.cil ? tokenPodleId(plan.cil) : null;
-      casti.push(t ? 'Útok na: ' + t.label : 'Klikni na tvora v oranžových hexech před sebou (nebo potvrď bez cíle)');
-    }
-    return casti;
+    const otoceni = duchOrient() !== plan.orientPred;
+    if (utok) return otoceni ? 'otocka_utok' : 'utok';
+    return otoceni ? 'otocka' : null;
   }
+  const cenaDruhu = (druh) => CENA_DRUHU[druh] || 1;
   function planJeHotov() {
-    if (plan.krok && (!plan.cesta.length || !overPlan(plan.cesta, duchOrient()).ok)) return false;
-    if (plan.otocka && plan.orient === null) return false;
+    const druh = druhPlanu();
+    if (!druh) return false;
+    if (plan.cesta.length && !overPlan(plan.cesta, duchOrient()).ok) return false;
+    if (kolo && kolo.kvota !== null && kolo.kvota !== undefined && cenaDruhu(druh) > kolo.kvota) return false;
     return true;
   }
 
+  function popisPlanu() {
+    const casti = [];
+    const druh = druhPlanu();
+    if (!druh && !plan.cesta.length && plan.cil === null) {
+      casti.push(plan.druhVynuceny ? 'Klikni na sousední hex, kam uděláš krok.'
+        : 'Klikni na hex (body cesty A, B, C… až ' + popisHexu(plan.dosah) + '), na nepřítele (dojde k němu a zaútočí) nebo do vlastního těla (čelo).');
+    }
+    if (plan.cesta.length) {
+      casti.push('Cesta: ' + plan.cesta.map((p, i) => PISMENA[i]).join(' → ') + ' (' + plan.cesta.length + ' z ' + popisHexu(plan.dosah) + ')');
+      const v = overPlan(plan.cesta, duchOrient());
+      if (v.ok) casti.push('Otočení celkem: ' + v.otoceni * 60 + '° z ' + plan.otoceniMax + '°');
+    }
+    if (plan.cesta.length || plan.orient !== null) {
+      casti.push('Čelo na konci: ' + popisOrient(duchOrient()) + (plan.cesta.length && plan.orient === null ? ' (změníš klikem do těla tvora nebo ↶ ↷; stojí otočení)' : ''));
+    }
+    if (maUtok()) {
+      const t = plan.cil ? tokenPodleId(plan.cil) : null;
+      if (t) casti.push('Útok na: ' + t.label);
+      else if (plan.cesta.length) casti.push('Útok: klikni na nepřítele v oranžových hexech (nebo potvrď jen pohyb).');
+    }
+    const cena = druh ? cenaDruhu(druh) : 0;
+    if (druh && kolo && kolo.kvota !== null && kolo.kvota !== undefined && cena > kolo.kvota) {
+      casti.push('Tohle stojí ' + popisAkci(cena) + ', v tomhle tahu máš ještě ' + popisAkci(kolo.kvota) + '. Zruš útok („Bez útoku“) a udělej jen pohyb.');
+    }
+    return casti;
+  }
+
   function otocOPlan(krok) {
-    if (!plan || !(plan.krok || plan.otocka)) return;
+    if (!plan) return;
     let o = duchOrient();
     for (let i = 0; i < 5; i++) {
       o = ((o + krok) % 6 + 6) % 6;
       if (orientPovolena(o)) {
-        plan.orient = o;
+        plan.orient = (!plan.cesta.length && o === plan.orientPred) ? null : o;
         if (plan.cil && !predniJeCil(plan.cil)) plan.cil = null;
         kreslit();
         prekreslitOverlay();
@@ -614,39 +672,47 @@ export function initSouboj(ctx) {
   }
 
   function kreslitPlan() {
+    const druh = druhPlanu();
     const box = el('div', 'tah-plan');
-    box.append(el('b', '', AKCE_DRUHY[plan.druh]));
+    const hlavicka = el('b', '', druh ? AKCE_DRUHY[druh] : 'Tah');
+    box.append(hlavicka);
+    if (druh) {
+      const cena = cenaDruhu(druh);
+      box.append(el('span', 'tah-cena', ' · ' + popisAkci(cena) + (kolo && kolo.kvota ? ' (zbývá ' + kolo.kvota + ')' : '')));
+    }
     popisPlanu().forEach((t) => box.append(el('p', 'ini-napoveda', t)));
-    if (plan.krok) {
-      const drzet = tlacitko(plan.drzetCelo ? 'Držet čelo' : 'Otáčet se po cestě', 'btn-ghost akce-btn' + (plan.drzetCelo ? ' aktivni' : ''), prepniDrzetCelo,
-        plan.drzetCelo ? 'Tvor se při chůzi nenatáčí (couvání, úkroky). Klikni pro automatické otáčení ve směru kroku.'
-          : 'Tvor se při chůzi sám natáčí ve směru kroku a otočení se počítá do rozpočtu. Klikni, když se nemá natáčet („držet čelo“).');
-      box.append(drzet);
-    }
+    const drzet = tlacitko(plan.drzetCelo ? 'Držet čelo' : 'Otáčet se po cestě', 'btn-ghost akce-btn' + (plan.drzetCelo ? ' aktivni' : ''), prepniDrzetCelo,
+      plan.drzetCelo ? 'Tvor se při chůzi nenatáčí (couvání, úkroky). Klikni pro automatické otáčení ve směru kroku.'
+        : 'Tvor se při chůzi sám natáčí ve směru kroku a otočení se počítá do rozpočtu. Klikni, když se nemá natáčet („držet čelo“).');
+    box.append(drzet);
     const r = el('div', 'tah-ovladani');
-    if (plan.krok) {
-      const zpet = tlacitko('↩ Bod', 'btn-ghost akce-btn', zpetOBod, 'Zpět o jeden bod cesty (Backspace)');
-      zpet.disabled = !plan.cesta.length;
-      r.append(zpet);
-    }
-    if (plan.krok || plan.otocka) {
-      r.append(
-        tlacitko('↶', 'btn-ghost akce-btn', () => otocOPlan(-1), 'Otočit čelo na konci o 60° doleva'),
-        tlacitko('↷', 'btn-ghost akce-btn', () => otocOPlan(1), 'Otočit čelo na konci o 60° doprava'),
-      );
-    }
-    const potvrdit = tlacitko('Potvrdit', 'btn-secondary', odeslatPlan);
+    const zpet = tlacitko('↩ Bod', 'btn-ghost akce-btn', zpetOBod, 'Zpět o jeden bod cesty (Backspace)');
+    zpet.disabled = !plan.cesta.length;
+    r.append(
+      zpet,
+      tlacitko('↶', 'btn-ghost akce-btn', () => otocOPlan(-1), 'Otočit čelo na konci o 60° doleva'),
+      tlacitko('↷', 'btn-ghost akce-btn', () => otocOPlan(1), 'Otočit čelo na konci o 60° doprava'),
+    );
+    const potvrdit = tlacitko('Potvrdit', 'btn-secondary', odeslatPlan, 'Provede plán (Enter)');
     potvrdit.disabled = !planJeHotov();
-    r.append(potvrdit, tlacitko('Zrušit', 'btn-ghost', zrusitPlan));
+    r.append(potvrdit, tlacitko('Zrušit', 'btn-ghost', zrusitPlan, 'Vypne plánování do dalšího tahu (Esc)'));
     box.append(r);
+    if (plan.cil !== null) {
+      const u = el('div', 'tah-ovladani');
+      u.append(tlacitko('Bez útoku', 'btn-ghost akce-btn', () => { plan.cil = null; kreslit(); prekreslitOverlay(); }, 'Jen pohyb, útok vynechat'));
+      if (plan.cesta.length) u.append(tlacitko('Bez pohybu', 'btn-ghost akce-btn', jenUtok, 'Zaútočit z místa (jen otočit, když je potřeba)'));
+      box.append(u);
+    }
     akceEl.append(box);
+    kreslitDalsiAkce();
   }
 
   function odeslatPlan() {
     if (!plan || !planJeHotov()) return;
-    const telo = {token_id: plan.tokenId, druh: plan.druh};
-    if (plan.krok) telo.cesta = plan.cesta.map((p) => ({col: p.col, row: p.row, smer: hexy.smerZOrientace(plan.tvar, p.o)}));
-    if (plan.orient !== null) telo.smer = hexy.smerZOrientace(plan.tvar, plan.orient);
+    const druh = druhPlanu();
+    const telo = {token_id: plan.tokenId, druh};
+    if (plan.cesta.length) telo.cesta = plan.cesta.map((p) => ({col: p.col, row: p.row, smer: hexy.smerZOrientace(plan.tvar, p.o)}));
+    if (plan.orient !== null || druh === 'otocka' || druh === 'otocka_utok') telo.smer = hexy.smerZOrientace(plan.tvar, duchOrient());
     if (plan.cil) telo.cil_token_id = plan.cil;
     postJson('api/tah_akce.php', Object.assign({mapa_id: mapaId}, telo)).then((d) => {
       if (d.error) { logLine('Chyba: ' + d.error); return; }
@@ -655,18 +721,119 @@ export function initSouboj(ctx) {
     });
   }
 
-  // Dvojklik potvrdí: pohyb na posledním bodu cesty, otočku na vlastním hexu, útok na zvoleném cíli.
+  // --- Útok: klik na nepřítele naplánuje cestu k němu a útok ---
+  const jeNepritel = (t) => {
+    const u = ucastnici.find((x) => x.token_id === t.id);
+    return !!u && !!plan.strana && u.strana !== plan.strana;
+  };
+  const jeVDosahuUtoku = (T, pivot, o) => {
+    const telo = new Set(teloTokenu(T).map(klicBunky));
+    return hexy.dosahUtoku(plan.tvar, pivot, o).some((b) => telo.has(klicBunky(b)));
+  };
+  // Vrací text chyby/oznámení (nebo null).
+  function naplanujUtok(T) {
+    // 1) Cesta už je (nebo se jen otáčím): stačí cíl, případně čelo na konci
+    const konec = duchBunka();
+    if (jeVDosahuUtoku(T, konec, duchOrient())) { plan.cil = T.id; return null; }
+    let o1 = null;
+    for (let o = 0; o < 6; o++) {
+      if (!orientPovolena(o) || !jeVDosahuUtoku(T, konec, o)) continue;
+      if (o1 === null || hexy.rozdilSmeru(duchOrient(), o) < hexy.rozdilSmeru(duchOrient(), o1)) o1 = o;
+    }
+    if (o1 !== null) {
+      plan.orient = (!plan.cesta.length && o1 === plan.orientPred) ? null : o1;
+      plan.cil = T.id;
+      return null;
+    }
+    // 2) Od začátku: nejméně hexů, pak nejméně otáčení; z poslední polohy nejlepší hex, odkud cíl dosáhne
+    const kandidati = [];
+    hexyVPoloměru(plan.odkud, plan.dosah).forEach((P) => {
+      const d = hexy.vzdalenost(plan.odkud, P);
+      for (let o = 0; o < 6; o++) {
+        if (!jeVDosahuUtoku(T, P, o)) continue;
+        if (d === 0) {
+          const t = hexy.otoceniMezi(plan.tvar, plan.odkud, plan.orientPred, o, plan.zabraneSet);
+          if (t !== null) kandidati.push({d, turns: t, cesta: [], P, o});
+        } else {
+          nejkratsiTrasy(plan.odkud, P).forEach((trasa) => {
+            const body = bodyZeHexu(plan.odkud, plan.orientPred, trasa, plan.drzetCelo);
+            const v = overPlan(body, o);
+            if (v.ok) kandidati.push({d, turns: v.otoceni, cesta: body, P, o});
+          });
+        }
+      }
+    });
+    kandidati.sort((a, b) => a.d - b.d || a.turns - b.turns);
+    if (kandidati.length) {
+      const k = kandidati[0];
+      plan.cesta = k.cesta;
+      plan.kam = k.cesta.length ? {col: k.P.col, row: k.P.row} : null;
+      const prirozene = k.cesta.length ? k.cesta[k.cesta.length - 1].o : plan.orientPred;
+      plan.orient = k.o !== prirozene ? k.o : null;
+      plan.cil = T.id;
+      return null;
+    }
+    // 3) Nedosáhne: cesta co nejblíž (bez útoku)
+    const teloT = teloTokenu(T);
+    let nejblize = null;
+    hexyVPoloměru(plan.odkud, plan.dosah).forEach((P) => {
+      const d = hexy.vzdalenost(plan.odkud, P);
+      if (d === 0) return;
+      const kdeKonci = Math.min(...teloT.map((b) => hexy.vzdalenost(P, b)));
+      nejkratsiTrasy(plan.odkud, P).forEach((trasa) => {
+        const body = bodyZeHexu(plan.odkud, plan.orientPred, trasa, plan.drzetCelo);
+        const v = overPlan(body, body[body.length - 1].o);
+        if (!v.ok) return;
+        if (nejblize === null || kdeKonci < nejblize.kdeKonci || (kdeKonci === nejblize.kdeKonci && (d < nejblize.d || (d === nejblize.d && v.otoceni < nejblize.turns)))) {
+          nejblize = {kdeKonci, d, turns: v.otoceni, body, P};
+        }
+      });
+    });
+    if (nejblize !== null) {
+      plan.cesta = nejblize.body;
+      plan.kam = {col: nejblize.P.col, row: nejblize.P.row};
+      plan.orient = null;
+      plan.cil = null;
+      return 'Na ' + T.label + ' tentokrát nedosáhneš (nejdál ' + popisHexu(plan.dosah) + ') — plán vede co nejblíž, zaútočíš dalším tahem.';
+    }
+    return 'Na ' + T.label + ' se nedá dojít ani zaútočit.';
+  }
+  // „Bez pohybu“: zaútočit z místa (otočit se jen, když je potřeba)
+  function jenUtok() {
+    const T = plan.cil ? tokenPodleId(plan.cil) : null;
+    if (!T) return;
+    const stareCesta = plan.cesta, stareKam = plan.kam, stareOrient = plan.orient;
+    plan.cesta = [];
+    plan.kam = null;
+    plan.orient = null;
+    let o1 = null;
+    for (let o = 0; o < 6; o++) {
+      if (!orientPovolena(o) || !jeVDosahuUtoku(T, plan.odkud, o)) continue;
+      if (o1 === null || hexy.rozdilSmeru(plan.orientPred, o) < hexy.rozdilSmeru(plan.orientPred, o1)) o1 = o;
+    }
+    if (o1 === null) {
+      plan.cesta = stareCesta; plan.kam = stareKam; plan.orient = stareOrient;
+      logLine('Z místa na ' + T.label + ' nedosáhneš.');
+      return;
+    }
+    plan.orient = o1 === plan.orientPred ? null : o1;
+    kreslit();
+    prekreslitOverlay();
+  }
+
+  // Dvojklik potvrdí: útok na zvoleném cíli, pohyb na posledním bodu cesty, otočku na vlastním hexu.
   function dvojklikPotvrzuje(c) {
     if (!planJeHotov()) return false;
-    if (plan.utok) return !!plan.cil && (tvorNaBunce(c) || {}).id === plan.cil;
-    if (plan.krok) return plan.cesta.length > 0 && stejnaBunka(c, konecCesty());
-    if (plan.otocka) return plan.orient !== null && stejnaBunka(c, plan.odkud);
-    return false;
+    if (plan.cil) return (tvorNaBunce(c) || {}).id === plan.cil;
+    if (plan.cesta.length) return stejnaBunka(c, konecCesty());
+    return plan.orient !== null && stejnaBunka(c, plan.odkud);
   }
 
   // Klik na mapu při plánování; m = bod v souřadnicích mapy.
   function klik(m) {
     if (!plan) return;
+    // plovoucí potvrzení u posledního bodu
+    if (plan.bublina && Math.hypot(m.x - plan.bublina.x, m.y - plan.bublina.y) < plan.bublina.r) { odeslatPlan(); return; }
     const c = hexBunka(m.x, m.y);
     const kl = klicBunky(c);
     const ted = Date.now();
@@ -675,11 +842,21 @@ export function initSouboj(ctx) {
       && Math.hypot(m.x - plan.posledniKlik.x, m.y - plan.posledniKlik.y) < gridPx() * 0.15;
     plan.posledniKlik = {t: ted, kl, x: m.x, y: m.y};
     if (dvojklik && dvojklikPotvrzuje(c)) { odeslatPlan(); return; }
+    // klik na jiného tvora: nepřítel = útok, jinak nic
+    const T = tvorNaBunce(c);
+    if (T) {
+      if (!maUtok()) { logLine('Obrana a krok je jen pohyb na sousední hex.'); return; }
+      if (!jeNepritel(T)) { logLine(T.label + ' není nepřítel v souboji — útok ani cesta tudy nevede.'); return; }
+      const zprava = naplanujUtok(T);
+      if (zprava) logLine(zprava);
+      kreslit();
+      prekreslitOverlay();
+      return;
+    }
     const pivot = duchBunka();
     const telo = new Set(hexy.bunkyTvaru(plan.tvar, pivot, duchOrient()).map(klicBunky));
-    const dalsi = plan.krok ? dalsiKroky() : new Map();
-    const jeKrok = dalsi.has(kl) && !stejnaBunka(c, pivot);
-    if ((plan.krok || plan.otocka) && telo.has(kl) && !jeKrok) {
+    const jeKrok = dalsiKroky().has(kl) && !stejnaBunka(c, pivot);
+    if (telo.has(kl) && !jeKrok) {
       // klik do těla tvora: čelem k místu kliknutí (úhel od otočného hexu)
       const st = hexStred(pivot.col, pivot.row);
       if (Math.hypot(m.x - st.x, m.y - st.y) < gridPx() * 0.22) return;
@@ -688,17 +865,12 @@ export function initSouboj(ctx) {
         logLine(duvodZakazuOrient(o));
         return;
       }
-      plan.orient = o;
+      plan.orient = (!plan.cesta.length && o === plan.orientPred) ? null : o;
       if (plan.cil && !predniJeCil(plan.cil)) plan.cil = null;
-    } else if (plan.krok && (jeKrok || (!telo.has(kl) && hexy.vzdalenost(konecCesty(), c) > 0 && !plan.zabrane.has(kl)))) {
+    } else {
       const chyba = pridejDoHexu(c);
       if (chyba) { logLine(chyba); return; }
       if (plan.cil && !predniJeCil(plan.cil)) plan.cil = null;
-    } else if (plan.utok) {
-      const t = tvorNaBunce(c);
-      if (t && predniJeCil(t.id)) plan.cil = plan.cil === t.id ? null : t.id;
-    } else {
-      return;
     }
     kreslit();
     prekreslitOverlay();
@@ -754,6 +926,34 @@ export function initSouboj(ctx) {
       soubojSvg.appendChild(cara);
     });
   }
+  // Nepřátelé v souboji (cíle kliknutí): slabý kroužek, ať je vidět, kam se dá útočit
+  function kresliNepratele() {
+    getTokeny().forEach((t) => {
+      if (t.id === plan.tokenId || !jeTvor(t) || !jeNepritel(t)) return;
+      const p = pivotTokenu(t);
+      const st = hexStred(p.col, p.row);
+      const kruh = document.createElementNS(SVGNS, 'circle');
+      kruh.setAttribute('cx', st.x.toFixed(1)); kruh.setAttribute('cy', st.y.toFixed(1));
+      kruh.setAttribute('r', (gridPx() * 0.66).toFixed(1));
+      kruh.setAttribute('class', 'sb-nepritel');
+      soubojSvg.appendChild(kruh);
+    });
+  }
+  // Plovoucí potvrzení u konce cesty (na dotyku se na dvojklik nedá spolehnout); klik na něj plán provede.
+  function kresliBublinu(stDuch) {
+    const g = gridPx();
+    const x = stDuch.x, y = stDuch.y - g * (plan.tvar.bunky.length > 1 ? 2.4 : 1.55), r = g * 0.42;
+    const kruh = document.createElementNS(SVGNS, 'circle');
+    kruh.setAttribute('cx', x.toFixed(1)); kruh.setAttribute('cy', y.toFixed(1)); kruh.setAttribute('r', r.toFixed(1));
+    kruh.setAttribute('class', 'sb-bublina');
+    soubojSvg.appendChild(kruh);
+    const t = document.createElementNS(SVGNS, 'text');
+    t.setAttribute('x', x.toFixed(1)); t.setAttribute('y', y.toFixed(1)); t.setAttribute('font-size', (g * 0.55).toFixed(1));
+    t.setAttribute('class', 'sb-bublina-text');
+    t.textContent = '✓';
+    soubojSvg.appendChild(t);
+    plan.bublina = {x, y, r};
+  }
   // Cesta: čára přes středy hexů od startu a body A, B, C… (poslední zvýrazněný)
   function kresliCestu() {
     if (!plan.cesta.length) return;
@@ -782,7 +982,8 @@ export function initSouboj(ctx) {
     soubojSvg.innerHTML = '';
     if (!jeHex() || !kolo) return;
     if (plan) {
-      if (plan.krok) dalsiKroky().forEach((b) => kresliHex(b, 'sb-cil'));
+      dalsiKroky().forEach((b) => kresliHex(b, 'sb-cil'));
+      if (maUtok()) kresliNepratele();
       const duch = duchBunka();
       const stDuch = hexStred(duch.col, duch.row);
       const velky = plan.tvar.bunky.length > 1;
@@ -799,14 +1000,16 @@ export function initSouboj(ctx) {
           soubojSvg.appendChild(kruh);
         }
       }
-      if (plan.krok) kresliCestu();
-      if (plan.krok || plan.otocka) {
+      kresliCestu();
+      {
         for (let k = 0; k < 6; k++) {
           const vybrany = k === duchOrient();
           kresliSipku(stDuch, hexy.smerZOrientace(plan.tvar, k), vybrany ? 'vybrana' : (orientPovolena(k) ? 'mozna' : 'zakazana'));
         }
       }
-      if (plan.utok) {
+      plan.bublina = null;
+      if (planJeHotov()) kresliBublinu(stDuch);
+      if (maUtok()) {
         const dosah = dosahUtoku();
         const vDosahu = new Set(dosah.map(klicBunky));
         dosah.forEach((b) => kresliHex(b, 'sb-predni'));
@@ -1089,6 +1292,25 @@ export function initSouboj(ctx) {
         const t = aktivniToken();
         if (!kolo || kolo.faze !== 'kolo' || !t || t.id !== plan.tokenId || t.x !== plan.x || t.y !== plan.y
           || (t.smer || 0) !== plan.smer0 || (t.hexu || 1) !== plan.hexu0) plan = null;
+      }
+      // Rozehraný plán drží krok se změnami: dosah (únava, dovednost) a obsazené hexy (ostatní se hýbou)
+      if (plan) {
+        const t = aktivniToken();
+        plan.dosah = plan.druhVynuceny ? 1 : nejdalPohybu(t);
+        plan.zabrane = obsazene(plan.tokenId);
+        plan.zabraneSet = new Set(plan.zabrane.keys());
+        if (plan.cesta.length && (plan.cesta.length > plan.dosah || !overPlan(plan.cesta, duchOrient()).ok)) {
+          plan.cesta = [];
+          plan.kam = null;
+          plan.orient = null;
+          plan.cil = null;
+          logLine('Situace se změnila (dosah nebo obsazené hexy) — cesta už nejde, naplánuj ji znovu.');
+        }
+      }
+      // Hexová mapa: plán začíná sám, jakmile je tvor na tahu (Esc ho do dalšího tahu vypne)
+      if (!plan && kolo && kolo.faze === 'kolo' && kolo.ovladam_aktivniho && kolo.aktivni_token_id !== null && jeHex() && !zruseno.has(klicTahu())) {
+        const t = aktivniToken();
+        if (t && jeTvor(t)) zahajitPlan(null);
       }
       kreslit();
       prekreslitOverlay();

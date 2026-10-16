@@ -276,6 +276,12 @@ body { -webkit-tap-highlight-color:transparent; }
 .sb-bod.posledni { fill:#ffd166; stroke:#fff; stroke-width:3; }
 .sb-bod-pismeno { fill:#1a1410; font-weight:700; text-anchor:middle; dominant-baseline:central; font-family:inherit; }
 .akce-btn.aktivni { background:rgba(255,209,102,.18); border-color:#ffd166; }
+.sb-nepritel { fill:none; stroke:rgba(255,110,90,.6); stroke-width:2; stroke-dasharray:3 3; vector-effect:non-scaling-stroke; }
+.sb-bublina { fill:#4caf6a; stroke:#fff; stroke-width:3; vector-effect:non-scaling-stroke; filter:drop-shadow(0 1px 3px rgba(0,0,0,.6)); }
+.sb-bublina-text { fill:#fff; font-weight:700; text-anchor:middle; dominant-baseline:central; font-family:inherit; }
+.dalsi-akce { margin:8px 0 4px; }
+.dalsi-akce > summary { cursor:pointer; font-size:12.5px; color:#bbb; padding:2px 0; }
+.tah-cena { color:#ffd166; font-size:12.5px; }
 .akce-lista { display:grid; grid-template-columns:repeat(2, 1fr); gap:5px; margin:8px 0 6px; }
 .akce-btn { font-size:12.5px; padding:6px 8px; text-align:center; }
 .akce-btn.mapova::after { content:" •"; color:#6bbf7a; }

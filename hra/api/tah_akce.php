@@ -19,7 +19,9 @@ $druh = (string)($data['druh'] ?? 'jina');
 if (!isset(DRACAK_VTT_AKCE_DRUHY[$druh])) {
     $druh = 'jina';
 }
-$pocet = max(1, min(9, (int)($data['pocet'] ?? 1)));
+// Cena v akcích: počet provedení × cena druhu (běh nebo sprint a útok = 2 akce, ostatní 1).
+$opakovani = max(1, min(9, (int)($data['pocet'] ?? 1)));
+$pocet = $opakovani * (DRACAK_VTT_AKCE_CENA[$druh] ?? 1);
 
 $info = dracak_vtt_souboj_tokeny_info($pdo, $svetId, $mapaId);
 if (!isset($info[$tokenId]) || !dracak_vtt_souboj_ovlada($user, $jePj, $info[$tokenId])) {
@@ -71,7 +73,7 @@ try {
     }
     $pohyb = dracak_vtt_souboj_pohyb($pdo, $mapa, $token, $info, $umysl !== false ? $umysl : null, $druh, $data, $jePj);
     if ($rezimPohybu !== null && $postavaRadek !== null && array_key_exists('unava', $postavaRadek)) {
-        $bodu = (int)(dracak_vtt_souboj_pravidla()['pohyb'][$rezimPohybu]['unava_bodu'] ?? 0) * $pocet;
+        $bodu = (int)(dracak_vtt_souboj_pravidla()['pohyb'][$rezimPohybu]['unava_bodu'] ?? 0) * $opakovani;
         if ($bodu > 0) {
             $unavaNova = min(65535, (int)$postavaRadek['unava'] + $bodu);
             $pdo->prepare('UPDATE postavy SET unava = ? WHERE id = ?')->execute([$unavaNova, (int)$postavaRadek['id']]);
@@ -110,7 +112,8 @@ try {
         'label' => $info[$tokenId]['label'],
         'druh' => $druh,
         'druh_nazev' => DRACAK_VTT_AKCE_DRUHY[$druh],
-        'pocet' => $pocet,
+        'pocet' => $opakovani,
+        'cena' => $pocet,
         'akce_zbyvajici' => (int)$ki['akce_zbyvajici'] - $pocet,
         'cil_token_id' => $pohyb['mapove'] ? $pohyb['cil_token_id'] : null,
         'cil_label' => $pohyb['mapove'] ? $pohyb['cil_label'] : null,

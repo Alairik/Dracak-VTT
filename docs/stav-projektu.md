@@ -144,6 +144,22 @@ MariaDB.** Postup, který v session fungoval:
   souboj_faze|souboj_hod|umysl_nastavit|tah_akce|tah_konec|akce_uprava.php`,
   klient `assets/js/souboj.js`. Bez ručního SQL zůstává dnešní jednoduchá
   iniciativa (starý panel, `iniciativa_hod.php`, `dalsi_tah.php`).
+- **Klikací tah (blok B, „tah v2“, etapa 1; hotovo 2026-10-16, návrh `docs/navrh-tahu-v2.md`):**
+  lišta akcí (Krok, Běh, Sprint, Otočka, Útok…) **je pryč**. Plán tahu začne sám, jakmile je tvor
+  na tahu (Esc / „Zrušit“ ho do dalšího tahu vypne, „Plánovat tah“ zapne), a hráč/PJ jen klikne:
+  **na hexy** (body cesty A, B, C…), **na nepřítele** (systém sám naplánuje cestu k hexu, odkud
+  dosáhne, a útok), **do vlastního těla** nebo ↶ ↷ (čelo na konci). Systém z toho pozná akci a cenu
+  (`druhPlanu()` v `assets/js/souboj.js`): 1 hex Krok, 2 Běh, 3 Sprint (4 s dovedností), s útokem
+  **Krok a útok = 1 akce, Běh / Sprint a útok = 2 akce** (nové druhy `beh_utok`, `sprint_utok`,
+  `DRACAK_VTT_AKCE_CENA`), bez pohybu Útok / Otočka a útok / Otočka. Plán ukazuje „Sprint a útok · 2
+  akce (zbývá N)“; stojí-li víc, než zbývá v tomhle tahu (kvóta půlky kola), Potvrdit se zamkne a
+  nabídne se „Bez útoku“; „Bez pohybu“ zaútočí z místa. Potvrzení: plovoucí ✓ u konce cesty,
+  „Potvrdit“, Enter, nebo dvojklik (na posledním bodu / cíli útoku). Zbylé akce (Čekání, Obrana,
+  Obrana a krok, Jiná činnost, Kouzlení) jsou v menu „Další akce…“; čtvercová mapa zůstává na
+  prostém seznamu akcí. **Běh a Sprint jsou kdykoli** (úmysl Pohyb je nehlídá — migrace 0087),
+  únava je omezuje (unavená postava max. běh, vyčerpaná jen krok). Plán se průběžně přepočítává
+  (dosah, obsazené hexy). **Omezení:** cestu k nepříteli hledá jen nejkratšími trasami (bez
+  objížděk) a útok se zatím jen zapíše (hody a zranění přijdou v etapě 2).
 - **Akce na hexové mapě (blok B, krok 2a; hotový, bez ručního SQL):** lišta akcí
   u tvora na tahu (Krok, Otočka, Útok, Krok a útok, Otočka a útok, Obrana, Obrana a
   krok, Čekání, Jiná činnost, Kouzlení). Akce s mapovou částí se plánují klikem na

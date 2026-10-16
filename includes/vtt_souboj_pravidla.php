@@ -8,8 +8,8 @@ declare(strict_types=1);
 // polí (shodu hlídá test při změně obou).
 //
 // POHYB (jedna akce Krok / Běh / Sprint):
-//  - krok 1 hex, běh 2 hexy (kniha h1625: při úmyslu Pohyb se krok smí protáhnout
-//    na dva hexy), sprint 3 hexy (HB); běh a sprint jen při úmyslu Pohyb
+//  - krok 1 hex, běh 2 hexy (kniha h1625), sprint 3 hexy (HB); běh a sprint kdykoli, kromě únavy
+//    (rozhodnutí uživatele 2026-10-16; jen_pri_umyslu v tabulce zůstává pro případné omezení)
 //  - dovednost Běh na krátké vzdálenosti (h1698) přidá +1 hex při běhu a sprintu
 //  - otočení v rámci jedné pohybové akce celkem až o 270° (HB; kniha měla 120°): tvor se smí
 //    otáčet před posuny, mezi nimi i po nich, součet všech otočení nejvýš 270° (4 kroky po 60°)
@@ -18,8 +18,8 @@ declare(strict_types=1);
 
 const DRACAK_VTT_POHYB_VYCHOZI = [
     'krok' => ['nazev' => 'Krok', 'hexu' => 1, 'jen_pri_umyslu' => null, 'bonus_dovednost' => 0, 'otoceni_max' => 270, 'unava_bodu' => 0],
-    'beh' => ['nazev' => 'Běh', 'hexu' => 2, 'jen_pri_umyslu' => 'pohyb', 'bonus_dovednost' => 1, 'otoceni_max' => 270, 'unava_bodu' => 0],
-    'sprint' => ['nazev' => 'Sprint', 'hexu' => 3, 'jen_pri_umyslu' => 'pohyb', 'bonus_dovednost' => 1, 'otoceni_max' => 270, 'unava_bodu' => 1],
+    'beh' => ['nazev' => 'Běh', 'hexu' => 2, 'jen_pri_umyslu' => null, 'bonus_dovednost' => 1, 'otoceni_max' => 270, 'unava_bodu' => 0],
+    'sprint' => ['nazev' => 'Sprint', 'hexu' => 3, 'jen_pri_umyslu' => null, 'bonus_dovednost' => 1, 'otoceni_max' => 270, 'unava_bodu' => 1],
 ];
 
 const DRACAK_VTT_TVARY_VYCHOZI = [

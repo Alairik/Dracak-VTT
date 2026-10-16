@@ -22,11 +22,14 @@ require_once __DIR__ . '/vtt_hexy.php';
 require_once __DIR__ . '/vtt_souboj.php';
 require_once __DIR__ . '/vtt_souboj_pravidla.php';
 
-const DRACAK_VTT_AKCE_S_KROKEM = ['krok', 'krok_utok', 'obrana_krok', 'beh', 'sprint'];
+const DRACAK_VTT_AKCE_S_KROKEM = ['krok', 'krok_utok', 'obrana_krok', 'beh', 'sprint', 'beh_utok', 'sprint_utok'];
 const DRACAK_VTT_AKCE_S_OTOCKOU = ['otocka', 'otocka_utok'];
-const DRACAK_VTT_AKCE_S_UTOKEM = ['utok', 'krok_utok', 'otocka_utok'];
+const DRACAK_VTT_AKCE_S_UTOKEM = ['utok', 'krok_utok', 'otocka_utok', 'beh_utok', 'sprint_utok'];
 // Jak se pohyb jmenuje v tabulce souboj_pohyb (krok / běh / sprint).
-const DRACAK_VTT_AKCE_REZIM_POHYBU = ['krok' => 'krok', 'krok_utok' => 'krok', 'obrana_krok' => 'krok', 'beh' => 'beh', 'sprint' => 'sprint'];
+const DRACAK_VTT_AKCE_REZIM_POHYBU = [
+    'krok' => 'krok', 'krok_utok' => 'krok', 'obrana_krok' => 'krok',
+    'beh' => 'beh', 'beh_utok' => 'beh', 'sprint' => 'sprint', 'sprint_utok' => 'sprint',
+];
 const DRACAK_VTT_EFEKT_BEH_NA_KRATKO = 'Běh na krátké vzdálenosti';
 
 // Tělo tvora na mapě: tvar podle počtu hexů (tokeny.hexu), otočný hex = hex, na
