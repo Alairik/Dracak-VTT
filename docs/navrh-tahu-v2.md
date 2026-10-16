@@ -98,8 +98,9 @@ uprostřed, přeskočí rovnou na výsledek. Server je autorita (klient jen navr
   se předvyplní). Stejně chybí čtyřstupňová škála výsledku (fatální neúspěch / úspěch / fatální úspěch —
   `vysledky_testu`, h `Fatální neúspěch a Totální úspěch` „zatím nepřečteno“): vyhodnocuje se jen úspěch a neúspěch.
 - ÚČ / OČ nestvůr z textu bestiáře: u zápisů s výsledkem („(+1 + 3) = 4“) se čísla vezmou sama, u vzorců
-  bez výsledku („+1 + síla zbraně“, „kvalita zbroje + štít“) je doplňuje PJ před každým hodem — vyřeší malý
-  deník nestvůry (krok 4).
+  bez výsledku („+1 + síla zbraně“, „kvalita zbroje + štít“) je PJ jednou doplní v **malém deníku nestvůry**
+  (panel tokenu, uloží se pro celý druh ve světě; tabulka `nestvura_staty_sveta`) a hody je berou samy. Bez
+  tabulky (ruční SQL) se čísla doplňují u hodu jako dřív.
 
 ## Poznámky k etapě 1 (co je hotové a jaká jsou omezení)
 

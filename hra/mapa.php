@@ -512,6 +512,8 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
   <div class="panel" id="panel-spravovat">
     <button class="close-x" data-close-panel><?php dracak_icon('x', 16); ?></button>
     <h3 id="spravovatNazev">—</h3>
+    <!-- Deník nestvůry (jen PJ, jen u nestvůry): přehled z bestiáře a čísla pro boj — nahoře, ať se nemusí scrollovat -->
+    <div id="denikNestvury" class="panel-sekce" style="display:none;"></div>
 
     <!-- Vzhled a poloha tokenu: otočení, velikost, barva, zámek, obrázek.
          Co z toho se zobrazí, řídí JS podle oprávnění (PJ vs. vlastník) a

@@ -43,7 +43,7 @@ function dracak_vtt_ddl_mapa(): array
         $stav['udalosti_varchar'] = $typUdalosti !== false && strtolower((string)$typUdalosti) === 'varchar';
         foreach ($pdo->query(
             'SELECT TABLE_NAME FROM information_schema.TABLES
-             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ("svet_obrazky", "mapa_kresby", "kolo_ucastnik", "souboj_vyzva")'
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ("svet_obrazky", "mapa_kresby", "kolo_ucastnik", "souboj_vyzva", "nestvura_staty_sveta")'
         )->fetchAll(PDO::FETCH_COLUMN) as $tabulka) {
             $stav['tabulky'][$tabulka] = true;
         }
@@ -88,6 +88,8 @@ function dracak_vtt_tokeny_funkce(): array
             && isset($ddl['kolo_sloupce']['faze'], $ddl['kolo_sloupce']['polovina'], $ddl['kolo_sloupce']['prekvapeni']),
         // Výzvy k hodu (útok, obrana, past; tabulka souboj_vyzva z ručního SQL) — bez nich se útok
         // jen zapíše do logu.
+        // Deník nestvůry (tabulka nestvura_staty_sveta z ručního SQL): čísla pro boj, která PJ doplní jednou za druh.
+        'denik_nestvur' => isset($ddl['tabulky']['nestvura_staty_sveta']),
         'vyzvy' => $udalosti && isset($ddl['tabulky']['kolo_ucastnik'], $ddl['tabulky']['souboj_vyzva'])
             && isset($ddl['kolo_sloupce']['faze'], $ddl['kolo_sloupce']['polovina'], $ddl['kolo_sloupce']['prekvapeni']),
     ];

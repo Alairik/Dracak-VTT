@@ -228,7 +228,7 @@ function dracak_vtt_souboj_bojovnik(PDO $pdo, array $infoTokenu): array
         return $b;
     }
     $q = $pdo->prepare(
-        'SELECT ni.aktualni_hp, ni.max_hp, n.velikost, n.uc, n.oc, n.odolnost
+        'SELECT ni.nestvura_id, ni.aktualni_hp, ni.max_hp, n.velikost, n.uc, n.oc, n.odolnost
          FROM nestvura_instance ni JOIN nestvury n ON n.id = ni.nestvura_id WHERE ni.id = ?'
     );
     $q->execute([$infoTokenu['entita_id']]);
@@ -236,10 +236,14 @@ function dracak_vtt_souboj_bojovnik(PDO $pdo, array $infoTokenu): array
     if (!$n) {
         return $b;
     }
-    $velikost = trim(dracak_vtt_text_cisla((string)$n['velikost']));
-    $b['velikost'] = isset(DRACAK_VTT_ROZDIL_VELIKOSTI[$velikost]) ? $velikost : null;
-    $b['velikost_text'] = $velikost !== '' ? $velikost : null;
-    $b['odolnost'] = preg_match('/^\d+$/', trim((string)$n['odolnost'])) ? (int)$n['odolnost'] : null;
+    // Čísla pro boj: uložená v deníku nestvůry (PJ je doplnil jednou za druh), jinak z textu bestiáře.
+    require_once __DIR__ . '/vtt_nestvury.php';
+    $s = dracak_vtt_nestvura_staty($pdo, (int)$infoTokenu['svet_id'], (int)$n['nestvura_id'], $n);
+    $st = $s['staty'];
+    $velikostText = trim(dracak_vtt_text_cisla((string)$n['velikost']));
+    $b['velikost'] = $st['velikost'];
+    $b['velikost_text'] = $velikostText !== '' ? $velikostText : null;
+    $b['odolnost'] = $st['odolnost'];
     $b['hp'] = (int)$n['aktualni_hp'];
     $b['max_hp'] = (int)$n['max_hp'];
     if ($b['odolnost'] !== null && $b['max_hp'] > 0) {
@@ -247,11 +251,13 @@ function dracak_vtt_souboj_bojovnik(PDO $pdo, array $infoTokenu): array
     }
     $b['uc_text'] = $n['uc'] !== null ? (string)$n['uc'] : null;
     $b['oc_text'] = $n['oc'] !== null ? (string)$n['oc'] : null;
-    foreach (dracak_vtt_nestvura_uc($n['uc']) as $i => $v) {
-        $b['zbrane'][] = ['id' => $i + 1, 'nazev' => $v['popis'] !== '' ? $v['popis'] : 'útok', 'uc' => $v['uc'],
-            'utocnost' => $v['utocnost'], 'drzena' => $i === 0];
+    foreach ($st['utoky'] as $i => $u) {
+        $b['zbrane'][] = ['id' => $i + 1, 'nazev' => (string)$u['nazev'], 'uc' => (int)$u['uc'], 'utocnost' => (int)$u['utocnost'], 'drzena' => $i === 0];
     }
-    $b['oc'] = dracak_vtt_nestvura_oc($n['oc']);
+    $b['oc'] = $st['oc'];
+    $b['oz'] = $st['oz'];
+    $b['oz_nazev'] = $st['oz'] !== null ? 'nestvůry' : null;
+    $b['staty_ulozeno'] = $s['ulozeno'];
     return $b;
 }
 
@@ -368,8 +374,33 @@ function dracak_vtt_souboj_sprinty_v_rade(PDO $pdo, int $mapaId, int $tokenId, i
     return $rada;
 }
 
+// Kolik útoků už tvor v tomhle kole odehrál (z událostí akce_provedena s cílem) — nestvůra podle toho střídá druhy útoku.
+function dracak_vtt_souboj_utoku_v_kole(PDO $pdo, int $mapaId, int $tokenId): int
+{
+    $stav = dracak_vtt_souboj_nacti($pdo, $mapaId);
+    if ($stav === null) {
+        return 0;
+    }
+    $q = $pdo->prepare('SELECT payload FROM svet_udalosti WHERE mapa_id = ? AND typ = "akce_provedena" ORDER BY id DESC LIMIT 80');
+    $q->execute([$mapaId]);
+    $pocet = 0;
+    foreach ($q->fetchAll(PDO::FETCH_COLUMN) as $json) {
+        $p = json_decode((string)$json, true);
+        if (!is_array($p) || (int)($p['token_id'] ?? 0) !== $tokenId) {
+            continue;
+        }
+        if ((int)($p['cislo_kola'] ?? 0) !== $stav['cislo_kola']) {
+            break;
+        }
+        if (!empty($p['cil_token_id'])) {
+            $pocet++;
+        }
+    }
+    return $pocet;
+}
+
 // Složky hodu na útok: základ vybrané zbraně + opravy (bojeschopnost, naložení, rozdíl velikostí, rozběh).
-function dracak_vtt_utok_priprav(PDO $pdo, array $utocnik, array $cil, bool $rozbeh): array
+function dracak_vtt_utok_priprav(PDO $pdo, array $utocnik, array $cil, bool $rozbeh, int $poradiUtoku = 0): array
 {
     $opravy = [];
     $upozorneni = [];
@@ -395,10 +426,13 @@ function dracak_vtt_utok_priprav(PDO $pdo, array $utocnik, array $cil, bool $roz
         $opravy[] = dracak_vtt_oprava('rozběh (dva sprinty za sebou, HB)', 1);
     }
     $vybrana = null;
+    if ($utocnik['typ'] !== 'postava' && count($utocnik['zbrane']) > 1) {
+        // Nestvůra s víc druhy útoku je střídá v uvedeném pořadí: nejdřív každý druh jednou, pak znovu (PJ-kniha, bestiář).
+        $vybrana = $utocnik['zbrane'][$poradiUtoku % count($utocnik['zbrane'])];
+    }
     foreach ($utocnik['zbrane'] as $z) {
-        if ($z['drzena']) {
+        if ($vybrana === null && $z['drzena']) {
             $vybrana = $z;
-            break;
         }
     }
     if ($vybrana === null && $utocnik['zbrane']) {
@@ -407,7 +441,8 @@ function dracak_vtt_utok_priprav(PDO $pdo, array $utocnik, array $cil, bool $roz
     if ($vybrana === null) {
         $upozorneni[] = $utocnik['typ'] === 'postava'
             ? 'Postava nemá zbraň se spočítaným ÚČ — doplň útočné číslo.'
-            : 'Útočné číslo nestvůry se z textu bestiáře nedá spočítat (' . ($utocnik['uc_text'] ?? 'bez údaje') . ') — doplň ho.';
+            : 'Útočné číslo nestvůry se z textu bestiáře nedá spočítat (' . ($utocnik['uc_text'] ?? 'bez údaje') . ') — doplň ho'
+                . (dracak_vtt_tokeny_funkce()['denik_nestvur'] ? ' (nejlíp v deníku nestvůry v panelu tokenu, pak platí pro celý druh).' : '.');
     }
     return [
         'utocnik_label' => $utocnik['label'],
@@ -438,7 +473,7 @@ function dracak_vtt_utok_zahaj(PDO $pdo, array $mapa, array $info, array $utocni
     $cilToken = $q->fetch();
     $utocnik = dracak_vtt_souboj_bojovnik($pdo, $info[$utId]);
     $cil = dracak_vtt_souboj_bojovnik($pdo, $info[$cilTokenId]);
-    $d = dracak_vtt_utok_priprav($pdo, $utocnik, $cil, $rozbeh);
+    $d = dracak_vtt_utok_priprav($pdo, $utocnik, $cil, $rozbeh, dracak_vtt_souboj_utoku_v_kole($pdo, $mapaId, $utId));
     $d['strana'] = $cilToken ? dracak_vtt_utok_strana($mapa, $cilToken, $utocnikToken) : 'predni';
     $id = dracak_vtt_vyzva_vloz($pdo, $mapaId, 'utok', $utId, $cilTokenId, null, $d);
     dracak_vtt_log_event((int)$mapa['svet_id'], $mapaId, 'vyzva_nova', dracak_vtt_vyzva_payload($info, 'utok', $id, $utId, $cilTokenId), $ucetId);
@@ -478,14 +513,15 @@ function dracak_vtt_obrana_zaloz(PDO $pdo, array $mapa, array $info, array $utok
     $akce = $q->fetchColumn();
     $muzeBranit = $akce !== false && (int)$akce > 0;
     $upozorneni = [];
+    $hintDenik = dracak_vtt_tokeny_funkce()['denik_nestvur'] ? ' (nejlíp v deníku nestvůry v panelu tokenu, pak platí pro celý druh)' : '';
     if ($obr['oc'] === null) {
         $upozorneni[] = $obr['typ'] === 'postava'
             ? 'Obranné číslo postavy se nedá spočítat (chybí obratnost) — doplň ho.'
-            : 'Obranné číslo nestvůry se z textu bestiáře nedá spočítat (' . ($obr['oc_text'] ?? 'bez údaje') . ') — doplň ho.';
+            : 'Obranné číslo nestvůry se z textu bestiáře nedá spočítat (' . ($obr['oc_text'] ?? 'bez údaje') . ') — doplň ho' . $hintDenik . '.';
     }
-    $ozZnamo = $obr['typ'] === 'postava';
+    $ozZnamo = $obr['typ'] === 'postava' || $obr['oz'] !== null;
     if (!$ozZnamo) {
-        $upozorneni[] = 'Obranu zbraní nestvůry (OZ) nestvůra v bestiáři nemá rozepsanou — když se brání, připiš ji do opravy.';
+        $upozorneni[] = 'Obranu zbraní nestvůry (OZ) nestvůra v bestiáři nemá rozepsanou — když se brání, připiš ji do opravy' . $hintDenik . '.';
     }
     $d = [
         'utocnik_label' => $info[$utId]['label'],

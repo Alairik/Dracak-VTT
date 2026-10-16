@@ -1524,6 +1524,11 @@ function otevritSpravovat(t) {
   const pjEl = document.getElementById('spravovatPjStav');
   if (pjEl) { pjEl.style.display = 'none'; pjEl.innerHTML = ''; }
   if (t.typ_entity !== 'obecny') nactiInventar();
+  if (denikNestvuryEl) {
+    denikNestvuryEl.style.display = 'none';
+    denikNestvuryEl.textContent = '';
+    if (IS_PJ_OR_ADMIN && t.typ_entity === 'nestvura_instance') nactiDenikNestvury(t.id);
+  }
   spravovatPanel.classList.add('open');
 }
 // Po obnově stavu sedí panel k aktuálním datům (životy, magenergie…);
@@ -1544,8 +1549,129 @@ function obnovPanelSpravovat() {
   const txt = document.getElementById('spravovatMagenergieText');
   if (txt && t.max_magenergie !== null) txt.textContent = (t.magenergie ?? 0) + '/' + t.max_magenergie;
   obnovVzhledSekci();
-  if (hpZmena) { renderInventar(); renderKorist(); }
+  if (hpZmena) {
+    renderInventar(); renderKorist();
+    if (IS_PJ_OR_ADMIN && t.typ_entity === 'nestvura_instance' && denikNestvuryEl && denikNestvuryEl.style.display !== 'none'
+      && !denikNestvuryEl.contains(document.activeElement)) nactiDenikNestvury(t.id);
+  }
 }
+// --- Deník nestvůry (jen PJ): přehled z bestiáře + čísla pro boj, uložená pro celý druh ve světě ---
+// Bestiář je tajný, proto jen PJ; čísla (útoky s ÚČ a útočností, OČ, OZ, velikost, odolnost) PJ doplní jednou
+// a hody je berou samy (hra/api/nestvura_denik.php, includes/vtt_nestvury.php).
+const denikNestvuryEl = document.getElementById('denikNestvury');
+function dnEl(tag, trida, text) {
+  const e = document.createElement(tag);
+  if (trida) e.className = trida;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+async function nactiDenikNestvury(tokenId, telo) {
+  if (!denikNestvuryEl) return;
+  try {
+    const r = telo
+      ? await postJson('api/nestvura_denik.php', Object.assign({mapa_id: MAPA_ID, token_id: tokenId}, telo))
+      : await (await fetch('api/nestvura_denik.php?mapa_id=' + MAPA_ID + '&token_id=' + tokenId, {cache: 'no-store', credentials: 'same-origin'})).json();
+    if (!spravovanyToken || spravovanyToken.tokenId !== tokenId) return;
+    if (r.error) { denikNestvuryEl.style.display = 'none'; if (telo) logLine('Chyba: ' + r.error); return; }
+    vykresliDenikNestvury(tokenId, r);
+    if (telo && r.ulozeno_nyni) logLine('Deník nestvůry „' + r.nazev + '“ ' + (telo.akce === 'uloz' ? 'uložen — platí pro celý druh v tomhle světě.' : 'vrácen podle bestiáře.'));
+  } catch (err) {
+    denikNestvuryEl.style.display = 'none';
+  }
+}
+function vykresliDenikNestvury(tokenId, d) {
+  const box = denikNestvuryEl;
+  box.textContent = '';
+  box.style.display = '';
+  const hlava = dnEl('div', 'dn-hlava');
+  hlava.append(dnEl('h4', 'panel-h4', 'Deník nestvůry'), dnEl('span', 'dn-stav' + (d.ulozeno ? ' ulozeno' : ''), d.ulozeno ? 'upraveno PJ' : 'podle bestiáře'));
+  box.appendChild(hlava);
+  // přehled z bestiáře
+  const b = d.bestiar || {};
+  const prehled = dnEl('div', 'dn-prehled');
+  [['Velikost', b.velikost], ['Odolnost', b.odolnost], ['Životaschopnost', b.zivotaschopnost], ['Pohyblivost', b.pohyblivost],
+    ['Vytrvalost', b.vytrvalost], ['Inteligence', b.inteligence], ['Charisma', b.charisma], ['Bojovnost', b.bojovnost],
+    ['ÚČ (text)', b.uc], ['OČ (text)', b.oc]].forEach(([k, v]) => {
+    if (v === null || v === undefined || v === '') return;
+    const r = dnEl('div', 'dn-radek');
+    r.append(dnEl('span', 'dn-k', k), dnEl('span', 'dn-v', String(v)));
+    prehled.appendChild(r);
+  });
+  if ((d.schopnosti || []).length) {
+    const r = dnEl('div', 'dn-radek');
+    r.append(dnEl('span', 'dn-k', 'Schopnosti'), dnEl('span', 'dn-v', d.schopnosti.join(', ')));
+    prehled.appendChild(r);
+  }
+  const hp = dnEl('div', 'dn-radek');
+  hp.append(dnEl('span', 'dn-k', 'Životy'), dnEl('span', 'dn-v', d.hp.aktualni + '/' + d.hp.max + (d.mez_vyrazeni !== null ? ' · vyřazen od ' + d.mez_vyrazeni + ' a méně' : '')));
+  prehled.appendChild(hp);
+  box.appendChild(prehled);
+
+  // čísla pro boj
+  box.appendChild(dnEl('div', 'dn-podnadpis', 'Čísla pro boj'));
+  const nespocteno = new Set(d.nespocteno || []);
+  const utokyBox = dnEl('div', 'dn-utoky');
+  const pole = (hodnota, min, max, sirka, placeholder, zvyraznit) => {
+    const i = dnEl('input', 'input dn-cislo' + (zvyraznit ? ' chybi' : ''));
+    i.type = 'number'; i.min = String(min); i.max = String(max);
+    i.value = hodnota === null || hodnota === undefined ? '' : String(hodnota);
+    if (sirka) i.style.width = sirka;
+    if (placeholder) i.placeholder = placeholder;
+    i.addEventListener('keydown', (e) => e.stopPropagation());
+    return i;
+  };
+  function pridejUtok(u, zvyraznit) {
+    const r = dnEl('div', 'dn-utok');
+    const nazev = dnEl('input', 'input dn-nazev'); nazev.type = 'text'; nazev.maxLength = 60; nazev.placeholder = 'útok'; nazev.value = u ? u.nazev : '';
+    nazev.addEventListener('keydown', (e) => e.stopPropagation());
+    const uc = pole(u ? u.uc : null, 0, 60, '52px', 'ÚČ', zvyraznit);
+    const ut = pole(u ? u.utocnost : 0, -20, 20, '52px', 'útoč.', false);
+    ut.title = 'Útočnost zbraně (zranění = rozdíl + útočnost)';
+    const x = dnEl('button', 'btn btn-ghost dn-x', '×'); x.type = 'button'; x.title = 'Smazat útok';
+    x.addEventListener('click', () => r.remove());
+    r.append(nazev, uc, ut, x);
+    utokyBox.appendChild(r);
+  }
+  (d.staty.utoky || []).forEach((u) => pridejUtok(u, false));
+  if (!(d.staty.utoky || []).length) pridejUtok(null, true);
+  box.appendChild(dnEl('div', 'dn-popisek', 'Útoky (název · ÚČ · útočnost) — nestvůra je střídá v uvedeném pořadí'));
+  box.appendChild(utokyBox);
+  const pridat = dnEl('button', 'btn btn-ghost dn-pridat', '+ útok'); pridat.type = 'button';
+  pridat.addEventListener('click', () => pridejUtok(null, false));
+  box.appendChild(pridat);
+  const rada = dnEl('div', 'dn-pole-radek');
+  const mk = (popisek, el, title) => { const w = dnEl('label', 'dn-pole'); w.title = title || ''; w.append(dnEl('span', '', popisek), el); rada.appendChild(w); return el; };
+  const oc = mk('OČ', pole(d.staty.oc, 0, 60, '56px', '', nespocteno.has('oc')), 'Obranné číslo (bez štítu a zbraně se dopočítá z oprav v hodu)');
+  const oz = mk('OZ', pole(d.staty.oz, -10, 10, '56px', '', false), 'Obrana zbraně — jen když se nestvůra brání zbraní (prázdné = bez oprav)');
+  const od = mk('Odolnost', pole(d.staty.odolnost, 0, 99, '56px', '', nespocteno.has('odolnost')), 'Z odolnosti a životů se počítá mez vyřazení a postih pod 1/3 životů');
+  const vel = dnEl('select', 'input dn-select' + (nespocteno.has('velikost') ? ' chybi' : ''));
+  [['', '—']].concat(['A0', 'A', 'B', 'C', 'D', 'E'].map((v) => [v, v])).forEach(([v, t]) => { const o = dnEl('option', '', t); o.value = v; if ((d.staty.velikost || '') === v) o.selected = true; vel.appendChild(o); });
+  mk('Velikost', vel, 'Pro opravu útoku podle Tabulky rozdílu velikostí' + (b.velikost ? ' (bestiář: ' + b.velikost + ')' : ''));
+  box.appendChild(rada);
+  if (nespocteno.size) {
+    box.appendChild(dnEl('div', 'dn-varovani', 'Žlutá pole se z textu bestiáře nedala spočítat — doplň je jednou a platí pro všechny nestvůry „' + d.nazev + '“ v tomhle světě.'));
+  }
+  const akce = dnEl('div', 'dn-akce');
+  const uloz = dnEl('button', 'btn btn-primary', 'Uložit pro všechny „' + d.nazev + '“'); uloz.type = 'button';
+  uloz.disabled = !d.lze_ulozit;
+  if (!d.lze_ulozit) uloz.title = 'Chybí ruční SQL (tabulka nestvura_staty_sveta) — zatím jen přehled.';
+  uloz.addEventListener('click', () => {
+    const utoky = Array.from(utokyBox.querySelectorAll('.dn-utok')).map((r) => ({
+      nazev: r.querySelector('.dn-nazev').value,
+      uc: r.querySelectorAll('.dn-cislo')[0].value,
+      utocnost: r.querySelectorAll('.dn-cislo')[1].value,
+    }));
+    nactiDenikNestvury(tokenId, {akce: 'uloz', staty: {utoky, oc: oc.value, oz: oz.value, odolnost: od.value, velikost: vel.value}});
+  });
+  akce.appendChild(uloz);
+  if (d.ulozeno) {
+    const vrat = dnEl('button', 'btn btn-ghost', 'Vrátit podle bestiáře'); vrat.type = 'button';
+    vrat.addEventListener('click', () => nactiDenikNestvury(tokenId, {akce: 'vrat'}));
+    akce.appendChild(vrat);
+  }
+  box.appendChild(akce);
+}
+
 // Inventář se načítá až pro token, na který někdo klikl (dřív se posílal
 // v HTML pro všechny tokeny najednou).
 async function nactiInventar() {

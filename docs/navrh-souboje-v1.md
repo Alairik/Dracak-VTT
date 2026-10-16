@@ -176,5 +176,7 @@ Dnešní „Další na tahu“ předává tah po každé jedné akci; podle dom�
 3. ✔ (hotovo jako „tah v2, etapa 2“, na produkci; viz `docs/navrh-tahu-v2.md`)
    Útok / obrana / výsledek (hody tlačítkem), zranění automaticky + oprava, bojeschopnost,
    vyřazení.
-4. Malý deník nestvůry (staty z čísel v zápisu), kořist.
+4. ✔ (základ hotový 2026-10-16, čeká na ruční SQL `nestvura_staty_sveta`) Malý deník nestvůry: přehled z bestiáře + čísla
+   pro boj (útoky s ÚČ a útočností, OČ, OZ, velikost, odolnost) uložená jednou za druh ve světě; zbývá kořist,
+   inteligence / charisma / pohyblivost / vytrvalost a schopnosti jako hratelná data, kouzla nestvůr.
 5. Kouzlení po akcích, střelba, útěk, zvláštní případy, později finty.

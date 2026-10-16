@@ -36,13 +36,15 @@ ním čeká, dokud se to neprovede ručně.
 
 **Ruční DDL blok je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný soubor, ve
 kterém jsou všechny dosud neprovedené DDL příkazy; uživatel ho dostává jako
-text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-16): nic nečeká.** Tabulka `souboj_vyzva` (výzvy k hodu; migrace `0088`) je na produkci
-provedená a hody v souboji jsou zapnuté.
+text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-16): čeká jediný blok — tabulka `nestvura_staty_sveta` (malý deník nestvůry: čísla pro boj, která PJ doplní
+jednou za druh nestvůry ve světě). Bez ní je deník jen přehled a hody se doplňují jako dřív; po vytvoření se uložení
+zapne samo. Po potvrzení uživatele se přidá `database/migrations/0090_nestvura_staty_sveta.sql` a soubor se vyprázdní.**
+Tabulka `souboj_vyzva` (migrace `0088`, výzvy k hodu) je na produkci provedená a hody v souboji jsou zapnuté.
 Bloky pro `0065`–`0081`, `DROP TABLE` tří mrtvých tabulek z 0008, `0084` (mapa),
 `0085` (souboj, krok 1) i `0086` (souboj, krok 2b: `tokeny.hexu`, tabulky
 `souboj_pohyb` se sloupcem `unava_bodu` a `tvary_tvoru`, efekt „Běh na krátké
 vzdálenosti“) jsou na produkci provedené a `0082` (217 položek ceníku) a `0083`
-proběhly samy přes `migrate.php`. Soubor je prázdný, dokud nepřibude další CREATE/ALTER.
+proběhly samy přes `migrate.php` (stejně tak `0089` — řádky vícenásobných útoků do iniciativy).
 
 Kód je napsaný tak, že funguje i před ručními kroky (chybějící sloupce
 se berou jako "není"), jen se nic z toho nedá ukládat.
@@ -203,6 +205,17 @@ MariaDB.** Postup, který v session fungoval:
   úspěch / neúspěch — v přepisu pravidel chybí). **Vícenásobné útoky se v rozšířeném systému řeší bonusem
   k iniciativě** (Tabulka vícenásobných útoků v pravidlech PJ — bestiář; každý útok i obrana = jedna akce), takže
   v útoku nic zvláštního nechybí; kniha jen dodává, že nestvůra s víc druhy útoku je střídá v uvedeném pořadí.
+- **Malý deník nestvůry (blok B, krok 4 – základ; hotovo 2026-10-16, čeká na ruční SQL `nestvura_staty_sveta`):**
+  klik PJ na nestvůru otevře panel tokenu, nahoře je **Deník nestvůry**: přehled z bestiáře (velikost, odolnost,
+  životaschopnost, pohyblivost, inteligence, charisma, bojovnost, text ÚČ a OČ, schopnosti, životy a mez vyřazení)
+  a **čísla pro boj** — útoky (název · ÚČ · útočnost), OČ, OZ, velikost (A0–E), odolnost. Předvyplní se z textu
+  bestiáře (`includes/vtt_nestvury.php`: číslo za „=“, za lomítkem útočnost; u goblina nespočítá nic, u vlka dvě útoky
+  a OČ 4), pole, která se spočítat nedala, jsou žlutá. „Uložit pro všechny <druh>“ uloží čísla pro **druh nestvůry
+  v tomhle světě** (ne pro jednu instanci), „Vrátit podle bestiáře“ je smaže. Hody je berou samy (`dracak_vtt_souboj_bojovnik`),
+  takže PJ je nepíše u každého hodu; nestvůra s víc útoky je střídá v uvedeném pořadí (drápy, tlama, drápy… — PJ-kniha, bestiář).
+  Jen PJ (bestiář je tajný), endpoint `hra/api/nestvura_denik.php`. Bez tabulky je panel jen přehled s vypnutým uložením.
+  **Zbývá:** kořist, vybavení nestvůry z katalogu (ÚČ/OČ dopočtem ze zbraně a zbroje), inteligence / charisma /
+  pohyblivost / vytrvalost jako hratelná data, kouzla nestvůr, automatický bonus k iniciativě podle „N× za kolo“.
 - **Akce na hexové mapě (blok B, krok 2a; hotový, bez ručního SQL):** lišta akcí
   u tvora na tahu (Krok, Otočka, Útok, Krok a útok, Otočka a útok, Obrana, Obrana a
   krok, Čekání, Jiná činnost, Kouzlení). Akce s mapovou částí se plánují klikem na
