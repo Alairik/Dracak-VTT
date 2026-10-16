@@ -65,3 +65,45 @@ export function celniHranaBody(cx, cy, size, orient) {
     return [cx + size * Math.cos(ang), cy + size * Math.sin(ang)];
   });
 }
+
+// Kam se tvor dostane jednou pohybovou akcí (krok / běh / sprint, HB): nejvýš `dosah`
+// posunů otočného hexu na sousední hex a v kterémkoli okamžiku (před pohybem, mezi
+// posuny, po nich) se smí otáčet po 60° — dohromady nejvýš `maxOtoceni` takových otočení
+// (270° = 4 kroky po 60°). Tělo musí v každé poloze a orientaci stát na volných hexech
+// (`obsazene`: Set klíčů "col,row"). `zed(a, b)` vrací true, když posun z a na b brání zeď.
+// Vrací Map "col,row,orientace" -> nejmenší počet 60° otočení; stav bez posunu mezi výsledky není.
+// Stejná funkce je v PHP (includes/vtt_hexy.php, dracak_vtt_hex_dosazitelne_stavy).
+export function dosazitelneStavy(tvar, odkud, orientace, dosah, maxOtoceni, obsazene, zed) {
+  const volne = (pivot, o) => bunkyTvaru(tvar, pivot, o).every((b) => !obsazene.has(klic(b)));
+  const otoc = (patro) => {
+    for (let pruchod = 0; pruchod < 6; pruchod++) {
+      for (const [k, t] of Array.from(patro.entries())) {
+        const [c, r, o] = k.split(',').map(Number);
+        for (const d of [-1, 1]) {
+          const o2 = (((o + d) % 6) + 6) % 6;
+          const t2 = t + 1;
+          const k2 = c + ',' + r + ',' + o2;
+          if (t2 <= maxOtoceni && (!patro.has(k2) || t2 < patro.get(k2)) && volne({col: c, row: r}, o2)) patro.set(k2, t2);
+        }
+      }
+    }
+    return patro;
+  };
+  const vysledek = new Map();
+  let patro = otoc(new Map([[odkud.col + ',' + odkud.row + ',' + orientace, 0]]));
+  for (let posun = 1; posun <= dosah; posun++) {
+    const dalsi = new Map();
+    patro.forEach((t, k) => {
+      const [c, r, o] = k.split(',').map(Number);
+      for (let s = 0; s < 6; s++) {
+        const n = soused({col: c, row: r}, s);
+        if (!volne(n, o) || (zed && zed({col: c, row: r}, n))) continue;
+        const k2 = n.col + ',' + n.row + ',' + o;
+        if (!dalsi.has(k2) || t < dalsi.get(k2)) dalsi.set(k2, t);
+      }
+    });
+    patro = otoc(dalsi);
+    patro.forEach((t, k) => { if (!vysledek.has(k) || t < vysledek.get(k)) vysledek.set(k, t); });
+  }
+  return vysledek;
+}

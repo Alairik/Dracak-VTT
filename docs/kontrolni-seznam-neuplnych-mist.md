@@ -382,6 +382,7 @@ knihou a opraví najednou. Pravidlo je v `CLAUDE.md`.
 - [x] PJ h2341 (b17388): „velikost A = 1 hex, B = 2 hexy, C = 3 hexy (1×3)“ nesedlo s domácím pravidlem — **přepsáno jako HB 2026-10-16** (A0/A/B = 1 hex, zvířecí C = 2, D = 3, E = 5; humanoidní C = 1). Nosorožec 1×4, slon 2×5 a drak (cca 50 hexů) zůstávají v textu jako „zatím bez vlastního tvaru“ — rozhodnout, jestli pro ně přidat tvary.
 - [ ] Příklad b10839 (Roxan, iniciativa 4 = dvě akce, „postupně až 4 hexy daleko“) odpovídá pravidlu z knihy (krok o dva hexy); podle HB je běh 2 hexy a sprint 3 (dvě akce sprintu = 6 hexů). Ponecháno podle knihy, při korektuře přepsat.
 - [ ] Překlep v b10838 (Pohyb): „přídel akcí“ → „příděl akcí“ — ponecháno podle knihy.
-- [ ] „Otočení až o 270°“ (HB, b10827) je na hexech prakticky bez omezení — nejvzdálenější strana je 180° — takže pravidlo znamená „k libovolné z šesti stran“. Potvrdit, že je to záměr.
+- [x] Otočení při pohybu: HB **celkem 270° za akci** (před pohybem, mezi hexy i po nich) — potvrzeno uživatelem 2026-10-16. U jednohexového tvora rozpočet nikdy nepřekáží (čisté otočení je nejvýš 180°), omezuje větší těla mezi překážkami.
+- [ ] Sprint: +1 bod únavy za použití (HB, 2026-10-16); „unavená postava nesmí sprintovat, vyčerpaná ani běhat“ beru z tabulky únavy (h1634) a uplatňuji jen u postav s vyplněnou odolností. Potvrdit, jestli PJ smí zákaz obejít (teď smí).
 - [ ] Běh a sprint jsem v kódu vázal na úmysl „Pohyb“ (kniha h1625: při úmyslu Pohyb se krok smí protáhnout na dva hexy). Potvrdit, jestli má běh/sprint jít i mimo tento úmysl.
 - [ ] Útok zvířecí C (2 hexy): v kódu 3 hexy před hlavou, jak u jednohexového tvora. Potvrdit proti tomu, jak se to hraje.

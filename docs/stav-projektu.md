@@ -38,8 +38,9 @@ ním čeká, dokud se to neprovede ručně.
 kterém jsou všechny dosud neprovedené DDL příkazy; uživatel ho dostává jako
 text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-16):
 čeká blok `0086` (souboj, krok 2b — tvorové na více hexech, Běh/Sprint): sloupec
-`tokeny.hexu`, tabulky `souboj_pohyb` a `tvary_tvoru`, efekt „Běh na krátké
-vzdálenosti“.** Bez něj souboj funguje (běh, sprint i tvary se berou z výchozích
+`tokeny.hexu`, tabulky `souboj_pohyb` (i se sloupcem `unava_bodu` — bod únavy za
+sprint) a `tvary_tvoru`, efekt „Běh na krátké vzdálenosti“.** Kdo starší verzi bloku už
+spustil, pustí ho znovu — doplní jen sloupec `unava_bodu`. Bez něj souboj funguje (běh, sprint i tvary se berou z výchozích
 hodnot v `includes/vtt_souboj_pravidla.php`), jen PJ nemůže tvorovi nastavit počet
 hexů. Bloky pro `0065`–`0081`, `DROP TABLE` tří mrtvých tabulek z 0008, `0084`
 (mapa) i `0085` (souboj, krok 1) jsou na produkci provedené a `0082` (217 položek
@@ -187,9 +188,20 @@ MariaDB.** Postup, který v session fungoval:
     úmyslu „Pohyb“ — v knize h1625 smí při úmyslu Pohyb krok o dva hexy; sprint = HB),
     **+1 hex k běhu i sprintu s dovedností Běh na krátké vzdálenosti** (h1698; PJ ji po
     úspěšném ověření nasadí postavě jako efekt „Běh na krátké vzdálenosti“ na 3 kola,
-    souboj ji pozná podle efektu), **otočení v rámci pohybu až o 270°** (HB; kniha 120°).
-    Celé tělo postupuje hex po hexu přes volné hexy (zeď zastaví hráče, ne PJ), cílový hex
-    i všechny hexy těla v cíli musí být volné. Otočka = otočení kolem otočného hexu.
+    souboj ji pozná podle efektu), **otočení v rámci pohybu celkem až 270° za akci** (HB;
+    kniha 120°; rozhodnutí 2026-10-16): tvor se smí otáčet po 60° před pohybem, mezi hexy i
+    po nich (např. otočka, dva hexy, otočka), součet všech otočení nejvýš 4 kroky (240°).
+    Server i klient hledají přípustnou cestu jako „stavy“ (poloha, čelo, spotřeba otáčení):
+    `dracak_vtt_hex_dosazitelne_stavy()` / `hexy.dosazitelneStavy()` (shoda ověřena na
+    150 náhodných případech). Celé tělo postupuje hex po hexu přes volné hexy (zeď zastaví
+    hráče, ne PJ), v každém mezistavu musí být tělo na volných hexech. U jednohexového tvora
+    rozpočet nikdy nevadí (čisté otočení je nejvýš 180°), omezuje větší těla mezi překážkami.
+    Otočka (samostatná akce) = otočení kolem otočného hexu o libovolný úhel.
+  - **Únava:** každé použití **sprintu přidá postavě 1 bod únavy** (`souboj_pohyb.unava_bodu`,
+    `postavy.unava`; nestvůry zatím únavu nemají). Podle tabulky únavy (h1634) **unavená
+    postava (stupeň 1+) nesmí sprintovat a vyčerpaná (2+) ani běhat** — server to hráči
+    zamítne (PJ smí rozhodnout jinak), klient tlačítko zamkne (`kolo.aktivni_zakazy`).
+    Platí jen u postav s vyplněnou odolností.
   - **Útok:** jednohexový a zvířecí C (2 hexy) útočí na 3 hexy před hlavou; D a E na
     **všechny hexy sousedící s oběma horními (čelními) hexy** mimo vlastní tělo. Cíl je
     v dosahu, stojí-li v dosahu kterýkoli hex jeho těla.
@@ -199,13 +211,13 @@ MariaDB.** Postup, který v session fungoval:
     pohybu, šipky čela (u D/E k hranám), tlačítka ↶ ↷ pro otočení po 60° a v liště akcí
     Běh a Sprint (zamčené, dokud tvor nemá úmysl Pohyb). Rotační úchyt tokenu D/E se
     přichytává na 30° + 60°.
-  - **Kniha** (`/pravidla.php`): HB bloky b93073–b93078 (krok 270°, běh, sprint, dovednost,
-    Pohyb), b93079–b93087 (tvary, otočný hex, čelo, útok) a PJ b94004 + přepsaný b17388
+  - **Kniha** (`/pravidla.php`): HB bloky b93073–b93078 (krok a otáčení celkem 270° za akci, běh,
+    sprint + bod únavy, dovednost, Pohyb), b93079–b93087 (tvary, otočný hex, čelo, útok) a PJ b94004 + přepsaný b17388
     (velikosti hexů).
   - **Co ještě chybí v kroku 2:** dosah dlouhých zbraní (spojí se s krokem 3 — bere se ze
     zbraně v ruce), pravidlo A0 (tvorové velikosti A0 smí sdílet hex; zatím se neuplatňuje,
-    protože tokeny velikost nenesou), „Útěk“, omezení běhu/sprintu naložením a únavou,
-    Rozený sprinter (trollobijec, b1507) a větší tvary z knihy (nosorožec 1×4, slon 2×5,
+    protože tokeny velikost nenesou), „Útěk“, omezení běhu/sprintu naložením,
+    únava nestvůr (až s deníkem nestvůry), Rozený sprinter (trollobijec, b1507) a větší tvary z knihy (nosorožec 1×4, slon 2×5,
     drak).
 - **3D kostky (`assets/js/kostky3d.js`):** dřív se kostka ukázala v rohu 300×150 px
   a její čísla s výsledkem v logu nesouhlasila (výsledek losoval server). Teď

@@ -53,7 +53,31 @@ try {
     $q = $pdo->prepare('SELECT umysl FROM kolo_ucastnik WHERE mapa_id = ? AND token_id = ?');
     $q->execute([$mapaId, $tokenId]);
     $umysl = $q->fetchColumn();
+    // Únava: unavená postava nesmí sprintovat, vyčerpaná ani běhat (hráče to zastaví, PJ smí rozhodnout jinak);
+    // sprint navíc stojí bod únavy za každé použití (HB, souboj_pohyb.unava_bodu).
+    $rezimPohybu = DRACAK_VTT_AKCE_REZIM_POHYBU[$druh] ?? null;
+    $unavaPlus = 0;
+    $unavaNova = null;
+    $postavaRadek = null;
+    if ($rezimPohybu !== null && $info[$tokenId]['typ_entity'] === 'postava') {
+        $q = $pdo->prepare('SELECT * FROM postavy WHERE id = ? FOR UPDATE');
+        $q->execute([(int)$info[$tokenId]['entita_id']]);
+        $postavaRadek = $q->fetch() ?: null;
+        $stupen = $postavaRadek ? dracak_vtt_postava_unava_stupen($postavaRadek) : null;
+        if ($stupen !== null && !$jePj && in_array($rezimPohybu, $stupen['zakazy'], true)) {
+            $pdo->rollBack();
+            dracak_vtt_souboj_chyba(422, 'Postava je ' . $stupen['nazev'] . ' — ' . ($rezimPohybu === 'sprint' ? 'sprintovat' : 'běhat') . ' nesmí.');
+        }
+    }
     $pohyb = dracak_vtt_souboj_pohyb($pdo, $mapa, $token, $info, $umysl !== false ? $umysl : null, $druh, $data, $jePj);
+    if ($rezimPohybu !== null && $postavaRadek !== null && array_key_exists('unava', $postavaRadek)) {
+        $bodu = (int)(dracak_vtt_souboj_pravidla()['pohyb'][$rezimPohybu]['unava_bodu'] ?? 0) * $pocet;
+        if ($bodu > 0) {
+            $unavaNova = min(65535, (int)$postavaRadek['unava'] + $bodu);
+            $pdo->prepare('UPDATE postavy SET unava = ? WHERE id = ?')->execute([$unavaNova, (int)$postavaRadek['id']]);
+            $unavaPlus = $bodu;
+        }
+    }
 
     $pohnul = false;
     if ($pohyb['mapove']) {
@@ -90,6 +114,8 @@ try {
         'akce_zbyvajici' => (int)$ki['akce_zbyvajici'] - $pocet,
         'cil_token_id' => $pohyb['mapove'] ? $pohyb['cil_token_id'] : null,
         'cil_label' => $pohyb['mapove'] ? $pohyb['cil_label'] : null,
+        'unava_plus' => $unavaPlus,
+        'unava_nova' => $unavaNova,
         'skryta' => !dracak_vtt_souboj_vidi_hrac($info[$tokenId]),
     ], (int)$user['id']);
     $posun = dracak_vtt_souboj_posun($pdo, $svetId, $mapaId, (int)$user['id']);

@@ -454,6 +454,24 @@ function dracak_vtt_souboj_klient(PDO $pdo, array $user, array $mapa, bool $jePj
         'novy' => true,
         // Hráč se v souboji na hexové mapě hýbe akcemi (Krok, Otočka), ne tažením.
         'pohyb_akcemi' => dracak_vtt_hex_rozmery($mapa) !== null,
+        // Pohybové akce, které únava aktivní postavě zakazuje (běh, sprint) — tlačítka se zamknou.
+        'aktivni_zakazy' => $aktivniId !== null && isset($info[$aktivniId])
+            ? dracak_vtt_souboj_zakazy_pohybu($pdo, $info[$aktivniId]['typ_entity'], $info[$aktivniId]['entita_id']) : [],
     ];
     return ['kolo' => $kolo, 'iniciativa' => $iniciativa, 'ucastnici' => $ucastnici];
+}
+
+// Pohybové akce, které únava postavě zakazuje (tabulka únavy h1634: unavená nesmí
+// sprintovat, vyčerpaná ani běhat). Prázdný seznam u nestvůr a postav bez odolnosti
+// (vytrvalost se nehádá). Klíče "beh" / "sprint" jako v tabulce souboj_pohyb.
+function dracak_vtt_souboj_zakazy_pohybu(PDO $pdo, string $typEntity, int $entitaId): array
+{
+    if ($typEntity !== 'postava') {
+        return [];
+    }
+    $q = $pdo->prepare('SELECT * FROM postavy WHERE id = ?');
+    $q->execute([$entitaId]);
+    $postava = $q->fetch();
+    $stupen = $postava ? dracak_vtt_postava_unava_stupen($postava) : null;
+    return $stupen === null ? [] : array_values(array_intersect(['beh', 'sprint'], $stupen['zakazy']));
 }

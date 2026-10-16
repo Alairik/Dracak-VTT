@@ -171,3 +171,66 @@ function dracak_vtt_hex_dosah_utoku(array $tvar, array $pivot, int $orientace): 
     }
     return array_values($dosah);
 }
+
+// Kam se tvor dostane jednou pohybovou akcí (krok / běh / sprint, HB): nejvýš
+// $dosah posunů otočného hexu na sousední hex a v kterémkoli okamžiku (před
+// pohybem, mezi posuny, po nich) se smí otáčet po 60° — dohromady nejvýš
+// $maxOtoceni takových otočení (270° = 4 kroky po 60°). Tělo musí v každé poloze
+// a orientaci stát na volných hexech ($obsazene: klíč "col,row" => cokoliv).
+// $zed(a, b) vrací true, když posun z hexu a na b brání zeď (null = zdi nejsou).
+// Vrací ["col,row,orientace" => nejmenší počet 60° otočení, kterým se do toho stavu
+// dá dojít]; stav bez posunu (pouhá otočka na místě) mezi výsledky není.
+// Stejnou funkci má klient v assets/js/hexy.js (shoda ověřena testem).
+function dracak_vtt_hex_dosazitelne_stavy(array $tvar, array $odkud, int $orientace, int $dosah, int $maxOtoceni, array $obsazene, ?callable $zed = null): array
+{
+    $volne = function (array $pivot, int $o) use ($tvar, $obsazene): bool {
+        foreach (dracak_vtt_hex_bunky_tvaru($tvar, $pivot, $o) as $b) {
+            if (isset($obsazene[$b[0] . ',' . $b[1]])) {
+                return false;
+            }
+        }
+        return true;
+    };
+    // Otáčení na místě: u každého otočného hexu v patře šíří nejmenší počet otočení po okruhu šesti orientací.
+    $otoc = function (array $patro) use ($volne, $maxOtoceni): array {
+        for ($pruchod = 0; $pruchod < 6; $pruchod++) {
+            foreach ($patro as $klic => $t) {
+                [$c, $r, $o] = array_map('intval', explode(',', $klic));
+                foreach ([-1, 1] as $d) {
+                    $o2 = (($o + $d) % 6 + 6) % 6;
+                    $t2 = $t + 1;
+                    $klic2 = $c . ',' . $r . ',' . $o2;
+                    if ($t2 <= $maxOtoceni && (!isset($patro[$klic2]) || $t2 < $patro[$klic2]) && $volne([$c, $r], $o2)) {
+                        $patro[$klic2] = $t2;
+                    }
+                }
+            }
+        }
+        return $patro;
+    };
+    $vysledek = [];
+    $patro = $otoc([$odkud[0] . ',' . $odkud[1] . ',' . $orientace => 0]);
+    for ($posun = 1; $posun <= $dosah; $posun++) {
+        $dalsi = [];
+        foreach ($patro as $klic => $t) {
+            [$c, $r, $o] = array_map('intval', explode(',', $klic));
+            for ($k = 0; $k < 6; $k++) {
+                $n = dracak_vtt_hex_soused([$c, $r], $k);
+                if (!$volne($n, $o) || ($zed !== null && $zed([$c, $r], $n))) {
+                    continue;
+                }
+                $klic2 = $n[0] . ',' . $n[1] . ',' . $o;
+                if (!isset($dalsi[$klic2]) || $t < $dalsi[$klic2]) {
+                    $dalsi[$klic2] = $t;
+                }
+            }
+        }
+        $patro = $otoc($dalsi);
+        foreach ($patro as $klic => $t) {
+            if (!isset($vysledek[$klic]) || $t < $vysledek[$klic]) {
+                $vysledek[$klic] = $t;
+            }
+        }
+    }
+    return $vysledek;
+}

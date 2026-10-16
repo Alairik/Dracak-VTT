@@ -11,13 +11,15 @@ declare(strict_types=1);
 //  - krok 1 hex, běh 2 hexy (kniha h1625: při úmyslu Pohyb se krok smí protáhnout
 //    na dva hexy), sprint 3 hexy (HB); běh a sprint jen při úmyslu Pohyb
 //  - dovednost Běh na krátké vzdálenosti (h1698) přidá +1 hex při běhu a sprintu
-//  - otočení v rámci pohybu až o 270° (HB; kniha měla 120°)
+//  - otočení v rámci jedné pohybové akce celkem až o 270° (HB; kniha měla 120°): tvor se smí
+//    otáčet před posuny, mezi nimi i po nich, součet všech otočení nejvýš 270° (4 kroky po 60°)
+//  - sprint stojí 1 bod únavy za každé použití (HB, sloupec unava_bodu)
 // TVARY (kolik hexů tvor zabírá): viz includes/vtt_hexy.php, "Tvorové na více hexech".
 
 const DRACAK_VTT_POHYB_VYCHOZI = [
-    'krok' => ['nazev' => 'Krok', 'hexu' => 1, 'jen_pri_umyslu' => null, 'bonus_dovednost' => 0, 'otoceni_max' => 270],
-    'beh' => ['nazev' => 'Běh', 'hexu' => 2, 'jen_pri_umyslu' => 'pohyb', 'bonus_dovednost' => 1, 'otoceni_max' => 270],
-    'sprint' => ['nazev' => 'Sprint', 'hexu' => 3, 'jen_pri_umyslu' => 'pohyb', 'bonus_dovednost' => 1, 'otoceni_max' => 270],
+    'krok' => ['nazev' => 'Krok', 'hexu' => 1, 'jen_pri_umyslu' => null, 'bonus_dovednost' => 0, 'otoceni_max' => 270, 'unava_bodu' => 0],
+    'beh' => ['nazev' => 'Běh', 'hexu' => 2, 'jen_pri_umyslu' => 'pohyb', 'bonus_dovednost' => 1, 'otoceni_max' => 270, 'unava_bodu' => 0],
+    'sprint' => ['nazev' => 'Sprint', 'hexu' => 3, 'jen_pri_umyslu' => 'pohyb', 'bonus_dovednost' => 1, 'otoceni_max' => 270, 'unava_bodu' => 1],
 ];
 
 const DRACAK_VTT_TVARY_VYCHOZI = [
@@ -55,11 +57,19 @@ function dracak_vtt_souboj_pravidla(?PDO $pdo = null): array
     try {
         $pdo = $pdo ?? dracak_db();
         $pohyb = [];
-        foreach ($pdo->query('SELECT kod, nazev, hexu, jen_pri_umyslu, bonus_dovednost, otoceni_max FROM souboj_pohyb')->fetchAll() as $r) {
-            $pohyb[(string)$r['kod']] = [
+        // Sloupec unava_bodu přibyl dodatečně — bez něj (starší ruční SQL) se bere z výchozích hodnot.
+        try {
+            $radky = $pdo->query('SELECT kod, nazev, hexu, jen_pri_umyslu, bonus_dovednost, otoceni_max, unava_bodu FROM souboj_pohyb')->fetchAll();
+        } catch (Throwable $e) {
+            $radky = $pdo->query('SELECT kod, nazev, hexu, jen_pri_umyslu, bonus_dovednost, otoceni_max FROM souboj_pohyb')->fetchAll();
+        }
+        foreach ($radky as $r) {
+            $kod = (string)$r['kod'];
+            $pohyb[$kod] = [
                 'nazev' => (string)$r['nazev'], 'hexu' => (int)$r['hexu'],
                 'jen_pri_umyslu' => $r['jen_pri_umyslu'] !== null && $r['jen_pri_umyslu'] !== '' ? (string)$r['jen_pri_umyslu'] : null,
                 'bonus_dovednost' => (int)$r['bonus_dovednost'], 'otoceni_max' => (int)$r['otoceni_max'],
+                'unava_bodu' => array_key_exists('unava_bodu', $r) ? (int)$r['unava_bodu'] : (int)(DRACAK_VTT_POHYB_VYCHOZI[$kod]['unava_bodu'] ?? 0),
             ];
         }
         $tvary = [];

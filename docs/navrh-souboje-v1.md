@@ -164,7 +164,8 @@ Dnešní „Další na tahu“ předává tah po každé jedné akci; podle dom�
    - **2b ✔ (hotovo v kódu, čeká na ruční SQL 0086)**: tvorové zabírající víc hexů
      (zvířecí C = 2, D = 3, E = 5) s otočným hexem a čelem, Běh (2 hexy) a Sprint (3 hexy)
      při úmyslu Pohyb, +1 hex s dovedností Běh na krátké vzdálenosti, otočení při pohybu
-     až o 270° (vše HB, rozhodnutí 2026-10-16). Tvary: **D** = trojúhelník (dva hexy
+     celkem až o 270° za akci (před pohybem, mezi hexy i po nich), sprint stojí 1 bod
+     únavy (vše HB, rozhodnutí 2026-10-16). Tvary: **D** = trojúhelník (dva hexy
      nahoře, spodní hex je otočný), **E** = 5 hexů (dva nahoře, pod nimi řada tří, otočný
      prostřední), čelo = hrana obou horních hexů, útok na všechny hexy sousedící s horními;
      **zvířecí C** = 2 hexy za sebou, otáčí se kolem zadního, hlava hledí vpřed, útok na
