@@ -158,6 +158,11 @@ Dnešní „Další na tahu“ předává tah po každé jedné akci; podle dom�
 1. ✔ Zahájit souboj (překvapení −6), úmysly, iniciativa s tlačítkem hodu + 3D kostka
    + ruční zápis, skrytá iniciativa pro hráče, kolo ve dvou půlkách. (Hotovo, na produkci.)
 2. Lišta akcí a pohyb po hexech (krok, otočka, čelo, 3 hexy před sebou, víc-hexoví tvorové).
+   - **2a ✔ (hotovo)**: jednohexoví tvorové — krok (i o dva hexy při úmyslu „Pohyb“),
+     otočka, výběr cíle útoku ve 3 hexech před tvorem, hexová geometrie v PHP i JS,
+     hráč se v souboji hýbe jen akcemi.
+   - **2b**: tvorové zabírající víc hexů (zvířecí C = 2, D = 3, E = 5) — čeká na
+     odsouhlasení tvarů a otáčení.
 3. Útok / obrana / výsledek (hody tlačítkem), zranění automaticky + oprava, bojeschopnost,
    vyřazení.
 4. Malý deník nestvůry (staty z čísel v zápisu), kořist.

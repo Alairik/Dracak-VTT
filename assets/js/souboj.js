@@ -17,6 +17,14 @@ const AKCE_DRUHY = {
   utok: 'Útok', obrana: 'Obrana', krok: 'Krok', otocka: 'Otočka', krok_utok: 'Krok a útok',
   otocka_utok: 'Otočka a útok', obrana_krok: 'Obrana a krok', kouzleni: 'Kouzlení', jina: 'Jiná činnost', cekani: 'Čekání',
 };
+// Pořadí tlačítek v liště akcí (h1623).
+const AKCE_LISTA = ['krok', 'otocka', 'utok', 'krok_utok', 'otocka_utok', 'obrana', 'obrana_krok', 'cekani', 'jina', 'kouzleni'];
+// Které akce mají část na mapě (krok / otočka / cíl útoku), viz includes/vtt_souboj_pohyb.php.
+const S_KROKEM = ['krok', 'krok_utok', 'obrana_krok'];
+const S_OTOCKOU = ['otocka', 'otocka_utok'];
+const S_UTOKEM = ['utok', 'krok_utok', 'otocka_utok'];
+const SMER_SIPKY = ['→', '↘', '↙', '←', '↖', '↗'];
+const SVGNS = 'http://www.w3.org/2000/svg';
 const FAZE = [['umysly', 'Úmysly'], ['iniciativa', 'Iniciativa'], ['kolo', 'Tahy']];
 const PREKVAPENI_TEXT = {
   druzina: 'družina je překvapena', nepratele: 'nepřátelé jsou překvapeni', obe: 'obě strany jsou překvapeny',
@@ -34,8 +42,10 @@ function el(tag, trida, text) {
 
 export function initSouboj(ctx) {
   const {mapaId, jePj, postJson, logLine, getTokeny, getVybrane, vystredit, obnovitStav, pohybAuto, hodit3D, nactiKostky, kostky3DPripraveny} = ctx;
+  // Hexy (viz assets/js/hexy.js; mapa.js je načítá s číslem verze a předává sem)
+  const {hexy, jeHexMapa, hexBunka, hexStred, gridPx, getZdi, soubojSvg} = ctx;
   const panel = document.getElementById('panelIniciativa');
-  if (!panel) return {aplikuj() {}, logUdalost() {}};
+  if (!panel) return {aplikuj() {}, logUdalost() {}, planuje: () => false, klik() {}, zrusitPlan() {}, prekreslitOverlay() {}};
   const titul = document.getElementById('iniciativaTitle');
   const fazeEl = document.getElementById('iniciativaFaze');
   const seznam = document.getElementById('iniciativaList');
@@ -281,14 +291,275 @@ export function initSouboj(ctx) {
 
     // Ovládání tahu: jen ten, kdo smí za tvora na tahu jednat
     if (kolo.ovladam_aktivniho && kolo.aktivni_token_id !== null) {
-      const box = el('div', 'tah-ovladani');
-      const sel = el('select', 'input');
-      Object.entries(AKCE_DRUHY).forEach(([k, t]) => sel.append(new Option(t, k)));
-      const provest = tlacitko('Provést akci', 'btn-secondary', () => volat('api/tah_akce.php', {token_id: kolo.aktivni_token_id, druh: sel.value}));
-      const konec = tlacitko('Ukončit tah', 'btn-ghost', () => volat('api/tah_konec.php', {}), 'Zbylé akce tohoto tahu propadnou jako čekání.');
-      box.append(sel, provest, konec);
-      akceEl.append(box);
-      akceEl.append(el('p', 'ini-napoveda', 'Provedení akce zatím jen odečte akci a zapíše ji do logu; pohyb po hexech a útoky přibudou v dalších krocích.'));
+      if (plan) kreslitPlan(); else kreslitListuAkci();
+    }
+  }
+
+  // --- Lišta akcí (h1623) a plánování akcí na mapě ---
+  // Na hexové mapě mají Krok, Otočka a Útok (i jejich spojení) mapovou část:
+  // klikáš na hexy (zeleně kam smíš, oranžově 3 hexy před tvorem) a až poté se
+  // akce potvrdí. Ostatní akce (Čekání, Obrana, Jiná činnost, Kouzlení) se
+  // odečtou hned. Na čtvercové mapě se odečte vše hned.
+  let plan = null;
+  const jeHex = () => !!(jeHexMapa && jeHexMapa());
+  const aktivniToken = () => (kolo && kolo.aktivni_token_id !== null ? tokenPodleId(kolo.aktivni_token_id) : null);
+
+  function kreslitListuAkci() {
+    const box = el('div', 'akce-lista');
+    AKCE_LISTA.forEach((k) => {
+      const mapova = jeHex() && (S_KROKEM.includes(k) || S_OTOCKOU.includes(k) || S_UTOKEM.includes(k));
+      box.append(tlacitko(AKCE_DRUHY[k], 'btn-ghost akce-btn' + (mapova ? ' mapova' : ''), () => {
+        if (mapova) zahajitPlan(k);
+        else volat('api/tah_akce.php', {token_id: kolo.aktivni_token_id, druh: k});
+      }, mapova ? 'Vybereš na mapě' : 'Odečte jednu akci'));
+    });
+    akceEl.append(box);
+    akceEl.append(tlacitko('Ukončit tah', 'btn-ghost', () => volat('api/tah_konec.php', {}), 'Zbylé akce tohoto tahu propadnou jako čekání.'));
+    akceEl.append(el('p', 'ini-napoveda', jeHex()
+      ? 'Akce s tečkou (Krok, Otočka, Útok…) vybíráš klikem na mapě. Obrana a Kouzlení se zatím jen odečtou; hody a zranění přijdou v dalších krocích.'
+      : 'Na této mapě není hexový grid, akce se jen odečtou a zapíšou do logu.'));
+  }
+
+  function zahajitPlan(druh) {
+    const t = aktivniToken();
+    if (!t) return;
+    const odkud = hexBunka(t.x, t.y);
+    const u = ucastnici.find((x) => x.token_id === t.id);
+    plan = {
+      druh, tokenId: t.id, odkud: {col: odkud.col, row: odkud.row}, smerPred: hexy.smerIdx(t.smer || 0),
+      umysl: u ? u.umysl : null, kam: null, smer: null, cil: null, x: t.x, y: t.y,
+    };
+    plan.krok = S_KROKEM.includes(druh);
+    plan.otocka = S_OTOCKOU.includes(druh);
+    plan.utok = S_UTOKEM.includes(druh);
+    plan.mozne = plan.krok ? mozneKroky() : new Map();
+    kreslit();
+    prekreslitOverlay();
+  }
+  function zrusitPlan() {
+    if (!plan) return;
+    plan = null;
+    kreslit();
+    prekreslitOverlay();
+  }
+
+  const klicBunky = (b) => b.col + ',' + b.row;
+  const stejnaBunka = (a, b) => a.col === b.col && a.row === b.row;
+
+  // Hexy, na kterých stojí jiní tvorové (postavy a nestvůry — značky nepřekáží).
+  function obsazene(krome) {
+    const m = new Map();
+    getTokeny().forEach((t) => {
+      if (t.id === krome || !['postava', 'nestvura_instance'].includes(t.typ_entity)) return;
+      m.set(klicBunky(hexBunka(t.x, t.y)), t);
+    });
+    return m;
+  }
+
+  // Úsečka A–B protíná zeď, která blokuje pohyb? (jen pro hráče; PJ smí přes zeď.)
+  function orient(ax, ay, bx, by, cx, cy) {
+    const v = (by - ay) * (cx - bx) - (bx - ax) * (cy - by);
+    return Math.abs(v) < 1e-9 ? 0 : (v > 0 ? 1 : 2);
+  }
+  function naUsecce(ax, ay, bx, by, cx, cy) {
+    return cx <= Math.max(ax, bx) + 1e-9 && cx >= Math.min(ax, bx) - 1e-9 && cy <= Math.max(ay, by) + 1e-9 && cy >= Math.min(ay, by) - 1e-9;
+  }
+  function usecky(x1, y1, x2, y2, x3, y3, x4, y4) {
+    const o1 = orient(x1, y1, x2, y2, x3, y3), o2 = orient(x1, y1, x2, y2, x4, y4);
+    const o3 = orient(x3, y3, x4, y4, x1, y1), o4 = orient(x3, y3, x4, y4, x2, y2);
+    if (o1 !== o2 && o3 !== o4) return true;
+    return (o1 === 0 && naUsecce(x1, y1, x2, y2, x3, y3)) || (o2 === 0 && naUsecce(x1, y1, x2, y2, x4, y4))
+      || (o3 === 0 && naUsecce(x3, y3, x4, y4, x1, y1)) || (o4 === 0 && naUsecce(x3, y3, x4, y4, x2, y2));
+  }
+  function zedVPrekazi(a, b) {
+    if (jePj) return false;
+    const sa = hexStred(a.col, a.row), sb = hexStred(b.col, b.row);
+    return (getZdi() || []).some((z) => z.blokuje_pohyb && usecky(sa.x, sa.y, sb.x, sb.y, z.x1, z.y1, z.x2, z.y2));
+  }
+
+  // Kam smí krok: sousední volný hex, při úmyslu „Pohyb“ až o dva hexy (h1625).
+  function mozneKroky() {
+    const m = new Map();
+    const dosah = plan.umysl === 'pohyb' ? 2 : 1;
+    const zabrane = obsazene(plan.tokenId);
+    const odkud = plan.odkud;
+    const volny = (b) => !zabrane.has(klicBunky(b));
+    for (let k = 0; k < 6; k++) {
+      const n1 = hexy.soused(odkud, k);
+      if (volny(n1) && !zedVPrekazi(odkud, n1)) m.set(klicBunky(n1), n1);
+      if (dosah >= 2 && volny(n1)) {
+        for (let k2 = 0; k2 < 6; k2++) {
+          const n2 = hexy.soused(n1, k2);
+          if (stejnaBunka(n2, odkud) || hexy.vzdalenost(odkud, n2) !== 2 || !volny(n2)) continue;
+          if (zedVPrekazi(odkud, n1) || zedVPrekazi(n1, n2)) continue;
+          m.set(klicBunky(n2), n2);
+        }
+      }
+    }
+    return m;
+  }
+
+  // Kde se tvor po akci ocitne a kam bude hledět.
+  const duchBunka = () => plan.kam || plan.odkud;
+  const duchSmer = () => (plan.smer !== null ? plan.smer : plan.smerPred);
+
+  function smerPovolen(idx) {
+    if (plan.krok) return hexy.rozdilSmeru(plan.smerPred, idx) <= 2;
+    if (plan.otocka) return idx !== plan.smerPred;
+    return false;
+  }
+
+  function popisPlanu() {
+    const casti = [];
+    if (plan.krok) casti.push(plan.kam ? 'Cíl: vybrán' : 'Klikni na zelený hex, kam půjdeš');
+    if (plan.krok || plan.otocka) {
+      casti.push(plan.smer !== null ? 'Čelem: ' + SMER_SIPKY[plan.smer]
+        : (plan.otocka ? 'Klikni do hexu tvora směrem, kam se otočí' : 'Čelem zůstaneš (nebo klikni do cílového hexu směrem, kam se otočíš — nejvýš o 120°)'));
+    }
+    if (plan.utok) {
+      const t = plan.cil ? tokenPodleId(plan.cil) : null;
+      casti.push(t ? 'Útok na: ' + t.label : 'Klikni na tvora v oranžových hexech před sebou (nebo potvrď bez cíle)');
+    }
+    return casti;
+  }
+  function planJeHotov() {
+    if (plan.krok && !plan.kam) return false;
+    if (plan.otocka && plan.smer === null) return false;
+    return true;
+  }
+
+  function kreslitPlan() {
+    const box = el('div', 'tah-plan');
+    box.append(el('b', '', AKCE_DRUHY[plan.druh]));
+    popisPlanu().forEach((t) => box.append(el('p', 'ini-napoveda', t)));
+    const r = el('div', 'tah-ovladani');
+    const potvrdit = tlacitko('Potvrdit', 'btn-secondary', odeslatPlan);
+    potvrdit.disabled = !planJeHotov();
+    r.append(potvrdit, tlacitko('Zrušit', 'btn-ghost', zrusitPlan));
+    box.append(r);
+    akceEl.append(box);
+  }
+
+  function odeslatPlan() {
+    if (!plan || !planJeHotov()) return;
+    const telo = {token_id: plan.tokenId, druh: plan.druh};
+    if (plan.kam) telo.cil = {col: plan.kam.col, row: plan.kam.row};
+    if (plan.smer !== null) telo.smer = hexy.smerStupne(plan.smer);
+    if (plan.cil) telo.cil_token_id = plan.cil;
+    postJson('api/tah_akce.php', Object.assign({mapa_id: mapaId}, telo)).then((d) => {
+      if (d.error) { logLine('Chyba: ' + d.error); return; }
+      plan = null;
+      obnovitStav();
+    });
+  }
+
+  // Klik na mapu při plánování; $m = bod v souřadnicích mapy.
+  function klik(m) {
+    if (!plan) return;
+    const c = hexBunka(m.x, m.y);
+    const duch = duchBunka();
+    if ((plan.krok || plan.otocka) && stejnaBunka(c, duch) && (plan.otocka || plan.kam)) {
+      // klik do hexu tvora: čelem k místu kliknutí
+      const st = hexStred(c.col, c.row);
+      if (Math.hypot(m.x - st.x, m.y - st.y) < gridPx() * 0.22) return;
+      const idx = hexy.smerIdx(Math.atan2(m.y - st.y, m.x - st.x) * 180 / Math.PI);
+      if (!smerPovolen(idx)) {
+        logLine(plan.krok ? 'Při kroku se otočíš nejvýš o 120°.' : 'Tímhle směrem už hledíš.');
+        return;
+      }
+      plan.smer = idx;
+      if (plan.cil && !predniJeCil(plan.cil)) plan.cil = null;
+    } else if (plan.krok && plan.mozne.has(klicBunky(c))) {
+      plan.kam = plan.mozne.get(klicBunky(c));
+      if (plan.cil && !predniJeCil(plan.cil)) plan.cil = null;
+    } else if (plan.utok) {
+      const t = tvorNaBunce(c);
+      if (t && predniJeCil(t.id)) plan.cil = plan.cil === t.id ? null : t.id;
+    } else if (plan.krok && !plan.kam && stejnaBunka(c, plan.odkud)) {
+      return;
+    }
+    kreslit();
+    prekreslitOverlay();
+  }
+  function tvorNaBunce(c) {
+    return getTokeny().find((t) => t.id !== plan.tokenId && ['postava', 'nestvura_instance'].includes(t.typ_entity)
+      && stejnaBunka(hexBunka(t.x, t.y), c)) || null;
+  }
+  function predniJeCil(tokenId) {
+    const t = tokenPodleId(tokenId);
+    if (!t) return false;
+    const b = hexBunka(t.x, t.y);
+    return hexy.predni(duchBunka(), duchSmer()).some((p) => stejnaBunka(p, b));
+  }
+
+  // --- Overlay na mapě (SVG nad tokeny, pod mlhou; neinteraktivní) ---
+  function obrys(cx, cy, size) {
+    let pts = '';
+    for (let i = 0; i < 6; i++) {
+      const ang = Math.PI / 180 * (60 * i - 30);
+      pts += (i ? ' ' : '') + (cx + size * Math.cos(ang)).toFixed(1) + ',' + (cy + size * Math.sin(ang)).toFixed(1);
+    }
+    return pts;
+  }
+  function kresliHex(b, trida) {
+    const st = hexStred(b.col, b.row);
+    const p = document.createElementNS(SVGNS, 'polygon');
+    p.setAttribute('points', obrys(st.x, st.y, gridPx() * 0.96));
+    p.setAttribute('class', 'sb-hex ' + trida);
+    soubojSvg.appendChild(p);
+    return st;
+  }
+  function kresliSipku(st, idx, trida) {
+    const size = gridPx();
+    const a = Math.PI / 180 * idx * 60;
+    const px = (r, w) => (st.x + r * Math.cos(a) - w * Math.sin(a)).toFixed(1) + ',' + (st.y + r * Math.sin(a) + w * Math.cos(a)).toFixed(1);
+    const t = document.createElementNS(SVGNS, 'polygon');
+    t.setAttribute('points', px(size * 0.9, 0) + ' ' + px(size * 0.5, -size * 0.24) + ' ' + px(size * 0.5, size * 0.24));
+    t.setAttribute('class', 'sb-sipka ' + trida);
+    soubojSvg.appendChild(t);
+  }
+  function prekreslitOverlay() {
+    if (!soubojSvg) return;
+    soubojSvg.innerHTML = '';
+    if (!jeHex() || !kolo) return;
+    if (plan) {
+      if (plan.krok) {
+        plan.mozne.forEach((b) => kresliHex(b, plan.kam && stejnaBunka(b, plan.kam) ? 'sb-cil-vybrany' : 'sb-cil'));
+      }
+      const duch = duchBunka();
+      const stDuch = hexStred(duch.col, duch.row);
+      if (plan.kam) {
+        const kruh = document.createElementNS(SVGNS, 'circle');
+        kruh.setAttribute('cx', stDuch.x); kruh.setAttribute('cy', stDuch.y);
+        kruh.setAttribute('r', (gridPx() * 0.62).toFixed(1));
+        kruh.setAttribute('class', 'sb-duch');
+        soubojSvg.appendChild(kruh);
+      }
+      if (plan.krok || plan.otocka) {
+        for (let k = 0; k < 6; k++) {
+          const vybrany = k === duchSmer();
+          kresliSipku(stDuch, k, vybrany ? 'vybrana' : (smerPovolen(k) ? 'mozna' : 'zakazana'));
+        }
+      }
+      if (plan.utok) {
+        hexy.predni(duch, duchSmer()).forEach((b) => {
+          const st = kresliHex(b, 'sb-predni');
+          const t = tvorNaBunce(b);
+          if (t) {
+            const kruh = document.createElementNS(SVGNS, 'circle');
+            kruh.setAttribute('cx', st.x); kruh.setAttribute('cy', st.y);
+            kruh.setAttribute('r', (gridPx() * 0.7).toFixed(1));
+            kruh.setAttribute('class', 'sb-terc' + (plan.cil === t.id ? ' vybrany' : ''));
+            soubojSvg.appendChild(kruh);
+          }
+        });
+      }
+      return;
+    }
+    // Bez plánování: 3 hexy před tvorem na tahu (kam smí útočit), ať je to vidět všem.
+    const t = kolo.faze === 'kolo' ? aktivniToken() : null;
+    if (t && ['postava', 'nestvura_instance'].includes(t.typ_entity)) {
+      hexy.predni(hexBunka(t.x, t.y), hexy.smerIdx(t.smer || 0)).forEach((b) => kresliHex(b, 'sb-predni slaby'));
     }
   }
 
@@ -484,7 +755,7 @@ export function initSouboj(ctx) {
   const ucastniciBtn = document.getElementById('souborUcastniciBtn');
   if (ucastniciBtn) ucastniciBtn.addEventListener('click', otevritZahajeni);
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { zavritHod(); zavritZahajeni(); }
+    if (e.key === 'Escape') { zavritHod(); zavritZahajeni(); zrusitPlan(); }
   });
 
   // --- Řádky v logu ---
@@ -513,7 +784,7 @@ export function initSouboj(ctx) {
         else if (p.polovina === 2) logLine('2. půlka kola.');
         break;
       case 'akce_provedena':
-        logLine(p.label + ': ' + p.druh_nazev + (p.pocet > 1 ? ' ×' + p.pocet : ''));
+        logLine(p.label + ': ' + p.druh_nazev + (p.pocet > 1 ? ' ×' + p.pocet : '') + (p.cil_label ? ' → ' + p.cil_label : ''));
         break;
       case 'tah_konec':
         logLine(p.label + ' ukončil(a) tah' + (p.propadlo ? ' (propadlo ' + p.propadlo + ')' : ''));
@@ -536,8 +807,18 @@ export function initSouboj(ctx) {
       kolo = stav.kolo;
       iniciativa = stav.iniciativa || [];
       ucastnici = stav.ucastnici || [];
+      // Plán akce platí jen pro toho, kdo je pořád na tahu, a jen když se nehnul.
+      if (plan) {
+        const t = aktivniToken();
+        if (!kolo || kolo.faze !== 'kolo' || !t || t.id !== plan.tokenId || t.x !== plan.x || t.y !== plan.y) plan = null;
+      }
       kreslit();
+      prekreslitOverlay();
     },
+    planuje: () => !!plan,
+    klik,
+    zrusitPlan,
+    prekreslitOverlay,
     logUdalost,
   };
 }

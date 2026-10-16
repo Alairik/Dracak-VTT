@@ -143,6 +143,30 @@ MariaDB.** Postup, který v session fungoval:
   souboj_faze|souboj_hod|umysl_nastavit|tah_akce|tah_konec|akce_uprava.php`,
   klient `assets/js/souboj.js`. Bez ručního SQL zůstává dnešní jednoduchá
   iniciativa (starý panel, `iniciativa_hod.php`, `dalsi_tah.php`).
+- **Akce na hexové mapě (blok B, krok 2a; hotový, bez ručního SQL):** lišta akcí
+  u tvora na tahu (Krok, Otočka, Útok, Krok a útok, Otočka a útok, Obrana, Obrana a
+  krok, Čekání, Jiná činnost, Kouzlení). Akce s mapovou částí se plánují klikem na
+  mapě: **Krok** = zeleně označené volné sousední hexy (při úmyslu „Pohyb“ až o dva
+  hexy, h1625) a otočení až o 120° (klik do cílového hexu směrem, kam se má tvor
+  dívat; bez kliku zůstane čelem jak byl); **Otočka** = klik do vlastního hexu směrem,
+  kam se otočí (na stejný směr ne); **Útok** = oranžově 3 hexy před tvorem (h1623),
+  klik na tvora v nich zapíše cíl (hod a zranění přijdou v kroku 3); u spojení se cíl
+  počítá z hexu a čela PO kroku/otočce. Potvrzení pošle akci na server
+  (`tah_akce.php`), který pravidla ověří sám (`includes/vtt_souboj_pohyb.php`):
+  sousedství a volný hex (stojí-li tam tvor, krok odmítne; vlastní „obecné“ tokeny
+  jsou jen značky a nepřekáží), zeď (hráčům blokuje stejně jako při tažení, PJ smí
+  přes), otočení ≤ 120° při kroku, cíl útoku jen v těch 3 hexech. Token se přesune na
+  střed hexu, čelo se zapíše jako násobek 60° a mlha se odhalí kolem postavy.
+  **V souboji na hexové mapě hráč tokenem netáhne ani ho volně neotáčí** (jen PJ);
+  hýbe se akcemi. Na čtvercové mapě (bez hexového gridu) akce zatím jen odečtou
+  jednu akci a zapíšou se do logu. Tři hexy před tvorem na tahu vidí na mapě všichni.
+  Geometrie: `includes/vtt_hexy.php` a `assets/js/hexy.js` (stejná matematika,
+  shoda ověřena porovnáním výstupů na mřížce buněk; směry čelem 0–5 po 60°, od
+  východu po směru hodinových ručiček).
+  **Co ještě chybí v kroku 2:** tvorové zabírající víc hexů (návrh čeká na
+  odsouhlasení uživatelem), dosah dlouhých zbraní (spojí se s krokem 3 — bere se ze
+  zbraně v ruce), pravidlo A0 (tvorové velikosti A0 smí sdílet hex; zatím
+  se neuplatňuje, protože tokeny velikost nenesou) a „Útěk“.
 - **3D kostky (`assets/js/kostky3d.js`):** dřív se kostka ukázala v rohu 300×150 px
   a její čísla s výsledkem v logu nesouhlasila (výsledek losoval server). Teď
   plátno vyplní okno a běžný hod kostkami (`kostka_hod.php`) bere čísla z kostek

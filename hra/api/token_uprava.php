@@ -56,6 +56,15 @@ if (!$jePj) {
     if (!dracak_vtt_je_na_tahu($user, (int)$token['mapa_id'], $tokenId)) {
         token_uprava_chyba(403, 'Teď nejsi na tahu.');
     }
+    // V souboji na hexové mapě se otáčí akcí Otočka nebo Krok (hra/api/tah_akce.php).
+    if (isset($zmeny['smer'])) {
+        $q = $pdo->prepare('SELECT * FROM mapy WHERE id = ?');
+        $q->execute([(int)$token['mapa_id']]);
+        $mapaRadek = $q->fetch();
+        if ($mapaRadek && dracak_vtt_pohyb_pres_akce($pdo, $mapaRadek)) {
+            token_uprava_chyba(403, 'V souboji se otáčí akcí Otočka (nebo Krok).');
+        }
+    }
 }
 
 $sloupce = [];   // sloupec => hodnota pro UPDATE

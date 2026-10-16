@@ -6,6 +6,7 @@
 // po nasazení nové verze nebral ze staré mezipaměti.
 const VERZE_MODULU = window.MAPA.verzeModulu || '0';
 const {hodit3D, nactiKostky, kostky3DPripraveny} = await import('./kostky3d.js?v=' + VERZE_MODULU);
+const hexy = await import('./hexy.js?v=' + VERZE_MODULU);
 const initSouboj = window.MAPA.funkce.souboj ? (await import('./souboj.js?v=' + VERZE_MODULU)).initSouboj : null;
 
 // --- Kamera: zoom a posun přes CSS transform na #mapWrap ---
@@ -1107,8 +1108,13 @@ function ocistitVyber() {
 // musí být každý tvor obrácen čelem k jedné ze šesti stran hexu, h1621),
 // čtverec = 8 směrů (45°), bez gridu po 15°.
 function krokOtoceni() { return GRID_PX > 0 ? (GRID_TYPE === 'hex' ? 60 : 45) : 15; }
+// V souboji s fázemi na hexové mapě se hráči hýbou a otáčejí akcemi (Krok,
+// Otočka — assets/js/souboj.js), tažením tokenu volně smí jen PJ.
+function volnyPohyb() {
+  return IS_PJ_OR_ADMIN || !(koloStav && koloStav.pohyb_akcemi);
+}
 function smiMenitSmer(t) {
-  return !!t && FUNKCE.smer && (IS_PJ_OR_ADMIN || (t.owned && t.na_tahu && !t.zamceno));
+  return !!t && FUNKCE.smer && (IS_PJ_OR_ADMIN || (volnyPohyb() && t.owned && t.na_tahu && !t.zamceno));
 }
 function aktualizujRotacniUchyt() {
   const uchyt = document.getElementById('rotUchyt');
@@ -1312,6 +1318,13 @@ const souboj = initSouboj ? initSouboj({
   hodit3D,
   nactiKostky,
   kostky3DPripraveny,
+  hexy,
+  jeHexMapa: () => GRID_PX > 0 && GRID_TYPE === 'hex',
+  hexBunka: (x, y) => hexBunka(x, y),
+  hexStred: (col, row) => mlhaBunkaStred(row, col),
+  gridPx: () => GRID_PX,
+  getZdi: () => zdiList,
+  soubojSvg: document.getElementById('soubojSvg'),
 }) : null;
 function nakreslitIniciativu() {
   if (souboj) { souboj.aplikuj({kolo: koloStav, iniciativa, ucastnici}); return; }
@@ -1505,6 +1518,8 @@ function zacitAkci(e, pinEl) {
   const elPod = e.target.closest('.vtt-token');
   akce.cilToken = elPod ? tokenData(parseInt(elPod.dataset.id, 10)) : null;
   if (pinEl) { akce.typ = 'pin'; akce.pin = pinEl; return; }
+  // Plánování akce v souboji (Krok, Otočka, Útok): klik vybírá hex, tah posouvá mapu.
+  if (souboj && souboj.planuje() && e.button === 0) { akce.typ = 'souboj'; return; }
   if (e.target.closest('#rotUchyt') && vybrane.size === 1) {
     akce.typ = 'otoceni';
     akce.token = tokenData(Array.from(vybrane)[0]);
@@ -1553,7 +1568,7 @@ function zacitAkci(e, pinEl) {
     akce.offY = m.y - t.y;
     // data o tahu/vlastnictví jsou jen pomůcka pro UI — server
     // (hra/api/token_presun.php) je autoritativní nezávisle na tom.
-    akce.smiTahnout = t.owned && t.na_tahu && !t.zamceno;
+    akce.smiTahnout = t.owned && t.na_tahu && !t.zamceno && volnyPohyb();
     // Shift/Ctrl (nebo nástroj "Výběr rámečkem" na dotyku) přidává/odebírá
     // token z výběru; obyčejný stisk na ještě nevybraný token vybere jen jeho.
     akce.modifikator = e.shiftKey || e.ctrlKey || e.metaKey || currentTool === 'vyber';
@@ -1651,6 +1666,7 @@ viewport.addEventListener('pointermove', (e) => {
     case 'pan':
     case 'klik':
     case 'prazdno':
+    case 'souboj':
       panAkce(e);
       break;
     case 'pin': {
@@ -1701,7 +1717,7 @@ viewport.addEventListener('pointermove', (e) => {
       // Táhne se celý výběr (jen tokeny, kterými smíš hýbat); netažený token
       // se táhne sám.
       if (!akce.skupina) {
-        const ve = vybrane.has(t.id) ? Array.from(vybrane).map(tokenData).filter((x) => x && x.owned && x.na_tahu && !x.zamceno) : [t];
+        const ve = vybrane.has(t.id) ? Array.from(vybrane).map(tokenData).filter((x) => x && x.owned && x.na_tahu && !x.zamceno && volnyPohyb()) : [t];
         akce.skupina = ve.some((x) => x.id === t.id) ? ve : [t];
       }
       let nx, ny;
@@ -1868,6 +1884,9 @@ function polozitToken(m) {
 
 function dokoncitAkci(a, e) {
   switch (a.typ) {
+    case 'souboj':
+      if (!a.posunuto && souboj) souboj.klik(bodMapy(e));
+      break;
     case 'pin':
       // Jen uloží novou pozici do skrytých polí formuláře — zápis do DB
       // proběhne až kliknutím na "Uložit změny", spolu s ostatními
@@ -2502,6 +2521,7 @@ let obnovitMlhuPoPollu = false;
 function applyEvent(u) {
   const naTeteMape = u.mapa_id === null || u.mapa_id === undefined || u.mapa_id == MAPA_ID;
   if (souboj && naTeteMape) souboj.logUdalost(u);
+  if (souboj && (u.typ === 'token_presun' || u.typ === 'tokeny_presun' || u.typ === 'token_zmena')) setTimeout(() => souboj.prekreslitOverlay(), 0);
   if (u.typ === 'token_presun') {
     const t = tokenData(u.payload.token_id);
     if (t) {

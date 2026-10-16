@@ -7,6 +7,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/vtt.php';
 require_once __DIR__ . '/vtt_mlha.php';
+require_once __DIR__ . '/vtt_souboj.php';
 
 // $token je řádek tokeny + svet_id + rozměry/grid mapy (viz dotazy v API).
 // Vrací null, když je přesun v pořádku, jinak [http kód, zpráva].
@@ -20,6 +21,15 @@ function dracak_vtt_token_kontrola_presunu(PDO $pdo, array $user, array $token, 
     // musí nejdřív odemknout.
     if (!empty($token['zamceno']) && !$jePj) {
         return [403, 'Token je zamčený.'];
+    }
+    // V souboji s fázemi na hexové mapě se hýbe akcemi (Krok, Otočka —
+    // hra/api/tah_akce.php), ne tažením; volně smí hýbat jen PJ.
+    if (!$jePj && dracak_vtt_pohyb_pres_akce($pdo, [
+        'id' => $token['mapa_id'], 'grid_typ' => $token['grid_typ'] ?? 'ctverec', 'grid_velikost_px' => $token['grid_velikost_px'] ?? 0,
+        'sirka_px' => $token['sirka_px'] ?? 0, 'vyska_px' => $token['vyska_px'] ?? 0,
+        'grid_posun_x' => $token['grid_posun_x'] ?? 0, 'grid_posun_y' => $token['grid_posun_y'] ?? 0,
+    ])) {
+        return [403, 'V souboji se hýbe akcí Krok — táhnout token teď nejde.'];
     }
     // Pořadí tahů (dracak_vtt_je_na_tahu): probíhá-li na téhle mapě boj,
     // smí token hýbat jen hráč, jehož token je zrovna aktivní.

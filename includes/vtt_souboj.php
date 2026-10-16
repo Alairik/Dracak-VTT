@@ -21,6 +21,7 @@ require_once __DIR__ . '/vtt.php';
 require_once __DIR__ . '/vtt_iniciativa.php';
 require_once __DIR__ . '/vtt_pohyblivost.php';
 require_once __DIR__ . '/vtt_mapa_stav.php';
+require_once __DIR__ . '/vtt_hexy.php';
 
 const DRACAK_VTT_UMYSLY = [
     'kouzleni' => 'Kouzlení',
@@ -100,6 +101,17 @@ function dracak_vtt_souboj_nacti(PDO $pdo, int $mapaId, bool $zamknout = false):
         'polovina' => (int)($r['polovina'] ?? 1),
         'prekvapeni' => (string)($r['prekvapeni'] ?? 'zadne'),
     ];
+}
+
+// Smí v souboji token hýbat jen akcemi (ne tažením)? Ano, když na mapě běží
+// souboj s fázemi a mapa je hexová — PJ si ale pořád hýbe volně (úprava
+// postavení, odhození do zdi…).
+function dracak_vtt_pohyb_pres_akce(PDO $pdo, array $mapa): bool
+{
+    if (!dracak_vtt_souboj_funkce() || dracak_vtt_hex_rozmery($mapa) === null) {
+        return false;
+    }
+    return dracak_vtt_souboj_nacti($pdo, (int)$mapa['id']) !== null;
 }
 
 // Údaje o tokenech mapy, které souboj potřebuje: jméno, kdo je ovládá, zda
@@ -439,6 +451,8 @@ function dracak_vtt_souboj_klient(PDO $pdo, array $user, array $mapa, bool $jePj
         'polovina' => $polovina,
         'prekvapeni' => $stav['prekvapeni'],
         'novy' => true,
+        // Hráč se v souboji na hexové mapě hýbe akcemi (Krok, Otočka), ne tažením.
+        'pohyb_akcemi' => dracak_vtt_hex_rozmery($mapa) !== null,
     ];
     return ['kolo' => $kolo, 'iniciativa' => $iniciativa, 'ucastnici' => $ucastnici];
 }
