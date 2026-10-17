@@ -250,7 +250,7 @@ MariaDB.** Postup, který v session fungoval:
   zrušen (Bojovník od 6. úrovně)“). Supertěžké zbraně (poznámky pod tabulkou, potvrzeno 2026-10-17): Bojovník nemá postih u těch, které nejsou podobné meči, Šermíř u těch,
   které jsou (`DRACAK_VTT_MECE_SUPERTEZKE`: Odachi, Flamberg, Warglaive, Obouruční meč supertěžký, Dvě katany, Dva dlouhé meče, Dvakrát
   warglaive), obojí bez omezení úrovní. **Katalog doplněn** migrací `0098` o 39 zbraní z tabulek (Bastard a Válečné kladivo obouruční, Kůsa,
-  Obouruční meč supertěžký jednoruční a kombinace dvou zbraní). **Nerozhodnuto:** těžká kuše u bojovníka, Mistr zbraně, bonusy
+  Obouruční meč supertěžký jednoruční a kombinace dvou zbraní); ceny čtyř kombinací, které v tabulce nesedí na součet dílů, jsou přepsané na součet a Kůsa je sečná (migrace `0099`, na přání uživatele). **Nerozhodnuto:** těžká kuše u bojovníka, Mistr zbraně, bonusy
   povolání podle druhu zbraně (h139, kombinace počítá h139 jako jednoruční, tabulka jako obouruční) — viz
   `docs/kontrolni-seznam-neuplnych-mist.md`. **Útok na vyřazeného** (h1613 b10736–b10737): tvor na mezi vyřazení nebo pod ní se brání jako nehybný (místo bonusu za
   obratnost −5, −3 bez zbraně, bez štítu, bez oprav za velikost a zezadu), bránit se zbraní nesmí a **zranění se násobí

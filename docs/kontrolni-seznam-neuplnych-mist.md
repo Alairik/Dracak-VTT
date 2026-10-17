@@ -417,10 +417,11 @@ knihou a opraví najednou. Pravidlo je v `CLAUDE.md`.
 - [ ] Popis **Warglaive** v katalogu tvrdil, že postih −2 nemá. Tabulka (supertěžké jednoruční: „všechny tyto zbraně mají −2 na iniciativu“)
   to nepotvrzuje — poznámka „///neztrácí −2 k ini“ patří k Řetězovému meči. Popis opraven migrací 0096, ověř podle knihy.
 - [ ] V poznámce pod tabulkou „lupič a eriten“ je v katalogu povolání **Erythen** — stejné povolání? V kódu se hledá podle názvu z DB.
-- [ ] Ceny kombinací v nové tabulce zbraní nesedí na součet dílů (b10686 †: cena a váha je součtem dílů): **Dvě katany** 1,20 zl (2× Katana
-  = 12 zl), **Dva dlouhé meče** 1,50 zl (15 zl), **Dvě Schiavony** 1,30 zl (13 zl) — vypadá jako posunutá desetinná čárka — a **Dva boxery**
-  1 st (2× Boxer = 10 st). Ostatní kombinace součet dávají. V katalogu (migrace 0098) nechány tak, jak jsou v tabulce.
-- [ ] **Kůsa** (střední obouruční, SZ 4, +2, +1, délka 1–2) nemá v tabulce druh zranění (sečná / bodná / tupá) — v katalogu prázdný.
+- [x] Ceny kombinací v nové tabulce zbraní nesedí na součet dílů (b10686 †): **Dvě katany** 1,20 zl, **Dva dlouhé meče** 1,50 zl, **Dvě Schiavony**
+  1,30 zl, **Dva boxery** 1 st. Uživatel 2026-10-17 potvrdil přepis na součet dílů — v katalogu opraveno migrací `0099` (12, 15, 13 a 1 zl).
+  **Text knihy** (`content/pravidla-hrac.html`, tabulka Nové zbraně tváří v tvář / Nové super těžké zbraně) zůstal podle zdroje; při
+  proofreadingu opravit i tam, ať kniha a katalog nesedí jinak.
+- [x] **Kůsa** nemá v tabulce druh zranění — uživatel 2026-10-17: sečná (`0099`).
 - [ ] V tabulce supertěžkých zbraní stojí „iciativu“, „Řetezový“, „neguje posth“ (překlepy zdroje, nechány).
 
 **Podezřelé údaje v Novém ceníku (h2055, nahráno beze změny, migrace 0082)**
