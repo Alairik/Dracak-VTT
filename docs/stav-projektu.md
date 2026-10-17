@@ -36,7 +36,9 @@ ním čeká, dokud se to neprovede ručně.
 
 **Ruční DDL blok je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný soubor, ve
 kterém jsou všechny dosud neprovedené DDL příkazy; uživatel ho dostává jako
-text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-17): nic nečeká.** Blok „Efekty s opravdovou
+text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-17): čeká blok „Iniciativa v2“** (sloupec `kolo_ucastnik.utoku_za_2_kola` a 4 sloupce `kolo_iniciativa`; bez něj
+zůstává dosavadní zaškrtávání bonusů a nic se nehlídá). Po potvrzení, že proběhl, se přesune připravená migrace `0093`
+z `docs/pripravene-migrace/` do `database/migrations/` (postup v tamním README). Dřív provedené: blok „Efekty s opravdovou
 mechanikou“ (migrace `0091`: 4 sloupce `efekty`, tabulka `efekt_slozky`, 2 sloupce `aktivni_efekty`) uživatel provedl;
 `0091` (zrcadlo DDL) a `0092` (data efektů) jsou v `database/migrations/`. Dosud provedené: tabulky `souboj_vyzva` (migrace `0088`, výzvy k hodu) a `nestvura_staty_sveta`
 (migrace `0090`, malý deník nestvůry) jsou na produkci provedené, hody i deník nestvůry jsou zapnuté.
@@ -216,6 +218,25 @@ MariaDB.** Postup, který v session fungoval:
   Jen PJ (bestiář je tajný), endpoint `hra/api/nestvura_denik.php`. Bez tabulky je panel jen přehled s vypnutým uložením.
   **Zbývá:** kořist, vybavení nestvůry z katalogu (ÚČ/OČ dopočtem ze zbraně a zbroje), inteligence / charisma /
   pohyblivost / vytrvalost jako hratelná data, kouzla nestvůr, automatický bonus k iniciativě podle „N× za kolo“.
+- **Iniciativa v2 a útok na vyřazeného (blok B, krok 6; v kódu hotové a otestované, zapne se ručním SQL, viz „Čeká na ruční spuštění“):**
+  uživatel při zkoušce zjistil, že jde zaškrtnout víc řádků Tabulky vícenásobných útoků najednou („3 za 2 kola“ i „2 za kolo“ = +9)
+  a bonus za úkon se dá uplatnit bez ohlášení. Teď (h1622): **hráč nejdřív ohlásí úmysl** (kouzlení / útok na blízko / střelba…)
+  a při Útoku nebo Střelbě zadá **jedno pole „útoků za 2 kola“** (2–8; zůstává mezi koly; bonus je řádek tabulky, tj. 3 × (počet − 2):
+  +3 … +18). Bez ohlášeného úmyslu se vícenásobné útoky nezapočítají a ručně zaškrtnuté řádky tabulky se v dialogu hodu
+  vůbec nenabízejí (server je ignoruje). Dialog hodu říká, co se přičte samo (únava, naložení, překvapení, kouzlení +1,
+  vícenásobné útoky z úmyslu) a k čemu se hráč zavazuje. **Slib úkonu** (`kolo_iniciativa.zavazek`): kdo dostal kladný bonus za
+  kouzlení nebo vícenásobné útoky, musí mu věnovat **první vlastní akci kola a aspoň polovinu akcí kola** (polovina = akce při
+  hodu / 2 nahoru). Hlídá to `dracak_vtt_souboj_proved_akci`: jiná první akce se odmítne, jiná pozdější akce se odmítne, jakmile
+  by na splnění poloviny nezbylo místo; **hráči** se to týká, **PJ smí výjimku** (za hráče jednat jinak, nebo „Zrušit slib“
+  u řádku tvora v pořadí tahů). **Obrana** se počítá jako bojová akce (bestiář: každý útok i obrana = jedna akce), takže plní
+  slíbený útok, ale do „první akce kola“ se nepočítá (je vynucená, dějí se před vlastním tahem); střelba zatím vlastní akci nemá,
+  splní ji útok. Počítadla jsou ve sloupcích (`zavazek_hotovo`, `akce_hotovo`), nuluje je nový hod iniciativy. Pořadí tahů ukazuje
+  „slib: kouzlení 0/2“. **Nerozhodnuto / ručně:** postih za obouruční zbraň (−2) a těžkou kuši (−3) se dál zaškrtává ručně — v DB
+  zbraně nemají údaj o držení a navíc povolání mají vlastní výjimky (bojovník +6 až +12 za obouruční zbraně, šermíř bez postihu…,
+  h139 / h156). **Útok na vyřazeného** (h1613 b10736–b10737): tvor na mezi vyřazení nebo pod ní se brání jako nehybný (místo bonusu za
+  obratnost −5, −3 bez zbraně, bez štítu, bez oprav za velikost a zezadu), bránit se zbraní nesmí a **zranění se násobí
+  úrovní** (postava nejvýš ×9, nestvůra životaschopností; u „3 + 4“ násobek doplní PJ na kartě obrany). Stejná cesta jako u
+  spícího (efekt Spánek). Nepokryto: kouzlící tvor jako nehybný.
 - **Efekty s opravdovou mechanikou (blok B, krok 5; hotové a na produkci 2026-10-17, ruční SQL 0091 proběhlo):**
   dřív byl efekt jen text (název, popis, „+2 Iniciativa“ jako věta) a boj ho ignoroval — lektvar Rychlosti na postavě
   nedělal nic. Teď má každý efekt v DB `mechanika_stav` (`auto` boj vyhodnotí všechno sám · `cast` čísla a akce boj, zbytek

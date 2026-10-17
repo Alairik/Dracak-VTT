@@ -93,8 +93,11 @@ function dracak_vtt_obratnost_bonus(PDO $pdo, ?int $stupen): ?int
 // vidí a řídí ho ručně přes dalsi_tah.php.
 function dracak_vtt_iniciativa_poradi(PDO $pdo, int $mapaId): array
 {
+    // Sloupce iniciativy v2 (slíbený úkon) jen když je ruční SQL provedené.
+    $v2 = function_exists('dracak_vtt_tokeny_funkce') && dracak_vtt_tokeny_funkce()['iniciativa_v2'];
     $stmt = $pdo->prepare(
         'SELECT ki.token_id, ki.hod, ki.modifikator, ki.vysledek, ki.akce_celkem, ki.akce_zbyvajici,
+                ' . ($v2 ? 'ki.zavazek, ki.zavazek_akci, ki.zavazek_hotovo, ki.akce_hotovo,' : '') . '
                 t.typ_entity, t.entita_id,
                 p.nazev AS postava_nazev, p.obratnost,
                 ni.nazev_instance, n.oc AS nestvura_oc

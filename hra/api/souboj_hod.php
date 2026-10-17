@@ -61,11 +61,18 @@ try {
     }
     $existuje = $pdo->prepare('SELECT 1 FROM kolo_iniciativa WHERE mapa_id = ? AND token_id = ?');
     $ucastnik = $pdo->prepare('SELECT * FROM kolo_ucastnik WHERE mapa_id = ? AND token_id = ?');
+    $v2 = dracak_vtt_iniciativa_v2();
     $upsert = $pdo->prepare(
-        'INSERT INTO kolo_iniciativa (mapa_id, token_id, hod, modifikator, vysledek, akce_celkem, akce_zbyvajici)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE hod = VALUES(hod), modifikator = VALUES(modifikator),
-             vysledek = VALUES(vysledek), akce_celkem = VALUES(akce_celkem), akce_zbyvajici = VALUES(akce_zbyvajici)'
+        $v2
+            ? 'INSERT INTO kolo_iniciativa (mapa_id, token_id, hod, modifikator, vysledek, akce_celkem, akce_zbyvajici, zavazek, zavazek_akci, zavazek_hotovo, akce_hotovo)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)
+               ON DUPLICATE KEY UPDATE hod = VALUES(hod), modifikator = VALUES(modifikator),
+                   vysledek = VALUES(vysledek), akce_celkem = VALUES(akce_celkem), akce_zbyvajici = VALUES(akce_zbyvajici),
+                   zavazek = VALUES(zavazek), zavazek_akci = VALUES(zavazek_akci), zavazek_hotovo = 0, akce_hotovo = 0'
+            : 'INSERT INTO kolo_iniciativa (mapa_id, token_id, hod, modifikator, vysledek, akce_celkem, akce_zbyvajici)
+               VALUES (?, ?, ?, ?, ?, ?, ?)
+               ON DUPLICATE KEY UPDATE hod = VALUES(hod), modifikator = VALUES(modifikator),
+                   vysledek = VALUES(vysledek), akce_celkem = VALUES(akce_celkem), akce_zbyvajici = VALUES(akce_zbyvajici)'
     );
     $vysledky = [];
     $bonusyPopis = [];
@@ -88,8 +95,17 @@ try {
         $m = dracak_vtt_iniciativa_modifikator($pdo, $info[$tokenId], $bonusIds, $jinyBonus, dracak_vtt_souboj_auto_popisy($stav, $u));
         $vysledek = $hod + $m['modifikator'];
         $akce = $m['bez_akci'] !== null ? 0 : dracak_vtt_iniciativa_akce($vysledek);
-        $upsert->execute([$mapaId, $tokenId, $hod, $m['modifikator'], $vysledek, $akce, $akce]);
+        // Kdo dostal bonus za úkon (kouzlení, vícenásobné útoky), ten mu věnuje první akci kola a aspoň polovinu akcí (h1622).
+        $zavazek = $akce > 0 ? dracak_vtt_iniciativa_zavazek($u) : null;
+        $zavazekAkci = $zavazek !== null ? (int)ceil($akce / 2) : 0;
+        $parametry = [$mapaId, $tokenId, $hod, $m['modifikator'], $vysledek, $akce, $akce];
+        if ($v2) {
+            array_push($parametry, $zavazek, $zavazekAkci);
+        }
+        $upsert->execute($parametry);
         $vysledky[] = [
+            'zavazek' => $zavazek,
+            'zavazek_akci' => $zavazekAkci,
             'token_id' => $tokenId,
             'label' => $info[$tokenId]['label'],
             'modifikator' => $m['modifikator'],
@@ -120,6 +136,8 @@ try {
         'akce_zbyvajici' => $vysledky[0]['akce_celkem'],
         'hodil' => $user['jmeno'],
         'rucne' => $rucne,
+        'zavazek' => $vysledky[0]['zavazek'],
+        'zavazek_akci' => $vysledky[0]['zavazek_akci'],
         'skryta' => $skryta,
     ], (int)$user['id']);
     $pdo->commit();

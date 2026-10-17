@@ -304,6 +304,73 @@ function dracak_vtt_souboj_posun(PDO $pdo, int $svetId, int $mapaId, int $ucetId
     return ['kolo_konec' => false, 'aktivni_token_id' => null, 'polovina' => 2, 'cislo_kola' => 0];
 }
 
+// ---------------------------------------------------------------------------------------------
+// Iniciativa v2: vícenásobné útoky jedním polem, slíbený úkon (ruční SQL: kolo_ucastnik.utoku_za_2_kola,
+// kolo_iniciativa.zavazek…; bez něj platí dosavadní zaškrtávání bonusů)
+// ---------------------------------------------------------------------------------------------
+
+function dracak_vtt_iniciativa_v2(): bool
+{
+    return dracak_vtt_tokeny_funkce()['iniciativa_v2'];
+}
+
+// Tabulka vícenásobných útoků (řádky Tabulky bonusů a postihů k iniciativě, PJ-kniha / bestiář): kolik útoků za 2 kola
+// -> název řádku. Bonus je 3 × (počet − 2) (+3 … +18); nad 8 útoků za 2 kola (4× za kolo) tabulka nemá řádek.
+const DRACAK_VTT_INI_UTOKY = [
+    3 => '3 útoky za 2 kola', 4 => '2 útoky za 1 kolo', 5 => '5 útoků za 2 kola',
+    6 => '3 útoky za 1 kolo', 7 => '7 útoků za 2 kola', 8 => '4 útoky za 1 kolo',
+];
+const DRACAK_VTT_INI_UTOKY_MAX = 8;
+// Úmysly, u kterých vícenásobné útoky platí (h1622: bonus za schopnost nebo zvláštní činnost jen při ohlášeném úkonu).
+const DRACAK_VTT_INI_UMYSLY_UTOKU = ['utok', 'strelba'];
+// Které akce splní slíbený úkon. Obrana se počítá jako bojová akce (bestiář: každý útok i obrana = jedna akce);
+// střelba zatím vlastní akci nemá, splní ji útok.
+const DRACAK_VTT_UTOCNE_AKCE = ['utok', 'krok_utok', 'otocka_utok', 'beh_utok', 'sprint_utok', 'obrana', 'obrana_krok'];
+const DRACAK_VTT_ZAVAZEK_AKCE = [
+    'kouzleni' => ['kouzleni'],
+    'utok' => DRACAK_VTT_UTOCNE_AKCE,
+    'strelba' => DRACAK_VTT_UTOCNE_AKCE,
+];
+const DRACAK_VTT_ZAVAZEK_NAZVY = ['kouzleni' => 'kouzlení', 'utok' => 'útok', 'strelba' => 'střelba'];
+
+// Kolik útoků za 2 kola platí v tomhle kole: pole účastníka, a jen při úmyslu Útok / Střelba (jinak null).
+function dracak_vtt_iniciativa_utoku(?array $ucastnik): ?int
+{
+    if ($ucastnik === null || !dracak_vtt_iniciativa_v2() || !in_array($ucastnik['umysl'] ?? null, DRACAK_VTT_INI_UMYSLY_UTOKU, true)) {
+        return null;
+    }
+    $n = $ucastnik['utoku_za_2_kola'] ?? null;
+    return $n !== null && isset(DRACAK_VTT_INI_UTOKY[(int)$n]) ? (int)$n : null;
+}
+
+// Úkon, za který tvor dostal kladný bonus k iniciativě, a tedy ho musí dělat jako první akci a aspoň polovinu akcí kola
+// (h1622): kouzlení (+1) nebo vícenásobné útoky při úmyslu Útok / Střelba. Jinak null (žádný bonus, žádný závazek).
+function dracak_vtt_iniciativa_zavazek(?array $ucastnik): ?string
+{
+    if ($ucastnik === null || !dracak_vtt_iniciativa_v2()) {
+        return null;
+    }
+    if (($ucastnik['umysl'] ?? null) === 'kouzleni') {
+        return 'kouzleni';
+    }
+    return dracak_vtt_iniciativa_utoku($ucastnik) !== null ? (string)$ucastnik['umysl'] : null;
+}
+
+// Tabulka vícenásobných útoků z DB pro klienta: [počet útoků za 2 kola => bonus k iniciativě].
+function dracak_vtt_iniciativa_utoky_tabulka(PDO $pdo): array
+{
+    $q = $pdo->prepare('SELECT popis, bonus FROM iniciativa_bonusy WHERE popis IN (' . implode(',', array_fill(0, count(DRACAK_VTT_INI_UTOKY), '?')) . ')');
+    $q->execute(array_values(DRACAK_VTT_INI_UTOKY));
+    $bonusy = array_column($q->fetchAll(), 'bonus', 'popis');
+    $vystup = [];
+    foreach (DRACAK_VTT_INI_UTOKY as $n => $popis) {
+        if (isset($bonusy[$popis])) {
+            $vystup[$n] = (int)$bonusy[$popis];
+        }
+    }
+    return $vystup;
+}
+
 // Modifikátor k hodu na iniciativu = součet vybraných řádků Tabulky bonusů a
 // postihů (str. 78, iniciativa_bonusy) + automatické (únava a naložení
 // postavy, překvapení, úmysl kouzlení) + ruční úprava. Popisy jdou do logu,
@@ -339,7 +406,10 @@ function dracak_vtt_iniciativa_modifikator(PDO $pdo, array $token, array $bonusI
         foreach ($stmt->fetchAll() as $b) {
             $pokryto = ($auto['skupiny']['unava'] && in_array($b['popis'], DRACAK_VTT_INICIATIVA_UNAVA, true))
                 || ($auto['skupiny']['nalozeni'] && in_array($b['popis'], DRACAK_VTT_INICIATIVA_NALOZENI, true))
-                || in_array($b['popis'], $navic, true);
+                || in_array($b['popis'], $navic, true)
+                // Iniciativa v2: vícenásobné útoky jen přes pole „útoků za 2 kola“ (a jen při ohlášeném úkonu) —
+                // zaškrtnout víc řádků najednou nejde.
+                || (dracak_vtt_iniciativa_v2() && in_array($b['popis'], DRACAK_VTT_INI_UTOKY, true));
             if ($pokryto) {
                 $ignorovane[] = $b['popis'];
             } else {
@@ -384,6 +454,10 @@ function dracak_vtt_souboj_auto_popisy(array $stav, ?array $ucastnik): array
         }
         if (($ucastnik['umysl'] ?? null) === 'kouzleni') {
             $popisy[] = 'Kouzlení';
+        }
+        $utoku = dracak_vtt_iniciativa_utoku($ucastnik);
+        if ($utoku !== null) {
+            $popisy[] = DRACAK_VTT_INI_UTOKY[$utoku];
         }
     }
     return $popisy;
@@ -438,6 +512,12 @@ function dracak_vtt_souboj_klient(PDO $pdo, array $user, array $mapa, bool $jePj
             'akce_celkem' => $ki ? $ki['akce_celkem'] : null,
             'akce_zbyvajici' => $ki ? $ki['akce_zbyvajici'] : null,
             'kvota' => $ki ? dracak_vtt_souboj_kvota($ki['akce_celkem'], $ki['akce_zbyvajici'], $polovina) : null,
+            // Iniciativa v2: kolik útoků za 2 kola tvor umí a slíbený úkon (kouzlení / útok / střelba) s počty akcí.
+            'utoku_za_2_kola' => $u && isset($u['utoku_za_2_kola']) && $u['utoku_za_2_kola'] !== null ? (int)$u['utoku_za_2_kola'] : null,
+            'zavazek' => $ki && !empty($ki['zavazek']) ? (string)$ki['zavazek'] : null,
+            'zavazek_akci' => $ki && !empty($ki['zavazek']) ? (int)$ki['zavazek_akci'] : null,
+            'zavazek_hotovo' => $ki && !empty($ki['zavazek']) ? (int)$ki['zavazek_hotovo'] : null,
+            'akce_hotovo' => $ki && isset($ki['akce_hotovo']) ? (int)$ki['akce_hotovo'] : null,
         ];
     };
 
@@ -484,6 +564,8 @@ function dracak_vtt_souboj_klient(PDO $pdo, array $user, array $mapa, bool $jePj
         'polovina' => $polovina,
         'prekvapeni' => $stav['prekvapeni'],
         'novy' => true,
+        'iniciativa_v2' => dracak_vtt_iniciativa_v2(),
+        'ini_utoky' => dracak_vtt_iniciativa_v2() ? dracak_vtt_iniciativa_utoky_tabulka($pdo) : new stdClass(),
         // Hráč se v souboji na hexové mapě hýbe akcemi (Krok, Otočka), ne tažením.
         'pohyb_akcemi' => dracak_vtt_hex_rozmery($mapa) !== null,
         // Pohybové akce, které únava aktivní postavě zakazuje (běh, sprint) — tlačítka se zamknou.

@@ -72,12 +72,33 @@ function dracak_vtt_souboj_proved_akci(PDO $pdo, array $mapa, bool $jePj, array 
                 $konec(422, 'Tvor nemůže jednat (efekt ' . $blok . ').');
             }
         }
-        $q = $pdo->prepare('SELECT akce_celkem, akce_zbyvajici FROM kolo_iniciativa WHERE mapa_id = ? AND token_id = ? FOR UPDATE');
+        $v2 = dracak_vtt_iniciativa_v2();
+        $q = $pdo->prepare('SELECT akce_celkem, akce_zbyvajici' . ($v2 ? ', zavazek, zavazek_akci, zavazek_hotovo, akce_hotovo' : '')
+            . ' FROM kolo_iniciativa WHERE mapa_id = ? AND token_id = ? FOR UPDATE');
         $q->execute([$mapaId, $tokenId]);
         $ki = $q->fetch();
         $kvota = $ki ? dracak_vtt_souboj_kvota((int)$ki['akce_celkem'], (int)$ki['akce_zbyvajici'], $stav['polovina']) : 0;
         if ($pocet > $kvota) {
             $konec(422, 'V tomhle tahu smíš odehrát už jen ' . $kvota . ' ' . ($kvota === 1 ? 'akci' : 'akcí') . '.');
+        }
+        // Slíbený úkon (h1622): kdo dostal bonus k iniciativě za kouzlení / vícenásobné útoky, ten mu věnuje první akci
+        // kola a aspoň polovinu akcí kola. Obrana před vlastním tahem se do první akce nepočítá (jde o vynucenou akci),
+        // k polovině úkonu se počítá jako bojová akce. PJ smí výjimku povolit.
+        $splniUkon = false;
+        if ($ki && $v2 && !empty($ki['zavazek'])) {
+            $splniUkon = in_array($druh, DRACAK_VTT_ZAVAZEK_AKCE[$ki['zavazek']] ?? [], true);
+            $ukonNazev = DRACAK_VTT_ZAVAZEK_NAZVY[$ki['zavazek']] ?? (string)$ki['zavazek'];
+            if (!$jePj && !$splniUkon) {
+                if ((int)$ki['akce_hotovo'] === 0) {
+                    $konec(422, 'Za ' . $ukonNazev . ' máš bonus k iniciativě, takže první akce kola musí být ' . $ukonNazev . ' (h1622). Výjimku může povolit PJ.');
+                }
+                $potrebuje = (int)$ki['zavazek_akci'] - (int)$ki['zavazek_hotovo'];
+                $zbudeBez = (int)$ki['akce_zbyvajici'] - $pocet;
+                if ($potrebuje > $zbudeBez) {
+                    $konec(422, 'Za ' . $ukonNazev . ' máš bonus k iniciativě — aspoň polovinu akcí kola (' . (int)$ki['zavazek_akci']
+                        . ') musíš věnovat tomu; ještě ' . $potrebuje . ' ti jich chybí, takže na jinou akci už nezbývá místo (h1622). Výjimku může povolit PJ.');
+                }
+            }
         }
 
         // Mapová část akce — pravidla pohybu, čela a dosahu; při porušení skončí chybou.
@@ -153,8 +174,13 @@ function dracak_vtt_souboj_proved_akci(PDO $pdo, array $mapa, bool $jePj, array 
             }
         }
 
-        $pdo->prepare('UPDATE kolo_iniciativa SET akce_zbyvajici = akce_zbyvajici - ? WHERE mapa_id = ? AND token_id = ?')
-            ->execute([$pocet, $mapaId, $tokenId]);
+        if ($v2) {
+            $pdo->prepare('UPDATE kolo_iniciativa SET akce_zbyvajici = akce_zbyvajici - ?, akce_hotovo = akce_hotovo + ?, zavazek_hotovo = zavazek_hotovo + ? WHERE mapa_id = ? AND token_id = ?')
+                ->execute([$pocet, $pocet, $splniUkon ? $pocet : 0, $mapaId, $tokenId]);
+        } else {
+            $pdo->prepare('UPDATE kolo_iniciativa SET akce_zbyvajici = akce_zbyvajici - ? WHERE mapa_id = ? AND token_id = ?')
+                ->execute([$pocet, $mapaId, $tokenId]);
+        }
 
         // Útok: založí výzvu k hodu. Rozběh (HB): dvě akce sprintu za sebou a pak útok, který smí být spojený
         // s druhým sprintem — počítá se z akcí před touhle.

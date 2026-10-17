@@ -348,3 +348,8 @@ body { -webkit-tap-highlight-color:transparent; }
 .efekt-radek { display: flex; gap: 6px; align-items: center; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
 .efekt-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .efekt-sundat { padding: 2px 8px; font-size: 12px; }
+
+/* Iniciativa v2: počet útoků za 2 kola u úmyslu, slib úkonu v pořadí tahů */
+.ini-utoky { width: 52px; }
+.ini-slib { font-size: 11px; opacity: .85; margin-left: 6px; white-space: nowrap; }
+.ini-zavazek { color: #e8c9a8; }

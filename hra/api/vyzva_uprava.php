@@ -127,7 +127,7 @@ try {
         }
         if ($volba === 'branit' && !empty($d['duvod_nebrani'])) {
             $pdo->rollBack();
-            dracak_vtt_souboj_chyba(422, 'Tvor se nemůže bránit zbraní (efekt ' . $d['duvod_nebrani'] . ') — jen nebránit se. PJ může efekt sundat.');
+            dracak_vtt_souboj_chyba(422, 'Tvor se nemůže bránit zbraní (' . ($d['duvod_nebrani'] === 'vyřazený' ? 'je vyřazený' : 'efekt ' . $d['duvod_nebrani']) . ') — jen nebránit se.' . ($d['duvod_nebrani'] === 'vyřazený' ? '' : ' PJ může efekt sundat.'));
         }
         if ($volba === 'branit' && empty($d['muze_branit']) && !$jePj) {
             $pdo->rollBack();

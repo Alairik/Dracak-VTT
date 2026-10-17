@@ -112,9 +112,10 @@ $iniciativaBonusy = dracak_db()->query('SELECT id, popis, bonus FROM iniciativa_
 // z panelu tokenu. Překvapení a kouzlení se přičtou samy (podle zahájení
 // souboje a úmyslu), řádky pro základní systém tu nemají smysl.
 $souboj = dracak_vtt_tokeny_funkce()['souboj'];
+$iniV2 = dracak_vtt_tokeny_funkce()['iniciativa_v2'];
 $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b['popis'], [
     'Překvapení', 'Kouzlení', 'Automatická iniciativa v základním systému', 'Automatická ztráta iniciativy v základním systému',
-], true)));
+], true) && !($iniV2 && in_array($b['popis'], DRACAK_VTT_INI_UTOKY, true))));   // v2: vícenásobné útoky jen polem „útoků za 2 kola“
 
 ?>
 <!doctype html>

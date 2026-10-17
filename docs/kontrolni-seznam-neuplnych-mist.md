@@ -372,8 +372,18 @@ začne hrát často, přidá se mu složka (nový řádek v `efekt_slozky`, bez 
 **Zbývá (není rozhodnutí o hře, jen nedodělané):**
 - [ ] Kouzlo se hodem proti pasti cíle (Protoplazma, Spánek, Zadrž osobu…): efekt po seslání nenasadí sám, PJ ho přidá po hodu cíle.
   Vlastní výzva pro hod cíle proti pasti zatím chybí.
-- [ ] Útok na tvora vyřazeného životy (mez vyřazení, h1610) a na kouzlícího: h1613 pro ně říká totéž co pro spícího (nehybný,
-  u vyřazeného navíc násobek úrovní), v kódu je to zatím jen u efektů (Spánek, Ochromení).
+- [x] Útok na tvora vyřazeného životy (mez vyřazení, h1610): hotovo 2026-10-17 (nehybný + zranění ×úroveň).
+- [ ] Útok na kouzlícího (h1613: kouzlící protivník je nehybný): zatím jen u efektů; mezi dvěma akcemi kouzlení by obrana měla
+  být nehybná (h1626) — vyžaduje sledovat rozkouzlené kouzlo.
+- [ ] Postih k iniciativě za obouruční zbraň (−2) a těžkou kuši (−3) se zaškrtává ručně: v DB zbraně nemají údaj o držení a
+  povolání mají výjimky (bojovník +6 / +9 / +12 za obouruční zbraně podle úrovně, šermíř bez postihu s obouručním mečem,
+  těžká kuše +3 …; h139, h156). Až budou zbraně mít „jednoruční / obouruční“ a povolání výjimky jako data, dá se přičítat samo.
+- [ ] Bonusy k iniciativě podle povolání a úrovně (Válečník – Bojovník, h139: +3 od 5. úrovně, +6 / +9 / +12 za obouruční zbraně,
+  +6 / +9 za jednoruční, +3 / +6 za střelné a vrhací zbraně…) nahrazují u bojovníka vícenásobné útoky z tabulky. Zadávají se
+  jako „jiný bonus“ a slib úkonu (první akce + polovina akcí) se u nich nehlídá — až budou povolání data (úroveň × druh zbraně),
+  dají se počítat i hlídat samy.
+- [ ] Slib úkonu (h1622): „aspoň polovina akcí kola“ jsem vyložil jako polovinu akcí zjištěných při hodu iniciativy, zaokrouhlenou
+  nahoru, a obranu jako bojovou akci. Kniha to blíž nerozvádí — kdyby byla polovina jinak, mění se jedna řádka (`zavazek_akci`).
 
 ## Na kontrolu při proofreadingu (stav 2026-10-14)
 

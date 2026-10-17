@@ -436,9 +436,10 @@ function dracak_vtt_utok_priprav(PDO $pdo, array $utocnik, array $cil, bool $roz
             $opravy[] = dracak_vtt_oprava((string)$x['nazev'], (int)$x['hodnota']);
         }
     }
-    if ($cil['efekty']['nehybny'] !== null) {
-        // h1613: na nehybnou postavu se nevztahují opravy za rozdíl velikostí.
-        $upozorneni[] = $cil['label'] . ' je nehybný (' . $cil['efekty']['nehybny'] . ') — bez opravy za rozdíl velikostí, obrana jen s postihem (h1613).';
+    $cilNehybny = $cil['efekty']['nehybny'] ?? (!empty($cil['bojeschopnost']['vyrazena']) ? 'vyřazený' : null);
+    if ($cilNehybny !== null) {
+        // h1613: na nehybnou (i vyřazenou) postavu se nevztahují opravy za rozdíl velikostí.
+        $upozorneni[] = $cil['label'] . ' je nehybný (' . $cilNehybny . ') — bez opravy za rozdíl velikostí, obrana jen s postihem (h1613).';
     } elseif ($utocnik['velikost'] !== null && $cil['velikost'] !== null) {
         $rozdil = DRACAK_VTT_ROZDIL_VELIKOSTI[$cil['velikost']][$utocnik['velikost']];
         if ($rozdil !== 0) {
@@ -540,22 +541,25 @@ function dracak_vtt_obrana_zaloz(PDO $pdo, array $mapa, array $info, array $utok
     $q->execute([$mapaId, $obrId]);
     $akce = $q->fetchColumn();
     $ef = $obr['efekty'];
-    $nehybny = $ef['nehybny'];
+    // Vyřazený (životy na mezi vyřazení nebo pod ní, h1610) platí jako nehybný a zranění se mu násobí úrovní (h1613 b10736).
+    $vyrazen = !empty($obr['bojeschopnost']['vyrazena']);
+    $nehybny = $ef['nehybny'] ?? ($vyrazen ? 'vyřazený' : null);
     $duvodNebrani = $nehybny ?? $ef['nemuze_branit'] ?? $ef['nemuze_jednat'];
+    $duvodText = static fn(?string $d): string => $d === 'vyřazený' ? 'je vyřazený' : 'efekt ' . $d;
     $muzeBranit = $duvodNebrani === null && $akce !== false && (int)$akce > 0;
     $upozorneni = [];
     if ($duvodNebrani !== null) {
-        $upozorneni[] = $obr['label'] . ' se nemůže bránit zbraní (efekt ' . $duvodNebrani . ').';
+        $upozorneni[] = $obr['label'] . ' se nemůže bránit zbraní (' . $duvodText($duvodNebrani) . ').';
     }
     if ($nehybny !== null && $obr['typ'] !== 'postava') {
         $upozorneni[] = 'Nehybná nestvůra: odečten postih −5 (v OČ nestvůry nevím, kolik je bonus za obratnost) — uprav v opravě, kdyby to bylo jinak.';
     }
     // Spící (a podobný) obránce: výsledné zranění se násobí jeho úrovní (h1613 b10736–b10737).
-    $nasobekDuvod = $ef['zraneni_x_uroven'];
+    $nasobekDuvod = $ef['zraneni_x_uroven'] ?? ($vyrazen ? 'vyřazený' : null);
     $nasobek = $nasobekDuvod !== null ? $obr['uroven_nasobek'] : null;
     if ($nasobekDuvod !== null) {
         $upozorneni[] = $nasobek !== null
-            ? 'Zranění ' . $obr['label'] . ' se násobí ×' . $nasobek . ' (' . $nasobekDuvod . ', jako útok na vyřazeného).'
+            ? 'Zranění ' . $obr['label'] . ' se násobí ×' . $nasobek . ' (' . $nasobekDuvod . ', útok na vyřazeného — h1613).'
             : 'Zranění ' . $obr['label'] . ' se má násobit úrovní (' . $nasobekDuvod . '), ale životaschopnost nestvůry není jedno číslo — nastav násobek.';
     }
     $hintDenik = dracak_vtt_tokeny_funkce()['denik_nestvur'] ? ' (nejlíp v deníku nestvůry v panelu tokenu, pak platí pro celý druh)' : '';
@@ -648,7 +652,10 @@ function dracak_vtt_utok_vyhodnot(PDO $pdo, array $mapa, array $info, array $uto
     // Obrana akcí (h1623) stojí obránce jednu akci.
     $akceObrance = null;
     if (($obranaVyzva['data']['volba'] ?? null) === 'branit') {
-        $pdo->prepare('UPDATE kolo_iniciativa SET akce_zbyvajici = GREATEST(0, akce_zbyvajici - 1) WHERE mapa_id = ? AND token_id = ?')
+        // Obrana je bojová akce: splňuje slíbený útok (iniciativa v2), do „první akce kola“ se ale nepočítá.
+        $pdo->prepare('UPDATE kolo_iniciativa SET akce_zbyvajici = GREATEST(0, akce_zbyvajici - 1)'
+            . (dracak_vtt_iniciativa_v2() ? ", zavazek_hotovo = zavazek_hotovo + IF(zavazek IN ('utok', 'strelba'), 1, 0)" : '')
+            . ' WHERE mapa_id = ? AND token_id = ?')
             ->execute([$mapaId, $obrId]);
         $q = $pdo->prepare('SELECT akce_zbyvajici FROM kolo_iniciativa WHERE mapa_id = ? AND token_id = ?');
         $q->execute([$mapaId, $obrId]);

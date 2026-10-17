@@ -24,7 +24,7 @@ function dracak_vtt_ddl_mapa(): array
     if ($stav !== null) {
         return $stav;
     }
-    $stav = ['sloupce' => [], 'typ_entity' => '', 'udalosti_varchar' => false, 'tabulky' => [], 'kolo_sloupce' => [], 'efekty_sloupce' => []];
+    $stav = ['sloupce' => [], 'typ_entity' => '', 'udalosti_varchar' => false, 'tabulky' => [], 'kolo_sloupce' => [], 'efekty_sloupce' => [], 'ini_sloupce' => []];
     try {
         $pdo = dracak_db();
         foreach ($pdo->query(
@@ -52,6 +52,13 @@ function dracak_vtt_ddl_mapa(): array
              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = "kolo_stav"'
         )->fetchAll(PDO::FETCH_COLUMN) as $sloupec) {
             $stav['kolo_sloupce'][$sloupec] = true;
+        }
+        foreach ($pdo->query(
+            'SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ("kolo_ucastnik", "kolo_iniciativa")
+               AND COLUMN_NAME IN ("utoku_za_2_kola", "zavazek", "zavazek_akci", "zavazek_hotovo", "akce_hotovo")'
+        )->fetchAll(PDO::FETCH_NUM) as [$tabulka, $sloupec]) {
+            $stav['ini_sloupce'][$tabulka . '.' . $sloupec] = true;
         }
         foreach ($pdo->query(
             'SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS
@@ -101,6 +108,12 @@ function dracak_vtt_tokeny_funkce(): array
             && isset($ddl['kolo_sloupce']['faze'], $ddl['kolo_sloupce']['polovina'], $ddl['kolo_sloupce']['prekvapeni']),
         // Efekty s mechanikou (tabulka efekt_slozky + nové sloupce efektů a nasazených efektů z ručního SQL):
         // bez nich jsou efekty jen štítky.
+        // Iniciativa v2 (ruční SQL: kolo_ucastnik.utoku_za_2_kola, kolo_iniciativa.zavazek…): jedno pole „útoků za 2 kola“
+        // místo zaškrtávání bonusů a hlídání slíbeného úkonu. Bez nich zůstává dosavadní způsob.
+        'iniciativa_v2' => $udalosti && isset($ddl['tabulky']['kolo_ucastnik'])
+            && isset($ddl['ini_sloupce']['kolo_ucastnik.utoku_za_2_kola'], $ddl['ini_sloupce']['kolo_iniciativa.zavazek'],
+                $ddl['ini_sloupce']['kolo_iniciativa.zavazek_akci'], $ddl['ini_sloupce']['kolo_iniciativa.zavazek_hotovo'],
+                $ddl['ini_sloupce']['kolo_iniciativa.akce_hotovo']),
         'efekty_mech' => isset($ddl['tabulky']['efekt_slozky'])
             && isset($ddl['efekty_sloupce']['efekty.mechanika_stav'], $ddl['efekty_sloupce']['efekty.trvani_kol'],
                 $ddl['efekty_sloupce']['efekty.kolo_se_nepocita'], $ddl['efekty_sloupce']['efekty.opakovani'],
