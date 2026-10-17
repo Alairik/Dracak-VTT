@@ -36,15 +36,11 @@ ním čeká, dokud se to neprovede ručně.
 
 **Ruční DDL blok je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný soubor, ve
 kterém jsou všechny dosud neprovedené DDL příkazy; uživatel ho dostává jako
-text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-17): čeká blok „Iniciativa v2“ + „Zbraně a iniciativa“**
-(sloupec `kolo_ucastnik.utoku_za_2_kola`, 4 sloupce `kolo_iniciativa`, 3 sloupce `predmety`: `chvat`, `trida_zbrane`, `ini_postih`).
-Uživatel napsal „sql proběhlo“, ale deploy po přesunu `0093` do `database/migrations/` skončil na `1142 ALTER command denied` u
-`kolo_ucastnik` — `migrate.php` ALTER přeskočí jen tehdy, když sloupec v DB serveru už je, takže tam **nebyl** (blok se asi spustil
-v jiné databázi, nebo spadl; `0093` proto zpět v `docs/pripravene-migrace/`). **Přesun do `database/migrations/` až po výsledku
-kontrolního SELECTu z bloku (musí vyjít 1, 4, 3), ne po slovech.** Do té doby jsou v produkci vypnuté: pole „útoků za 2 kola“, slib
-úkonu, ztráta iniciativy −3 a postih podle zbraně v ruce (feature flagy `iniciativa_v2`, `zbrane_ini`). V `database/migrations/` jsou
-`0091`, `0092` (data efektů) a `0094` (efekt „Ztráta iniciativy“, jen DML — bez v2 sloupců jen nečinný). Provedené dřív: blok „Efekty
-s opravdovou mechanikou“ (migrace `0091`: 4 sloupce `efekty`, tabulka `efekt_slozky`, 2 sloupce `aktivni_efekty`). Dosud provedené: tabulky `souboj_vyzva` (migrace `0088`, výzvy k hodu) a `nestvura_staty_sveta`
+text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-17): nic nečeká.** Blok „Iniciativa v2“ + „Zbraně a iniciativa“
+uživatel provedl (kontrolní SELECT vyšel 1, 4, 3) po tom, co první „sql proběhlo“ nesedělo — deploy po předčasném přesunu `0093`
+skončil na `1142 ALTER denied`, takže sloupce na serveru nebyly. **Poučení: migraci přesouvat do `database/migrations/` až podle
+čísel z kontrolního SELECTu, ne podle slov.** Migrace `0091`–`0096` jsou v `database/migrations/`: sloupce efektů (`0091`) a data (`0092`),
+sloupce iniciativy v2 (`0093`), efekt „Ztráta iniciativy“ (`0094`, DML), sloupce zbraní (`0095`) a jejich data (`0096`). Dosud provedené: tabulky `souboj_vyzva` (migrace `0088`, výzvy k hodu) a `nestvura_staty_sveta`
 (migrace `0090`, malý deník nestvůry) jsou na produkci provedené, hody i deník nestvůry jsou zapnuté.
 Bloky pro `0065`–`0081`, `DROP TABLE` tří mrtvých tabulek z 0008, `0084` (mapa),
 `0085` (souboj, krok 1) i `0086` (souboj, krok 2b: `tokeny.hexu`, tabulky
