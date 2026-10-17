@@ -36,11 +36,10 @@ ním čeká, dokud se to neprovede ručně.
 
 **Ruční DDL blok je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný soubor, ve
 kterém jsou všechny dosud neprovedené DDL příkazy; uživatel ho dostává jako
-text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-17): čeká blok „Iniciativa v2“** (sloupec `kolo_ucastnik.utoku_za_2_kola` a 4 sloupce `kolo_iniciativa`; bez něj
-zůstává dosavadní zaškrtávání bonusů a nic se nehlídá). Po potvrzení, že proběhl, se přesune připravená migrace `0093`
-z `docs/pripravene-migrace/` do `database/migrations/` (postup v tamním README). Dřív provedené: blok „Efekty s opravdovou
-mechanikou“ (migrace `0091`: 4 sloupce `efekty`, tabulka `efekt_slozky`, 2 sloupce `aktivni_efekty`) uživatel provedl;
-`0091` (zrcadlo DDL) a `0092` (data efektů) jsou v `database/migrations/`. Dosud provedené: tabulky `souboj_vyzva` (migrace `0088`, výzvy k hodu) a `nestvura_staty_sveta`
+text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-17): nic nečeká.** Provedené: blok „Iniciativa v2“
+(migrace `0093`: sloupec `kolo_ucastnik.utoku_za_2_kola` a 4 sloupce `kolo_iniciativa`) a před ním „Efekty s opravdovou
+mechanikou“ (migrace `0091`: 4 sloupce `efekty`, tabulka `efekt_slozky`, 2 sloupce `aktivni_efekty`); `0091`, `0092` (data efektů)
+i `0093` jsou v `database/migrations/`. Dosud provedené: tabulky `souboj_vyzva` (migrace `0088`, výzvy k hodu) a `nestvura_staty_sveta`
 (migrace `0090`, malý deník nestvůry) jsou na produkci provedené, hody i deník nestvůry jsou zapnuté.
 Bloky pro `0065`–`0081`, `DROP TABLE` tří mrtvých tabulek z 0008, `0084` (mapa),
 `0085` (souboj, krok 1) i `0086` (souboj, krok 2b: `tokeny.hexu`, tabulky
