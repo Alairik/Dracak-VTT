@@ -40,7 +40,7 @@ text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-17): nic ne
 uživatel provedl (kontrolní SELECT vyšel 1, 4, 3) po tom, co první „sql proběhlo“ nesedělo — deploy po předčasném přesunu `0093`
 skončil na `1142 ALTER denied`, takže sloupce na serveru nebyly. **Poučení: migraci přesouvat do `database/migrations/` až podle
 čísel z kontrolního SELECTu, ne podle slov.** Migrace `0091`–`0096` jsou v `database/migrations/`: sloupce efektů (`0091`) a data (`0092`),
-sloupce iniciativy v2 (`0093`), efekt „Ztráta iniciativy“ (`0094`, DML), sloupce zbraní (`0095`) a jejich data (`0096`). Dosud provedené: tabulky `souboj_vyzva` (migrace `0088`, výzvy k hodu) a `nestvura_staty_sveta`
+sloupce iniciativy v2 (`0093`), efekt „Ztráta iniciativy“ (`0094`, `0097` — DML), sloupce zbraní (`0095`), jejich data (`0096`) a chybějící zbraně (`0098`). Dosud provedené: tabulky `souboj_vyzva` (migrace `0088`, výzvy k hodu) a `nestvura_staty_sveta`
 (migrace `0090`, malý deník nestvůry) jsou na produkci provedené, hody i deník nestvůry jsou zapnuté.
 Bloky pro `0065`–`0081`, `DROP TABLE` tří mrtvých tabulek z 0008, `0084` (mapa),
 `0085` (souboj, krok 1) i `0086` (souboj, krok 2b: `tokeny.hexu`, tabulky
@@ -226,16 +226,19 @@ MariaDB.** Postup, který v session fungoval:
   vůbec nenabízejí (server je ignoruje). Dialog hodu říká, co se přičte samo (únava, naložení, překvapení, kouzlení +1,
   vícenásobné útoky z úmyslu) a k čemu se hráč zavazuje. **Slib úkonu** (`kolo_iniciativa.zavazek`): kdo dostal kladný bonus za
   kouzlení nebo vícenásobné útoky, má mu věnovat **první vlastní akci kola a aspoň polovinu akcí kola** (polovina = akce při
-  hodu / 2 nahoru). **První akci** hlídá `dracak_vtt_souboj_proved_akci` zákazem (hráči se odmítne jiná, **PJ smí výjimku** nebo
-  „Zrušit slib“ u řádku tvora v pořadí tahů). **Polovinu akcí** se zákazem nehlídá (rozhodnutí uživatele 2026-10-17): kdo ji
-  slíbenému úkonu nevěnuje, **dostane v příštím kole −3 k iniciativě**. Na konci kola (`dracak_vtt_souboj_nove_kolo`) se
-  před smazáním `kolo_iniciativa` zjistí, komu `zavazek_hotovo < zavazek_akci` (`dracak_vtt_iniciativa_nesplneny_slib`), a po odpočtu
-  efektů se mu nasadí efekt **„Ztráta iniciativy (nesplněný slib)“** na 1 kolo (`dracak_vtt_iniciativa_ztrata_nasad`, migrace `0094`;
-  složka `ini_radek` = řádek „Automatická ztráta iniciativy v základním systému“, −3). Je vidět v panelu efektů tokenu i v logu
-  („nesplněný slib: kouzlení 1/2 akcí“), PJ ho smí sundat. Netrestá se vyřazený, spící ani ochromený tvor a ten, komu PJ slib zrušil.
-  **Obrana** se počítá jako bojová akce (bestiář: každý útok i obrana = jedna akce), takže plní slíbený útok, ale do „první akce
-  kola“ se nepočítá (je vynucená, děje se před vlastním tahem); střelba zatím vlastní akci nemá, splní ji útok. Počítadla jsou ve
-  sloupcích (`zavazek_hotovo`, `akce_hotovo`), nuluje je nový hod iniciativy. Pořadí tahů ukazuje „slib: kouzlení 0/2“.
+  hodu / 2 nahoru). **Nic se nezakazuje** (rozhodnutí uživatele 2026-10-17, u první akce potvrzeno téhož dne): porušení se trestá
+  **−3 k iniciativě v příštím kole** (řádek „Automatická ztráta iniciativy v základním systému“). Dvě místa, jedno pravidlo:
+  (1) první akce kola, která není slíbený úkon, potrestá hned `dracak_vtt_souboj_proved_akci` (po zápisu akce, před posunem tahu);
+  (2) na konci kola (`dracak_vtt_souboj_nove_kolo`) se před smazáním `kolo_iniciativa` zjistí, komu `zavazek_hotovo < zavazek_akci`
+  (`dracak_vtt_iniciativa_nesplneny_slib`). Trest = efekt **„Ztráta iniciativy (nesplněný slib)“** (`dracak_vtt_iniciativa_ztrata_zaloz`,
+  migrace `0094` + `0097`, složka `ini_radek`): trvá 1 kolo, ale **kolo nasazení se nepočítá** (jako u kouzel), takže se nasadí v kole
+  porušení a drží celé příští kolo. Jednou za kolo (dvojí porušení netrestá −6); kdo má efekt z minulého kola, dostane ho znovu na
+  další. Je vidět v panelu efektů tokenu i v logu („první akce kola měla být kouzlení, byla čekání“, „nesplněný slib: kouzlení 1/2
+  akcí“). **PJ výjimka:** „Zrušit slib“ u řádku tvora v pořadí tahů (před akcí), nebo efekt sundat v panelu efektů. Netrestá se
+  vyřazený, spící ani ochromený tvor (jen u konce kola). **Obrana** se počítá jako bojová akce (bestiář: každý útok i obrana = jedna
+  akce), takže plní slíbený útok, ale do „první akce kola“ se nepočítá (je vynucená, děje se před vlastním tahem); střelba zatím
+  vlastní akci nemá, splní ji útok. Počítadla jsou ve sloupcích (`zavazek_hotovo`, `akce_hotovo`), nuluje je nový hod iniciativy.
+  Pořadí tahů ukazuje „slib: kouzlení 0/2“.
   **Postih za zbraň v ruce** (tabulky zbraní uživatele, b14664–b14827; ruční SQL 0095, data 0096): zbraně mají `chvat`
   (jednoruční / obouruční), `trida_zbrane` (lehká … supertěžká) a `ini_postih` (−2 těžké obouruční zbraně označené * a všechny
   supertěžké kromě Řetězového meče, −3 těžká kuše). Postava s takovou zbraní v ruce (`postavy.drzena_zbran_id`) ho dostane **sama**
@@ -244,8 +247,12 @@ MariaDB.** Postup, který v session fungoval:
   (`DRACAK_VTT_INI_POSTIH_VYJIMKY` v `vtt_souboj.php`): Bojovník od 6. úrovně (každá zbraň pro boj tváří v tvář), Šermíř od 8. úrovně
   (obouruční meč), Lovec stínů od 7. úrovně (každá zbraň tváří v tvář), Lučištník – Vertolův luk, Lupič a Erythen – Fuuma shuriken,
   Mechanik – Arbalest, Divoch – Těžký kyj (super těžký) / Obří kyj / Válečný totem. Log říká důvod („Cep (těžká obouruční zbraň): postih −2
-  zrušen (Bojovník od 6. úrovně)“). **Nerozhodnuto:** které supertěžké zbraně jsou „podobné meči“ pro Bojovníka a Šermíře, těžká kuše
-  u bojovníka, Mistr zbraně, kombinace dvou zbraní v katalogu — viz `docs/kontrolni-seznam-neuplnych-mist.md`. **Útok na vyřazeného** (h1613 b10736–b10737): tvor na mezi vyřazení nebo pod ní se brání jako nehybný (místo bonusu za
+  zrušen (Bojovník od 6. úrovně)“). Supertěžké zbraně (poznámky pod tabulkou, potvrzeno 2026-10-17): Bojovník nemá postih u těch, které nejsou podobné meči, Šermíř u těch,
+  které jsou (`DRACAK_VTT_MECE_SUPERTEZKE`: Odachi, Flamberg, Warglaive, Obouruční meč supertěžký, Dvě katany, Dva dlouhé meče, Dvakrát
+  warglaive), obojí bez omezení úrovní. **Katalog doplněn** migrací `0098` o 39 zbraní z tabulek (Bastard a Válečné kladivo obouruční, Kůsa,
+  Obouruční meč supertěžký jednoruční a kombinace dvou zbraní). **Nerozhodnuto:** těžká kuše u bojovníka, Mistr zbraně, bonusy
+  povolání podle druhu zbraně (h139, kombinace počítá h139 jako jednoruční, tabulka jako obouruční) — viz
+  `docs/kontrolni-seznam-neuplnych-mist.md`. **Útok na vyřazeného** (h1613 b10736–b10737): tvor na mezi vyřazení nebo pod ní se brání jako nehybný (místo bonusu za
   obratnost −5, −3 bez zbraně, bez štítu, bez oprav za velikost a zezadu), bránit se zbraní nesmí a **zranění se násobí
   úrovní** (postava nejvýš ×9, nestvůra životaschopností; u „3 + 4“ násobek doplní PJ na kartě obrany). Stejná cesta jako u
   spícího (efekt Spánek). Nepokryto: kouzlící tvor jako nehybný.

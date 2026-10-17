@@ -82,16 +82,17 @@ function dracak_vtt_souboj_proved_akci(PDO $pdo, array $mapa, bool $jePj, array 
             $konec(422, 'V tomhle tahu smíš odehrát už jen ' . $kvota . ' ' . ($kvota === 1 ? 'akci' : 'akcí') . '.');
         }
         // Slíbený úkon (h1622): kdo dostal bonus k iniciativě za kouzlení / vícenásobné útoky, ten mu věnuje první akci
-        // kola a aspoň polovinu akcí kola. První akci hlídáme hned (obrana před vlastním tahem se do ní nepočítá — jde
-        // o vynucenou akci); polovinu ne: kdo jí slíbenému úkonu nevěnuje, ztratí v příštím kole iniciativu (−3, viz
-        // dracak_vtt_iniciativa_nesplneny_slib, rozhodnutí uživatele 2026-10-17). PJ smí výjimku povolit.
+        // kola a aspoň polovinu akcí kola. Nic se nezakazuje (rozhodnutí uživatele 2026-10-17): kdo první akci kola
+        // věnuje něčemu jinému, nebo na konci kola nemá splněnou polovinu, dostane v příštím kole −3 k iniciativě
+        // (efekt „Ztráta iniciativy“, dracak_vtt_iniciativa_ztrata_zaloz). Obrana před vlastním tahem se do první akce
+        // nepočítá (jde o vynucenou akci), k polovině úkonu se počítá jako bojová akce. PJ slib zruší („Zrušit slib“).
         $splniUkon = false;
+        $prvniPorusena = false;
+        $ukonNazev = '';
         if ($ki && $v2 && !empty($ki['zavazek'])) {
             $splniUkon = in_array($druh, DRACAK_VTT_ZAVAZEK_AKCE[$ki['zavazek']] ?? [], true);
             $ukonNazev = DRACAK_VTT_ZAVAZEK_NAZVY[$ki['zavazek']] ?? (string)$ki['zavazek'];
-            if (!$jePj && !$splniUkon && (int)$ki['akce_hotovo'] === 0) {
-                $konec(422, 'Za ' . $ukonNazev . ' máš bonus k iniciativě, takže první akce kola musí být ' . $ukonNazev . ' (h1622). Výjimku může povolit PJ.');
-            }
+            $prvniPorusena = !$splniUkon && (int)$ki['akce_hotovo'] === 0;
         }
 
         // Mapová část akce — pravidla pohybu, čela a dosahu; při porušení skončí chybou.
@@ -199,6 +200,11 @@ function dracak_vtt_souboj_proved_akci(PDO $pdo, array $mapa, bool $jePj, array 
             'unava_nova' => $unavaNova,
             'skryta' => !dracak_vtt_souboj_vidi_hrac($info[$tokenId]),
         ], (int)$user['id']);
+        // První akce kola nebyla slíbený úkon: příští kolo −3 (před posunem tahu, ať se to započítá do tohoto kola).
+        if ($prvniPorusena) {
+            dracak_vtt_iniciativa_ztrata_zaloz($pdo, $svetId, $mapaId, (int)$user['id'], $info[$tokenId],
+                'první akce kola měla být ' . $ukonNazev . ', byla ' . DRACAK_VTT_AKCE_DRUHY[$druh]);
+        }
         // Útok přeruší tah: dokud se nehodí a nevyhodnotí, tah se neposouvá (posune ho vyhodnocení).
         $posun = $vyzvaId !== null
             ? ['kolo_konec' => false, 'aktivni_token_id' => $tokenId, 'polovina' => $stav['polovina'], 'cislo_kola' => $stav['cislo_kola']]

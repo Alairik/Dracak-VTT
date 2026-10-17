@@ -114,8 +114,8 @@ export function initSouboj(ctx) {
     const stav = r.zavazek_hotovo + '/' + r.zavazek_akci;
     if (!dlouhy) return 'slib: ' + nazev + ' ' + stav;
     const co = r.zavazek === 'kouzleni' ? 'kouzlení' : 'útok';
-    return 'Bonus k iniciativě za ' + nazev + ': ' + (r.akce_hotovo === 0 ? 'první akce kola musí být ' + co + '. ' : '')
-      + 'Aspoň ' + r.zavazek_akci + ' ' + akci(r.zavazek_akci) + ' kola má být ' + co + ' (splněno ' + stav + ') — jinak v příštím kole −3 k iniciativě.';
+    return 'Bonus k iniciativě za ' + nazev + ': ' + (r.akce_hotovo === 0 ? 'první akce kola má být ' + co + ' a ' : '')
+      + 'aspoň ' + r.zavazek_akci + ' ' + akci(r.zavazek_akci) + ' kola má být ' + co + ' (splněno ' + stav + ') — jinak v příštím kole −3 k iniciativě.';
   }
   function pips(celkem, zbyva) {
     const w = el('span', 'ini-pips');
@@ -186,7 +186,7 @@ export function initSouboj(ctx) {
     utoky.min = '2';
     utoky.max = '8';
     utoky.value = String(u.utoku_za_2_kola || 2);
-    utoky.title = 'Kolik útoků za 2 kola umíš (2 = běžně, bez bonusu). Bonus k iniciativě je 3 × (počet − 2); kdo ho dostane, musí vícenásobným útokům věnovat první akci a aspoň polovinu akcí kola, jinak v příštím kole ztratí iniciativu (−3).';
+    utoky.title = 'Kolik útoků za 2 kola umíš (2 = běžně, bez bonusu). Bonus k iniciativě je 3 × (počet − 2); kdo ho dostane, má vícenásobným útokům věnovat první akci a aspoň polovinu akcí kola, jinak v příštím kole ztratí iniciativu (−3).';
     const ukazUtoky = () => { utoky.style.display = v2 && ['utok', 'strelba'].includes(sel.value) ? '' : 'none'; };
     ukazUtoky();
     const uloz = () => volat('api/umysl_nastavit.php', Object.assign({
@@ -212,7 +212,7 @@ export function initSouboj(ctx) {
 
   function kreslitUmysly() {
     seznam.append(el('p', 'ini-napoveda', kolo.iniciativa_v2
-      ? 'Každý ohlásí, co bude v tomto kole dělat — podle toho se určí bonusy k iniciativě (kouzlení +1; při útoku nebo střelbě se zadá, kolik útoků za 2 kola umí). Kdo za úkon dostane bonus, musí mu věnovat první akci kola a aspoň polovinu akcí, jinak v příštím kole ztratí iniciativu (−3).'
+      ? 'Každý ohlásí, co bude v tomto kole dělat — podle toho se určí bonusy k iniciativě (kouzlení +1; při útoku nebo střelbě se zadá, kolik útoků za 2 kola umí). Kdo za úkon dostane bonus, má mu věnovat první akci kola a aspoň polovinu akcí, jinak v příštím kole ztratí iniciativu (−3).'
       : 'Každý ohlásí, co bude v tomto kole dělat — podle toho se určí bonusy k iniciativě (kouzlení +1).'));
     const skupiny = seskupit(ucastnici, () => '');
     skupiny.forEach((s) => {
@@ -1119,8 +1119,8 @@ export function initSouboj(ctx) {
     if (kolo && kolo.iniciativa_v2 && u) {
       // Co se z úmyslu přičte samo a k čemu se tvor tím zavazuje (h1622)
       const uk = ['utok', 'strelba'].includes(u.umysl) && u.utoku_za_2_kola && kolo.ini_utoky && kolo.ini_utoky[u.utoku_za_2_kola];
-      if (u.umysl === 'kouzleni') hodPopis.textContent += ' Úmysl: kouzlení (+1) — první akce kola musí být kouzlení a aspoň polovina akcí kola má být kouzlení, jinak v příštím kole −3 k iniciativě.';
-      else if (uk) hodPopis.textContent += ' Úmysl: ' + UMYSLY[u.umysl].toLowerCase() + ', ' + u.utoku_za_2_kola + ' ' + (u.utoku_za_2_kola < 5 ? 'útoky' : 'útoků') + ' za 2 kola (+' + uk + ') — první akce kola musí být útok a aspoň polovina akcí kola má být útok (obrana se počítá), jinak v příštím kole −3 k iniciativě.';
+      if (u.umysl === 'kouzleni') hodPopis.textContent += ' Úmysl: kouzlení (+1) — první akce kola i aspoň polovina akcí kola mají být kouzlení, jinak v příštím kole −3 k iniciativě.';
+      else if (uk) hodPopis.textContent += ' Úmysl: ' + UMYSLY[u.umysl].toLowerCase() + ', ' + u.utoku_za_2_kola + ' ' + (u.utoku_za_2_kola < 5 ? 'útoky' : 'útoků') + ' za 2 kola (+' + uk + ') — první akce kola i aspoň polovina akcí kola mají být útok (obrana se počítá k polovině), jinak v příštím kole −3 k iniciativě.';
       else if (!u.umysl) hodPopis.textContent += ' Nemáš ohlášený úmysl — kouzlení a vícenásobné útoky se nezapočítají.';
     }
     mHod.querySelectorAll('.hod-bonus-check').forEach((cb) => {
