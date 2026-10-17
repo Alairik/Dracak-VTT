@@ -92,7 +92,7 @@ try {
             $pdo->rollBack();
             dracak_vtt_souboj_chyba(422, 'Iniciativa už je pro ' . $info[$tokenId]['label'] . ' hozená.');
         }
-        $m = dracak_vtt_iniciativa_modifikator($pdo, $info[$tokenId], $bonusIds, $jinyBonus, dracak_vtt_souboj_auto_popisy($stav, $u));
+        $m = dracak_vtt_iniciativa_modifikator($pdo, $info[$tokenId], $bonusIds, $jinyBonus, dracak_vtt_souboj_auto_popisy($stav, $u), $u);
         $vysledek = $hod + $m['modifikator'];
         $akce = $m['bez_akci'] !== null ? 0 : dracak_vtt_iniciativa_akce($vysledek);
         // Kdo dostal bonus za úkon (kouzlení, vícenásobné útoky), ten mu věnuje první akci kola a aspoň polovinu akcí (h1622).

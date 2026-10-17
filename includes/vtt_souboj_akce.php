@@ -82,22 +82,15 @@ function dracak_vtt_souboj_proved_akci(PDO $pdo, array $mapa, bool $jePj, array 
             $konec(422, 'V tomhle tahu smíš odehrát už jen ' . $kvota . ' ' . ($kvota === 1 ? 'akci' : 'akcí') . '.');
         }
         // Slíbený úkon (h1622): kdo dostal bonus k iniciativě za kouzlení / vícenásobné útoky, ten mu věnuje první akci
-        // kola a aspoň polovinu akcí kola. Obrana před vlastním tahem se do první akce nepočítá (jde o vynucenou akci),
-        // k polovině úkonu se počítá jako bojová akce. PJ smí výjimku povolit.
+        // kola a aspoň polovinu akcí kola. První akci hlídáme hned (obrana před vlastním tahem se do ní nepočítá — jde
+        // o vynucenou akci); polovinu ne: kdo jí slíbenému úkonu nevěnuje, ztratí v příštím kole iniciativu (−3, viz
+        // dracak_vtt_iniciativa_nesplneny_slib, rozhodnutí uživatele 2026-10-17). PJ smí výjimku povolit.
         $splniUkon = false;
         if ($ki && $v2 && !empty($ki['zavazek'])) {
             $splniUkon = in_array($druh, DRACAK_VTT_ZAVAZEK_AKCE[$ki['zavazek']] ?? [], true);
             $ukonNazev = DRACAK_VTT_ZAVAZEK_NAZVY[$ki['zavazek']] ?? (string)$ki['zavazek'];
-            if (!$jePj && !$splniUkon) {
-                if ((int)$ki['akce_hotovo'] === 0) {
-                    $konec(422, 'Za ' . $ukonNazev . ' máš bonus k iniciativě, takže první akce kola musí být ' . $ukonNazev . ' (h1622). Výjimku může povolit PJ.');
-                }
-                $potrebuje = (int)$ki['zavazek_akci'] - (int)$ki['zavazek_hotovo'];
-                $zbudeBez = (int)$ki['akce_zbyvajici'] - $pocet;
-                if ($potrebuje > $zbudeBez) {
-                    $konec(422, 'Za ' . $ukonNazev . ' máš bonus k iniciativě — aspoň polovinu akcí kola (' . (int)$ki['zavazek_akci']
-                        . ') musíš věnovat tomu; ještě ' . $potrebuje . ' ti jich chybí, takže na jinou akci už nezbývá místo (h1622). Výjimku může povolit PJ.');
-                }
+            if (!$jePj && !$splniUkon && (int)$ki['akce_hotovo'] === 0) {
+                $konec(422, 'Za ' . $ukonNazev . ' máš bonus k iniciativě, takže první akce kola musí být ' . $ukonNazev . ' (h1622). Výjimku může povolit PJ.');
             }
         }
 

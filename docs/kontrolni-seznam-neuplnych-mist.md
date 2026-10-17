@@ -375,21 +375,47 @@ začne hrát často, přidá se mu složka (nový řádek v `efekt_slozky`, bez 
 - [x] Útok na tvora vyřazeného životy (mez vyřazení, h1610): hotovo 2026-10-17 (nehybný + zranění ×úroveň).
 - [ ] Útok na kouzlícího (h1613: kouzlící protivník je nehybný): zatím jen u efektů; mezi dvěma akcemi kouzlení by obrana měla
   být nehybná (h1626) — vyžaduje sledovat rozkouzlené kouzlo.
-- [ ] Postih k iniciativě za obouruční zbraň (−2) a těžkou kuši (−3) se zaškrtává ručně: v DB zbraně nemají údaj o držení a
-  povolání mají výjimky (bojovník +6 / +9 / +12 za obouruční zbraně podle úrovně, šermíř bez postihu s obouručním mečem,
-  těžká kuše +3 …; h139, h156). Až budou zbraně mít „jednoruční / obouruční“ a povolání výjimky jako data, dá se přičítat samo.
+- [x] Postih k iniciativě za zbraň v ruce: hotovo 2026-10-17 (po ručním SQL). Zbraně mají `chvat`, `trida_zbrane` a `ini_postih`
+  (−2 těžké obouruční označené * a všechny supertěžké kromě Řetězového meče, −3 těžká kuše); postava ho dostane sama podle
+  `drzena_zbran_id` při úmyslu Útok / Střelba / bez ohlášeného úmyslu. Výjimky povolání jsou v `DRACAK_VTT_INI_POSTIH_VYJIMKY`
+  (Bojovník od 6. úrovně pro boj tváří v tvář b932, Šermíř od 8. úrovně obouruční meč b1086, Lovec stínů od 7. úrovně b7148 a
+  jmenované supertěžké zbraně z poznámek pod tabulkou: Lučištník – Vertolův luk, Lupič a Erythen – Fuuma shuriken, Mechanik –
+  Arbalest, Divoch – Těžký kyj / Obří kyj / Válečný totem). **Zbývá:**
+  - [ ] Poznámky pod tabulkou supertěžkých zbraní říkají „bojovník neguje postihy u všech meči-nepodobných zbraní na blízko,
+    šermíř u všech meči-podobných“ — chybí seznam, které supertěžké zbraně jsou „podobné meči“ (Odachi, Flamberg, Warglaive, Dvě
+    katany, Dva dlouhé meče?) a od jaké úrovně to platí. Dokud to není rozhodnuté, platí jen úrovně z popisu povolání výš.
+  - [ ] Těžká kuše u bojovníka (b992, b994: „těžká kuše ztrácí postih“, „+3 iniciativa“) — kniha neříká od jaké úrovně, nepřičítá se.
+  - [ ] Dovednost Mistr zbraně (b11267: „odstraní postih −2 k iniciativě, má-li ho, těžká / supertěžká zbraň“) — vyžaduje evidenci,
+    s jakou zbraní postava dovednost ovládá; zatím se nepočítá. Stejně Flagelant (b8434, po 30 000 zkušeností s jednou zbraní).
+  - [ ] Zbraně z tabulek, které v katalogu nejsou: **Bastard (obouruční)**, **Válečné kladivo (obouruční, s hvězdičkou)**,
+    **Obouruční meč jako supertěžká jednoruční zbraň (SZ 6)** a všechny kombinace dvou zbraní (Dvě dýky, Kord + dýka, Dvě šavle,
+    Dva dlouhé meče …). Bez nich nejde držet „kombinaci“ a bonusy bojovníka za jednoruční kombinace se nedají přiřadit.
+  - [ ] Zbraň, kterou má postava v ruce, je jedna (`drzena_zbran_id`); u dvou zbraní naráz se postih nevyhodnocuje.
 - [ ] Bonusy k iniciativě podle povolání a úrovně (Válečník – Bojovník, h139: +3 od 5. úrovně, +6 / +9 / +12 za obouruční zbraně,
   +6 / +9 za jednoruční, +3 / +6 za střelné a vrhací zbraně…) nahrazují u bojovníka vícenásobné útoky z tabulky. Zadávají se
   jako „jiný bonus“ a slib úkonu (první akce + polovina akcí) se u nich nehlídá — až budou povolání data (úroveň × druh zbraně),
   dají se počítat i hlídat samy.
-- [ ] Slib úkonu (h1622): „aspoň polovina akcí kola“ jsem vyložil jako polovinu akcí zjištěných při hodu iniciativy, zaokrouhlenou
-  nahoru, a obranu jako bojovou akci. Kniha to blíž nerozvádí — kdyby byla polovina jinak, mění se jedna řádka (`zavazek_akci`).
+- [x] Slib úkonu (h1622): rozhodnuto uživatelem 2026-10-17 — **aspoň polovina akcí kola** (polovina akcí zjištěných při hodu, nahoru;
+  obrana se počítá jako bojová akce) se **nehlídá zákazem**: kdo jí slíbenému úkonu nevěnuje, dostane v příštím kole −3 k iniciativě
+  (efekt „Ztráta iniciativy (nesplněný slib)“ na 1 kolo, řádek „Automatická ztráta iniciativy v základním systému“). Netrestá se
+  vyřazený, spící ani ochromený tvor a ten, komu PJ slib zrušil. **První akce kola** se pořád hlídá (hráči se odmítne jiná první
+  akce než slíbená, PJ smí výjimku) — uživatel mluvil jen o polovině akcí; kdyby to mělo být taky jen trestem, je to jedna podmínka.
+- [ ] Výsledek hodu na iniciativu 0 a méně (h1623 b10805, b10810): kniha říká, že „postih v dalším kole“ se přenáší — VTT zatím dává
+  0 akcí a nic nepřenáší.
 
 ## Na kontrolu při proofreadingu (stav 2026-10-14)
 
 Sem patří věci, kde jsem **převzal údaj z knihy tak, jak je** (při rozporu
 podle homebrew), nebo si text musel vyložit. Na konci se projdou společně s
 knihou a opraví najednou. Pravidlo je v `CLAUDE.md`.
+
+**Zbraně a iniciativa (2026-10-17, tabulky zbraní uživatele b14664–b14827)**
+- [ ] Základní tabulka zbraní označuje ‡ („vždy ztrácí iniciativu“) i **Válečnou sekeru** (b10672), nová tabulka ji ve „střední
+  obouruční“ bez hvězdičky nemá. Podle pravidla „homebrew má přednost“ platí nová tabulka: Válečná sekera (obouruční) postih nemá.
+- [ ] Popis **Warglaive** v katalogu tvrdil, že postih −2 nemá. Tabulka (supertěžké jednoruční: „všechny tyto zbraně mají −2 na iniciativu“)
+  to nepotvrzuje — poznámka „///neztrácí −2 k ini“ patří k Řetězovému meči. Popis opraven migrací 0096, ověř podle knihy.
+- [ ] V poznámce pod tabulkou „lupič a eriten“ je v katalogu povolání **Erythen** — stejné povolání? V kódu se hledá podle názvu z DB.
+- [ ] V tabulce supertěžkých zbraní stojí „iciativu“, „Řetezový“, „neguje posth“ (překlepy zdroje, nechány).
 
 **Podezřelé údaje v Novém ceníku (h2055, nahráno beze změny, migrace 0082)**
 - [ ] Soudek 10 l váží 200 mn, ale soudek 20 l jen 100 mn (a 50 l 255 mn) — ostatní soudky sedí na řadu, tohle vypadá jako překlep (100?).

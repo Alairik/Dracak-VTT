@@ -55,8 +55,8 @@ function dracak_vtt_ddl_mapa(): array
         }
         foreach ($pdo->query(
             'SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS
-             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ("kolo_ucastnik", "kolo_iniciativa")
-               AND COLUMN_NAME IN ("utoku_za_2_kola", "zavazek", "zavazek_akci", "zavazek_hotovo", "akce_hotovo")'
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ("kolo_ucastnik", "kolo_iniciativa", "predmety")
+               AND COLUMN_NAME IN ("utoku_za_2_kola", "zavazek", "zavazek_akci", "zavazek_hotovo", "akce_hotovo", "chvat", "trida_zbrane", "ini_postih")'
         )->fetchAll(PDO::FETCH_NUM) as [$tabulka, $sloupec]) {
             $stav['ini_sloupce'][$tabulka . '.' . $sloupec] = true;
         }
@@ -114,6 +114,9 @@ function dracak_vtt_tokeny_funkce(): array
             && isset($ddl['ini_sloupce']['kolo_ucastnik.utoku_za_2_kola'], $ddl['ini_sloupce']['kolo_iniciativa.zavazek'],
                 $ddl['ini_sloupce']['kolo_iniciativa.zavazek_akci'], $ddl['ini_sloupce']['kolo_iniciativa.zavazek_hotovo'],
                 $ddl['ini_sloupce']['kolo_iniciativa.akce_hotovo']),
+        // Zbraně s údajem o držení, třídě a postihu k iniciativě (ruční SQL: predmety.chvat, trida_zbrane, ini_postih):
+        // postih držené zbraně se přičte k iniciativě sám, místo ručního zaškrtávání „Obouruční zbraň“ / „Těžká kuše“.
+        'zbrane_ini' => isset($ddl['ini_sloupce']['predmety.chvat'], $ddl['ini_sloupce']['predmety.trida_zbrane'], $ddl['ini_sloupce']['predmety.ini_postih']),
         'efekty_mech' => isset($ddl['tabulky']['efekt_slozky'])
             && isset($ddl['efekty_sloupce']['efekty.mechanika_stav'], $ddl['efekty_sloupce']['efekty.trvani_kol'],
                 $ddl['efekty_sloupce']['efekty.kolo_se_nepocita'], $ddl['efekty_sloupce']['efekty.opakovani'],

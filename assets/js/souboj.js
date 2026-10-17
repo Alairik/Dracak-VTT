@@ -108,13 +108,14 @@ export function initSouboj(ctx) {
     }
     return w;
   }
-  // Slib úkonu, za který tvor dostal bonus k iniciativě (h1622): první akce kola a aspoň polovina akcí.
+  // Slib úkonu, za který tvor dostal bonus k iniciativě (h1622): první akce kola a aspoň polovina akcí (kdo polovinu nesplní, ztratí v příštím kole iniciativu: −3).
   function textZavazku(r, dlouhy) {
     const nazev = {kouzleni: 'kouzlení', utok: 'útok (obrana se počítá)', strelba: 'střelba'}[r.zavazek] || r.zavazek;
     const stav = r.zavazek_hotovo + '/' + r.zavazek_akci;
     if (!dlouhy) return 'slib: ' + nazev + ' ' + stav;
-    return 'Bonus k iniciativě za ' + nazev + ': ' + (r.akce_hotovo === 0 ? 'první akce kola musí být ' + (r.zavazek === 'kouzleni' ? 'kouzlení' : 'útok') + ' a ' : '')
-      + 'aspoň ' + r.zavazek_akci + ' ' + akci(r.zavazek_akci) + ' kola musí být ' + (r.zavazek === 'kouzleni' ? 'kouzlení' : 'útok') + ' (splněno ' + stav + ').';
+    const co = r.zavazek === 'kouzleni' ? 'kouzlení' : 'útok';
+    return 'Bonus k iniciativě za ' + nazev + ': ' + (r.akce_hotovo === 0 ? 'první akce kola musí být ' + co + '. ' : '')
+      + 'Aspoň ' + r.zavazek_akci + ' ' + akci(r.zavazek_akci) + ' kola má být ' + co + ' (splněno ' + stav + ') — jinak v příštím kole −3 k iniciativě.';
   }
   function pips(celkem, zbyva) {
     const w = el('span', 'ini-pips');
@@ -185,7 +186,7 @@ export function initSouboj(ctx) {
     utoky.min = '2';
     utoky.max = '8';
     utoky.value = String(u.utoku_za_2_kola || 2);
-    utoky.title = 'Kolik útoků za 2 kola umíš (2 = běžně, bez bonusu). Bonus k iniciativě je 3 × (počet − 2); kdo ho dostane, musí vícenásobným útokům věnovat první akci a aspoň polovinu akcí kola.';
+    utoky.title = 'Kolik útoků za 2 kola umíš (2 = běžně, bez bonusu). Bonus k iniciativě je 3 × (počet − 2); kdo ho dostane, musí vícenásobným útokům věnovat první akci a aspoň polovinu akcí kola, jinak v příštím kole ztratí iniciativu (−3).';
     const ukazUtoky = () => { utoky.style.display = v2 && ['utok', 'strelba'].includes(sel.value) ? '' : 'none'; };
     ukazUtoky();
     const uloz = () => volat('api/umysl_nastavit.php', Object.assign({
@@ -211,7 +212,7 @@ export function initSouboj(ctx) {
 
   function kreslitUmysly() {
     seznam.append(el('p', 'ini-napoveda', kolo.iniciativa_v2
-      ? 'Každý ohlásí, co bude v tomto kole dělat — podle toho se určí bonusy k iniciativě (kouzlení +1; při útoku nebo střelbě se zadá, kolik útoků za 2 kola umí). Kdo za úkon dostane bonus, musí mu věnovat první akci kola a aspoň polovinu akcí.'
+      ? 'Každý ohlásí, co bude v tomto kole dělat — podle toho se určí bonusy k iniciativě (kouzlení +1; při útoku nebo střelbě se zadá, kolik útoků za 2 kola umí). Kdo za úkon dostane bonus, musí mu věnovat první akci kola a aspoň polovinu akcí, jinak v příštím kole ztratí iniciativu (−3).'
       : 'Každý ohlásí, co bude v tomto kole dělat — podle toho se určí bonusy k iniciativě (kouzlení +1).'));
     const skupiny = seskupit(ucastnici, () => '');
     skupiny.forEach((s) => {
@@ -314,7 +315,7 @@ export function initSouboj(ctx) {
           tlacitko('½ Protoplazma', 'btn-ghost ini-mini', () => uprav({op: 'protoplazma'}), 'Kouzlo Protoplazma: sníží akce na polovinu (dolů)'),
         );
         if (r.zavazek) strip.append(tlacitko('Zrušit slib', 'btn-ghost ini-mini', () => uprav({op: 'zavazek_zrusit'}),
-          'Tvor už nemusí první akci a polovinu akcí věnovat slíbenému úkonu (bonus k iniciativě mu zůstává)'));
+          'Tvor už nemusí první akci a polovinu akcí věnovat slíbenému úkonu a neztratí kvůli tomu iniciativu (bonus mu zůstává)'));
         seznam.append(strip);
       }
     });
@@ -1113,12 +1114,13 @@ export function initSouboj(ctx) {
     hodPopis.textContent = 'Hoď 1k6. Únava, naložení'
       + (kolo && kolo.cislo_kola === 1 && kolo.prekvapeni !== 'zadne' ? ', překvapení' : '')
       + (kolo && kolo.iniciativa_v2 ? ', kouzlení a vícenásobné útoky z ohlášeného úmyslu' : ' a kouzlení')
-      + ' se přičtou samy.' + (u && u.hozeno ? ' (Přehození přepíše dřívější hod.)' : '');
+      + ' se přičtou samy.' + (pohybAuto.zbran && prvni && prvni.typ_entity === 'postava' ? ' Postih těžké zbraně v ruce (obouruční, supertěžké, těžká kuše) se přičte sám podle zbraně, kterou postava drží.' : '')
+      + (u && u.hozeno ? ' (Přehození přepíše dřívější hod.)' : '');
     if (kolo && kolo.iniciativa_v2 && u) {
       // Co se z úmyslu přičte samo a k čemu se tvor tím zavazuje (h1622)
       const uk = ['utok', 'strelba'].includes(u.umysl) && u.utoku_za_2_kola && kolo.ini_utoky && kolo.ini_utoky[u.utoku_za_2_kola];
-      if (u.umysl === 'kouzleni') hodPopis.textContent += ' Úmysl: kouzlení (+1) — první akce kola a aspoň polovina akcí musí být kouzlení.';
-      else if (uk) hodPopis.textContent += ' Úmysl: ' + UMYSLY[u.umysl].toLowerCase() + ', ' + u.utoku_za_2_kola + ' ' + (u.utoku_za_2_kola < 5 ? 'útoky' : 'útoků') + ' za 2 kola (+' + uk + ') — první akce kola a aspoň polovina akcí musí být útok (obrana se počítá).';
+      if (u.umysl === 'kouzleni') hodPopis.textContent += ' Úmysl: kouzlení (+1) — první akce kola musí být kouzlení a aspoň polovina akcí kola má být kouzlení, jinak v příštím kole −3 k iniciativě.';
+      else if (uk) hodPopis.textContent += ' Úmysl: ' + UMYSLY[u.umysl].toLowerCase() + ', ' + u.utoku_za_2_kola + ' ' + (u.utoku_za_2_kola < 5 ? 'útoky' : 'útoků') + ' za 2 kola (+' + uk + ') — první akce kola musí být útok a aspoň polovina akcí kola má být útok (obrana se počítá), jinak v příštím kole −3 k iniciativě.';
       else if (!u.umysl) hodPopis.textContent += ' Nemáš ohlášený úmysl — kouzlení a vícenásobné útoky se nezapočítají.';
     }
     mHod.querySelectorAll('.hod-bonus-check').forEach((cb) => {
@@ -1168,7 +1170,7 @@ export function initSouboj(ctx) {
         const v = d.vysledky && d.vysledky[0];
         if (v) hodVysledek.textContent = 'Padlo ' + hod + ' ' + (v.modifikator >= 0 ? '+' : '−') + Math.abs(v.modifikator) + ' = ' + v.vysledek + ' → ' + v.akce_celkem + ' ' + akci(v.akce_celkem);
         (d.upozorneni || []).forEach((t) => logLine(t));
-        if (v && v.zavazek) logLine(v.label + ' si za ' + ZAVAZEK_NAZVY[v.zavazek] + ' vzal(a) bonus k iniciativě: první akce kola a aspoň ' + v.zavazek_akci + ' ' + akci(v.zavazek_akci) + ' musí být ' + ZAVAZEK_NAZVY[v.zavazek] + '.');
+        if (v && v.zavazek) logLine(v.label + ' si za ' + ZAVAZEK_NAZVY[v.zavazek] + ' vzal(a) bonus k iniciativě: první akce kola a aspoň ' + v.zavazek_akci + ' ' + akci(v.zavazek_akci) + ' mají být ' + ZAVAZEK_NAZVY[v.zavazek] + ' (jinak v příštím kole −3).');
         obnovitStav();
         setTimeout(zavritHod, 1100);
       }
@@ -1651,7 +1653,7 @@ export function initSouboj(ctx) {
         const t = getTokeny().find((x) => x.typ_entity === p.typ_entity && x.entita_id === p.entita_id);
         const kdo = t ? t.label : 'Tvor';
         logLine(kdo + ': efekt ' + p.efekt_nazev + (p.obnoveno ? ' obnoven' : '') + (p.zbyva_kol ? ' na ' + p.zbyva_kol + ' ' + (p.zbyva_kol === 1 ? 'kolo' : (p.zbyva_kol < 5 ? 'kola' : 'kol')) : '')
-          + (p.akce ? ' — akce ' + p.akce.pred[1] + ' → ' + p.akce.po[1] : '') + (p.shrnuti && p.shrnuti.length ? ' (' + p.shrnuti.join(', ') + ')' : ''));
+          + (p.akce ? ' — akce ' + p.akce.pred[1] + ' → ' + p.akce.po[1] : '') + (p.shrnuti && p.shrnuti.length ? ' (' + p.shrnuti.join(', ') + ')' : '') + (p.duvod_text ? ' — ' + p.duvod_text : ''));
         break;
       }
       case 'efekt_konci': {

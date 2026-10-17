@@ -217,6 +217,8 @@ function dracak_vtt_souboj_akce_prepocet(int $celkem, int $zbyva, string $op, in
 function dracak_vtt_souboj_nove_kolo(PDO $pdo, int $svetId, int $mapaId, int $ucetId, array $stav): int
 {
     $nove = $stav['cislo_kola'] + 1;
+    // Slib úkonu: kdo nevěnoval aspoň polovinu akcí tomu, za co dostal bonus, ztratí v příští iniciativě (zjistit dřív, než se smaže).
+    $nesplnili = dracak_vtt_iniciativa_nesplneny_slib($pdo, $svetId, $mapaId);
     $pdo->prepare(
         'UPDATE kolo_stav SET cislo_kola = ?, aktivni_token_id = NULL, faze = "umysly", polovina = 1, prekvapeni = "zadne"
          WHERE mapa_id = ?'
@@ -224,12 +226,14 @@ function dracak_vtt_souboj_nove_kolo(PDO $pdo, int $svetId, int $mapaId, int $uc
     $pdo->prepare('DELETE FROM kolo_iniciativa WHERE mapa_id = ?')->execute([$mapaId]);
     $pdo->prepare('UPDATE kolo_ucastnik SET umysl = NULL, umysl_cil_token_id = NULL WHERE mapa_id = ?')->execute([$mapaId]);
     $efekty = dracak_vtt_efekty_odpocet($pdo, $svetId, $mapaId, $ucetId, $stav['cislo_kola']);
+    $ztrata = dracak_vtt_iniciativa_ztrata_nasad($pdo, $svetId, $mapaId, $ucetId, $nesplnili);
     // Krvácení, regenerace… : na začátku kola se každému takovému tvoru založí hod kostkou (výzva „tik“).
     dracak_vtt_efekty_tiky_zaloz($pdo, $svetId, $mapaId, $ucetId);
     dracak_vtt_log_event($svetId, $mapaId, 'kolo_nove', [
         'predchozi_kolo' => $stav['cislo_kola'],
         'nove_kolo' => $nove,
         'efekty_konci' => $efekty,
+        'ztrata_iniciativy' => $ztrata,
     ], $ucetId);
     return $nove;
 }
@@ -356,6 +360,84 @@ function dracak_vtt_iniciativa_zavazek(?array $ucastnik): ?string
     return dracak_vtt_iniciativa_utoku($ucastnik) !== null ? (string)$ucastnik['umysl'] : null;
 }
 
+// Efekt, který příští kolo sníží iniciativu tomu, kdo nesplnil slíbený úkon (migrace 0094; složka ini_radek =
+// řádek tabulky „Automatická ztráta iniciativy v základním systému“, −3).
+const DRACAK_VTT_EFEKT_ZTRATA_INI = 'Ztráta iniciativy (nesplněný slib)';
+
+// Konec kola: kdo dostal bonus k iniciativě za úkon (kouzlení, vícenásobné útoky) a nevěnoval mu aspoň polovinu akcí
+// kola, přijde v PŘÍŠTÍ iniciativě o ni (−3). Rozhodnutí uživatele 2026-10-17: místo tvrdého zákazu jiných akcí.
+// Kdo už nemohl jednat (vyřazený, spí, ochromený) a komu PJ slib zrušil, se netrestá. Volat PŘED smazáním
+// kolo_iniciativa (po novém kole slib už nikde není). Vrací [['token_id', 'label', 'typ_entity', 'entita_id', 'zavazek',
+// 'zavazek_akci', 'zavazek_hotovo']].
+function dracak_vtt_iniciativa_nesplneny_slib(PDO $pdo, int $svetId, int $mapaId): array
+{
+    if (!dracak_vtt_iniciativa_v2() || !dracak_vtt_efekty_funkce()) {
+        return [];
+    }
+    $q = $pdo->prepare(
+        'SELECT token_id, zavazek, zavazek_akci, zavazek_hotovo FROM kolo_iniciativa
+         WHERE mapa_id = ? AND zavazek IS NOT NULL AND zavazek_hotovo < zavazek_akci'
+    );
+    $q->execute([$mapaId]);
+    $radky = $q->fetchAll();
+    if (!$radky) {
+        return [];
+    }
+    $info = dracak_vtt_souboj_tokeny_info($pdo, $svetId, $mapaId);
+    $vysledek = [];
+    foreach ($radky as $r) {
+        $t = $info[(int)$r['token_id']] ?? null;
+        if ($t === null || !in_array($t['typ_entity'], ['postava', 'nestvura_instance'], true)) {
+            continue;
+        }
+        if (dracak_vtt_efekty_souhrn($pdo, $t['typ_entity'], (int)$t['entita_id'])['nemuze_jednat'] !== null
+            || dracak_vtt_souboj_vyrazen($pdo, $t)) {
+            continue;
+        }
+        $vysledek[] = [
+            'token_id' => (int)$r['token_id'], 'label' => (string)$t['label'], 'typ_entity' => $t['typ_entity'],
+            'entita_id' => (int)$t['entita_id'], 'zavazek' => (string)$r['zavazek'],
+            'zavazek_akci' => (int)$r['zavazek_akci'], 'zavazek_hotovo' => (int)$r['zavazek_hotovo'],
+        ];
+    }
+    return $vysledek;
+}
+
+// Nasadí tvorům z dracak_vtt_iniciativa_nesplneny_slib efekt „Ztráta iniciativy“ na jedno (nové) kolo. Volat až PO
+// odpočtu trvání efektů, ať se nové kolo nesníží hned. Bez migrace 0094 (efekt v DB chybí) jen vrátí prázdný seznam.
+function dracak_vtt_iniciativa_ztrata_nasad(PDO $pdo, int $svetId, int $mapaId, int $ucetId, array $nesplnili): array
+{
+    if (!$nesplnili) {
+        return [];
+    }
+    $q = $pdo->prepare('SELECT id FROM efekty WHERE nazev = ?');
+    $q->execute([DRACAK_VTT_EFEKT_ZTRATA_INI]);
+    $efektId = (int)$q->fetchColumn();
+    if ($efektId <= 0) {
+        return [];
+    }
+    $hotovo = [];
+    foreach ($nesplnili as $n) {
+        $v = dracak_vtt_efekt_aplikuj($pdo, $mapaId, $n['typ_entity'], $n['entita_id'], $efektId, ['zbyva_kol' => 1]);
+        $duvod = 'nesplněný slib: ' . (DRACAK_VTT_ZAVAZEK_NAZVY[$n['zavazek']] ?? $n['zavazek']) . ' ' . $n['zavazek_hotovo'] . '/' . $n['zavazek_akci'] . ' akcí';
+        dracak_vtt_log_event($svetId, $mapaId, 'efekt_aplikovan', [
+            'typ_entity' => $n['typ_entity'],
+            'entita_id' => $n['entita_id'],
+            'aktivni_efekt_id' => $v['aktivni_efekt_id'],
+            'efekt_id' => $efektId,
+            'efekt_nazev' => $v['nazev'],
+            'zbyva_kol' => $v['zbyva_kol'],
+            'obnoveno' => $v['obnoveno'],
+            'zbyva_pred' => $v['zbyva_pred'],
+            'shrnuti' => $v['shrnuti'],
+            'akce' => null,
+            'duvod_text' => $duvod,
+        ], $ucetId);
+        $hotovo[] = ['token_id' => $n['token_id'], 'label' => $n['label'], 'duvod' => $duvod];
+    }
+    return $hotovo;
+}
+
 // Tabulka vícenásobných útoků z DB pro klienta: [počet útoků za 2 kola => bonus k iniciativě].
 function dracak_vtt_iniciativa_utoky_tabulka(PDO $pdo): array
 {
@@ -371,20 +453,107 @@ function dracak_vtt_iniciativa_utoky_tabulka(PDO $pdo): array
     return $vystup;
 }
 
+// ---------------------------------------------------------------------------------------------
+// Postih k iniciativě podle držené zbraně (ruční SQL: predmety.chvat, trida_zbrane, ini_postih; bez něj se
+// „Obouruční zbraň“ / „Těžká kuše“ dál zaškrtávají ručně)
+// ---------------------------------------------------------------------------------------------
+//
+// Zbraň má v DB `ini_postih` (−2 těžké obouruční a všechny supertěžké zbraně kromě Řetězového meče, −3 těžká kuše —
+// tabulky zbraní, b14664 a b14822; h1622 b10804 Arpag s obouručním mečem). Postava ho dostane, když drží zbraň
+// (postavy.drzena_zbran_id) a jde do boje s ní: úmysl Útok, Střelba, nebo žádný ohlášený (kdo úmysl neohlásí, neunikne
+// postihu). Kouzlení, pohyb, čekání a útěk postihem zbraně netrpí (postih nese ten, kdo s ní útočí, b10636).
+// Výjimky povolání (kdo postih nemá): jen to, co kniha říká výslovně s úrovní nebo se jmenovanou zbraní.
+const DRACAK_VTT_INI_POSTIH_UMYSLY = ['utok', 'strelba'];
+const DRACAK_VTT_INI_POSTIH_VYJIMKY = [
+    // rozsah 'tvt' = jakákoli zbraň pro boj tváří v tvář (ne střelná, ne vrhací)
+    ['povolani' => ['Bojovník'], 'od' => 6, 'rozsah' => 'tvt', 'zdroj' => 'h139, b932'],
+    ['povolani' => ['Šermíř'], 'od' => 8, 'zbrane' => ['Obouruční meč'], 'zdroj' => 'h156, b1086'],
+    ['povolani' => ['Lovec stínů'], 'od' => 7, 'rozsah' => 'tvt', 'zdroj' => 'b7148'],
+    // Poznámky pod tabulkou supertěžkých zbraní (b14822–b14827) — úroveň neuvádí, supertěžké zbraně se ale nesmí učit na 1. úrovni.
+    ['povolani' => ['Lučištník'], 'od' => 1, 'zbrane' => ['Vertolův luk'], 'zdroj' => 'tabulka supertěžkých zbraní'],
+    ['povolani' => ['Lupič', 'Erythen'], 'od' => 1, 'zbrane' => ['Fuuma shuriken'], 'zdroj' => 'tabulka supertěžkých zbraní'],
+    ['povolani' => ['Mechanik'], 'od' => 1, 'zbrane' => ['Arbalest'], 'zdroj' => 'tabulka supertěžkých zbraní'],
+    ['povolani' => ['Divoch'], 'od' => 1, 'zbrane' => ['Těžký kyj (super těžký jednoruční)', 'Obří kyj', 'Válečný totem'], 'zdroj' => 'tabulka supertěžkých zbraní'],
+];
+// Řádky Tabulky bonusů a postihů k iniciativě, které za postavu nahrazuje postih držené zbraně.
+const DRACAK_VTT_INI_RADKY_ZBRANE = ['Obouruční zbraň', 'Těžká kuše'];
+const DRACAK_VTT_ZBRAN_TRIDY = ['lehka' => 'lehká', 'stredni' => 'střední', 'tezka' => 'těžká', 'supertezka' => 'supertěžká'];
+const DRACAK_VTT_ZBRAN_CHVATY = ['jednoruci' => 'jednoruční', 'obourucni' => 'obouruční'];
+
+function dracak_vtt_zbrane_ini(): bool
+{
+    return dracak_vtt_tokeny_funkce()['zbrane_ini'];
+}
+
+// Kdo postih zbraně nemá (text pro log), nebo null. $zbran = řádek predmety (nazev, kategorie_zbrane, dostrel_maly).
+function dracak_vtt_iniciativa_zbran_vyjimka(PDO $pdo, array $postava, array $zbran): ?string
+{
+    if (empty($postava['povolani_id'])) {
+        return null;
+    }
+    $q = $pdo->prepare('SELECT nazev FROM povolani WHERE id = ?');
+    $q->execute([(int)$postava['povolani_id']]);
+    $povolani = $q->fetchColumn();
+    if ($povolani === false) {
+        return null;
+    }
+    $uroven = (int)($postava['uroven'] ?? 1);
+    $tvt = $zbran['dostrel_maly'] === null && !preg_match('/vrhaci|strelna/', (string)($zbran['kategorie_zbrane'] ?? ''));
+    foreach (DRACAK_VTT_INI_POSTIH_VYJIMKY as $v) {
+        if (!in_array($povolani, $v['povolani'], true) || $uroven < $v['od']) {
+            continue;
+        }
+        $sedi = isset($v['zbrane']) ? in_array($zbran['nazev'], $v['zbrane'], true) : ($tvt && ($v['rozsah'] ?? '') === 'tvt');
+        if ($sedi) {
+            return $povolani . ($v['od'] > 1 ? ' od ' . $v['od'] . '. úrovně' : '');
+        }
+    }
+    return null;
+}
+
+// Postih k iniciativě z držené zbraně: ['postih' => int (0 = zrušený výjimkou povolání), 'popis' => text] nebo null,
+// když žádný není (nic nedrží, zbraň postih nemá, úmysl není boj se zbraní).
+function dracak_vtt_iniciativa_zbran(PDO $pdo, array $postava, ?string $umysl): ?array
+{
+    if (empty($postava['drzena_zbran_id']) || ($umysl !== null && !in_array($umysl, DRACAK_VTT_INI_POSTIH_UMYSLY, true))) {
+        return null;
+    }
+    $q = $pdo->prepare("SELECT nazev, ini_postih, chvat, trida_zbrane, kategorie_zbrane, dostrel_maly FROM predmety WHERE id = ? AND typ = 'zbran'");
+    $q->execute([(int)$postava['drzena_zbran_id']]);
+    $z = $q->fetch();
+    if (!$z || $z['ini_postih'] === null || (int)$z['ini_postih'] === 0) {
+        return null;
+    }
+    $postih = (int)$z['ini_postih'];
+    $druh = trim((DRACAK_VTT_ZBRAN_TRIDY[$z['trida_zbrane']] ?? '') . ' ' . (DRACAK_VTT_ZBRAN_CHVATY[$z['chvat']] ?? ''));
+    $nazev = $z['nazev'] . ($druh !== '' ? ' (' . $druh . ' zbraň)' : '');
+    $vyjimka = dracak_vtt_iniciativa_zbran_vyjimka($pdo, $postava, $z);
+    if ($vyjimka !== null) {
+        return ['postih' => 0, 'popis' => $nazev . ': postih ' . ($postih < 0 ? '−' : '+') . abs($postih) . ' zrušen (' . $vyjimka . ')'];
+    }
+    return ['postih' => $postih, 'popis' => $nazev . ': ' . ($postih < 0 ? '−' : '+') . abs($postih)];
+}
+
 // Modifikátor k hodu na iniciativu = součet vybraných řádků Tabulky bonusů a
 // postihů (str. 78, iniciativa_bonusy) + automatické (únava a naložení
 // postavy, překvapení, úmysl kouzlení) + ruční úprava. Popisy jdou do logu,
 // ať je vidět, PROČ vyšlo dané číslo. $navic = další popisy řádků tabulky,
 // které se přidají automaticky (Překvapení, Kouzlení).
-function dracak_vtt_iniciativa_modifikator(PDO $pdo, array $token, array $bonusIds, int $jinyBonus, array $navic = []): array
+function dracak_vtt_iniciativa_modifikator(PDO $pdo, array $token, array $bonusIds, int $jinyBonus, array $navic = [], ?array $ucastnik = null): array
 {
     $auto = ['popisy' => [], 'skupiny' => ['unava' => false, 'nalozeni' => false], 'upozorneni' => []];
+    $zbran = null;
     if ($token['typ_entity'] === 'postava') {
         $stmt = $pdo->prepare('SELECT * FROM postavy WHERE id = ?');
         $stmt->execute([(int)$token['entita_id']]);
         $postavaRow = $stmt->fetch();
         if ($postavaRow) {
             $auto = dracak_vtt_iniciativa_auto_bonusy($pdo, $postavaRow);
+            // Postih držené zbraně (jen v souboji s úmysly; ruční zaškrtnutí „Obouruční zbraň“ / „Těžká kuše“ se pak ignoruje).
+            if ($ucastnik !== null && dracak_vtt_zbrane_ini()) {
+                $auto['skupiny']['zbran'] = true;
+                $zbran = dracak_vtt_iniciativa_zbran($pdo, $postavaRow, $ucastnik['umysl'] ?? null);
+            }
         }
     }
     // Aktivní efekty tvora: řádky tabulky bonusů z efektů (Rychlost +6, Protoplazma −3) se přičtou samy a ručně
@@ -405,6 +574,7 @@ function dracak_vtt_iniciativa_modifikator(PDO $pdo, array $token, array $bonusI
         $stmt->execute($bonusIds);
         foreach ($stmt->fetchAll() as $b) {
             $pokryto = ($auto['skupiny']['unava'] && in_array($b['popis'], DRACAK_VTT_INICIATIVA_UNAVA, true))
+                || (!empty($auto['skupiny']['zbran']) && in_array($b['popis'], DRACAK_VTT_INI_RADKY_ZBRANE, true))
                 || ($auto['skupiny']['nalozeni'] && in_array($b['popis'], DRACAK_VTT_INICIATIVA_NALOZENI, true))
                 || in_array($b['popis'], $navic, true)
                 // Iniciativa v2: vícenásobné útoky jen přes pole „útoků za 2 kola“ (a jen při ohlášeném úkonu) —
@@ -430,12 +600,14 @@ function dracak_vtt_iniciativa_modifikator(PDO $pdo, array $token, array $bonusI
     // TINYINT sloupec (-128..127) — jen ochrana proti přetečení, ne pravidlová hranice.
     $efektyBonus = $ef !== null ? $ef['ini_bonus'] : 0;
     $efektyDuvody = $ef !== null ? $ef['ini_duvody'] : [];
-    $modifikator = max(-100, min(100, (int)array_sum(array_column($vsechny, 'bonus')) + $jinyBonus + $efektyBonus));
+    $zbranBonus = $zbran !== null ? $zbran['postih'] : 0;
+    $zbranDuvody = $zbran !== null ? [$zbran['popis']] : [];
+    $modifikator = max(-100, min(100, (int)array_sum(array_column($vsechny, 'bonus')) + $jinyBonus + $efektyBonus + $zbranBonus));
     return [
         'modifikator' => $modifikator,
-        'popisy' => array_merge($popisy, array_map(fn($t) => $t . ' (automaticky)', $efektyDuvody)),
+        'popisy' => array_merge($popisy, array_map(fn($t) => $t . ' (automaticky)', array_merge($efektyDuvody, $zbranDuvody))),
         'bez_akci' => $ef['nemuze_jednat'] ?? null,
-        'automaticke' => array_merge(array_column($automaticke, 'popis'), $efektyDuvody),
+        'automaticke' => array_merge(array_column($automaticke, 'popis'), $efektyDuvody, $zbranDuvody),
         'ignorovano' => $ignorovane,
         'upozorneni' => $auto['upozorneni'],
     ];

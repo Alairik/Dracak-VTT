@@ -113,6 +113,7 @@ $iniciativaBonusy = dracak_db()->query('SELECT id, popis, bonus FROM iniciativa_
 // souboje a úmyslu), řádky pro základní systém tu nemají smysl.
 $souboj = dracak_vtt_tokeny_funkce()['souboj'];
 $iniV2 = dracak_vtt_tokeny_funkce()['iniciativa_v2'];
+$zbraneIni = dracak_vtt_tokeny_funkce()['zbrane_ini'];
 $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b['popis'], [
     'Překvapení', 'Kouzlení', 'Automatická iniciativa v základním systému', 'Automatická ztráta iniciativy v základním systému',
 ], true) && !($iniV2 && in_array($b['popis'], DRACAK_VTT_INI_UTOKY, true))));   // v2: vícenásobné útoky jen polem „útoků za 2 kola“
@@ -661,7 +662,7 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
         <summary>Další bonusy a postihy</summary>
         <div id="hodBonusyList" style="max-height:150px;overflow-y:auto;font-size:12px;margin:6px 0;">
           <?php foreach ($hodBonusy as $b): ?>
-            <?php $autoSkupina = in_array($b['popis'], DRACAK_VTT_INICIATIVA_UNAVA, true) ? 'unava' : (in_array($b['popis'], DRACAK_VTT_INICIATIVA_NALOZENI, true) ? 'nalozeni' : ''); ?>
+            <?php $autoSkupina = in_array($b['popis'], DRACAK_VTT_INICIATIVA_UNAVA, true) ? 'unava' : (in_array($b['popis'], DRACAK_VTT_INICIATIVA_NALOZENI, true) ? 'nalozeni' : ($zbraneIni && $souboj && in_array($b['popis'], DRACAK_VTT_INI_RADKY_ZBRANE, true) ? 'zbran' : '')); ?>
             <label style="display:flex;align-items:center;gap:6px;font-weight:400;margin-bottom:2px;">
               <input type="checkbox" class="hod-bonus-check" value="<?= (int)$b['id'] ?>"<?= $autoSkupina !== '' ? ' data-auto="' . $autoSkupina . '"' : '' ?>>
               <?= htmlspecialchars($b['popis']) ?> (<?= $b['bonus'] >= 0 ? '+' . (int)$b['bonus'] : (int)$b['bonus'] ?>)
@@ -709,7 +710,7 @@ window.MAPA = <?= json_encode([
     'svetId' => $svetId,
     'mapaId' => $mapaId,
     'jePj' => $isPjOrAdmin,
-    'pohybAuto' => ['unava' => $pohybNastaveni['auto_unava'], 'nalozeni' => $pohybNastaveni['auto_naklad']],
+    'pohybAuto' => ['unava' => $pohybNastaveni['auto_unava'], 'nalozeni' => $pohybNastaveni['auto_naklad'], 'zbran' => $zbraneIni && $souboj],
     'funkce' => dracak_vtt_tokeny_funkce(),
     'pravidla' => dracak_vtt_souboj_pravidla(),
     'verzeModulu' => max((int)@filemtime(__DIR__ . '/../assets/js/souboj.js'), (int)@filemtime(__DIR__ . '/../assets/js/kostky3d.js'), (int)@filemtime(__DIR__ . '/../assets/js/hexy.js')),
