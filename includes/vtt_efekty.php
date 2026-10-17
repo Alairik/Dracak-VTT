@@ -47,6 +47,7 @@ const DRACAK_VTT_EFEKT_SLOZKY = [
     'nemuze_jednat' => 'tvor nemůže jednat (jeho tah se přeskočí)',
     'nemuze_branit' => 'tvor se nemůže bránit zbraní (jen „nebránit se“)',
     'nehybny' => 'v obraně platí jako nehybný protivník (h1613)',
+    'zraneni_x_uroven' => 'zranění útoku na něj se násobí jeho úrovní (spící jako vyřazený, h1613 b10736; postava nejvýš ×9, nestvůra životaschopností)',
     'tik_zivoty' => 'na začátku každého kola hod kostkou: −1 ubírá životy, 1 léčí',
 ];
 
@@ -126,6 +127,8 @@ function dracak_vtt_efekt_slozka_text(array $s): string
             return 'nemůže se bránit zbraní';
         case 'nehybny':
             return 'v obraně jako nehybný';
+        case 'zraneni_x_uroven':
+            return 'zranění na něj ×úroveň';
         case 'tik_zivoty':
             $k = $s['pocet_kostek'] !== null && $s['typ_kostky'] !== null
                 ? dracak_vtt_kostky_text((int)$s['pocet_kostek'], (string)$s['typ_kostky'], (int)($s['pevny_bonus'] ?? 0)) : 'kostky ze zdroje';
@@ -165,7 +168,7 @@ function dracak_vtt_efekty_aktivni(PDO $pdo, string $typ, int $entitaId): array
 //   opravy_uc / opravy_oc                       [{nazev, hodnota}] do rozpisu hodu
 //   ini_radky                                   názvy řádků Tabulky bonusů a postihů k iniciativě
 //   ini_duvody                                  texty do logu iniciativy
-//   nemuze_jednat / nemuze_branit / nehybny     název efektu, který to způsobuje, jinak null
+//   nemuze_jednat / nemuze_branit / nehybny / zraneni_x_uroven   název efektu, který to způsobuje, jinak null
 //   tiky                                        [{aktivni_id, nazev, znamenko, kostky: "1k4"}] na začátku kola
 // Nestackovatelný efekt se počítá jednou, i kdyby ve starých datech byl nasazený víckrát.
 function dracak_vtt_efekty_souhrn(PDO $pdo, string $typ, int $entitaId): array
@@ -173,7 +176,7 @@ function dracak_vtt_efekty_souhrn(PDO $pdo, string $typ, int $entitaId): array
     $s = [
         'uc_bonus' => 0, 'oc_bonus' => 0, 'ini_bonus' => 0, 'beh_hexu' => 0,
         'opravy_uc' => [], 'opravy_oc' => [], 'ini_radky' => [], 'ini_duvody' => [],
-        'nemuze_jednat' => null, 'nemuze_branit' => null, 'nehybny' => null, 'tiky' => [],
+        'nemuze_jednat' => null, 'nemuze_branit' => null, 'nehybny' => null, 'zraneni_x_uroven' => null, 'tiky' => [],
     ];
     if (!in_array($typ, ['postava', 'nestvura_instance'], true) || $entitaId <= 0) {
         return $s;
@@ -219,6 +222,7 @@ function dracak_vtt_efekty_souhrn(PDO $pdo, string $typ, int $entitaId): array
                 case 'nemuze_jednat':
                 case 'nemuze_branit':
                 case 'nehybny':
+                case 'zraneni_x_uroven':
                     $s[$sl['druh']] ??= $ae['nazev'];
                     break;
                 case 'tik_zivoty':

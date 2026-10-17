@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../includes/vtt_souboj.php';
 //  - utocnost      (PJ)  útočnost zbraně u útoku
 //  - nebezpecnost  (PJ)  obtížnost hodu proti pasti (hráči ji nevidí)
 //  - zbran_id      (kdo ovládá útočníka) jiná zbraň / jiný útok nestvůry
+//  - nasobek       (PJ)  násobek zranění u obrany spícího / vyřazeného tvora (1–99)
 //  - volba         (kdo ovládá obránce) 'branit' (zbraní, stojí akci) / 'nebranit' (jen brněním, −3)
 // Po hodu už se výzva nemění.
 // Tělo: {mapa_id, vyzva_id, ...pole výše}
@@ -68,6 +69,20 @@ try {
         }
         $d[$pole] = $hodnota;
         $zmeneno[] = $pole;
+    }
+
+    // Násobek zranění (spící / vyřazený) — PJ ho opraví, když se úroveň nestvůry nedala přečíst.
+    if (array_key_exists('nasobek', $data)) {
+        if (!$jePj) {
+            $pdo->rollBack();
+            dracak_vtt_souboj_chyba(403, 'Tohle smí měnit jen PJ.');
+        }
+        if ($v['druh'] !== 'obrana' || empty($d['nasobek_duvod'])) {
+            $pdo->rollBack();
+            dracak_vtt_souboj_chyba(422, 'Násobek zranění se nastavuje jen u obrany spícího tvora.');
+        }
+        $d['nasobek'] = $data['nasobek'] === null || $data['nasobek'] === '' ? null : max(1, min(99, (int)$data['nasobek']));
+        $zmeneno[] = 'nasobek';
     }
 
     if (array_key_exists('zbran_id', $data)) {

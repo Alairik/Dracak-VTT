@@ -25,7 +25,8 @@ UPDATE efekty SET mechanika_stav = 'past' WHERE nazev IN ('Připíchnutí (bodn�
 UPDATE efekty SET mechanika_stav = 'ceka' WHERE nazev IN ('Zesílený sluch', 'Neviditelnost (lektvar)', 'Noční vidění', 'Řeč se zvířaty (lektvar)', 'Oslepení (Malé oko)', 'Nutkání mluvit pravdu (Pravdomluv)', 'Strach');
 UPDATE efekty SET mechanika_stav = 'past' WHERE nazev LIKE 'Otrava (%' OR nazev LIKE 'Protijed proti jedu %';
 
--- 3) Výchozí trvání v kolech (jen tam, kde kniha říká počet kol), kolo seslání se nepočítá (kouzla, h1626 b10848), sčítání trvání.
+-- 3) Výchozí trvání v kolech (jen tam, kde kniha říká počet kol), kolo seslání se nepočítá (kouzla, h1626 b10848; stejně i lektvar
+--    Rychlosti — rozhodnutí uživatele 2026-10-17: kouzlo a lektvar Rychlosti se sčítají jako jeden efekt), sčítání trvání.
 UPDATE efekty SET trvani_kol = 2 WHERE nazev = 'Zastrašen (útěk)';
 UPDATE efekty SET trvani_kol = 4 WHERE nazev = 'Zastrašen (útěk, totální úspěch)';
 UPDATE efekty SET trvani_kol = 1 WHERE nazev = 'Sražen na zem (bojovník)';
@@ -33,7 +34,7 @@ UPDATE efekty SET trvani_kol = 1 WHERE nazev = 'Ochromení (drtivá zbraň troll
 UPDATE efekty SET trvani_kol = 5 WHERE nazev = 'Rychlost (lektvar)';
 UPDATE efekty SET trvani_kol = 5 WHERE nazev = 'Regenerace (lektvar)';
 UPDATE efekty SET trvani_kol = 3 WHERE nazev = 'Běh na krátké vzdálenosti';
-UPDATE efekty SET kolo_se_nepocita = 1 WHERE nazev IN ('Spánek', 'Ochromení', 'Rychlost (kouzlo)', 'Protoplazma');
+UPDATE efekty SET kolo_se_nepocita = 1 WHERE nazev IN ('Spánek', 'Ochromení', 'Rychlost (kouzlo)', 'Protoplazma', 'Rychlost (lektvar)');
 UPDATE efekty SET opakovani = 'secti' WHERE nazev IN ('Rychlost (lektvar)', 'Rychlost (kouzlo)', 'Protoplazma');
 -- Sražení a ochromení trollobijce, krvácení se sčítají (každé zásahy zvlášť) — už mají stackovatelne = 1 (Ochromení trollobijce, Krvácení).
 
@@ -65,6 +66,9 @@ SELECT id, 'nemuze_jednat', NULL, NULL, NULL, NULL, NULL, 'Spánek: tvor nejedn�
 INSERT INTO efekt_slozky (efekt_id, druh, hodnota, pocet_kostek, typ_kostky, pevny_bonus, parametr, poznamka)
 SELECT id, 'nehybny', NULL, NULL, NULL, NULL, NULL, 'h1613 b10736: sám spící se brání jako nehybný' FROM efekty WHERE nazev = 'Spánek'
   AND NOT EXISTS (SELECT 1 FROM efekt_slozky s WHERE s.efekt_id = efekty.id AND s.druh = 'nehybny');
+INSERT INTO efekt_slozky (efekt_id, druh, hodnota, pocet_kostek, typ_kostky, pevny_bonus, parametr, poznamka)
+SELECT id, 'zraneni_x_uroven', NULL, NULL, NULL, NULL, NULL, 'h1613 b10736–b10737: spící jako vyřazený, zranění se násobí úrovní obránce (postava nejvýš 9, nestvůra životaschopností); rozhodnutí uživatele 2026-10-17' FROM efekty WHERE nazev = 'Spánek'
+  AND NOT EXISTS (SELECT 1 FROM efekt_slozky s WHERE s.efekt_id = efekty.id AND s.druh = 'zraneni_x_uroven');
 INSERT INTO efekt_slozky (efekt_id, druh, hodnota, pocet_kostek, typ_kostky, pevny_bonus, parametr, poznamka)
 SELECT id, 'nemuze_jednat', NULL, NULL, NULL, NULL, NULL, 'tooltip efektu: nemůže konat žádné akce ani se bránit' FROM efekty WHERE nazev = 'Ochromení'
   AND NOT EXISTS (SELECT 1 FROM efekt_slozky s WHERE s.efekt_id = efekty.id AND s.druh = 'nemuze_jednat');

@@ -366,13 +366,14 @@ cloumák a ostatní lektvary / svitky s hodinovým nebo směnovým trváním, Po
 bere položka, ne efekt), Trvalé posílení vlastnosti. Ke každému je v knize popis, který PJ vyhodnotí ručně; pokud se něco z toho
 začne hrát často, přidá se mu složka (nový řádek v `efekt_slozky`, bez změny kódu u stávajících druhů složek).
 
-**Otevřené rozhodnutí o hře (čeká na odpověď uživatele):**
-- [ ] Lektvar Rychlosti: počítá se kolo vypití do 5 kol? Kniha (h1626 b10848) říká „kolo seslání se do trvání nepočítá“ jen o kouzlech;
-  kouzlo a lektvar Rychlosti se ale podle popisu sčítají (trvání, ne účinek). Zatím: u kouzla se kolo nepočítá, u lektvaru ano.
-- [ ] Spící tvor jako „vyřazený“: kniha (h1613 b10736–b10737, příklad se spícím Krwellem) násobí zranění úrovní obránce
-  (postavy nejvýš 9, nestvůry životaschopností). Zatím Spánek dává jen „nehybný“ (h1613 b10733); násobek zranění se nepočítá.
+**Rozhodnuto uživatelem 2026-10-17:** (1) lektvar Rychlosti se počítá stejně jako kouzlo — kolo vypití se do trvání nepočítá;
+(2) spící tvor platí jako vyřazený — zranění útoku na něj se násobí úrovní obránce (h1613 b10736–b10737).
+
+**Zbývá (není rozhodnutí o hře, jen nedodělané):**
 - [ ] Kouzlo se hodem proti pasti cíle (Protoplazma, Spánek, Zadrž osobu…): efekt po seslání nenasadí sám, PJ ho přidá po hodu cíle.
   Vlastní výzva pro hod cíle proti pasti zatím chybí.
+- [ ] Útok na tvora vyřazeného životy (mez vyřazení, h1610) a na kouzlícího: h1613 pro ně říká totéž co pro spícího (nehybný,
+  u vyřazeného navíc násobek úrovní), v kódu je to zatím jen u efektů (Spánek, Ochromení).
 
 ## Na kontrolu při proofreadingu (stav 2026-10-14)
 

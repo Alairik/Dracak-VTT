@@ -36,17 +36,15 @@ ním čeká, dokud se to neprovede ručně.
 
 **Ruční DDL blok je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný soubor, ve
 kterém jsou všechny dosud neprovedené DDL příkazy; uživatel ho dostává jako
-text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-16): čeká blok „Efekty s opravdovou
-mechanikou“** (4 sloupce `efekty`, tabulka `efekt_slozky`, 2 sloupce `aktivni_efekty`; bez něj jsou efekty dál jen
-štítky). Po potvrzení, že proběhl, se přesunou **připravené migrace `0091` (zrcadlo DDL) a `0092` (data efektů)** z
-`docs/pripravene-migrace/` do `database/migrations/` (postup v tamním README) — dřív ne, `0092` by na produkci spadla
-a zastavila další migrace. Dosud provedené: tabulky `souboj_vyzva` (migrace `0088`, výzvy k hodu) a `nestvura_staty_sveta`
+text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-17): nic nečeká.** Blok „Efekty s opravdovou
+mechanikou“ (migrace `0091`: 4 sloupce `efekty`, tabulka `efekt_slozky`, 2 sloupce `aktivni_efekty`) uživatel provedl;
+`0091` (zrcadlo DDL) a `0092` (data efektů) jsou v `database/migrations/`. Dosud provedené: tabulky `souboj_vyzva` (migrace `0088`, výzvy k hodu) a `nestvura_staty_sveta`
 (migrace `0090`, malý deník nestvůry) jsou na produkci provedené, hody i deník nestvůry jsou zapnuté.
 Bloky pro `0065`–`0081`, `DROP TABLE` tří mrtvých tabulek z 0008, `0084` (mapa),
 `0085` (souboj, krok 1) i `0086` (souboj, krok 2b: `tokeny.hexu`, tabulky
 `souboj_pohyb` se sloupcem `unava_bodu` a `tvary_tvoru`, efekt „Běh na krátké
 vzdálenosti“) jsou na produkci provedené a `0082` (217 položek ceníku) a `0083`
-proběhly samy přes `migrate.php` (stejně tak `0089` — řádky vícenásobných útoků do iniciativy).
+proběhly samy přes `migrate.php` (stejně tak `0089` — řádky vícenásobných útoků do iniciativy a `0092` — data efektů). Soubor je prázdný, dokud nepřibude další CREATE/ALTER.
 
 Kód je napsaný tak, že funguje i před ručními kroky (chybějící sloupce
 se berou jako "není"), jen se nic z toho nedá ukládat.
@@ -218,14 +216,16 @@ MariaDB.** Postup, který v session fungoval:
   Jen PJ (bestiář je tajný), endpoint `hra/api/nestvura_denik.php`. Bez tabulky je panel jen přehled s vypnutým uložením.
   **Zbývá:** kořist, vybavení nestvůry z katalogu (ÚČ/OČ dopočtem ze zbraně a zbroje), inteligence / charisma /
   pohyblivost / vytrvalost jako hratelná data, kouzla nestvůr, automatický bonus k iniciativě podle „N× za kolo“.
-- **Efekty s opravdovou mechanikou (blok B, krok 5; v kódu hotové a otestované, zapne se ručním SQL, viz „Čeká na ruční spuštění“):**
+- **Efekty s opravdovou mechanikou (blok B, krok 5; hotové a na produkci 2026-10-17, ruční SQL 0091 proběhlo):**
   dřív byl efekt jen text (název, popis, „+2 Iniciativa“ jako věta) a boj ho ignoroval — lektvar Rychlosti na postavě
   nedělal nic. Teď má každý efekt v DB `mechanika_stav` (`auto` boj vyhodnotí všechno sám · `cast` čísla a akce boj, zbytek
   PJ · `pj` jen štítek s popisem · `past` navazuje na pasti a jedy · `ceka` v knize chybí údaj), výchozí `trvani_kol`,
-  `kolo_se_nepocita` (kolo seslání se do trvání nepočítá, h1626 b10848), `opakovani` (`secti` = opakované seslání trvání sčítá,
+  `kolo_se_nepocita` (kolo seslání se do trvání nepočítá, h1626 b10848; stejně i u lektvaru Rychlosti — rozhodnutí uživatele 2026-10-17), `opakovani` (`secti` = opakované seslání trvání sčítá,
   účinek ne — Rychlost, Protoplazma) a **složky v tabulce `efekt_slozky`** (co přesně dělá): `akce_zdvojit`, `akce_pulit`,
   `akce_zmena`, `ini_radek` (řádek Tabulky bonusů a postihů k iniciativě: Kouzlo Rychlost +6, Kouzlo Protoplazma −3, v dalších
-  kolech), `ini_bonus`, `uc_bonus`, `oc_bonus`, `beh_hexu`, `nemuze_jednat`, `nemuze_branit`, `nehybny` (h1613) a `tik_zivoty`
+  kolech), `ini_bonus`, `uc_bonus`, `oc_bonus`, `beh_hexu`, `nemuze_jednat`, `nemuze_branit`, `nehybny` (h1613), `zraneni_x_uroven` (spící jako vyřazený: zranění útoku na něj se násobí jeho
+  úrovní, postava nejvýš ×9, nestvůra životaschopností — h1613 b10736–b10737, rozhodnutí uživatele 2026-10-17; u nestvůry se
+  složeným údajem „3 + 4“ násobek PJ doplní na kartě obrany) a `tik_zivoty`
   (kostky na začátku každého kola). Kód: **`includes/vtt_efekty.php`** (jediné místo, které zapisuje do `aktivni_efekty`:
   `dracak_vtt_efekt_aplikuj`; souhrn mechaniky tvora `dracak_vtt_efekty_souhrn`; odpočet trvání; tiky), napojení v
   `vtt_souboj.php` (iniciativa: efektové bonusy se přičtou samy a ručně zaškrtnutý stejný řádek se nezapočítá podruhé;

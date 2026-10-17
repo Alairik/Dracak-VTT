@@ -1364,6 +1364,13 @@ export function initSouboj(ctx) {
       k.appendChild(el('div', 'vyzva-poznamka', 'Útok ' + (v.utocnik_label || '?') + ': ' + (v.utok_celkem !== null && v.utok_celkem !== undefined ? v.utok_celkem : '?')
         + (v.strana === 'bok' ? ' · útok z boku nebo zezadu' : '')));
       if (v.duvod_nebrani) k.appendChild(el('div', 'vyzva-poznamka', 'Nemůže se bránit zbraní: ' + v.duvod_nebrani + (v.nehybny ? ' (platí jako nehybný)' : '')));
+      if (v.nasobek_duvod) {
+        const n = el('div', 'vyzva-radek');
+        n.appendChild(el('span', '', 'zranění se násobí úrovní (' + v.nasobek_duvod + ')'));
+        if (v.je_pj && v.stav === 'ceka') n.appendChild(poleCisla(v.nasobek, 1, 99, (x) => upravitVyzvu(v, {nasobek: x}), '64px'));
+        else n.appendChild(el('span', 'vyzva-hodnota', v.nasobek ? '×' + v.nasobek : ''));
+        k.appendChild(n);
+      }
       if (v.stav === 'ceka') {
         const volba = el('div', 'vyzva-volba');
         const b1 = tlacitko('Bránit se (stojí akci)', 'btn ' + (v.volba === 'branit' ? 'btn-primary' : 'btn-ghost'), () => upravitVyzvu(v, {volba: 'branit'}),
@@ -1505,7 +1512,7 @@ export function initSouboj(ctx) {
     const kdo = (p.label || 'Někdo') + ' → ' + (p.cil_label || 'někdo');
     k.appendChild(el('strong', '', p.zasah ? 'Zásah! ' + kdo : 'Minul(a). ' + kdo));
     k.appendChild(el('div', 'vyzva-poznamka', 'Útok ' + p.utok + ' proti obraně ' + p.obrana
-      + (p.zasah ? ' → zranění ' + p.zraneni : '')));
+      + (p.zasah ? ' → zranění ' + p.zraneni + (p.nasobek > 1 ? ' (' + p.zraneni_zaklad + ' × ' + p.nasobek + ', ' + p.nasobek_duvod + ')' : (p.nasobek_duvod ? ' (' + p.nasobek_duvod + ': násobí se úrovní)' : '')) : '')));
     if (p.zasah && p.hp_nove !== null && p.hp_nove !== undefined) {
       k.appendChild(el('div', '', (p.cil_label || 'Obránce') + ': ' + p.hp_nove + (p.max_hp ? '/' + p.max_hp : '') + ' životů'
         + (p.vyrazen ? ' — VYŘAZEN(A) z boje' : '')));
@@ -1580,7 +1587,7 @@ export function initSouboj(ctx) {
       }
       case 'souboj_vysledek':
         logLine((p.zasah ? 'Zásah: ' : 'Minul(a): ') + (p.label || 'někdo') + ' → ' + (p.cil_label || 'někdo') + ' — útok ' + p.utok + ' proti obraně ' + p.obrana
-          + (p.zasah ? ', zranění ' + p.zraneni + (p.hp_nove !== null && p.hp_nove !== undefined ? ' (zbývá ' + p.hp_nove + (p.max_hp ? '/' + p.max_hp : '') + ' životů)' : '') : '')
+          + (p.zasah ? ', zranění ' + p.zraneni + (p.nasobek > 1 ? ' (' + p.zraneni_zaklad + ' × ' + p.nasobek + ')' : (p.nasobek_duvod ? ' (násobí se úrovní: ' + p.nasobek_duvod + ')' : '')) + (p.hp_nove !== null && p.hp_nove !== undefined ? ' (zbývá ' + p.hp_nove + (p.max_hp ? '/' + p.max_hp : '') + ' životů)' : '') : '')
           + (p.vyrazen ? ' — VYŘAZEN(A)' : ''));
         ukazVysledek(p);
         break;

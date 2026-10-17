@@ -197,7 +197,7 @@ function dracak_vtt_souboj_bojovnik(PDO $pdo, array $infoTokenu): array
         'typ' => $infoTokenu['typ_entity'], 'entita_id' => $infoTokenu['entita_id'], 'label' => $infoTokenu['label'],
         'velikost' => null, 'odolnost' => null, 'hp' => 0, 'max_hp' => 0, 'bojeschopnost' => null,
         'nalozeni_velke' => false, 'zbrane' => [], 'oc' => null, 'stit' => false, 'oz' => null, 'oz_nazev' => null,
-        'uc_text' => null, 'oc_text' => null, 'bonus_obratnost' => null,
+        'uc_text' => null, 'oc_text' => null, 'bonus_obratnost' => null, 'uroven_nasobek' => null,
         'efekty' => dracak_vtt_efekty_souhrn(
             $pdo, (string)$infoTokenu['typ_entity'], (int)$infoTokenu['entita_id']
         ),
@@ -214,6 +214,8 @@ function dracak_vtt_souboj_bojovnik(PDO $pdo, array $infoTokenu): array
         $b['odolnost'] = $d['stupne']['odolnost'];
         $b['hp'] = (int)$p['aktualni_hp'];
         $b['max_hp'] = (int)$p['max_hp'];
+        // Násobek zranění útoku na vyřazeného / spícího (h1613 b10736): úroveň postavy, nejvýš 9.
+        $b['uroven_nasobek'] = max(1, min(9, (int)($p['uroven'] ?? 1)));
         $b['bojeschopnost'] = $d['bojeschopnost'];
         $b['nalozeni_velke'] = in_array($d['pohyblivost']['nalozeni']['kod'] ?? null, ['velke', 'prilis_velke'], true);
         foreach ($d['zbrane'] as $z) {
@@ -234,7 +236,7 @@ function dracak_vtt_souboj_bojovnik(PDO $pdo, array $infoTokenu): array
         return $b;
     }
     $q = $pdo->prepare(
-        'SELECT ni.nestvura_id, ni.aktualni_hp, ni.max_hp, n.velikost, n.uc, n.oc, n.odolnost
+        'SELECT ni.nestvura_id, ni.aktualni_hp, ni.max_hp, n.velikost, n.uc, n.oc, n.odolnost, n.zivotaschopnost
          FROM nestvura_instance ni JOIN nestvury n ON n.id = ni.nestvura_id WHERE ni.id = ?'
     );
     $q->execute([$infoTokenu['entita_id']]);
@@ -248,6 +250,8 @@ function dracak_vtt_souboj_bojovnik(PDO $pdo, array $infoTokenu): array
     $st = $s['staty'];
     $velikostText = trim(dracak_vtt_text_cisla((string)$n['velikost']));
     $b['velikost'] = $st['velikost'];
+    // U nestvůry se zranění násobí životaschopností bez omezení; jen čisté číslo (u „3 + 4“ se nehádá, doplní PJ).
+    $b['uroven_nasobek'] = preg_match('/^\s*(\d{1,3})\s*$/', (string)$n['zivotaschopnost'], $mz) && (int)$mz[1] >= 1 ? (int)$mz[1] : null;
     $b['velikost_text'] = $velikostText !== '' ? $velikostText : null;
     $b['odolnost'] = $st['odolnost'];
     $b['hp'] = (int)$n['aktualni_hp'];
@@ -546,6 +550,14 @@ function dracak_vtt_obrana_zaloz(PDO $pdo, array $mapa, array $info, array $utok
     if ($nehybny !== null && $obr['typ'] !== 'postava') {
         $upozorneni[] = 'Nehybná nestvůra: odečten postih −5 (v OČ nestvůry nevím, kolik je bonus za obratnost) — uprav v opravě, kdyby to bylo jinak.';
     }
+    // Spící (a podobný) obránce: výsledné zranění se násobí jeho úrovní (h1613 b10736–b10737).
+    $nasobekDuvod = $ef['zraneni_x_uroven'];
+    $nasobek = $nasobekDuvod !== null ? $obr['uroven_nasobek'] : null;
+    if ($nasobekDuvod !== null) {
+        $upozorneni[] = $nasobek !== null
+            ? 'Zranění ' . $obr['label'] . ' se násobí ×' . $nasobek . ' (' . $nasobekDuvod . ', jako útok na vyřazeného).'
+            : 'Zranění ' . $obr['label'] . ' se má násobit úrovní (' . $nasobekDuvod . '), ale životaschopnost nestvůry není jedno číslo — nastav násobek.';
+    }
     $hintDenik = dracak_vtt_tokeny_funkce()['denik_nestvur'] ? ' (nejlíp v deníku nestvůry v panelu tokenu, pak platí pro celý druh)' : '';
     if ($obr['oc'] === null) {
         $upozorneni[] = $obr['typ'] === 'postava'
@@ -563,6 +575,8 @@ function dracak_vtt_obrana_zaloz(PDO $pdo, array $mapa, array $info, array $utok
         'zaklad_nazev' => 'OČ',
         'stit' => $nehybny !== null ? false : $obr['stit'],
         'nehybny' => $nehybny,
+        'nasobek' => $nasobek,
+        'nasobek_duvod' => $nasobekDuvod,
         'bonus_obratnost' => $obr['bonus_obratnost'],
         'efekt_opravy' => $ef['opravy_oc'],
         'duvod_nebrani' => $duvodNebrani,
@@ -621,7 +635,9 @@ function dracak_vtt_utok_vyhodnot(PDO $pdo, array $mapa, array $info, array $uto
     $obrana = (int)$obranaVyzva['data']['celkem'];
     $utocnost = (int)($utokVyzva['data']['utocnost'] ?? 0);
     $zasah = $utok >= $obrana;
-    $zraneni = $zasah ? max(1, $utok - $obrana + $utocnost) : 0;
+    $zraneniZaklad = $zasah ? max(1, $utok - $obrana + $utocnost) : 0;
+    $nasobek = max(1, (int)($obranaVyzva['data']['nasobek'] ?? 1));
+    $zraneni = $zraneniZaklad * $nasobek;
     $obrId = (int)$obranaVyzva['token_id'];
     $utId = (int)$utokVyzva['token_id'];
 
@@ -642,6 +658,9 @@ function dracak_vtt_utok_vyhodnot(PDO $pdo, array $mapa, array $info, array $uto
     $vysledek = [
         'zasah' => $zasah,
         'zraneni' => $zraneni,
+        'zraneni_zaklad' => $zraneniZaklad,
+        'nasobek' => $nasobek,
+        'nasobek_duvod' => $nasobek > 1 ? ($obranaVyzva['data']['nasobek_duvod'] ?? null) : null,
         'utok' => $utok,
         'obrana' => $obrana,
         'utocnost' => $utocnost,
@@ -659,6 +678,10 @@ function dracak_vtt_utok_vyhodnot(PDO $pdo, array $mapa, array $info, array $uto
     // Do události jen to, co smí vidět každý: útočnost zbraně a životy skrytého obránce ne.
     $verejne = $vysledek;
     unset($verejne['utocnost']);
+    if ($info[$obrId]['typ_entity'] !== 'postava') {
+        // Násobek nestvůry je její životaschopnost — tajná jako bestiář; zůstane jen důvod („Spánek“).
+        unset($verejne['nasobek'], $verejne['zraneni_zaklad']);
+    }
     if (!$info[$obrId]['viditelny']) {
         $verejne['hp_pred'] = $verejne['hp_nove'] = $verejne['max_hp'] = null;
         $verejne['vyrazen'] = false;
@@ -725,7 +748,12 @@ function dracak_vtt_vyzvy_klient(PDO $pdo, array $user, bool $jePj, array $info,
             $radek['volba'] = $d['volba'] ?? null;
             $radek['muze_branit'] = !empty($d['muze_branit']);
             $radek['duvod_nebrani'] = $d['duvod_nebrani'] ?? null;
+            $radek['nasobek'] = $d['nasobek'] ?? null;
+            $radek['nasobek_duvod'] = $d['nasobek_duvod'] ?? null;
             $radek['nehybny'] = !empty($d['nehybny']);
+            if (!$jePj && isset($info[$t]) && $info[$t]['typ_entity'] !== 'postava') {
+                $radek['nasobek'] = null;   // násobek nestvůry = její životaschopnost, hráč ji nevidí
+            }
             $radek['utok_celkem'] = $d['utok_celkem'] ?? null;
             $radek['utocnik_label'] = $jePj || ($c !== null && $cViditelny) ? ($d['utocnik_label'] ?? null) : 'Neznámý tvor';
             $radek['smi_volit'] = $ovlada && $v['stav'] === 'ceka';
