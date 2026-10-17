@@ -398,8 +398,15 @@ začne hrát často, přidá se mu složka (nový řádek v `efekt_slozky`, bez 
   (kromě těžké kuše). Přičte se samo při úmyslu Útok (zbraň tváří v tvář) nebo Střelba (střelná / vrhací zbraň), jen se zbraní, o které
   katalog ví, jak se drží; nahrazuje pole „útoků za 2 kola“ a zavazuje ke slibu úkonu stejně jako ono. Úroveň a zbraň se čtou z deníku postavy.
   **Zbývá:**
-  - [ ] **Těžká kuše u bojovníka** (b992 „těžká kuše ztrácí postih“, b994 „+3 iniciativa“): kniha u těch řádků nemá úroveň. Nepočítá se, platí jen
-    postih −3 za zbraň. Nejpravděpodobnější výklad (čistě podle řazení řádků): od 12. úrovně bez postihu, od 24. úrovně +3 — čeká na potvrzení.
+  - [x] **Těžká kuše u bojovníka** (b992 „těžká kuše ztrácí postih“, b994 „+3 iniciativa“): úroveň v knize není, uživatel 2026-10-17 potvrdil výklad
+    „o stupeň pozadu“: od **12. úrovně** ztrácí postih −3 (= 0), od **24. úrovně** má +3 (stejné úrovně jako ostatní střelné zbraně).
+    Hotovo jako dvojice záznamů: výjimka postihu (`DRACAK_VTT_INI_POSTIH_VYJIMKY`, od 12.) + bonus pro zbraň (`DRACAK_VTT_INI_BONUSY_POVOLANI`, od 24.,
+    ostatní střelné řádky mají `krome => Těžká kuše`). **Obecné pravidlo (uživatel):** platí u každého povolání a každé zbraně, která je ve výčtu
+    bonusů vynechaná kvůli vlastnímu postihu — zbraň jde o jeden stupeň pozadu (první stupeň: bez postihu, druhý: bonus prvního). Příklady k
+    případnému doplnění: **Šermíř** (b1084: střelné a vrhací zbraně od 10. úrovně +3, od 20. +6; těžká kuše „jednou za kolo“ → „třikrát za dvě kola“
+    = 0 → +3; kniha ale u něj výslovně neříká, že kuše ztrácí postih −3, ani neuvádí zbytek jeho tabulky tak jednoznačně jako u bojovníka),
+    **Stopař stínů / Lovec stínů** (b7145–b7147: kuše +3 / +6 / +9 od 7. / 12. / 18. úrovně; Arbalest je zbraň vyvinutá pro stopaře, h939) — zatím
+    se neřeší, přidá se stejným způsobem, až bude jasné, které zbraně jsou vynechané.
   - [ ] **Ostatní povolání** mají vlastní tabulky bonusů k iniciativě podle úrovně a zbraně (Šermíř b1082–b1085, Rytíř b8253, Paladin b8309, Lovec
     stínů b7148–b7152, Lupič b5566, b5634, b5729, b5916, Sicco b5780 …). Zadávají se dál polem „útoků za 2 kola“ (nebo „jiný bonus“). Až budou
     potřeba, přidají se jako další záznam v `DRACAK_VTT_INI_BONUSY_POVOLANI` — mechanismus (nejvyšší platný řádek podle úrovně a druhu zbraně)

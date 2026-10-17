@@ -491,6 +491,9 @@ const DRACAK_VTT_INI_POSTIH_VYJIMKY = [
     ['povolani' => ['Bojovník'], 'od' => 6, 'rozsah' => 'tvt', 'zdroj' => 'h139, b932'],
     ['povolani' => ['Šermíř'], 'od' => 8, 'zbrane' => ['Obouruční meč'], 'zdroj' => 'h156, b1086'],
     ['povolani' => ['Lovec stínů'], 'od' => 7, 'rozsah' => 'tvt', 'zdroj' => 'b7148'],
+    // Bojovník, b992: „Těžká kuše ztrácí postih k iniciativě“ — úroveň potvrdil uživatel 2026-10-17: stejná, od které ostatní střelné zbraně
+    // dostávají +3 (12.), takže kuše má od 12. úrovně 0 a od 24. úrovně +3 (bonus: DRACAK_VTT_INI_BONUSY_POVOLANI).
+    ['povolani' => ['Bojovník'], 'od' => 12, 'zbrane' => ['Těžká kuše'], 'zdroj' => 'h139, b992'],
     // Poznámky pod tabulkou supertěžkých zbraní (b14822–b14827) — úroveň neuvádí, supertěžké zbraně se ale nesmí učit na 1. úrovni.
     // „Podobná meči“ = DRACAK_VTT_MECE_SUPERTEZKE (seznam potvrdil uživatel 2026-10-17); rozsah se týká jen supertěžkých zbraní.
     ['povolani' => ['Bojovník'], 'od' => 1, 'rozsah' => 'supertezke_nepodobne_mecum', 'zdroj' => 'tabulka supertěžkých zbraní'],
@@ -517,9 +520,12 @@ const DRACAK_VTT_ZBRAN_CHVATY = ['jednoruci' => 'jednoruční', 'obourucni' => '
 // Bonusy povolání k iniciativě za vícenásobné útoky podle úrovně a druhu zbraně (mimo Tabulku vícenásobných útoků, kterou je
 // jinak třeba zadat polem „útoků za 2 kola“). Hodnoty +3 … +12 jsou řádky té tabulky, takže se NESČÍTAJÍ: platí nejvyšší, který
 // úroveň a zbraň dovolí. Bojovník — homebrew „Koncentrovaná povolání / Válečník – Bojovník“ (h139, b985–b991, b993); „obouruční“
-// je jednokusá zbraň držená oběma rukama, „jednoruční“ i kombinace dvou zbraní. Těžká kuše (b992, b994) se sem nepočítá: kniha u ní
-// neříká úroveň, platí jen její postih −3 (viz docs/kontrolni-seznam-neuplnych-mist.md).
-// 'druh': tvt = jakákoli zbraň pro boj tváří v tvář, obourucni, jednoruci, strelna = střelné a vrhací zbraně kromě těžké kuše.
+// je jednokusá zbraň držená oběma rukama, „jednoruční“ i kombinace dvou zbraní.
+// Zbraň s vlastním postihem, kterou řádek vynechává ('krome'), jde o jeden stupeň pozadu: o stupeň dřív ztratí postih (výjimka v
+// DRACAK_VTT_INI_POSTIH_VYJIMKY) a o stupeň později dostane bonus předchozího stupně ('zbrane'). Těžká kuše Bojovníka (b992, b994):
+// od 12. úrovně bez postihu = 0, od 24. úrovně +3 (potvrdil uživatel 2026-10-17; „tak to platí u každého, kdo by měl takové omezení“ —
+// další povolání a zbraně (Arbalest…) se přidají stejnou dvojicí záznamů).
+// 'druh': tvt = jakákoli zbraň pro boj tváří v tvář, obourucni, jednoruci, strelna = střelné a vrhací zbraně (kromě 'krome').
 const DRACAK_VTT_INI_BONUSY_POVOLANI = [
     'Bojovník' => [
         ['od' => 5, 'bonus' => 3, 'druh' => 'tvt', 'zdroj' => 'b985'],
@@ -528,8 +534,9 @@ const DRACAK_VTT_INI_BONUSY_POVOLANI = [
         ['od' => 16, 'bonus' => 9, 'druh' => 'obourucni', 'zdroj' => 'b988'],
         ['od' => 27, 'bonus' => 12, 'druh' => 'obourucni', 'zdroj' => 'b989'],
         ['od' => 28, 'bonus' => 9, 'druh' => 'jednoruci', 'zdroj' => 'b990'],
-        ['od' => 12, 'bonus' => 3, 'druh' => 'strelna', 'zdroj' => 'b991'],
-        ['od' => 24, 'bonus' => 6, 'druh' => 'strelna', 'zdroj' => 'b993'],
+        ['od' => 12, 'bonus' => 3, 'druh' => 'strelna', 'krome' => ['Těžká kuše'], 'zdroj' => 'b991'],
+        ['od' => 24, 'bonus' => 6, 'druh' => 'strelna', 'krome' => ['Těžká kuše'], 'zdroj' => 'b993'],
+        ['od' => 24, 'bonus' => 3, 'zbrane' => ['Těžká kuše'], 'zdroj' => 'b994'],
     ],
 ];
 
@@ -637,14 +644,17 @@ function dracak_vtt_iniciativa_trida_bonus(PDO $pdo, array $postava, ?string $um
     }
     $strelna = $z['dostrel_maly'] !== null || preg_match('/vrhaci|strelna/', (string)($z['kategorie_zbrane'] ?? ''));
     $chvat = (string)($z['chvat'] ?? '');
-    if ($strelna ? $umysl !== 'strelba' || $z['nazev'] === 'Těžká kuše' : ($umysl !== 'utok' || $chvat === '')) {
+    if ($strelna ? $umysl !== 'strelba' : ($umysl !== 'utok' || $chvat === '')) {
         return null;
     }
     $druhy = $strelna ? ['strelna'] : ['tvt', $chvat === 'obourucni' ? 'obourucni' : 'jednoruci'];
     $uroven = (int)($postava['uroven'] ?? 1);
     $nejlepsi = null;
     foreach ($pravidla as $r) {
-        if ($uroven >= $r['od'] && in_array($r['druh'], $druhy, true) && ($nejlepsi === null || $r['bonus'] > $nejlepsi['bonus'])) {
+        $sedi = isset($r['zbrane'])
+            ? in_array($z['nazev'], $r['zbrane'], true)
+            : in_array($r['druh'], $druhy, true) && !in_array($z['nazev'], $r['krome'] ?? [], true);
+        if ($uroven >= $r['od'] && $sedi && ($nejlepsi === null || $r['bonus'] > $nejlepsi['bonus'])) {
             $nejlepsi = $r;
         }
     }
