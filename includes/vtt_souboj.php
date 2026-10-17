@@ -355,13 +355,17 @@ function dracak_vtt_iniciativa_utoku(?array $ucastnik): ?int
 
 // Úkon, za který tvor dostal kladný bonus k iniciativě, a tedy ho musí dělat jako první akci a aspoň polovinu akcí kola
 // (h1622): kouzlení (+1) nebo vícenásobné útoky při úmyslu Útok / Střelba. Jinak null (žádný bonus, žádný závazek).
-function dracak_vtt_iniciativa_zavazek(?array $ucastnik): ?string
+function dracak_vtt_iniciativa_zavazek(?array $ucastnik, ?int $tridaBonus = null): ?string
 {
     if ($ucastnik === null || !dracak_vtt_iniciativa_v2()) {
         return null;
     }
     if (($ucastnik['umysl'] ?? null) === 'kouzleni') {
         return 'kouzleni';
+    }
+    // Bonus povolání za vícenásobné útoky (Bojovník…) zavazuje stejně jako pole „útoků za 2 kola“.
+    if ($tridaBonus !== null && $tridaBonus > 0 && in_array($ucastnik['umysl'] ?? null, DRACAK_VTT_INI_UMYSLY_UTOKU, true)) {
+        return (string)$ucastnik['umysl'];
     }
     return dracak_vtt_iniciativa_utoku($ucastnik) !== null ? (string)$ucastnik['umysl'] : null;
 }
@@ -505,23 +509,73 @@ const DRACAK_VTT_MECE_SUPERTEZKE = [
     'Odachi', 'Flamberg', 'Warglaive', 'Obouruční meč (super těžký jednoruční)', 'Dvě katany', 'Dva dlouhé meče', 'Dvakrát warglaive',
 ];
 const DRACAK_VTT_ZBRAN_TRIDY = ['lehka' => 'lehká', 'stredni' => 'střední', 'tezka' => 'těžká', 'supertezka' => 'supertěžká'];
-const DRACAK_VTT_ZBRAN_CHVATY = ['jednoruci' => 'jednoruční', 'obourucni' => 'obouruční'];
+// kombinace = dvě jednoruční zbraně v obou rukách (Dvě dýky, Kord + dýka…): tabulka zbraní je řadí k obouručním, ale pro bonusy
+// povolání platí jako jednoruční (Bojovník, h139 b987 „jednoruční zbraně, včetně kombinací“; rozhodnutí uživatele 2026-10-17).
+// obourucni = jen jednokusá zbraň držená oběma rukama.
+const DRACAK_VTT_ZBRAN_CHVATY = ['jednoruci' => 'jednoruční', 'obourucni' => 'obouruční', 'kombinace' => 'kombinace'];
+
+// Bonusy povolání k iniciativě za vícenásobné útoky podle úrovně a druhu zbraně (mimo Tabulku vícenásobných útoků, kterou je
+// jinak třeba zadat polem „útoků za 2 kola“). Hodnoty +3 … +12 jsou řádky té tabulky, takže se NESČÍTAJÍ: platí nejvyšší, který
+// úroveň a zbraň dovolí. Bojovník — homebrew „Koncentrovaná povolání / Válečník – Bojovník“ (h139, b985–b991, b993); „obouruční“
+// je jednokusá zbraň držená oběma rukama, „jednoruční“ i kombinace dvou zbraní. Těžká kuše (b992, b994) se sem nepočítá: kniha u ní
+// neříká úroveň, platí jen její postih −3 (viz docs/kontrolni-seznam-neuplnych-mist.md).
+// 'druh': tvt = jakákoli zbraň pro boj tváří v tvář, obourucni, jednoruci, strelna = střelné a vrhací zbraně kromě těžké kuše.
+const DRACAK_VTT_INI_BONUSY_POVOLANI = [
+    'Bojovník' => [
+        ['od' => 5, 'bonus' => 3, 'druh' => 'tvt', 'zdroj' => 'b985'],
+        ['od' => 10, 'bonus' => 6, 'druh' => 'obourucni', 'zdroj' => 'b986'],
+        ['od' => 15, 'bonus' => 6, 'druh' => 'jednoruci', 'zdroj' => 'b987'],
+        ['od' => 16, 'bonus' => 9, 'druh' => 'obourucni', 'zdroj' => 'b988'],
+        ['od' => 27, 'bonus' => 12, 'druh' => 'obourucni', 'zdroj' => 'b989'],
+        ['od' => 28, 'bonus' => 9, 'druh' => 'jednoruci', 'zdroj' => 'b990'],
+        ['od' => 12, 'bonus' => 3, 'druh' => 'strelna', 'zdroj' => 'b991'],
+        ['od' => 24, 'bonus' => 6, 'druh' => 'strelna', 'zdroj' => 'b993'],
+    ],
+];
 
 function dracak_vtt_zbrane_ini(): bool
 {
     return dracak_vtt_tokeny_funkce()['zbrane_ini'];
 }
 
-// Kdo postih zbraně nemá (text pro log), nebo null. $zbran = řádek predmety (nazev, kategorie_zbrane, dostrel_maly).
-function dracak_vtt_iniciativa_zbran_vyjimka(PDO $pdo, array $postava, array $zbran): ?string
+// Zbraň v ruce postavy (řádek predmety s údaji pro iniciativu) nebo null.
+function dracak_vtt_iniciativa_drzena_zbran(PDO $pdo, array $postava): ?array
+{
+    if (empty($postava['drzena_zbran_id'])) {
+        return null;
+    }
+    $q = $pdo->prepare("SELECT nazev, ini_postih, chvat, trida_zbrane, kategorie_zbrane, dostrel_maly FROM predmety WHERE id = ? AND typ = 'zbran'");
+    $q->execute([(int)$postava['drzena_zbran_id']]);
+    return $q->fetch() ?: null;
+}
+
+function dracak_vtt_postava_povolani_nazev(PDO $pdo, array $postava): ?string
 {
     if (empty($postava['povolani_id'])) {
         return null;
     }
     $q = $pdo->prepare('SELECT nazev FROM povolani WHERE id = ?');
     $q->execute([(int)$postava['povolani_id']]);
-    $povolani = $q->fetchColumn();
-    if ($povolani === false) {
+    $n = $q->fetchColumn();
+    return $n === false ? null : (string)$n;
+}
+
+// „těžká obouruční zbraň“, „lehká kombinace“ — druh zbraně pro log; prázdné, když zbraň třídu ani držení nemá.
+function dracak_vtt_zbran_druh_text(array $z): string
+{
+    $trida = DRACAK_VTT_ZBRAN_TRIDY[$z['trida_zbrane'] ?? ''] ?? '';
+    $chvat = DRACAK_VTT_ZBRAN_CHVATY[$z['chvat'] ?? ''] ?? '';
+    if ($trida === '' && $chvat === '') {
+        return '';
+    }
+    return trim($trida . ' ' . $chvat) . (($z['chvat'] ?? '') === 'kombinace' ? ' dvou zbraní' : ' zbraň');
+}
+
+// Kdo postih zbraně nemá (text pro log), nebo null. $zbran = řádek predmety (nazev, kategorie_zbrane, dostrel_maly).
+function dracak_vtt_iniciativa_zbran_vyjimka(PDO $pdo, array $postava, array $zbran): ?string
+{
+    $povolani = dracak_vtt_postava_povolani_nazev($pdo, $postava);
+    if ($povolani === null) {
         return null;
     }
     $uroven = (int)($postava['uroven'] ?? 1);
@@ -550,23 +604,67 @@ function dracak_vtt_iniciativa_zbran_vyjimka(PDO $pdo, array $postava, array $zb
 // když žádný není (nic nedrží, zbraň postih nemá, úmysl není boj se zbraní).
 function dracak_vtt_iniciativa_zbran(PDO $pdo, array $postava, ?string $umysl): ?array
 {
-    if (empty($postava['drzena_zbran_id']) || ($umysl !== null && !in_array($umysl, DRACAK_VTT_INI_POSTIH_UMYSLY, true))) {
+    if ($umysl !== null && !in_array($umysl, DRACAK_VTT_INI_POSTIH_UMYSLY, true)) {
         return null;
     }
-    $q = $pdo->prepare("SELECT nazev, ini_postih, chvat, trida_zbrane, kategorie_zbrane, dostrel_maly FROM predmety WHERE id = ? AND typ = 'zbran'");
-    $q->execute([(int)$postava['drzena_zbran_id']]);
-    $z = $q->fetch();
+    $z = dracak_vtt_iniciativa_drzena_zbran($pdo, $postava);
     if (!$z || $z['ini_postih'] === null || (int)$z['ini_postih'] === 0) {
         return null;
     }
     $postih = (int)$z['ini_postih'];
-    $druh = trim((DRACAK_VTT_ZBRAN_TRIDY[$z['trida_zbrane']] ?? '') . ' ' . (DRACAK_VTT_ZBRAN_CHVATY[$z['chvat']] ?? ''));
-    $nazev = $z['nazev'] . ($druh !== '' ? ' (' . $druh . ' zbraň)' : '');
+    $druh = dracak_vtt_zbran_druh_text($z);
+    $nazev = $z['nazev'] . ($druh !== '' ? ' (' . $druh . ')' : '');
     $vyjimka = dracak_vtt_iniciativa_zbran_vyjimka($pdo, $postava, $z);
     if ($vyjimka !== null) {
         return ['postih' => 0, 'popis' => $nazev . ': postih ' . ($postih < 0 ? '−' : '+') . abs($postih) . ' zrušen (' . $vyjimka . ')'];
     }
     return ['postih' => $postih, 'popis' => $nazev . ': ' . ($postih < 0 ? '−' : '+') . abs($postih)];
+}
+
+// Bonus povolání k iniciativě za vícenásobné útoky (DRACAK_VTT_INI_BONUSY_POVOLANI): ['bonus' => int, 'popis' => text] nebo null.
+// Jen při ohlášeném úmyslu — Útok se zbraní pro boj tváří v tvář, Střelba se střelnou nebo vrhací zbraní — a se zbraní,
+// o které katalog ví, jak se drží (zbraň bez údaje o držení bonus nedostane). Nahrazuje ruční pole „útoků za 2 kola“.
+function dracak_vtt_iniciativa_trida_bonus(PDO $pdo, array $postava, ?string $umysl): ?array
+{
+    if (!in_array($umysl, DRACAK_VTT_INI_UMYSLY_UTOKU, true)) {
+        return null;
+    }
+    $povolani = dracak_vtt_postava_povolani_nazev($pdo, $postava);
+    $pravidla = $povolani !== null ? (DRACAK_VTT_INI_BONUSY_POVOLANI[$povolani] ?? null) : null;
+    $z = $pravidla !== null ? dracak_vtt_iniciativa_drzena_zbran($pdo, $postava) : null;
+    if ($z === null) {
+        return null;
+    }
+    $strelna = $z['dostrel_maly'] !== null || preg_match('/vrhaci|strelna/', (string)($z['kategorie_zbrane'] ?? ''));
+    $chvat = (string)($z['chvat'] ?? '');
+    if ($strelna ? $umysl !== 'strelba' || $z['nazev'] === 'Těžká kuše' : ($umysl !== 'utok' || $chvat === '')) {
+        return null;
+    }
+    $druhy = $strelna ? ['strelna'] : ['tvt', $chvat === 'obourucni' ? 'obourucni' : 'jednoruci'];
+    $uroven = (int)($postava['uroven'] ?? 1);
+    $nejlepsi = null;
+    foreach ($pravidla as $r) {
+        if ($uroven >= $r['od'] && in_array($r['druh'], $druhy, true) && ($nejlepsi === null || $r['bonus'] > $nejlepsi['bonus'])) {
+            $nejlepsi = $r;
+        }
+    }
+    if ($nejlepsi === null) {
+        return null;
+    }
+    $druh = dracak_vtt_zbran_druh_text($z);
+    return [
+        'bonus' => (int)$nejlepsi['bonus'],
+        'popis' => $povolani . ' od ' . $nejlepsi['od'] . '. úrovně, ' . $z['nazev'] . ($druh !== '' ? ' (' . $druh . ')' : '') . ': +' . $nejlepsi['bonus'],
+    ];
+}
+
+// Totéž podle id postavy (pro klienta).
+function dracak_vtt_iniciativa_trida_bonus_postavy(PDO $pdo, int $postavaId, ?string $umysl): ?array
+{
+    $q = $pdo->prepare('SELECT * FROM postavy WHERE id = ?');
+    $q->execute([$postavaId]);
+    $p = $q->fetch();
+    return $p ? dracak_vtt_iniciativa_trida_bonus($pdo, $p, $umysl) : null;
 }
 
 // Modifikátor k hodu na iniciativu = součet vybraných řádků Tabulky bonusů a
@@ -578,6 +676,7 @@ function dracak_vtt_iniciativa_modifikator(PDO $pdo, array $token, array $bonusI
 {
     $auto = ['popisy' => [], 'skupiny' => ['unava' => false, 'nalozeni' => false], 'upozorneni' => []];
     $zbran = null;
+    $trida = null;
     if ($token['typ_entity'] === 'postava') {
         $stmt = $pdo->prepare('SELECT * FROM postavy WHERE id = ?');
         $stmt->execute([(int)$token['entita_id']]);
@@ -588,6 +687,13 @@ function dracak_vtt_iniciativa_modifikator(PDO $pdo, array $token, array $bonusI
             if ($ucastnik !== null && dracak_vtt_zbrane_ini()) {
                 $auto['skupiny']['zbran'] = true;
                 $zbran = dracak_vtt_iniciativa_zbran($pdo, $postavaRow, $ucastnik['umysl'] ?? null);
+                // Bonus povolání za vícenásobné útoky nahrazuje ruční pole „útoků za 2 kola“ (jinak by se počítal dvakrát).
+                if (dracak_vtt_iniciativa_v2()) {
+                    $trida = dracak_vtt_iniciativa_trida_bonus($pdo, $postavaRow, $ucastnik['umysl'] ?? null);
+                    if ($trida !== null) {
+                        $navic = array_values(array_diff($navic, DRACAK_VTT_INI_UTOKY));
+                    }
+                }
             }
         }
     }
@@ -635,13 +741,14 @@ function dracak_vtt_iniciativa_modifikator(PDO $pdo, array $token, array $bonusI
     // TINYINT sloupec (-128..127) — jen ochrana proti přetečení, ne pravidlová hranice.
     $efektyBonus = $ef !== null ? $ef['ini_bonus'] : 0;
     $efektyDuvody = $ef !== null ? $ef['ini_duvody'] : [];
-    $zbranBonus = $zbran !== null ? $zbran['postih'] : 0;
-    $zbranDuvody = $zbran !== null ? [$zbran['popis']] : [];
+    $zbranBonus = ($zbran !== null ? $zbran['postih'] : 0) + ($trida !== null ? $trida['bonus'] : 0);
+    $zbranDuvody = array_merge($zbran !== null ? [$zbran['popis']] : [], $trida !== null ? [$trida['popis']] : []);
     $modifikator = max(-100, min(100, (int)array_sum(array_column($vsechny, 'bonus')) + $jinyBonus + $efektyBonus + $zbranBonus));
     return [
         'modifikator' => $modifikator,
         'popisy' => array_merge($popisy, array_map(fn($t) => $t . ' (automaticky)', array_merge($efektyDuvody, $zbranDuvody))),
         'bez_akci' => $ef['nemuze_jednat'] ?? null,
+        'trida_bonus' => $trida,
         'automaticke' => array_merge(array_column($automaticke, 'popis'), $efektyDuvody, $zbranDuvody),
         'ignorovano' => $ignorovane,
         'upozorneni' => $auto['upozorneni'],
@@ -697,7 +804,7 @@ function dracak_vtt_souboj_klient(PDO $pdo, array $user, array $mapa, bool $jePj
     $viditelny = function (int $tokenId) use ($info, $jePj): bool {
         return isset($info[$tokenId]) && ($jePj || dracak_vtt_souboj_vidi_hrac($info[$tokenId]));
     };
-    $sestav = function (int $tokenId) use ($info, $ucastniciDb, $kiPoTokenu, $user, $jePj, $polovina): array {
+    $sestav = function (int $tokenId) use ($pdo, $info, $ucastniciDb, $kiPoTokenu, $user, $jePj, $polovina): array {
         $i = $info[$tokenId];
         $u = $ucastniciDb[$tokenId] ?? null;
         $ki = $kiPoTokenu[$tokenId] ?? null;
@@ -720,6 +827,9 @@ function dracak_vtt_souboj_klient(PDO $pdo, array $user, array $mapa, bool $jePj
             'akce_zbyvajici' => $ki ? $ki['akce_zbyvajici'] : null,
             'kvota' => $ki ? dracak_vtt_souboj_kvota($ki['akce_celkem'], $ki['akce_zbyvajici'], $polovina) : null,
             // Iniciativa v2: kolik útoků za 2 kola tvor umí a slíbený úkon (kouzlení / útok / střelba) s počty akcí.
+            // Bonus povolání za vícenásobné útoky (Bojovník…) podle úrovně a zbraně v ruce — nahrazuje pole „útoků za 2 kola“.
+            'ini_trida' => $u && $i['typ_entity'] === 'postava' && dracak_vtt_iniciativa_v2() && dracak_vtt_zbrane_ini()
+                ? dracak_vtt_iniciativa_trida_bonus_postavy($pdo, (int)$i['entita_id'], $u['umysl'] ?? null) : null,
             'utoku_za_2_kola' => $u && isset($u['utoku_za_2_kola']) && $u['utoku_za_2_kola'] !== null ? (int)$u['utoku_za_2_kola'] : null,
             'zavazek' => $ki && !empty($ki['zavazek']) ? (string)$ki['zavazek'] : null,
             'zavazek_akci' => $ki && !empty($ki['zavazek']) ? (int)$ki['zavazek_akci'] : null,

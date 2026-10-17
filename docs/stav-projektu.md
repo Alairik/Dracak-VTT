@@ -40,7 +40,7 @@ text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-17): nic ne
 uživatel provedl (kontrolní SELECT vyšel 1, 4, 3) po tom, co první „sql proběhlo“ nesedělo — deploy po předčasném přesunu `0093`
 skončil na `1142 ALTER denied`, takže sloupce na serveru nebyly. **Poučení: migraci přesouvat do `database/migrations/` až podle
 čísel z kontrolního SELECTu, ne podle slov.** Migrace `0091`–`0096` jsou v `database/migrations/`: sloupce efektů (`0091`) a data (`0092`),
-sloupce iniciativy v2 (`0093`), efekt „Ztráta iniciativy“ (`0094`, `0097` — DML), sloupce zbraní (`0095`), jejich data (`0096`) a chybějící zbraně (`0098`). Dosud provedené: tabulky `souboj_vyzva` (migrace `0088`, výzvy k hodu) a `nestvura_staty_sveta`
+sloupce iniciativy v2 (`0093`), efekt „Ztráta iniciativy“ (`0094`, `0097` — DML), sloupce zbraní (`0095`), jejich data (`0096`), chybějící zbraně (`0098`), opravy cen a Kůsy (`0099`) a držení kombinací (`0100`). Dosud provedené: tabulky `souboj_vyzva` (migrace `0088`, výzvy k hodu) a `nestvura_staty_sveta`
 (migrace `0090`, malý deník nestvůry) jsou na produkci provedené, hody i deník nestvůry jsou zapnuté.
 Bloky pro `0065`–`0081`, `DROP TABLE` tří mrtvých tabulek z 0008, `0084` (mapa),
 `0085` (souboj, krok 1) i `0086` (souboj, krok 2b: `tokeny.hexu`, tabulky
@@ -250,8 +250,12 @@ MariaDB.** Postup, který v session fungoval:
   zrušen (Bojovník od 6. úrovně)“). Supertěžké zbraně (poznámky pod tabulkou, potvrzeno 2026-10-17): Bojovník nemá postih u těch, které nejsou podobné meči, Šermíř u těch,
   které jsou (`DRACAK_VTT_MECE_SUPERTEZKE`: Odachi, Flamberg, Warglaive, Obouruční meč supertěžký, Dvě katany, Dva dlouhé meče, Dvakrát
   warglaive), obojí bez omezení úrovní. **Katalog doplněn** migrací `0098` o 39 zbraní z tabulek (Bastard a Válečné kladivo obouruční, Kůsa,
-  Obouruční meč supertěžký jednoruční a kombinace dvou zbraní); ceny čtyř kombinací, které v tabulce nesedí na součet dílů, jsou přepsané na součet a Kůsa je sečná (migrace `0099`, na přání uživatele). **Nerozhodnuto:** těžká kuše u bojovníka, Mistr zbraně, bonusy
-  povolání podle druhu zbraně (h139, kombinace počítá h139 jako jednoruční, tabulka jako obouruční) — viz
+  Obouruční meč supertěžký jednoruční a kombinace dvou zbraní); ceny čtyř kombinací, které v tabulce nesedí na součet dílů, jsou přepsané na součet a Kůsa je sečná (migrace `0099`, na přání uživatele). **Bonusy Bojovníka podle úrovně a zbraně** (h139 b985–b993, `DRACAK_VTT_INI_BONUSY_POVOLANI`): +3 tváří v tvář od 5. úrovně,
+  jednokusá obouruční zbraň +6 / +9 / +12 (10. / 16. / 27. úroveň), jednoruční zbraň a kombinace +6 / +9 (15. / 28.), střelné a vrhací zbraně +3 / +6
+  (12. / 24.; těžká kuše ne). Nesčítají se (jsou to řádky Tabulky vícenásobných útoků), přičtou se samy při úmyslu Útok / Střelba se zbraní
+  v ruce, nahrazují pole „útoků za 2 kola“ (klient ukáže „+9 povolání“ místo pole) a zavazují ke slibu úkonu. Držení zbraně: `chvat` =
+  `jednoruci` / `obourucni` (jen jednokusá zbraň v obou rukách) / `kombinace` (dvě zbraně, počítá se jako jednoruční; migrace `0100`).
+  **Nerozhodnuto:** těžká kuše u bojovníka (kniha neříká úroveň), Mistr zbraně, bonusy ostatních povolání — viz
   `docs/kontrolni-seznam-neuplnych-mist.md`. **Útok na vyřazeného** (h1613 b10736–b10737): tvor na mezi vyřazení nebo pod ní se brání jako nehybný (místo bonusu za
   obratnost −5, −3 bez zbraně, bez štítu, bez oprav za velikost a zezadu), bránit se zbraní nesmí a **zranění se násobí
   úrovní** (postava nejvýš ×9, nestvůra životaschopností; u „3 + 4“ násobek doplní PJ na kartě obrany). Stejná cesta jako u

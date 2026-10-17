@@ -96,7 +96,7 @@ try {
         $vysledek = $hod + $m['modifikator'];
         $akce = $m['bez_akci'] !== null ? 0 : dracak_vtt_iniciativa_akce($vysledek);
         // Kdo dostal bonus za úkon (kouzlení, vícenásobné útoky), ten mu věnuje první akci kola a aspoň polovinu akcí (h1622).
-        $zavazek = $akce > 0 ? dracak_vtt_iniciativa_zavazek($u) : null;
+        $zavazek = $akce > 0 ? dracak_vtt_iniciativa_zavazek($u, $m['trida_bonus']['bonus'] ?? null) : null;
         $zavazekAkci = $zavazek !== null ? (int)ceil($akce / 2) : 0;
         $parametry = [$mapaId, $tokenId, $hod, $m['modifikator'], $vysledek, $akce, $akce];
         if ($v2) {

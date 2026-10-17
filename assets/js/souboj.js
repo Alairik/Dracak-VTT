@@ -187,7 +187,15 @@ export function initSouboj(ctx) {
     utoky.max = '8';
     utoky.value = String(u.utoku_za_2_kola || 2);
     utoky.title = 'Kolik útoků za 2 kola umíš (2 = běžně, bez bonusu). Bonus k iniciativě je 3 × (počet − 2); kdo ho dostane, má vícenásobným útokům věnovat první akci a aspoň polovinu akcí kola, jinak v příštím kole ztratí iniciativu (−3).';
-    const ukazUtoky = () => { utoky.style.display = v2 && ['utok', 'strelba'].includes(sel.value) ? '' : 'none'; };
+    // Bonus povolání podle úrovně a zbraně v ruce (Bojovník…) nahrazuje pole „útoků za 2 kola“ — ukáže se místo něj.
+    const trida = el('span', 'ini-trida', u.ini_trida ? '+' + u.ini_trida.bonus + ' povolání' : '');
+    if (u.ini_trida) trida.title = u.ini_trida.popis + ' — přičte se samo, pole „útoků za 2 kola“ se nepoužije';
+    const ukazUtoky = () => {
+      const utok = v2 && ['utok', 'strelba'].includes(sel.value);
+      const sTridou = utok && !!u.ini_trida && sel.value === u.umysl;
+      utoky.style.display = utok && !sTridou ? '' : 'none';
+      trida.style.display = sTridou ? '' : 'none';
+    };
     ukazUtoky();
     const uloz = () => volat('api/umysl_nastavit.php', Object.assign({
       token_ids: idSkupiny(s), umysl: sel.value || null, cil_token_id: cil.value ? parseInt(cil.value, 10) : null,
@@ -196,7 +204,7 @@ export function initSouboj(ctx) {
     cil.addEventListener('change', uloz);
     utoky.addEventListener('change', uloz);
     utoky.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') utoky.blur(); });
-    w.append(sel, cil, utoky);
+    w.append(sel, cil, utoky, trida);
     return w;
   }
   function textUmyslu(u) {
@@ -205,6 +213,7 @@ export function initSouboj(ctx) {
   }
   // „ (4 útoky za 2 kola, +6)“ — jen když úmysl je Útok / Střelba a tvor umí víc než 2 útoky za 2 kola.
   function popisUtoku(u) {
+    if (kolo && kolo.iniciativa_v2 && u.ini_trida && ['utok', 'strelba'].includes(u.umysl)) return ' (bonus povolání +' + u.ini_trida.bonus + ' k iniciativě)';
     if (!kolo || !kolo.iniciativa_v2 || !u.utoku_za_2_kola || !['utok', 'strelba'].includes(u.umysl)) return '';
     const bonus = kolo.ini_utoky && kolo.ini_utoky[u.utoku_za_2_kola];
     return ' (' + u.utoku_za_2_kola + ' ' + (u.utoku_za_2_kola < 5 ? 'útoky' : 'útoků') + ' za 2 kola' + (bonus ? ', +' + bonus + ' k iniciativě' : '') + ')';
@@ -1120,6 +1129,7 @@ export function initSouboj(ctx) {
       // Co se z úmyslu přičte samo a k čemu se tvor tím zavazuje (h1622)
       const uk = ['utok', 'strelba'].includes(u.umysl) && u.utoku_za_2_kola && kolo.ini_utoky && kolo.ini_utoky[u.utoku_za_2_kola];
       if (u.umysl === 'kouzleni') hodPopis.textContent += ' Úmysl: kouzlení (+1) — první akce kola i aspoň polovina akcí kola mají být kouzlení, jinak v příštím kole −3 k iniciativě.';
+      else if (u.ini_trida && ['utok', 'strelba'].includes(u.umysl)) hodPopis.textContent += ' Úmysl: ' + UMYSLY[u.umysl].toLowerCase() + ' — ' + u.ini_trida.popis + ' (bonus povolání se přičte sám). První akce kola i aspoň polovina akcí kola mají být útok (obrana se počítá k polovině), jinak v příštím kole −3 k iniciativě.';
       else if (uk) hodPopis.textContent += ' Úmysl: ' + UMYSLY[u.umysl].toLowerCase() + ', ' + u.utoku_za_2_kola + ' ' + (u.utoku_za_2_kola < 5 ? 'útoky' : 'útoků') + ' za 2 kola (+' + uk + ') — první akce kola i aspoň polovina akcí kola mají být útok (obrana se počítá k polovině), jinak v příštím kole −3 k iniciativě.';
       else if (!u.umysl) hodPopis.textContent += ' Nemáš ohlášený úmysl — kouzlení a vícenásobné útoky se nezapočítají.';
     }

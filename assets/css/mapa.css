@@ -351,5 +351,6 @@ body { -webkit-tap-highlight-color:transparent; }
 
 /* Iniciativa v2: počet útoků za 2 kola u úmyslu, slib úkonu v pořadí tahů */
 .ini-utoky { width: 52px; }
+.ini-trida { font-size: 11px; padding: 2px 6px; border-radius: 10px; background: rgba(201, 138, 60, .22); white-space: nowrap; }
 .ini-slib { font-size: 11px; opacity: .85; margin-left: 6px; white-space: nowrap; }
 .ini-zavazek { color: #e8c9a8; }

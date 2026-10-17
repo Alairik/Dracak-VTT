@@ -388,15 +388,22 @@ začne hrát často, přidá se mu složka (nový řádek v `efekt_slozky`, bez 
   - [ ] Dovednost Mistr zbraně (b11267: „odstraní postih −2 k iniciativě, má-li ho, těžká / supertěžká zbraň“) — vyžaduje evidenci,
     s jakou zbraní postava dovednost ovládá; zatím se nepočítá. Stejně Flagelant (b8434, po 30 000 zkušeností s jednou zbraní).
   - [x] Zbraně z tabulek, které v katalogu chyběly (Bastard obouruční, Válečné kladivo obouruční, Kůsa, Obouruční meč supertěžký jednoruční,
-    kombinace dvou zbraní): doplněno migrací `0098` (39 zbraní). Zůstává: **bonusy bojovníka podle druhu zbraně** (h139: „obouruční“ +3/+6/+9/+12,
-    „jednoruční včetně kombinací“ +3/+6/+9) — kniha počítá kombinace jako jednoruční, tabulka zbraní je řadí k obouručním (`chvat`
-    u kombinací je `obourucni`); až se budou bonusy bojovníka implementovat, musí se tohle rozhodnout (kombinace poznat podle názvu,
-    nebo příznakem v DB).
+    kombinace dvou zbraní): doplněno migrací `0098` (39 zbraní). Kombinace mají od `0100` držení `kombinace` (obě ruce, pro bonusy
+    povolání jednoruční — rozhodnutí uživatele 2026-10-17: „dvě jednoruční jsou jednoruční, tabulka je řadí k obouručním, protože se
+    drží v obou rukách“); `obourucni` je jen jednokusá zbraň držená oběma rukama.
   - [ ] Zbraň, kterou má postava v ruce, je jedna (`drzena_zbran_id`); u dvou zbraní naráz se postih nevyhodnocuje.
-- [ ] Bonusy k iniciativě podle povolání a úrovně (Válečník – Bojovník, h139: +3 od 5. úrovně, +6 / +9 / +12 za obouruční zbraně,
-  +6 / +9 za jednoruční, +3 / +6 za střelné a vrhací zbraně…) nahrazují u bojovníka vícenásobné útoky z tabulky. Zadávají se
-  jako „jiný bonus“ a slib úkonu (první akce + polovina akcí) se u nich nehlídá — až budou povolání data (úroveň × druh zbraně),
-  dají se počítat i hlídat samy.
+- [x] Bonusy k iniciativě **Bojovníka** podle úrovně a druhu zbraně (h139, b985–b991, b993): hotovo 2026-10-17 (`DRACAK_VTT_INI_BONUSY_POVOLANI`).
+  Hodnoty +3 … +12 jsou řádky Tabulky vícenásobných útoků, takže se nesčítají (platí nejvyšší): tváří v tvář od 5. úrovně +3; jednokusá obouruční
+  zbraň od 10. +6, od 16. +9, od 27. +12; jednoruční zbraň a kombinace dvou zbraní od 15. +6, od 28. +9; střelné a vrhací zbraně od 12. +3, od 24. +6
+  (kromě těžké kuše). Přičte se samo při úmyslu Útok (zbraň tváří v tvář) nebo Střelba (střelná / vrhací zbraň), jen se zbraní, o které
+  katalog ví, jak se drží; nahrazuje pole „útoků za 2 kola“ a zavazuje ke slibu úkonu stejně jako ono. Úroveň a zbraň se čtou z deníku postavy.
+  **Zbývá:**
+  - [ ] **Těžká kuše u bojovníka** (b992 „těžká kuše ztrácí postih“, b994 „+3 iniciativa“): kniha u těch řádků nemá úroveň. Nepočítá se, platí jen
+    postih −3 za zbraň. Nejpravděpodobnější výklad (čistě podle řazení řádků): od 12. úrovně bez postihu, od 24. úrovně +3 — čeká na potvrzení.
+  - [ ] **Ostatní povolání** mají vlastní tabulky bonusů k iniciativě podle úrovně a zbraně (Šermíř b1082–b1085, Rytíř b8253, Paladin b8309, Lovec
+    stínů b7148–b7152, Lupič b5566, b5634, b5729, b5916, Sicco b5780 …). Zadávají se dál polem „útoků za 2 kola“ (nebo „jiný bonus“). Až budou
+    potřeba, přidají se jako další záznam v `DRACAK_VTT_INI_BONUSY_POVOLANI` — mechanismus (nejvyšší platný řádek podle úrovně a druhu zbraně)
+    je hotový, u některých povolání ale bonus nezávisí jen na úrovni a zbrani (protivník, délka zbraně, počet protivníků).
 - [x] Slib úkonu (h1622): rozhodnuto uživatelem 2026-10-17 — **žádná část slibu se nehlídá zákazem**, porušení se trestá −3 k iniciativě
   v příštím kole (efekt „Ztráta iniciativy (nesplněný slib)“, řádek „Automatická ztráta iniciativy v základním systému“): jednak když
   první akce kola není slíbený úkon (hned), jednak když na konci kola není splněná aspoň polovina akcí (polovina akcí zjištěných při
