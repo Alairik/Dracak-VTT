@@ -403,10 +403,16 @@ začne hrát často, přidá se mu složka (nový řádek v `efekt_slozky`, bez 
     Hotovo jako dvojice záznamů: výjimka postihu (`DRACAK_VTT_INI_POSTIH_VYJIMKY`, od 12.) + bonus pro zbraň (`DRACAK_VTT_INI_BONUSY_POVOLANI`, od 24.,
     ostatní střelné řádky mají `krome => Těžká kuše`). **Obecné pravidlo (uživatel):** platí u každého povolání a každé zbraně, která je ve výčtu
     bonusů vynechaná kvůli vlastnímu postihu — zbraň jde o jeden stupeň pozadu (první stupeň: bez postihu, druhý: bonus prvního). Příklady k
-    případnému doplnění: **Šermíř** (b1084: střelné a vrhací zbraně od 10. úrovně +3, od 20. +6; těžká kuše „jednou za kolo“ → „třikrát za dvě kola“
-    = 0 → +3; kniha ale u něj výslovně neříká, že kuše ztrácí postih −3, ani neuvádí zbytek jeho tabulky tak jednoznačně jako u bojovníka),
-    **Stopař stínů / Lovec stínů** (b7145–b7147: kuše +3 / +6 / +9 od 7. / 12. / 18. úrovně; Arbalest je zbraň vyvinutá pro stopaře, h939) — zatím
-    se neřeší, přidá se stejným způsobem, až bude jasné, které zbraně jsou vynechané.
+    doplnění: **Šermíř** (b1084) — hotovo 2026-10-19: střelné a vrhací zbraně od 10. úrovně +3, od 20. +6, těžká kuše „jednou za kolo“ = bez
+    postihu (od 10.), „třikrát za dvě kola“ = +3 (od 20.). Uživatel: „jednou za kolo znamená bez postihu, to je výchozí stav pro většinu zbraní;
+    pokud pak nedostane bonus, nedostane ho — jen ztratí postih“ (těžká kuše má −3 právě proto, že střílí jen jednou za 2 kola, ‡ v tabulce
+    střeleckých zbraní, b10771). Zbývá **Stopař stínů / Lovec stínů** (b7145–b7147: kuše +3 / +6 / +9 od 7. / 12. / 18. úrovně) — žádný řádek
+    nejmenuje vynechanou zbraň, takže se nic nepřidává. **Arbalest**: u Stopaře (h939) kniha žádné parametry ani pravidlo pro iniciativu neuvádí
+    (uživatel: vyrábí se zřejmě vždy na míru); parametry v katalogu jsou z tabulky supertěžkých zbraní (SZ 4, útočnost 6, dostřel 20/40/80,
+    nátah 3 akce, −2 na iniciativu).
+  - [ ] **Šermíř — zbraně tváří v tvář** (b1082, b1083, b1085): texty si odporují (pět útoků za dvě kola od 13. úrovně vs. od 16. úrovně; +9 / +12 / +15
+    v b1083 vs. +6 / +9 v b1085) a mají podmínky (meči podobné zbraně, kombinace podobných zbraní, obouruční meč). Dokud se nerozhodne, jak se čtou,
+    zadává se polem „útoků za 2 kola“.
   - [ ] **Ostatní povolání** mají vlastní tabulky bonusů k iniciativě podle úrovně a zbraně (Šermíř b1082–b1085, Rytíř b8253, Paladin b8309, Lovec
     stínů b7148–b7152, Lupič b5566, b5634, b5729, b5916, Sicco b5780 …). Zadávají se dál polem „útoků za 2 kola“ (nebo „jiný bonus“). Až budou
     potřeba, přidají se jako další záznam v `DRACAK_VTT_INI_BONUSY_POVOLANI` — mechanismus (nejvyšší platný řádek podle úrovně a druhu zbraně)

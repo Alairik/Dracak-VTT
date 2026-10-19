@@ -255,7 +255,7 @@ MariaDB.** Postup, který v session fungoval:
   (12. / 24.; těžká kuše 0 / +3). Nesčítají se (jsou to řádky Tabulky vícenásobných útoků), přičtou se samy při úmyslu Útok / Střelba se zbraní
   v ruce, nahrazují pole „útoků za 2 kola“ (klient ukáže „+9 povolání“ místo pole) a zavazují ke slibu úkonu. Držení zbraně: `chvat` =
   `jednoruci` / `obourucni` (jen jednokusá zbraň v obou rukách) / `kombinace` (dvě zbraně, počítá se jako jednoruční; migrace `0100`).
-  **Těžká kuše** jde u bojovníka o stupeň pozadu (potvrdil uživatel): od 12. úrovně bez postihu = 0, od 24. úrovně +3; stejným způsobem se doplní další povolání a zbraně, které bonusy vynechávají kvůli vlastnímu postihu (Šermíř b1084, Arbalest u Stopaře). **Nerozhodnuto:** Mistr zbraně, bonusy ostatních povolání — viz
+  **Těžká kuše** jde u bojovníka o stupeň pozadu (potvrdil uživatel): od 12. úrovně bez postihu = 0, od 24. úrovně +3; stejně **Šermíř** u střelných a vrhacích zbraní (b1084: 10. úroveň +3, 20. +6, těžká kuše 0 → +3; „jednou za kolo“ = bez postihu); jeho zbraně tváří v tvář zůstávají na ručním poli (texty si odporují). Další povolání a zbraně, které bonusy vynechávají kvůli vlastnímu postihu, se doplní stejnou dvojicí záznamů. **Nerozhodnuto:** Mistr zbraně, bonusy ostatních povolání — viz
   `docs/kontrolni-seznam-neuplnych-mist.md`. **Útok na vyřazeného** (h1613 b10736–b10737): tvor na mezi vyřazení nebo pod ní se brání jako nehybný (místo bonusu za
   obratnost −5, −3 bez zbraně, bez štítu, bez oprav za velikost a zezadu), bránit se zbraní nesmí a **zranění se násobí
   úrovní** (postava nejvýš ×9, nestvůra životaschopností; u „3 + 4“ násobek doplní PJ na kartě obrany). Stejná cesta jako u

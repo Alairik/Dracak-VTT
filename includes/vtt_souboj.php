@@ -494,6 +494,9 @@ const DRACAK_VTT_INI_POSTIH_VYJIMKY = [
     // Bojovník, b992: „Těžká kuše ztrácí postih k iniciativě“ — úroveň potvrdil uživatel 2026-10-17: stejná, od které ostatní střelné zbraně
     // dostávají +3 (12.), takže kuše má od 12. úrovně 0 a od 24. úrovně +3 (bonus: DRACAK_VTT_INI_BONUSY_POVOLANI).
     ['povolani' => ['Bojovník'], 'od' => 12, 'zbrane' => ['Těžká kuše'], 'zdroj' => 'h139, b992'],
+    // Šermíř, b1084: těžkou kuší „jednou za kolo“ = výchozí stav, tedy bez postihu −3 (uživatel 2026-10-19: „jednou za kolo znamená bez postihu“;
+    // těžká kuše má −3 právě proto, že střílí jen jednou za 2 kola); dál stejně o stupeň pozadu (bonus od 20. úrovně).
+    ['povolani' => ['Šermíř'], 'od' => 10, 'zbrane' => ['Těžká kuše'], 'zdroj' => 'h156, b1084'],
     // Poznámky pod tabulkou supertěžkých zbraní (b14822–b14827) — úroveň neuvádí, supertěžké zbraně se ale nesmí učit na 1. úrovni.
     // „Podobná meči“ = DRACAK_VTT_MECE_SUPERTEZKE (seznam potvrdil uživatel 2026-10-17); rozsah se týká jen supertěžkých zbraní.
     ['povolani' => ['Bojovník'], 'od' => 1, 'rozsah' => 'supertezke_nepodobne_mecum', 'zdroj' => 'tabulka supertěžkých zbraní'],
@@ -537,6 +540,14 @@ const DRACAK_VTT_INI_BONUSY_POVOLANI = [
         ['od' => 12, 'bonus' => 3, 'druh' => 'strelna', 'krome' => ['Těžká kuše'], 'zdroj' => 'b991'],
         ['od' => 24, 'bonus' => 6, 'druh' => 'strelna', 'krome' => ['Těžká kuše'], 'zdroj' => 'b993'],
         ['od' => 24, 'bonus' => 3, 'zbrane' => ['Těžká kuše'], 'zdroj' => 'b994'],
+    ],
+    // Šermíř — jen střelné a vrhací zbraně (b1084: třikrát za dvě kola = +3, dvakrát za kolo = +6; těžká kuše o stupeň pozadu:
+    // jednou za kolo = 0, třikrát za dvě kola = +3). Bonusy za zbraně tváří v tvář (b1082, b1083, b1085) se zatím zadávají polem
+    // „útoků za 2 kola“: texty si odporují (5 útoků za 2 kola od 13. nebo od 16. úrovně) a mají podmínky (meči podobné zbraně).
+    'Šermíř' => [
+        ['od' => 10, 'bonus' => 3, 'druh' => 'strelna', 'krome' => ['Těžká kuše'], 'zdroj' => 'b1084'],
+        ['od' => 20, 'bonus' => 6, 'druh' => 'strelna', 'krome' => ['Těžká kuše'], 'zdroj' => 'b1084'],
+        ['od' => 20, 'bonus' => 3, 'zbrane' => ['Těžká kuše'], 'zdroj' => 'b1084'],
     ],
 ];
 
