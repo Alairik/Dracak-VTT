@@ -8,6 +8,7 @@ const VERZE_MODULU = window.MAPA.verzeModulu || '0';
 const {hodit3D, nactiKostky, kostky3DPripraveny} = await import('./kostky3d.js?v=' + VERZE_MODULU);
 const hexy = await import('./hexy.js?v=' + VERZE_MODULU);
 const initSouboj = window.MAPA.funkce.souboj ? (await import('./souboj.js?v=' + VERZE_MODULU)).initSouboj : null;
+const initDenikDock = (window.MAPA.denikPostavy || []).length ? (await import('./denik_dock.js?v=' + VERZE_MODULU)).initDenikDock : null;
 
 // --- Kamera: zoom a posun přes CSS transform na #mapWrap ---
 // Souřadnice mapy (pixely původního obrázku) se na obrazovku převádějí jen
@@ -1419,6 +1420,16 @@ const souboj = initSouboj ? initSouboj({
   getZdi: () => zdiList,
   soubojSvg: document.getElementById('soubojSvg'),
 }) : null;
+// Deník postavy v panelu vedle mapy (assets/js/denik_dock.js) — upravuje se přímo při hře.
+const denikDock = initDenikDock ? initDenikDock({
+  postavy: window.MAPA.denikPostavy,
+  spravovaneId: () => (spravovanyToken && spravovanyToken.typEntity === 'postava' ? spravovanyToken.entitaId : null),
+  posunMapy: (dx) => kamera.posun(dx, 0),
+  poZmene: (postavaId) => {
+    obnovitStav();
+    if (spravovanyToken && spravovanyToken.typEntity === 'postava' && spravovanyToken.entitaId === postavaId) nactiInventar();
+  },
+}) : null;
 function nakreslitIniciativu() {
   if (souboj) { souboj.aplikuj({kolo: koloStav, iniciativa, ucastnici, vyzvy}); return; }
   if (!iniPanel) return;
@@ -1489,6 +1500,10 @@ function aplikujStav(s) {
   nakreslitIniciativu();
   naplnitVolnePostavy();
   obnovPanelSpravovat();
+  if (denikDock) {
+    const naTahu = koloStav && koloStav.aktivni_token_id ? tokeny.find((x) => x.id === koloStav.aktivni_token_id) : null;
+    denikDock.tah(naTahu && naTahu.typ_entity === 'postava' ? naTahu.entita_id : null);
+  }
 }
 
 // --- Panel Spravovat (klik na vlastní token) ---
@@ -1505,6 +1520,7 @@ function otevritSpravovat(t) {
     maxMagenergie: t.max_magenergie,
   };
   document.getElementById('spravovatNazev').textContent = t.label;
+  if (denikDock && t.typ_entity === 'postava') denikDock.nasleduj(t.entita_id);
   // Vlastní (obecný) token nemá životy, iniciativu, efekty ani inventář.
   const sekceEntita = document.getElementById('sekceEntita');
   if (sekceEntita) sekceEntita.style.display = t.typ_entity === 'obecny' ? 'none' : '';
@@ -2924,7 +2940,7 @@ async function poll() {
         posledniUdalostId = Math.max(posledniUdalostId, u.id);
         applyEvent(u);
       }
-      if (d.udalosti.length) posledniAktivita = Date.now();
+      if (d.udalosti.length) { posledniAktivita = Date.now(); if (denikDock) denikDock.obnov(); }
     }
   } catch (err) { /* výpadek sítě — zkusí se příště */ }
   // Mlha nemá vlastní typ události (PJ ruční kreslení i odhalení hráčem se

@@ -10,6 +10,17 @@
   let zaneprazdneno = false;
   let rozepsano = false;
 
+  // V mapě (iframe) dá deník mapě vědět, že se něco změnilo — mapa si hned stáhne nový stav (životy, inventář…).
+  function oznamZmenu() {
+    if (window.parent === window) return;
+    try { window.parent.postMessage({ dracak: 'denik_zmena', postava_id: Number(ID) }, window.location.origin); } catch (e) { /* jiný původ */ }
+  }
+  // …a naopak: mapa řekne deníku, ať se obnoví (zásah v souboji, léčení…).
+  window.addEventListener('message', function (ev) {
+    if (ev.origin !== window.location.origin || ev.source !== window.parent) return;
+    if (ev.data && ev.data.dracak === 'denik_obnov') obnovPokudNepise();
+  });
+
   async function posli(telo) {
     const r = await fetch(API, {
       method: 'POST',
@@ -22,6 +33,7 @@
     if (!r.ok || data.error) {
       throw new Error(data.error || 'Zápis se nepovedl (' + r.status + ').');
     }
+    oznamZmenu();
     return data;
   }
 
@@ -29,7 +41,7 @@
     if (zaneprazdneno) return;
     zaneprazdneno = true;
     try {
-      const r = await fetch('denik.php?id=' + encodeURIComponent(ID) + '&fragment=1', { credentials: 'same-origin' });
+      const r = await fetch('denik.php?id=' + encodeURIComponent(ID) + '&fragment=1' + (wrap.classList.contains('dn-embed') ? '&embed=1' : ''), { credentials: 'same-origin' });
       if (!r.ok) return;
       const html = await r.text();
       const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -83,6 +95,7 @@
       let data = {};
       try { data = await r.json(); } catch (e) { /* prázdná odpověď */ }
       if (!r.ok || data.error) { hlaska(data.error || 'Nepovedlo se (' + r.status + ').'); return null; }
+      oznamZmenu();
       return data;
     } catch (e) {
       hlaska('Spojení se nepovedlo.');
@@ -328,10 +341,11 @@
 
   // Polling změn od jiných klientů (PJ strhne životy…): každých 5 s, ne když
   // je karta skrytá, hráč píše, nebo má rozepsaný text.
-  setInterval(function () {
+  function obnovPokudNepise() {
     if (document.hidden || rozepsano) return;
     const a = document.activeElement;
     if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;
     obnov();
-  }, 5000);
+  }
+  setInterval(obnovPokudNepise, 5000);
 })();

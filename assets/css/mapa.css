@@ -354,3 +354,38 @@ body { -webkit-tap-highlight-color:transparent; }
 .ini-trida { font-size: 11px; padding: 2px 6px; border-radius: 10px; background: rgba(201, 138, 60, .22); white-space: nowrap; }
 .ini-slib { font-size: 11px; opacity: .85; margin-left: 6px; white-space: nowrap; }
 .ini-zavazek { color: #e8c9a8; }
+
+/* ---------- Panel „Deník“ vedle mapy (assets/js/denik_dock.js; deník v rámečku hra/denik.php?embed=1) ---------- */
+.denik-dock { position:fixed; left:88px; /* přesnou hodnotu dosadí denik_dock.js podle šířky lišty */ top:12px; bottom:12px; width:var(--denik-w, 480px); max-width:calc(100vw - 100px); z-index:195;
+              display:flex; flex-direction:column; background:#1d1a17; color:#eee; border:1px solid rgba(255,255,255,.16);
+              border-radius:12px; box-shadow:0 8px 28px rgba(0,0,0,.45); }
+.denik-dock-hlava { display:flex; align-items:center; gap:6px; padding:6px 8px; flex:none; }
+.denik-dock-hlava select.input { background:#2b251f; color:#f1e6d8; border:1px solid rgba(255,255,255,.28); border-radius:6px;
+                                 padding:4px 6px; margin:0; width:auto; min-width:0; font-size:12.5px; box-sizing:border-box; }
+.denik-dock-hlava #denikPostava { flex:1 1 40%; font-weight:600; }
+.denik-dock-hlava #denikSledovat { flex:1 1 40%; }
+.denik-dock-btn { flex:none; width:30px; height:30px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px;
+                  border:none; background:transparent; color:#ddd; font-size:16px; text-decoration:none; cursor:pointer; }
+.denik-dock-btn:hover { background:rgba(255,255,255,.14); }
+.denik-dock-frame { flex:1; min-height:0; width:100%; border:0; border-radius:0 0 12px 12px; background:#f6f1e9; }
+.denik-dock-uchyt { position:absolute; right:-6px; top:0; bottom:0; width:12px; cursor:ew-resize; z-index:2; touch-action:none; }
+.denik-dock-uchyt::after { content:""; position:absolute; left:4px; top:50%; width:4px; height:44px; margin-top:-22px; border-radius:2px; background:rgba(255,255,255,.35); }
+.denik-dock-uchyt:hover::after { background:rgba(255,255,255,.7); }
+@media (max-width: 760px) {
+  /* Telefon / malý tablet: deník jako spodní list přes spodek mapy. */
+  .denik-dock { left:0; right:0; top:auto; bottom:0; width:auto; max-width:none; height:62vh; border-radius:12px 12px 0 0; }
+  .denik-dock-frame { border-radius:0; }
+  .denik-dock-uchyt { display:none; }
+}
+
+/* Mapa se při otevřeném deníku zúží zleva (panel nezakrývá tokeny); proměnnou --denik-posun nastavuje denik_dock.js. */
+body.denik-dock-otevreny #viewport { left: var(--denik-posun, 0px); }
+@media (max-width: 760px) { body.denik-dock-otevreny #viewport { left: 0; } }
+/* Prvky vystředěné na obrazovce se vystředí nad zúženou mapou, ne pod panelem. */
+body.denik-dock-otevreny .topbar,
+body.denik-dock-otevreny .vyzva-panel { left: calc((100% + var(--denik-posun, 0px)) / 2); }
+body.denik-dock-otevreny .vyzva-panel { max-width: calc(100vw - var(--denik-posun, 0px) - 24px); }
+@media (max-width: 760px) {
+  body.denik-dock-otevreny .topbar, body.denik-dock-otevreny .vyzva-panel { left: 50%; }
+  body.denik-dock-otevreny .vyzva-panel { max-width: none; }
+}

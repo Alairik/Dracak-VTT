@@ -132,6 +132,8 @@ foreach ($d['inventar'] as $i) {
     }
 }
 
+// ?embed=1: deník uvnitř mapy (hra/mapa.php, panel „Deník“) — bez odkazů, které by z mapy odvedly pryč.
+$embed = isset($_GET['embed']);
 $fragment = isset($_GET['fragment']);
 if (!$fragment) {
     dracak_vtt_page_start($postava['nazev'] . ' — deník', $user, true, ['../assets/css/denik.css']);
@@ -139,7 +141,7 @@ if (!$fragment) {
 $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' => 'Odolnost', 'inteligence' => 'Inteligence', 'charisma' => 'Charisma'];
 ?>
 <?php if (!$fragment): ?>
-<div class="dn-wrap" data-postava-id="<?= $postavaId ?>" data-svet-id="<?= $svetId ?>">
+<div class="dn-wrap<?= $embed ? ' dn-embed' : '' ?>" data-postava-id="<?= $postavaId ?>" data-svet-id="<?= $svetId ?>">
 <?php endif; ?>
 <div class="dn" id="denik">
 
@@ -148,8 +150,10 @@ $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' =>
       <div class="dn-avatar" aria-hidden="true"><?= $e($inicialy) ?></div>
       <div class="dn-id">
         <div class="dn-nav-horni">
+          <?php if (!$embed): ?>
           <a class="svet-pill svet-pill-ghost" href="<?= $svetId > 0 ? 'svet.php?id=' . $svetId : 'postavy_moje.php' ?>">← <?= $svetId > 0 ? $e($postava['svet_nazev']) : 'Moje postavy' ?></a>
           <a class="svet-pill svet-pill-ghost" href="postava.php?id=<?= $postavaId ?>">Upravit základní údaje</a>
+          <?php endif; ?>
           <a class="svet-pill svet-pill-ghost" href="denik_tisk.php?id=<?= $postavaId ?>" target="_blank" rel="noopener">Tisk</a>
         </div>
         <h1 class="dn-jmeno"><?= $e($postava['nazev']) ?></h1>

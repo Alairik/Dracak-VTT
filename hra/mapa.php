@@ -83,6 +83,14 @@ if ($isPjOrAdmin) {
     $svetPostavyKorist = $stmt->fetchAll();
 }
 
+// Deník postavy v panelu na mapě: PJ/admin otevře deník kterékoli postavy světa, hráč jen svých (hra/denik.php to hlídá znovu).
+$denikPostavy = [];
+if ($svetId > 0) {
+    $stmt = dracak_db()->prepare('SELECT id, nazev FROM postavy WHERE svet_id = ?' . ($isPjOrAdmin ? '' : ' AND vlastnik_ucet_id = ?') . ' ORDER BY nazev');
+    $stmt->execute($isPjOrAdmin ? [$svetId] : [$svetId, (int)$user['id']]);
+    $denikPostavy = $stmt->fetchAll();
+}
+
 $nestvuryKatalog = [];
 $efektyKatalog = [];
 $rychleEfekty = [];
@@ -203,6 +211,9 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
     <?php endif; ?>
     <button class="tbtn" type="button" id="tb-kostky" title="Hodit kostkou"><?php dracak_icon('dices'); ?></button>
     <button class="tbtn" type="button" id="tb-log" title="Log"><?php dracak_icon('scroll-text'); ?></button>
+    <?php if ($denikPostavy): ?>
+      <button class="tbtn" type="button" id="tb-denik" title="Deník postavy — výbava, životy, zbraň v ruce… přímo na mapě"><?php dracak_icon('book-open-text'); ?></button>
+    <?php endif; ?>
     <?php if ($isPjOrAdmin): ?>
       <button class="tbtn" type="button" id="tb-grid" title="Nastavení gridu"><?php dracak_icon('grid-2x2'); ?></button>
       <button class="tbtn" type="button" id="tb-mlha" title="Mlha války"><?php dracak_icon('cloud-fog'); ?></button>
@@ -701,6 +712,23 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
     </div>
   </div>
 
+  <?php if ($denikPostavy): ?>
+  <div id="denikDock" class="denik-dock" style="display:none;" role="complementary" aria-label="Deník postavy">
+    <div class="denik-dock-uchyt" id="denikUchyt" title="Tažením změníš šířku" aria-hidden="true"></div>
+    <div class="denik-dock-hlava">
+      <select id="denikPostava" class="input" aria-label="Postava"></select>
+      <select id="denikSledovat" class="input" aria-label="Kterou postavu deník ukazuje" title="Kterou postavu deník ukazuje">
+        <option value="vyber">podle vybraného tokenu</option>
+        <option value="tah">podle toho, kdo je na tahu</option>
+        <option value="nic">pevně tuhle postavu</option>
+      </select>
+      <a id="denikOtevrit" class="denik-dock-btn" target="_blank" rel="noopener" title="Otevřít na celé stránce (nová záložka)">↗</a>
+      <button id="denikZavrit" class="denik-dock-btn" type="button" title="Zavřít deník" aria-label="Zavřít deník">✕</button>
+    </div>
+    <iframe id="denikFrame" class="denik-dock-frame" title="Deník postavy"></iframe>
+  </div>
+  <?php endif; ?>
+
   <div id="diceBoxContainer" style="position:fixed;inset:0;pointer-events:none;z-index:9999;"></div>
 
 <script>
@@ -713,7 +741,7 @@ window.MAPA = <?= json_encode([
     'pohybAuto' => ['unava' => $pohybNastaveni['auto_unava'], 'nalozeni' => $pohybNastaveni['auto_naklad'], 'zbran' => $zbraneIni && $souboj],
     'funkce' => dracak_vtt_tokeny_funkce(),
     'pravidla' => dracak_vtt_souboj_pravidla(),
-    'verzeModulu' => max((int)@filemtime(__DIR__ . '/../assets/js/souboj.js'), (int)@filemtime(__DIR__ . '/../assets/js/kostky3d.js'), (int)@filemtime(__DIR__ . '/../assets/js/hexy.js')),
+    'verzeModulu' => max((int)@filemtime(__DIR__ . '/../assets/js/souboj.js'), (int)@filemtime(__DIR__ . '/../assets/js/kostky3d.js'), (int)@filemtime(__DIR__ . '/../assets/js/hexy.js'), (int)@filemtime(__DIR__ . '/../assets/js/denik_dock.js')),
     'grid' => [
         'px' => (int)($mapa['grid_velikost_px'] ?? 0),
         'typ' => $mapa['grid_typ'] ?? 'ctverec',
@@ -723,6 +751,7 @@ window.MAPA = <?= json_encode([
     'zdi' => array_values($zdi),
     'piny' => array_values($mapaBody),
     'svetPostavy' => $svetPostavyKorist,
+    'denikPostavy' => $denikPostavy,
     'mlhaAktivni' => (bool)$mapa['mlha_aktivni'],
     'stav' => $stav,
 ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>;
