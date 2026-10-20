@@ -211,9 +211,6 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
     <?php endif; ?>
     <button class="tbtn" type="button" id="tb-kostky" title="Hodit kostkou"><?php dracak_icon('dices'); ?></button>
     <button class="tbtn" type="button" id="tb-log" title="Log"><?php dracak_icon('scroll-text'); ?></button>
-    <?php if ($denikPostavy): ?>
-      <button class="tbtn" type="button" id="tb-denik" title="Deník postavy — výbava, životy, zbraň v ruce… přímo na mapě"><?php dracak_icon('book-open-text'); ?></button>
-    <?php endif; ?>
     <?php if ($isPjOrAdmin): ?>
       <button class="tbtn" type="button" id="tb-grid" title="Nastavení gridu"><?php dracak_icon('grid-2x2'); ?></button>
       <button class="tbtn" type="button" id="tb-mlha" title="Mlha války"><?php dracak_icon('cloud-fog'); ?></button>
@@ -530,6 +527,10 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
   <div class="panel" id="panel-spravovat">
     <button class="close-x" data-close-panel><?php dracak_icon('x', 16); ?></button>
     <h3 id="spravovatNazev">—</h3>
+    <?php if ($denikPostavy): ?>
+    <!-- Deník postavy: otevře panel vedle mapy (assets/js/denik_dock.js) s deníkem právě tohoto tokenu -->
+    <button class="btn btn-secondary denik-otevrit" type="button" id="spravovatDenik" style="display:none;"><?php dracak_icon('book-open-text', 16); ?> Otevřít deník</button>
+    <?php endif; ?>
     <!-- Deník nestvůry (jen PJ, jen u nestvůry): přehled z bestiáře a čísla pro boj — nahoře, ať se nemusí scrollovat -->
     <div id="denikNestvury" class="panel-sekce" style="display:none;"></div>
 

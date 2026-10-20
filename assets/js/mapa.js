@@ -1430,6 +1430,15 @@ const denikDock = initDenikDock ? initDenikDock({
     if (spravovanyToken && spravovanyToken.typEntity === 'postava' && spravovanyToken.entitaId === postavaId) nactiInventar();
   },
 }) : null;
+const denikOtevritBtn = document.getElementById('spravovatDenik');
+if (denikOtevritBtn && denikDock) {
+  denikOtevritBtn.addEventListener('click', () => {
+    if (!spravovanyToken || spravovanyToken.typEntity !== 'postava') return;
+    denikDock.otevriPro(spravovanyToken.entitaId);
+    // Na telefonu je deník spodní list přes půl obrazovky — detail tokenu by pod ním zbytečně překážel.
+    if (window.innerWidth <= 760) spravovatPanel.classList.remove('open');
+  });
+}
 function nakreslitIniciativu() {
   if (souboj) { souboj.aplikuj({kolo: koloStav, iniciativa, ucastnici, vyzvy}); return; }
   if (!iniPanel) return;
@@ -1521,6 +1530,8 @@ function otevritSpravovat(t) {
   };
   document.getElementById('spravovatNazev').textContent = t.label;
   if (denikDock && t.typ_entity === 'postava') denikDock.nasleduj(t.entita_id);
+  const denikBtn = document.getElementById('spravovatDenik');
+  if (denikBtn) denikBtn.style.display = denikDock && t.typ_entity === 'postava' && denikDock.smi(t.entita_id) ? '' : 'none';
   // Vlastní (obecný) token nemá životy, iniciativu, efekty ani inventář.
   const sekceEntita = document.getElementById('sekceEntita');
   if (sekceEntita) sekceEntita.style.display = t.typ_entity === 'obecny' ? 'none' : '';

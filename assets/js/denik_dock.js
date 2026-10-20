@@ -21,8 +21,7 @@ const TELEFON = 760;         // pod touto šířkou je deník spodní list přes
 //       posunMapy: (dx) => void — mapa se po otevření panelu zúží zleva; obsah se posune tak, aby střed pohledu zůstal uprostřed}
 export function initDenikDock(ctx) {
   const dock = document.getElementById('denikDock');
-  const tlacitko = document.getElementById('tb-denik');
-  if (!dock || !tlacitko || !ctx.postavy.length) return null;
+  if (!dock || !ctx.postavy.length) return null;
   const vyber = document.getElementById('denikPostava');
   const sledovat = document.getElementById('denikSledovat');
   const frame = document.getElementById('denikFrame');
@@ -75,11 +74,10 @@ export function initDenikDock(ctx) {
     frame.src = 'denik.php?id=' + postavaId + '&embed=1';
   }
 
-  function otevri(bezKompenzace) {
+  function otevri(bezKompenzace, postavaId) {
     stav.otevreno = true;
     dock.style.display = '';
-    tlacitko.classList.add('armed');
-    const vybrana = ctx.spravovaneId();
+    const vybrana = postavaId || ctx.spravovaneId();
     const cil = vybrana && povoleneId.has(vybrana) ? vybrana : (povoleneId.has(stav.postava) ? stav.postava : ctx.postavy[0].id);
     zobrazena = null;
     zobraz(cil);
@@ -90,7 +88,6 @@ export function initDenikDock(ctx) {
   function zavri() {
     stav.otevreno = false;
     dock.style.display = 'none';
-    tlacitko.classList.remove('armed');
     document.body.classList.remove('denik-dock-otevreny');
     aplikujPosun(false);
     frame.src = 'about:blank';   // zastaví i pravidelné obnovování deníku
@@ -98,7 +95,6 @@ export function initDenikDock(ctx) {
     uloz(stav);
   }
 
-  tlacitko.addEventListener('click', () => (stav.otevreno ? zavri() : otevri()));
   document.getElementById('denikZavrit').addEventListener('click', zavri);
   vyber.addEventListener('change', () => {
     // Ruční volba postavy = pevně tuhle postavu, ať ji další klik na token nepřepne.
@@ -139,6 +135,13 @@ export function initDenikDock(ctx) {
   }
 
   return {
+    // Smí aktuální uživatel otevřít deník téhle postavy (PJ všechny z světa, hráč své)?
+    smi: (postavaId) => povoleneId.has(postavaId),
+    // Tlačítko „Otevřít deník“ v detailu tokenu: výslovná volba, přebije i režim „pevně“.
+    otevriPro(postavaId) {
+      if (!povoleneId.has(postavaId)) return;
+      if (stav.otevreno) zobraz(postavaId); else otevri(false, postavaId);
+    },
     // Klik na token na mapě: ukaž jeho postavu (jen v režimu „podle vybraného tokenu“).
     nasleduj(postavaId) {
       if (stav.sledovat === 'vyber') zobraz(postavaId);
