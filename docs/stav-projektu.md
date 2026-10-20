@@ -466,6 +466,15 @@ MariaDB.** Postup, který v session fungoval:
   marker přetáhnout na nové místo, dokud je formulář otevřený
   (`pinEditujiId` stav + `.pin-editing` CSS třída). Ukládá se spolu s
   ostatními poli až kliknutím na "Uložit změny", ne okamžitě na mouseup.
+- **Vzhled pinu na mapě** (`assets/css/mapa.css`, `.mapa-bod-marker`) —
+  ikona je Lucide `stroke="currentColor"` a tlačítko barvu nenastavovalo,
+  takže byla černá a na tmavé mapě (kobka) neviditelná. Teď tmavý kruh
+  (`#181614`) se světlým prstencem (`#e8c9a8`) a světlou ikonou (`#eee`):
+  čitelné na libovolném podkladu. Bod pinu je spodní okraj kruhu (dřív
+  spodní okraj ikony). Pin skrytý hráčům má dál `opacity:.6` (inline z
+  `hra/mapa.php` a `mapa.js`), beze změny. V design systému (Claude
+  artifact „Dračák VTT“) jsou k tomu hotové assety `Pins` (kapky) a
+  `Icons-halo`; v repu zatím jen tenhle CSS, assety se nepoužívají.
 - **Nahrání nového obrázku existující mapy** — tužka v rámečku náhledu
   na `hra/svet.php` (světová mapa i zóny, jen PJ/admin), akce
   `upravit_obrazek_mapy`. Přepočítá `sirka_px`/`vyska_px` z nového

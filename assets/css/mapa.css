@@ -177,6 +177,13 @@ body { -webkit-tap-highlight-color:transparent; }
 
   .mapa-bod-marker.pin-editing { cursor:move; outline:2px dashed #ffd166; outline-offset:3px; border-radius:50%; }
 
+  /* Ikona pinu je Lucide s stroke="currentColor"; tlačítko barvu nenastavuje, takže byla černá a na tmavé mapě
+     (kobka, noc) zmizela. Tmavý kruh se světlým prstencem je čitelný na libovolném podkladu: na světlém drží kruh,
+     na tmavém prstenec (aspoň jedna z hran má vždy ≥ 3,4:1). Bod pinu = spodní okraj kruhu. */
+  .mapa-bod-marker { color:#eee; }
+  .mapa-bod-marker svg { display:block; box-sizing:content-box; padding:5px; border-radius:50%; background:#181614;
+                         box-shadow:0 0 0 2px #e8c9a8, 0 2px 6px rgba(0,0,0,.45); }
+
   .vtt-ping { position:absolute; transform:translate(-50%,-50%) scale(calc(1 / var(--z, 1))); pointer-events:none; z-index:150;
               display:flex; flex-direction:column; align-items:center; }
   .ping-dot { width:22px; height:22px; border-radius:50%; border:3px solid #ffb347; box-sizing:border-box;
