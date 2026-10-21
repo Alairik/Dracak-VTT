@@ -1430,13 +1430,18 @@ const denikDock = initDenikDock ? initDenikDock({
     if (spravovanyToken && spravovanyToken.typEntity === 'postava' && spravovanyToken.entitaId === postavaId) nactiInventar();
   },
 }) : null;
-const denikOtevritBtn = document.getElementById('spravovatDenik');
-if (denikOtevritBtn && denikDock) {
-  denikOtevritBtn.addEventListener('click', () => {
-    if (!spravovanyToken || spravovanyToken.typEntity !== 'postava') return;
-    denikDock.otevriPro(spravovanyToken.entitaId);
-    // Na telefonu je deník spodní list přes půl obrazovky — detail tokenu by pod ním zbytečně překážel.
-    if (window.innerWidth <= 760) spravovatPanel.classList.remove('open');
+// Otevře deník vybrané postavy (volitelně rovnou na sekci: boj, schopnosti, vybaveni). Používá se z tlačítek v detailu tokenu.
+function otevritDenikVybrane(sekce) {
+  if (!denikDock || !spravovanyToken || spravovanyToken.typEntity !== 'postava') return;
+  denikDock.otevriPro(spravovanyToken.entitaId, sekce || null);
+  // Na telefonu je deník spodní list přes půl obrazovky — detail tokenu by pod ním zbytečně překážel.
+  if (window.innerWidth <= 760) spravovatPanel.classList.remove('open');
+}
+if (denikDock) {
+  const denikOtevritBtn = document.getElementById('spravovatDenik');
+  if (denikOtevritBtn) denikOtevritBtn.addEventListener('click', () => otevritDenikVybrane());
+  document.querySelectorAll('#spravovatDenikBlok [data-denik-sekce]').forEach((b) => {
+    b.addEventListener('click', () => otevritDenikVybrane(b.dataset.denikSekce));
   });
 }
 function nakreslitIniciativu() {
@@ -1530,8 +1535,8 @@ function otevritSpravovat(t) {
   };
   document.getElementById('spravovatNazev').textContent = t.label;
   if (denikDock && t.typ_entity === 'postava') denikDock.nasleduj(t.entita_id);
-  const denikBtn = document.getElementById('spravovatDenik');
-  if (denikBtn) denikBtn.style.display = denikDock && t.typ_entity === 'postava' && denikDock.smi(t.entita_id) ? '' : 'none';
+  const denikBlok = document.getElementById('spravovatDenikBlok');
+  if (denikBlok) denikBlok.style.display = denikDock && t.typ_entity === 'postava' && denikDock.smi(t.entita_id) ? '' : 'none';
   // Vlastní (obecný) token nemá životy, iniciativu, efekty ani inventář.
   const sekceEntita = document.getElementById('sekceEntita');
   if (sekceEntita) sekceEntita.style.display = t.typ_entity === 'obecny' ? 'none' : '';
@@ -2588,8 +2593,14 @@ function renderInventar() {
   const jeMrtvaNestvura = spravovanyToken.typEntity === 'nestvura_instance' && spravovanyToken.hp !== null && spravovanyToken.hp <= 0;
   if (jeMrtvaNestvura) { cont.innerHTML = ''; return; }
   const polozky = inventarCache.get(klicEntity(spravovanyToken.typEntity, spravovanyToken.entitaId)) || [];
-  if (!polozky.length) { cont.innerHTML = ''; return; }
-  let html = '<h4 style="font-size:12px;color:#e8c9a8;margin:0 0 6px;">Inventář</h4>';
+  // U postavy vede z Inventáře cesta do deníku (přidat, vzít do ruky, odebrat) — i když zatím nemá nic k použití.
+  const smiDenik = !!denikDock && spravovanyToken.typEntity === 'postava' && denikDock.smi(spravovanyToken.entitaId);
+  if (!polozky.length && !smiDenik) { cont.innerHTML = ''; return; }
+  let html = '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 6px;">'
+    + '<h4 style="font-size:12px;color:#e8c9a8;margin:0;">Inventář</h4>'
+    + (smiDenik ? '<button class="btn btn-ghost" type="button" data-denik-vybava style="font-size:11px;padding:3px 8px;">Upravit v deníku</button>' : '')
+    + '</div>';
+  if (!polozky.length) html += '<p class="note" style="margin:0;font-size:12px;">Nic k použití. Výbavu přidáš v deníku.</p>';
   polozky.forEach((p, i) => {
     const mnozstviText = p.typ_polozky === 'kouzlo' ? '' : (' ×' + p.mnozstvi);
     html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:12.5px;">'
@@ -2601,6 +2612,8 @@ function renderInventar() {
   cont.querySelectorAll('[data-pouzit-index]').forEach(btn => {
     btn.addEventListener('click', () => pouzitPolozku(polozky[parseInt(btn.dataset.pouzitIndex, 10)]));
   });
+  const denikVybava = cont.querySelector('[data-denik-vybava]');
+  if (denikVybava) denikVybava.addEventListener('click', () => otevritDenikVybrane('vybaveni'));
 }
 
 // Bez cíle = použito na sobě (typický "vypij lektvar"). Zadáním přesného

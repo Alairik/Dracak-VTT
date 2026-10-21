@@ -126,7 +126,11 @@ MariaDB.** Postup, který v session fungoval:
 - **Deník postavy v panelu na mapě (2026-10-19, bez ručního SQL):** v boji se výbava, zbraň v ruce, životy, kouzla… upravují ve stejném deníku jako
   na stránce postavy (`hra/denik.php`), ale **přímo vedle mapy, bez proklikávání**. **Vstup je v detailu tokenu** (panel Spravovat, tlačítko „Otevřít deník“ `#spravovatDenik` nahoře pod jménem; rozhodnutí uživatele 2026-10-20 —
   v levé liště nástrojů tlačítko není; zobrazí se u tokenu postavy, kterou smí uživatel otevřít, a přebije i režim „pevně“, na telefonu detail po otevření
-  schová) a otevře panel (`#denikDock`, `assets/js/denik_dock.js`) s deníkem v rámečku (`denik.php?id=…&embed=1` — bez odkazů, které by z mapy odvedly pryč; celé
+  schová) a otevře panel (`#denikDock`, `assets/js/denik_dock.js`). Pod ním jsou **skoky rovnou na sekci deníku** (Boj / Kouzla / Výbava →
+  `#boj`, `#schopnosti`, `#vybaveni`) a v Inventáři detailu u postavy tlačítko „Upravit v deníku“ (Výbava; Inventář se u postavy ukazuje vždy, i prázdný);
+  skok srovná sekci pod hlavičku deníku, jen když se ta v panelu drží nahoře. **Kontrakt pro přepracování deníku (Claude Design):** ponechat `id`
+  sekcí `prehled`, `boj`, `schopnosti`, `vybaveni`, `postava` a třídu `.dn-pas` u hlavičky — mapa na nich stojí; když zmizí, skok se prostě neprovede
+  a deník zůstane nahoře. V horní liště mapy je odkaz **Pravidla ↗** (`../pravidla.php`, nová záložka; co kdo uvidí, hlídá `pravidla.php` podle role) s deníkem v rámečku (`denik.php?id=…&embed=1` — bez odkazů, které by z mapy odvedly pryč; celé
   funkce deníku včetně hledání v katalogu, kontejnerů, hodů a sesílání zůstávají). Panel ukazuje postavu **podle vybraného tokenu** (výchozí),
   **podle toho, kdo je na tahu**, nebo **pevně** jednu (ruční výběr v seznamu přepne na „pevně“); nestvůra deník postavy nemá, takže výběr nestvůry
   postavu nemění. PJ otevře deník kterékoli postavy světa, hráč jen svých (server to hlídá znovu, cizí deník dá 403). Mapa se po otevření zúží

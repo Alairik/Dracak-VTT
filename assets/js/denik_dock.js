@@ -74,6 +74,27 @@ export function initDenikDock(ctx) {
     frame.src = 'denik.php?id=' + postavaId + '&embed=1';
   }
 
+  // Skok na sekci deníku (id sekce z nabídky deníku: prehled, boj, schopnosti, vybaveni, postava). Pokud se hlavička deníku
+  // při posunu drží nahoře, sekce se srovná až pod ni; když sekce v deníku není, deník zůstane tam, kde je.
+  let cekajici = null;   // {postava, sekce, kdy} — rámeček se ještě načítá, skok proběhne po načtení
+  function skocNaSekci(sekce) {
+    try {
+      const doc = frame.contentDocument;
+      const el = doc && doc.getElementById(sekce);
+      if (!el) return false;
+      const pas = doc.querySelector('.dn-pas');
+      const drziSe = pas && ['sticky', 'fixed'].includes(frame.contentWindow.getComputedStyle(pas).position);   // v úzkém panelu se hlavička odroluje s obsahem
+      const odsazeni = (drziSe ? pas.getBoundingClientRect().height : 0) + 8;
+      frame.contentWindow.scrollTo({top: frame.contentWindow.scrollY + el.getBoundingClientRect().top - odsazeni, behavior: 'smooth'});
+      return true;
+    } catch (e) { return false; }
+  }
+  frame.addEventListener('load', () => {
+    const c = cekajici;
+    cekajici = null;
+    if (c && c.postava === zobrazena && Date.now() - c.kdy < 8000) skocNaSekci(c.sekce);
+  });
+
   function otevri(bezKompenzace, postavaId) {
     stav.otevreno = true;
     dock.style.display = '';
@@ -138,9 +159,13 @@ export function initDenikDock(ctx) {
     // Smí aktuální uživatel otevřít deník téhle postavy (PJ všechny z světa, hráč své)?
     smi: (postavaId) => povoleneId.has(postavaId),
     // Tlačítko „Otevřít deník“ v detailu tokenu: výslovná volba, přebije i režim „pevně“.
-    otevriPro(postavaId) {
+    // Volitelně rovnou na sekci deníku (Boj, Schopnosti a kouzla, Vybavení…).
+    otevriPro(postavaId, sekce) {
       if (!povoleneId.has(postavaId)) return;
+      const uzUkazuje = stav.otevreno && zobrazena === postavaId;
+      if (sekce) cekajici = {postava: postavaId, sekce, kdy: Date.now()};
       if (stav.otevreno) zobraz(postavaId); else otevri(false, postavaId);
+      if (sekce && uzUkazuje && skocNaSekci(sekce)) cekajici = null;
     },
     // Klik na token na mapě: ukaž jeho postavu (jen v režimu „podle vybraného tokenu“).
     nasleduj(postavaId) {
