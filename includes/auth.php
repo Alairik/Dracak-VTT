@@ -6,9 +6,64 @@ require_once __DIR__ . '/db.php';
 function dracak_session_start(): void
 {
     if (session_status() !== PHP_SESSION_ACTIVE) {
+        // Cookie nesmí číst JS (httponly), nesmí se poslat z cizí stránky
+        // (SameSite=Lax — obrana proti CSRF, viz dracak_csrf_guard níž) a
+        // po HTTPS jen přes HTTPS. strict_mode: server nepřijme session id,
+        // které sám nevystavil (session fixation).
+        $https = !empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off';
+        session_set_cookie_params([
+            'lifetime' => 0,
+            'path' => '/',
+            'secure' => $https,
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+        ini_set('session.use_strict_mode', '1');
         session_start();
     }
 }
+
+// Obrana proti CSRF bez tokenů: každý požadavek, který něco mění (POST a
+// jiné než GET/HEAD/OPTIONS), musí přijít z téhož webu. Prohlížeč u POST
+// vždycky pošle hlavičku Origin (nebo aspoň Sec-Fetch-Site / Referer) a
+// stránka z cizího webu ji podvrhnout neumí. Chybí-li všechny tři (curl,
+// velmi staré prohlížeče), požadavek projde — CSRF je útok přes prohlížeč
+// přihlášené oběti, ten hlavičku vždy pošle. Běží při každém načtení
+// auth.php, takže kryje všechny stránky i hra/api/*.php bez zásahu do JS.
+function dracak_csrf_guard(): void
+{
+    $method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+    if (PHP_SAPI === 'cli' || in_array($method, ['GET', 'HEAD', 'OPTIONS'], true)) {
+        return;
+    }
+    $hostHeader = (string)($_SERVER['HTTP_X_FORWARDED_HOST'] ?? $_SERVER['HTTP_HOST'] ?? '');
+    $host = strtolower((string)preg_replace('/:\d+$/', '', trim(explode(',', $hostHeader)[0])));
+    if ($host === '') {
+        return;
+    }
+
+    $origin = (string)($_SERVER['HTTP_ORIGIN'] ?? '');
+    $fetchSite = (string)($_SERVER['HTTP_SEC_FETCH_SITE'] ?? '');
+    $referer = (string)($_SERVER['HTTP_REFERER'] ?? '');
+    $ok = null;
+    if ($origin !== '') {
+        $h = parse_url($origin, PHP_URL_HOST);
+        $ok = is_string($h) && strtolower($h) === $host;
+    } elseif ($fetchSite !== '') {
+        $ok = in_array($fetchSite, ['same-origin', 'none'], true);
+    } elseif ($referer !== '') {
+        $h = parse_url($referer, PHP_URL_HOST);
+        $ok = is_string($h) && strtolower($h) === $host;
+    }
+    if ($ok === false) {
+        error_log('[dracak-vtt] CSRF guard odmítl ' . $method . ' ' . ($_SERVER['REQUEST_URI'] ?? '')
+            . ' (Origin=' . $origin . ', Sec-Fetch-Site=' . $fetchSite . ', Host=' . $host . ')');
+        http_response_code(403);
+        header('Content-Type: application/json; charset=utf-8');
+        die(json_encode(['error' => 'Požadavek z cizího webu byl odmítnut.'], JSON_UNESCAPED_UNICODE));
+    }
+}
+dracak_csrf_guard();
 
 function dracak_current_user(): ?array
 {

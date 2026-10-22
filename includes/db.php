@@ -7,6 +7,7 @@ declare(strict_types=1);
 // auth.php), takže tohle platí prakticky v celé appce.
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');
+header_remove('X-Powered-By');
 
 function dracak_fail_safely(string $logMessage): void
 {

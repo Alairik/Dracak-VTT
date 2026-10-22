@@ -1,3 +1,26 @@
 <IfModule mod_headers.c>
     Header set X-Robots-Tag "noindex, nofollow"
+    # Clickjacking: stránky smí do rámečku jen vlastní web (deník v panelu
+    # mapy je rámeček ze stejného originu).
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Content-Security-Policy "frame-ancestors 'self'"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Strict-Transport-Security "max-age=15552000"
+    # Neprozrazovat verzi PHP.
+    Header always unset X-Powered-By
 </IfModule>
+
+# Skryté soubory (.ftp-deploy-sync-state.json, .git*...) a config.php s
+# přístupy k databázi nesmí jít stáhnout přes HTTP. config.php je jinak
+# v bezpečí jen proto, že ho PHP spouští místo vydání — kdyby handler
+# někdy selhal (např. při přepnutí verze PHP), vydal by se jako text.
+<FilesMatch "^(\..*|config(\.example)?\.php)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>

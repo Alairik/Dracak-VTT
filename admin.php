@@ -16,22 +16,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $jmeno = trim($_POST['jmeno'] ?? '');
         $heslo = (string)($_POST['heslo'] ?? '');
         $role = in_array($_POST['role'] ?? '', ['admin', 'pj', 'hrac'], true) ? $_POST['role'] : 'hrac';
-        if ($email === '' || $jmeno === '' || strlen($heslo) < 8) {
-            $error = 'Vyplň e-mail, jméno a heslo (min. 8 znaků).';
+        if ($email === '' || $jmeno === '' || strlen($heslo) < 12) {
+            $error = 'Vyplň e-mail, jméno a heslo (min. 12 znaků).';
         } else {
             try {
                 $stmt = $pdo->prepare('INSERT INTO ucty (email, heslo_hash, jmeno, role) VALUES (?, ?, ?, ?)');
                 $stmt->execute([$email, password_hash($heslo, PASSWORD_DEFAULT), $jmeno, $role]);
             } catch (PDOException $e) {
-                $error = str_contains($e->getMessage(), 'Duplicate') ? 'Tenhle e-mail už účet má.' : 'Chyba: ' . $e->getMessage();
+                if (str_contains($e->getMessage(), 'Duplicate')) {
+                    $error = 'Tenhle e-mail už účet má.';
+                } else {
+                    error_log('[dracak-vtt] admin.php vytvorit: ' . $e->getMessage());
+                    $error = 'Účet se nepodařilo založit (podrobnosti jsou v logu serveru).';
+                }
             }
         }
     } elseif ($akce === 'ulozit') {
         $id = (int)$_POST['id'];
         $role = in_array($_POST['role'] ?? '', ['admin', 'pj', 'hrac'], true) ? $_POST['role'] : 'hrac';
         $noveHeslo = (string)($_POST['nove_heslo'] ?? '');
-        if ($noveHeslo !== '' && strlen($noveHeslo) < 8) {
-            $error = 'Nové heslo musí mít aspoň 8 znaků.';
+        if ($noveHeslo !== '' && strlen($noveHeslo) < 12) {
+            $error = 'Nové heslo musí mít aspoň 12 znaků.';
         } else {
             $pdo->prepare('UPDATE ucty SET role = ? WHERE id = ?')->execute([$role, $id]);
             if ($noveHeslo !== '') {
@@ -95,7 +100,7 @@ foreach ($pdo->query('SELECT ucet_id, tabulka FROM ucet_opravneni')->fetchAll() 
         <input type="hidden" name="akce" value="vytvorit">
         <div class="field"><label>E-mail</label><input type="email" name="email" required></div>
         <div class="field"><label>Jméno</label><input type="text" name="jmeno" required></div>
-        <div class="field"><label>Heslo (min. 8 znaků)</label><input type="password" name="heslo" required minlength="8"></div>
+        <div class="field"><label>Heslo (min. 12 znaků)</label><input type="password" name="heslo" required minlength="12"></div>
         <div class="field"><label>Role</label>
           <select name="role">
             <option value="hrac">hráč</option>
@@ -125,7 +130,7 @@ foreach ($pdo->query('SELECT ucet_id, tabulka FROM ucet_opravneni')->fetchAll() 
             </div>
             <div class="field" style="margin-top:10px;max-width:260px;">
               <label>Nové heslo (nech prázdné = beze změny)</label>
-              <input type="password" name="nove_heslo" minlength="8" placeholder="min. 8 znaků" autocomplete="new-password">
+              <input type="password" name="nove_heslo" minlength="12" placeholder="min. 12 znaků" autocomplete="new-password">
             </div>
             <div class="note" style="margin-top:10px;">Smí sám editovat (jen pro roli hráč):</div>
             <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;">

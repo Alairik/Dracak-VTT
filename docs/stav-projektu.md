@@ -115,6 +115,37 @@ MariaDB.** Postup, který v session fungoval:
   *obsah pravidlové knihy* (`dracak_can_edit*`), nemá nic společného s VTT
   oprávněním ve světě.
 
+### Bezpečnost (audit 2026-10-22, reakce na NÚKIB „php2shell“)
+- **PHP samotné je největší riziko, ne kód:** CVE-2026-109618/109619
+  (RCE bez přihlášení), opraveno v 8.2.35 / 8.3.36 / 8.4.27 / 8.5.12.
+  Produkce běžela 21. 10. na **8.2.33** (první řádek výstupu `migrate.php`
+  v logu deploye). Verzi přepíná jen uživatel v administraci WEDOSu —
+  **po přepnutí zkontrolovat PHP verzi v logu dalšího deploye.** Kód je
+  kompatibilní s 8.2–8.4 (lokálně ověřeno na 8.3); 8.5 netestováno.
+- **Hotovo v kódu:** session cookie `HttpOnly` + `SameSite=Lax` + `Secure`
+  (po HTTPS) + `use_strict_mode`; **ochrana proti CSRF** v
+  `dracak_csrf_guard()` (`includes/auth.php`, běží při každém načtení
+  auth.php): POST s cizím `Origin` / `Sec-Fetch-Site` / `Referer` → 403,
+  bez tokenů a bez zásahu do JS; kořenový `.htaccess` zavírá dotfiles a
+  `config.php` a posílá hlavičky (X-Frame-Options, CSP `frame-ancestors`,
+  nosniff, Referrer-Policy, HSTS 180 dní, bez X-Powered-By); `migrate.php`
+  bere token jen z hlavičky (ne z `?token=`); `admin.php` nevypisuje text
+  DB chyby; minimální délka hesla 12 znaků (existující účty se nemění).
+- **Hlídá to deploy:** poslední krok `deploy.yml` („Post-deploy security
+  checks“) ověří na ostré doméně zavřené cesty, hlavičky a CSRF
+  (POST se stejným Origin = 200, s cizím = 403). Červený krok = hosting
+  direktivu neuplatnil, ne chyba aplikace.
+- **Prošlo auditem bez nálezu:** SQL (prepared statements, jediná
+  konkatenace je `(int)`), nahrávání obrázků (whitelist přes
+  `getimagesize`, náhodné jméno, přípona z MIME, složka zavřená, výdej
+  přes PHP po kontrole světa), sanitizace HTML (`dracak_sanitize_html`),
+  `innerHTML` v `assets/js` (vždy `esc()`, barvy kreseb ověřuje server).
+- **Vědomě otevřené:** omezení počtu pokusů o přihlášení (chce tabulku →
+  ruční SQL; u pár známých účtů nízké riziko); GitHub Actions jsou
+  pinované na tag (`@v4`), ne na SHA; endpointy `hra/api/*` jsem
+  neprošel řádek po řádku, jen vzorek (přístup ke světu se kontroluje
+  přes `dracak_vtt_svet_access` / `dracak_vtt_souboj_zacatek`).
+
 ### VTT základ
 - Svět → Mapy (`typ_mapy` ENUM `svet`/`zona`) → Tokeny (postava/nestvůra).
 - Polling: `hra/api/stav.php` (snapshot), `hra/api/udalosti.php` (delta od

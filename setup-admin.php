@@ -17,8 +17,8 @@ if ($count > 0) {
     $email = trim($_POST['email'] ?? '');
     $jmeno = trim($_POST['jmeno'] ?? '');
     $heslo = (string)($_POST['heslo'] ?? '');
-    if ($email === '' || $jmeno === '' || strlen($heslo) < 8) {
-        $error = 'Vyplň e-mail, jméno a heslo (min. 8 znaků).';
+    if ($email === '' || $jmeno === '' || strlen($heslo) < 12) {
+        $error = 'Vyplň e-mail, jméno a heslo (min. 12 znaků).';
     } else {
         $stmt = $pdo->prepare('INSERT INTO ucty (email, heslo_hash, jmeno, role) VALUES (?, ?, ?, ?)');
         $stmt->execute([$email, password_hash($heslo, PASSWORD_DEFAULT), $jmeno, 'admin']);
@@ -45,8 +45,8 @@ if ($count > 0) {
         <input type="email" name="email" required>
         <label>Jméno</label>
         <input type="text" name="jmeno" required>
-        <label>Heslo (min. 8 znaků)</label>
-        <input type="password" name="heslo" required minlength="8">
+        <label>Heslo (min. 12 znaků)</label>
+        <input type="password" name="heslo" required minlength="12">
         <button class="btn-primary" type="submit">Založit</button>
       </form>
     <?php endif; ?>

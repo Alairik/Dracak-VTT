@@ -90,3 +90,46 @@ jobs:
             fi
           done
           exit $fail
+
+      - name: Post-deploy security checks
+        run: |
+          # Ověřuje na ostré doméně, že zabezpečení z .htaccess a
+          # includes/auth.php opravdu funguje (hosting nemusí .htaccess
+          # direktivy respektovat — tichý neúspěch je horší než červený krok).
+          base="https://vtt.zvelebil.online"
+          fail=0
+
+          # 1) Soubory a složky, které musí být zvenku zavřené.
+          for path in config.php .ftp-deploy-sync-state.json includes/auth.php content/pravidla-pj.html database/migrations/0100_zbrane_kombinace_chvat.sql uploads/; do
+            code=$(curl -sS -o /dev/null -w "%{http_code}" "$base/$path")
+            echo "$path -> HTTP $code (čekáno 403 nebo 404)"
+            if [ "$code" != "403" ] && [ "$code" != "404" ]; then
+              echo "::error::$path je zvenku dostupné (HTTP $code)"
+              fail=1
+            fi
+          done
+
+          # 2) Bezpečnostní hlavičky.
+          hdrs=$(curl -sSI "$base/index.php")
+          for h in x-frame-options x-content-type-options strict-transport-security; do
+            if echo "$hdrs" | grep -qi "^$h:"; then
+              echo "hlavička $h OK"
+            else
+              echo "::error::chybí hlavička $h (mod_headers / .htaccess se neuplatnil)"
+              fail=1
+            fi
+          done
+          if echo "$hdrs" | grep -qi "^x-powered-by:"; then
+            echo "::warning::server prozrazuje verzi PHP v X-Powered-By"
+          fi
+
+          # 3) Ochrana proti CSRF: POST ze stejného webu projde (špatné
+          # přihlášení = HTTP 200 s formulářem), POST z cizího webu ne (403).
+          ok=$(curl -sS -o /dev/null -w "%{http_code}" -X POST -H "Origin: $base" -d "email=smoke@example.invalid&password=x" "$base/index.php")
+          bad=$(curl -sS -o /dev/null -w "%{http_code}" -X POST -H "Origin: https://evil.example" -d "email=smoke@example.invalid&password=x" "$base/index.php")
+          echo "POST se stejným Origin -> HTTP $ok (čekáno 200)"
+          echo "POST s cizím Origin -> HTTP $bad (čekáno 403)"
+          if [ "$ok" != "200" ]; then echo "::error::legitimní POST ze stejného webu neprošel (HTTP $ok)"; fail=1; fi
+          if [ "$bad" != "403" ]; then echo "::error::POST z cizího webu nebyl odmítnut (HTTP $bad)"; fail=1; fi
+
+          exit $fail

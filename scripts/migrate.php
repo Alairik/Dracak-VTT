@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 // Volá se přes HTTP z GitHub Actions po úspěšném FTP Deploy (poslední
-// krok v deploy.yml), hlavička X-Migrate-Token nebo ?token=. Spustí jen
+// krok v deploy.yml), hlavička X-Migrate-Token. Spustí jen
 // nové soubory z database/migrations/, eviduje je v migrace_log. Tenhle
 // soubor je JEDINÝ, co smí být v scripts/ na serveru — nahrává se přes
 // FTP (viz deploy.yml), na rozdíl od zbytku database/ ke kterému patří.
@@ -288,7 +288,8 @@ if (!file_exists($configPath)) {
 $config = require $configPath;
 
 $expectedToken = $config['migrate_token'] ?? '';
-$providedToken = $_SERVER['HTTP_X_MIGRATE_TOKEN'] ?? $_GET['token'] ?? '';
+// Jen hlavička — token v ?token= by zůstal v access logu hostingu.
+$providedToken = $_SERVER['HTTP_X_MIGRATE_TOKEN'] ?? '';
 
 // config.php vzniká z getenv() v deploy.yml — chybějící/prázdný GitHub
 // Secret se zapíše jako bool false, ne jako "". hash_equals() se
