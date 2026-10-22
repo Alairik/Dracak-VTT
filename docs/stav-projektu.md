@@ -118,10 +118,13 @@ MariaDB.** Postup, který v session fungoval:
 ### Bezpečnost (audit 2026-10-22, reakce na NÚKIB „php2shell“)
 - **PHP samotné je největší riziko, ne kód:** CVE-2026-109618/109619
   (RCE bez přihlášení), opraveno v 8.2.35 / 8.3.36 / 8.4.27 / 8.5.12.
-  Produkce běžela 21. 10. na **8.2.33** (první řádek výstupu `migrate.php`
-  v logu deploye). Verzi přepíná jen uživatel v administraci WEDOSu —
-  **po přepnutí zkontrolovat PHP verzi v logu dalšího deploye.** Kód je
-  kompatibilní s 8.2–8.4 (lokálně ověřeno na 8.3); 8.5 netestováno.
+  Produkce běžela 21. 10. na 8.2.33, 22. 10. dopoledne už WEDOS sám dal
+  opravenou 8.2.35 a uživatel pak přepnul na **PHP 8.4 — ověřeno
+  22. 10. 2026 v logu deploye: 8.4.27 (opravená verze), smoke test i
+  security checks zelené.** Verzi přepíná jen uživatel v administraci
+  WEDOSu; aktuální verzi vždy ukazuje první řádek výstupu `migrate.php`
+  v logu deploye. Kód běží na 8.4 (lokálně lint jen na 8.3); 8.5
+  netestováno.
 - **Hotovo v kódu:** session cookie `HttpOnly` + `SameSite=Lax` + `Secure`
   (po HTTPS) + `use_strict_mode`; **ochrana proti CSRF** v
   `dracak_csrf_guard()` (`includes/auth.php`, běží při každém načtení
