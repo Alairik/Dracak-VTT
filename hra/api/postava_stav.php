@@ -141,6 +141,18 @@ switch ($akce) {
         if ($pole === 'drzena_zbran_id' && !$jePj && dracak_vtt_zbrane_boj_kontext($pdo, $postava) !== null) {
             odpoved(422, ['error' => 'V boji se zbraň mění vytasením — stojí akci.']);
         }
+        // Zbraň v ruce jde přes společnou funkci jako vytasení — odložená zbraň se zasune k tělu (u_sebe) a platí stejné kontroly.
+        if ($pole === 'drzena_zbran_id') {
+            if ($predmetId > 0 && (int)($postava['drzena_zbran_id'] ?? 0) === $predmetId) {
+                odpoved(200, ['ok' => true]);   // už ji drží
+            }
+            try {
+                dracak_vtt_zbrane_vytasit($pdo, $postava, $predmetId, false);
+            } catch (RuntimeException $ex) {
+                odpoved(422, ['error' => $ex->getMessage()]);
+            }
+            odpoved(200, ['ok' => true]);
+        }
         if ($predmetId > 0) {
             // Jen předmět, který postava má v inventáři, a správného typu.
             $typ = $pole === 'drzena_zbran_id' ? 'zbran' : 'zbroj';

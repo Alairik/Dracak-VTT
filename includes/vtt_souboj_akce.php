@@ -80,6 +80,8 @@ function dracak_vtt_souboj_proved_akci(PDO $pdo, array $mapa, bool $jePj, array 
         $ki = $q->fetch();
         // Vytasení zbraně bez akce (efekt se složkou tasit_zdarma: Erythen — Rychlé tasení, Dikobraz): neubere akci a není
         // „akce kola“ (nemění slib úkonu ani pořadí tahu), jen se zapíše do logu a započítá do limitu „jednou za kolo“.
+        // Tady se jen rozhodne, že akce nestojí nic; jestli zbraň jde vytasit, ověří dracak_vtt_zbrane_vytasit() níž v téže
+        // transakci (při chybě se vrátí zpět i zápis do logu).
         $zdarmaEfekt = null;
         if ($druh === 'vytasit' && $info[$tokenId]['typ_entity'] === 'postava') {
             $postavaZdarma = dracak_vtt_entity_row('postava', (int)$info[$tokenId]['entita_id']);
@@ -230,7 +232,7 @@ function dracak_vtt_souboj_proved_akci(PDO $pdo, array $mapa, bool $jePj, array 
             'zbran_nazev' => $vytasenaZbran,
             'zdarma_efekt' => $zdarmaEfekt,
             'pocet' => $pocet,
-            'akce_zbyvajici' => (int)$ki['akce_zbyvajici'] - $pocet,
+            'akce_zbyvajici' => ($ki ? (int)$ki['akce_zbyvajici'] : 0) - $pocet,
             'cil_token_id' => $pohyb['mapove'] ? $pohyb['cil_token_id'] : null,
             'cil_label' => $pohyb['mapove'] ? $pohyb['cil_label'] : null,
             'unava_plus' => $unavaPlus,

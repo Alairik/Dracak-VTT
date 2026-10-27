@@ -176,18 +176,26 @@ function dracak_vtt_zbrane_zdarma_zdroje(PDO $pdo, array $postava): array
 // po stránkách, dokud se nenarazí na dřívější kolo — počet akcí v kole proto nic neusekne.
 function dracak_vtt_zbrane_zdarma_pouzito(PDO $pdo, int $mapaId, int $tokenId, int $cisloKola, string $efekt): int
 {
+    // V rámci jednoho požadavku se nemění (deník se ptá na každou zbraň zvlášť), proto jednou.
+    static $pamet = [];
+    $klic = $mapaId . ':' . $tokenId . ':' . $cisloKola . ':' . $efekt;
+    if (isset($pamet[$klic])) {
+        return $pamet[$klic];
+    }
     // Nic z dřívějšího souboje na téže mapě (kola se v novém souboji počítají znovu od 1).
     $q = $pdo->prepare('SELECT COALESCE(MAX(id), 0) FROM svet_udalosti WHERE mapa_id = ? AND typ = "souboj_start"');
     $q->execute([$mapaId]);
     $odStartu = (int)$q->fetchColumn();
-    $q = $pdo->prepare('SELECT id, payload FROM svet_udalosti WHERE mapa_id = ? AND typ = "akce_provedena" AND id > ? AND id < ? ORDER BY id DESC LIMIT 200');
+    // Jen události tohoto tokenu (payload začíná {"token_id":N,…}), ať se nečte a nedekóduje celý souboj.
+    $q = $pdo->prepare('SELECT id, payload FROM svet_udalosti WHERE mapa_id = ? AND typ = "akce_provedena" AND id > ? AND id < ? AND payload LIKE ? ORDER BY id DESC LIMIT 200');
+    $vzor = '{"token_id":' . $tokenId . ',%';
     $pocet = 0;
     $hranice = PHP_INT_MAX;
     while (true) {
-        $q->execute([$mapaId, $odStartu, $hranice]);
+        $q->execute([$mapaId, $odStartu, $hranice, $vzor]);
         $radky = $q->fetchAll();
         if (!$radky) {
-            return $pocet;
+            return $pamet[$klic] = $pocet;
         }
         foreach ($radky as $r) {
             $hranice = (int)$r['id'];
@@ -196,7 +204,7 @@ function dracak_vtt_zbrane_zdarma_pouzito(PDO $pdo, int $mapaId, int $tokenId, i
                 continue;
             }
             if ((int)($p['cislo_kola'] ?? 0) < $cisloKola) {
-                return $pocet;
+                return $pamet[$klic] = $pocet;
             }
             if ((int)($p['cislo_kola'] ?? 0) === $cisloKola && ($p['zdarma_efekt'] ?? null) === $efekt) {
                 $pocet++;

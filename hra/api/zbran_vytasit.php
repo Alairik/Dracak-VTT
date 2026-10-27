@@ -44,6 +44,10 @@ if ($boj !== null && !($jePj && !empty($data['bez_akce']))) {
     if (!$boj['na_tahu']) {
         odpoved_vytasit(422, ['error' => 'V boji zbraň vytasíš na svém tahu — stojí akci (nebo ji PJ změní bez akce).']);
     }
+    // Bez akce smí jen to, co dovolí efekt (Rychlé tasení, Dikobraz); jinak je potřeba akce, a ta došla.
+    if ($boj['akci_zbyva'] < 1 && dracak_vtt_zbrane_zdarma($pdo, $postava, $zbranId, $boj) === null) {
+        odpoved_vytasit(422, ['error' => 'V tomhle tahu už nemáš akci, kterou bys na vytasení zbraně měl.']);
+    }
     [$mapa, , $jePjMapy, $uzivatel] = dracak_vtt_souboj_zacatek($boj['mapa_id']);
     $vysledek = dracak_vtt_souboj_proved_akci($pdo, $mapa, $jePjMapy, $uzivatel, [
         'mapa_id' => $boj['mapa_id'], 'token_id' => $boj['token_id'], 'druh' => 'vytasit', 'zbran_id' => $zbranId,
