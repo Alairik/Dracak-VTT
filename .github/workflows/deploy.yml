@@ -71,15 +71,6 @@ jobs:
           mkdir -p .migrate-stage .migrate-stage-empty
           cp scripts/migrate.php ".migrate-stage/$name"
           echo "MIGRATE_FILE=$name" >> "$GITHUB_ENV"
-          # TEMP DIAG: zkoušební soubory, ať zjistíme, proč /scripts/ vrací 404
-          n="${name#migrate-}"; n="${n%.php}"
-          echo "DIAG_N=$n" >> "$GITHUB_ENV"
-          mkdir -p .diag-hra
-          for d in .migrate-stage .diag-hra; do
-            echo ok > "$d/probe-$n.txt"
-            printf '<?php echo "php-ok";' > "$d/probe-$n.php"
-          done
-
       - name: Upload one-time migration file
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
@@ -91,24 +82,19 @@ jobs:
           server-dir: ./scripts/
 
       # TEMP DIAG
-      - name: Upload probes to hra
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftps
-          local-dir: ./.diag-hra/
-          server-dir: ./hra/
-
-      # TEMP DIAG
       - name: Diagnostics
         continue-on-error: true
         run: |
-          for u in "scripts/probe-$DIAG_N.txt" "scripts/probe-$DIAG_N.php" "scripts/$MIGRATE_FILE" "hra/probe-$DIAG_N.txt" "hra/probe-$DIAG_N.php" "scripts/" "scripts/.ftp-deploy-sync-state.json" "hra/svety.php"; do
-            code=$(curl -sS -o /tmp/o -w "%{http_code}" "https://vtt.zvelebil.online/$u")
-            echo "$u -> HTTP $code | $(head -c 100 /tmp/o | tr '\n' ' ')"
+          echo "runner: $(curl -sS -m 10 https://ipinfo.io/json | tr -d '\n' | head -c 300)"
+          for u in "" index.php dashboard.php hra/svety.php assets/js/denik.js assets/css/denik.css robots.txt scripts/ "scripts/$MIGRATE_FILE"; do
+            code=$(curl -sS -o /tmp/o -w "%{http_code} %{size_download}b %{redirect_url}" "https://vtt.zvelebil.online/$u")
+            echo "/$u -> $code | $(head -c 90 /tmp/o | tr '\n' ' ')"
           done
+          echo "--- hlavičky /index.php:"
+          curl -sSI "https://vtt.zvelebil.online/index.php" | head -20
+          echo "--- s prohlížečovým UA:"
+          curl -sS -o /dev/null -w "index.php %{http_code}\n" -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36" "https://vtt.zvelebil.online/index.php"
+          curl -sS -o /dev/null -w "scripts/migrate %{http_code}\n" -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36" "https://vtt.zvelebil.online/scripts/$MIGRATE_FILE"
 
       - name: Run pending DB migrations
         run: |
@@ -134,18 +120,6 @@ jobs:
           protocol: ftps
           local-dir: ./.migrate-stage-empty/
           server-dir: ./scripts/
-
-      # TEMP DIAG
-      - name: Remove probes from hra
-        if: always() && env.MIGRATE_FILE != ''
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftps
-          local-dir: ./.migrate-stage-empty/
-          server-dir: ./hra/
 
       - name: Check one-time migration file is gone
         if: always() && env.MIGRATE_FILE != ''

@@ -37,6 +37,22 @@ přestavěné podle prototypu; engine (`includes/vtt_denik.php`) a API zůstaly,
 **Zbývá:** figurína a sloty (krok 3, DDL), aktivní zbraň ze slotů Zbraň 1–4 / Střelná 1–2 (krok 2), detail předmětu, hledání a filtry v inventáři,
 Dovednosti (krok 5, DDL), Společníci (krok 6, DDL), připnutá kouzla.
 
+## Rozhodnutí uživatele 2026-10-27 (po kroku 1) — vzhled ano, vymyšlená mechanika ne
+
+- **Prototyp je jen první vzhled.** Design nezná pravidla a něco si přidává; **platí pravidla v knize**, ne prototyp. Co v něm není z knihy
+  (OZ v OČ, vzorec nosnosti, fond profibodů, šance na seslání…), se neimplementuje bez ověření v `content/pravidla-*.html`.
+- **OČ v záhlaví bez OZ zbraně** zůstává podle knihy (h1611: obrana zbraní je nepovinné pravidlo; odpověď na dotaz z 2026-10-27: „pravidla platí“).
+- **Sloty „Zbraň 1–X“ nejsou ruka, ale výzbroj při těle:** které zbraně má postava připravené na opasku, v pochvě, v závěsu, v toulci nebo holstru a může je
+  v boji vytasit nebo přezbrojit. **V ruce je aktivní vždy jen jedna.** Z toho vyjde nová (domácí) mechanika opasku, pochev, toulců a podobného — zatím
+  nedefinovaná, dělá se až po rozhodnutí uživatele (krok 2 nebo 3).
+- **Co o tom říká kniha (podklad pro tu mechaniku):** tabulka POCHVY (b14697, b14205…: jednoruční 1 st / 10 mn, obouruční 1,5 st / 15 mn, tyčové 80 md / 10 mn,
+  super těžké 2 st / 20 mn, holster na vrhací zbraň každých 5 ks 1,5 st / 10 mn); „aby mohla postava pohodlně mít zbraně při sobě, potřebuje k nim pořídit
+  pochvu či závěs“ (b14698; standardní pochva, závěs, bandalýr 2,5 zl, 10 mn); toulec na 20 ks 1,5 st / 7 mn, rozšířený 4×10 ks 6 st / 20 mn (b14202);
+  **vyměnit zbraň je úkon kola** a nejde vytasit meč a použít ho v jednom kole (kapitola Čas v souboji, b10619); Erithen Rychlé tasení — „volně dostupná“ zbraň
+  je z pochvy, holstru apod., ne z batohu ani z rukou (b7751, b7754); zloděj vytáhne malou lehkou vrhací zbraň z úkrytu (rukáv, bota, kapsa, opasek) a vrhne ji
+  v jednom kole (b5565); Dikobraz: tasení vrhací zbraně nestojí akci (b9098). Chybí: kolik zbraní se vejde na opasek/do pochev, cena tasení v rozšířeném
+  systému (1 akce?), co je „volně dostupné“ u obouručních na zádech.
+
 ## Co v repu přibylo
 
 - **`docs/prototypy/denik-v2.dc.html`** — zdroj prototypu ve formátu Claude
