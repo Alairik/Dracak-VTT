@@ -57,18 +57,27 @@ function dracak_nasazeni_kontrola(): array
 
     // Co leží na serveru navíc. Nahraná data (uploads/), konfigurace, evidence FTP a samotný manifest se přeskakují;
     // v uploads/ se hledají jen spustitelné soubory (tam smí být jen obrázky).
-    $preskocit = ['config.php', 'deploy-manifest.json', '.ftp-deploy-sync-state.json'];
+    // Co patří hostingu a ne nám (logy, složky pro CGI a ověření domény), se nehlásí — jinak by se admin naučil hlášení ignorovat.
+    // `.user.ini` a `php.ini` se naopak hlásí: umí před každým skriptem načíst cizí kód.
+    $preskocit = ['config.php', 'deploy-manifest.json', '.ftp-deploy-sync-state.json', 'error_log', 'php_errorlog'];
+    $preskocitSlozky = ['.git/', 'node_modules/', 'cgi-bin/', '.well-known/'];
     $spustitelne = '/\.(php\d?|phtml|phar|pht|cgi|pl|py|sh|htaccess)$/i';
     $it = new RecursiveIteratorIterator(
         new RecursiveDirectoryIterator($koren, FilesystemIterator::SKIP_DOTS | FilesystemIterator::UNIX_PATHS),
-        RecursiveIteratorIterator::LEAVES_ONLY
+        RecursiveIteratorIterator::LEAVES_ONLY,
+        RecursiveIteratorIterator::CATCH_GET_CHILD   // nečitelná složka (host ji spravuje sám) nesmí shodit celou stránku
     );
     foreach ($it as $soubor) {
         if (!$soubor->isFile()) {
             continue;
         }
         $rel = ltrim(substr($soubor->getPathname(), strlen($koren)), '/');
-        if (str_starts_with($rel, '.git/') || str_starts_with($rel, 'node_modules/') || in_array($rel, $preskocit, true)) {
+        foreach ($preskocitSlozky as $slozka) {
+            if (str_starts_with($rel, $slozka)) {
+                continue 2;
+            }
+        }
+        if (in_array($rel, $preskocit, true)) {
             continue;
         }
         if (isset($soubory[$rel])) {
@@ -121,7 +130,7 @@ function dracak_nasazeni_pozadavek(string $url): array
 
 // Zavřené cesty a bezpečnostní hlavičky, ověřené požadavky ze serveru na vlastní doménu.
 // Vrací ['zakladna' => string, 'cesty' => [[cesta, kod, ok, poznamka]], 'hlavicky' => [[nazev, ok, poznamka]], 'chyba' => ?string].
-function dracak_nasazeni_zavrene_cesty(string $hostHlavicka, bool $https): array
+function dracak_nasazeni_zavrene_cesty(string $hostHlavicka, bool $https, string $vzdalenaAdresa = ''): array
 {
     $host = strtolower(trim(explode(',', $hostHlavicka)[0]));
     $vysledek = ['zakladna' => '', 'cesty' => [], 'hlavicky' => [], 'chyba' => null];
@@ -130,8 +139,24 @@ function dracak_nasazeni_zavrene_cesty(string $hostHlavicka, bool $https): array
         $vysledek['chyba'] = 'Nepodařilo se zjistit adresu webu.';
         return $vysledek;
     }
+    // Server se nesmí nechat poslat na IP adresu ani localhost (SSRF) — to jen při vývoji, kdy se na web díváš ze stejného počítače.
+    $bezPortu = (string)preg_replace('/:\d+$/', '', $host);
+    $jeVnitrni = $bezPortu === 'localhost' || filter_var($bezPortu, FILTER_VALIDATE_IP) !== false;
+    if ($jeVnitrni && !in_array($vzdalenaAdresa, ['127.0.0.1', '::1'], true)) {
+        $vysledek['chyba'] = 'Web je otevřený přes IP adresu nebo localhost — kontrola zevnitř serveru se tu nedělá. Otevři ho přes jeho doménu.';
+        return $vysledek;
+    }
     $zakladna = ($https ? 'https://' : 'http://') . $host;
     $vysledek['zakladna'] = $zakladna;
+
+    // Kontrola, že server vlastní doménu vůbec vidí: stránka, která musí odpovědět (robots.txt je součást nasazení). Hosting, který
+    // požadavky odmítá jednotně odpovědí 404/403 — pak by „zavřeno“ vyšlo u všeho, i u otevřené konfigurace, a bylo by to falešné ujištění.
+    $kontrola = dracak_nasazeni_pozadavek($zakladna . '/robots.txt');
+    if ($kontrola['kod'] !== 200) {
+        $vysledek['chyba'] = 'Server se na vlastní doménu nedovolá (' . ($kontrola['kod'] !== null ? 'robots.txt vrátil HTTP ' . $kontrola['kod'] : (string)$kontrola['chyba'])
+            . ') — zavřené cesty se zevnitř ověřit nedají, protože by „zavřeno“ vyšlo i u otevřených.';
+        return $vysledek;
+    }
 
     $migrace = glob(dracak_nasazeni_koren() . '/database/migrations/*.sql') ?: [];
     sort($migrace);
@@ -140,22 +165,15 @@ function dracak_nasazeni_zavrene_cesty(string $hostHlavicka, bool $https): array
         $cesty[] = 'database/migrations/' . basename((string)end($migrace));
     }
 
-    $zkusilo = 0;
     foreach ($cesty as $cesta) {
         $r = dracak_nasazeni_pozadavek($zakladna . '/' . $cesta);
         if ($r['kod'] === null) {
             $vysledek['cesty'][] = [$cesta, null, null, $r['chyba']];
             continue;
         }
-        $zkusilo++;
         $zavrene = in_array($r['kod'], [403, 404], true);
         $vysledek['cesty'][] = [$cesta, $r['kod'], $zavrene, $zavrene ? 'zavřeno' : 'DOSTUPNÉ ZVENKU (čekáno 403 nebo 404)'];
     }
-    if ($zkusilo === 0) {
-        $vysledek['chyba'] = 'Server se na vlastní doménu nedovolá (' . ($vysledek['cesty'][0][3] ?? 'bez odpovědi') . ') — tohle zevnitř ověřit nejde.';
-        return $vysledek;
-    }
-
     $r = dracak_nasazeni_pozadavek($zakladna . '/index.php');
     if ($r['kod'] !== null) {
         foreach (['x-frame-options', 'x-content-type-options', 'strict-transport-security'] as $h) {

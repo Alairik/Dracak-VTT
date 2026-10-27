@@ -153,6 +153,13 @@ MariaDB.** Postup, který v session fungoval:
   změněné soubory, chybějící soubor tedy další deploy sám nedoplní — drobná změna v tom souboru, nebo ruční FTP. Otestováno lokálně (manifest ze skutečného repa,
   čistý stav, chybějící / změněný / cizí soubor, uploads, bez / poškozený manifest, zavřené cesty proti routeru napodobujícímu `.htaccess`); na ostrém hostingu
   poběží až po prvním nasazení s touto změnou (do té doby „na serveru není manifest“).
+  **Po nezávislém code review (2026-10-28) opraveno:** (1) rozdělení SQL už neořezává víceřádkové texty, jejichž řádek začíná `--` (komentář jen mimo řetězec; na všech
+  101 migracích dává stejné příkazy jako dřív); (2) zakázané příkazy se hledají po příkazech a bez textu v řetězcích — věta s „truncate“ soubor neshodí a `ALTER … DROP`
+  (i bez slova COLUMN), DROP INDEX / FOREIGN KEY / VIEW se zastaví; (3) „už hotovo“ se uzná jen při odepřeném oprávnění (1142 / 1044) a u ALTER s víc klauzulemi musí být
+  hotová každá; `ADD INDEX` / `ADD CONSTRAINT` se už nepletou se sloupcem; (4) kontrola zavřených cest nejdřív ověří, že server vlastní doménu vidí (`robots.txt` = 200),
+  jinak by hosting odpovídající 404 na všechno vyrobil falešné „zavřeno“; hostitel jen z `Host` a IP / localhost jen při vývoji z loopbacku (SSRF); (5) sken serveru
+  přeskočí nečitelné složky a logy hostingu; (6) počet využití „jednou za kolo“ se čte po stránkách od startu souboje, ne z pevného okna; (7) `manifest.php` ukončí blok
+  `exclude` podle odsazení a na nepodporovanou syntaxi vzoru (`!`, `{}`, `[]`) deploy zastaví; (8) `zbran_vytasit.php` nemá předčasnou kontrolu akcí (bezplatné vytasení akci nepotřebuje).
 - **Hlídá to deploy:** poslední krok `deploy.yml` („Post-deploy security
   checks“) ověří na ostré doméně zavřené cesty, hlavičky a CSRF
   (POST se stejným Origin = 200, s cizím = 403). Červený krok = hosting

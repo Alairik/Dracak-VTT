@@ -14,12 +14,41 @@ $koren = getcwd();
 $vystup = $argv[1] ?? $koren . '/deploy-manifest.json';
 
 // --- vzory vyloučení z deploy.yml ---
-$yml = (string)file_get_contents($koren . '/.github/workflows/deploy.yml');
-if (!preg_match('/^\s*exclude:\s*\|\s*\n((?:[ \t]+\S.*\n?)+)/m', $yml, $m)) {
+// Blok `exclude: |` = všechny řádky odsazené hlouběji než samotný klíč `exclude:` (další klíč kroku, např. `dangerous-clean-slate:`,
+// je odsazený stejně jako `exclude:`, takže blok ukončí).
+$radky = explode("\n", (string)file_get_contents($koren . '/.github/workflows/deploy.yml'));
+$vzory = [];
+$nalezeno = false;
+$odsazeniKlice = 0;
+foreach ($radky as $radek) {
+    if (!$nalezeno) {
+        if (preg_match('/^(\s*)exclude:\s*\|\s*$/', $radek, $m)) {
+            $nalezeno = true;
+            $odsazeniKlice = strlen($m[1]);
+        }
+        continue;
+    }
+    if (trim($radek) === '') {
+        continue;
+    }
+    $odsazeni = strlen($radek) - strlen(ltrim($radek));
+    if ($odsazeni <= $odsazeniKlice) {
+        break;
+    }
+    $vzory[] = trim($radek);
+}
+if (!$nalezeno || !$vzory) {
     fwrite(STDERR, "V deploy.yml nenalezen blok exclude.\n");
     exit(1);
 }
-$vzory = array_values(array_filter(array_map('trim', explode("\n", $m[1])), static fn(string $r): bool => $r !== ''));
+// Podporujeme jen *, ** a ?. Cokoli dalšího (negace, složené závorky, výčty) by se vyložilo jinak než v nahrávací akci
+// a manifest by se tiše rozešel s tím, co se opravdu nahrálo — raději deploy zastavit.
+foreach ($vzory as $vzor) {
+    if (preg_match('/[!{}\[\]]/', $vzor)) {
+        fwrite(STDERR, "Vzor vyloučení „{$vzor}“ používá syntaxi, kterou manifest.php nezná (! { } [ ]). Doplň podporu, nebo vzor přepiš.\n");
+        exit(1);
+    }
+}
 
 // Glob jako v minimatch (s dot: true): ** přes složky, * a ? uvnitř jednoho názvu.
 function glob_na_regex(string $vzor): string

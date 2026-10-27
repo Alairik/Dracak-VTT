@@ -172,25 +172,37 @@ function dracak_vtt_zbrane_zdarma_zdroje(PDO $pdo, array $postava): array
     return $zdroje;
 }
 
-// Kolikrát tvor v tomhle kole využil vytasení bez akce z daného efektu (z událostí akce_provedena).
+// Kolikrát tvor v tomhle kole využil vytasení bez akce z daného efektu (z událostí akce_provedena). Události se čtou od nejnovějších
+// po stránkách, dokud se nenarazí na dřívější kolo — počet akcí v kole proto nic neusekne.
 function dracak_vtt_zbrane_zdarma_pouzito(PDO $pdo, int $mapaId, int $tokenId, int $cisloKola, string $efekt): int
 {
-    $q = $pdo->prepare('SELECT payload FROM svet_udalosti WHERE mapa_id = ? AND typ = "akce_provedena" ORDER BY id DESC LIMIT 120');
+    // Nic z dřívějšího souboje na téže mapě (kola se v novém souboji počítají znovu od 1).
+    $q = $pdo->prepare('SELECT COALESCE(MAX(id), 0) FROM svet_udalosti WHERE mapa_id = ? AND typ = "souboj_start"');
     $q->execute([$mapaId]);
+    $odStartu = (int)$q->fetchColumn();
+    $q = $pdo->prepare('SELECT id, payload FROM svet_udalosti WHERE mapa_id = ? AND typ = "akce_provedena" AND id > ? AND id < ? ORDER BY id DESC LIMIT 200');
     $pocet = 0;
-    foreach ($q->fetchAll(PDO::FETCH_COLUMN) as $json) {
-        $p = json_decode((string)$json, true);
-        if (!is_array($p) || (int)($p['token_id'] ?? 0) !== $tokenId) {
-            continue;
+    $hranice = PHP_INT_MAX;
+    while (true) {
+        $q->execute([$mapaId, $odStartu, $hranice]);
+        $radky = $q->fetchAll();
+        if (!$radky) {
+            return $pocet;
         }
-        if ((int)($p['cislo_kola'] ?? 0) !== $cisloKola) {
-            break;
-        }
-        if (($p['zdarma_efekt'] ?? null) === $efekt) {
-            $pocet++;
+        foreach ($radky as $r) {
+            $hranice = (int)$r['id'];
+            $p = json_decode((string)$r['payload'], true);
+            if (!is_array($p) || (int)($p['token_id'] ?? 0) !== $tokenId) {
+                continue;
+            }
+            if ((int)($p['cislo_kola'] ?? 0) < $cisloKola) {
+                return $pocet;
+            }
+            if ((int)($p['cislo_kola'] ?? 0) === $cisloKola && ($p['zdarma_efekt'] ?? null) === $efekt) {
+                $pocet++;
+            }
         }
     }
-    return $pocet;
 }
 
 // Který efekt dovolí tomuhle tvoru vytasit zbraň daného druhu bez akce právě teď (null = bez akce to nejde).

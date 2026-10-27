@@ -40,12 +40,9 @@ $jePj = $user['role'] === 'admin' || ($svetId > 0 && dracak_vtt_je_pj_sveta($use
 
 $boj = dracak_vtt_zbrane_boj_kontext($pdo, $postava);
 if ($boj !== null && !($jePj && !empty($data['bez_akce']))) {
-    // V boji: akce tahu `vytasit` (kontroluje tah, zbývající akce, ovládání tokenu i „zbraň je u sebe“).
+    // V boji: akce tahu `vytasit` (kontroluje tah, zbývající akce — bezplatné vytasení akci nepotřebuje —, ovládání tokenu i „zbraň je u sebe“).
     if (!$boj['na_tahu']) {
         odpoved_vytasit(422, ['error' => 'V boji zbraň vytasíš na svém tahu — stojí akci (nebo ji PJ změní bez akce).']);
-    }
-    if ($boj['akci_zbyva'] < 1) {
-        odpoved_vytasit(422, ['error' => 'V tomhle tahu už nemáš akci, kterou bys na vytasení zbraně měl.']);
     }
     [$mapa, , $jePjMapy, $uzivatel] = dracak_vtt_souboj_zacatek($boj['mapa_id']);
     $vysledek = dracak_vtt_souboj_proved_akci($pdo, $mapa, $jePjMapy, $uzivatel, [

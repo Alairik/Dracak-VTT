@@ -7,14 +7,12 @@ declare(strict_types=1);
 // od 22. 10. 2026 volání z GitHubu odmítá, a tak se změny pouští tlačítkem v administraci (rozhodnutí uživatele
 // 2026-10-27, varianta A). Pravidla zůstala stejná jako u migrate.php:
 //  - spouští se jen nové soubory, popořadě, každý jednou; co proběhlo, eviduje tabulka migrace_log;
-//  - soubor se zakázaným příkazem (DROP TABLE/COLUMN/DATABASE, TRUNCATE) se vůbec nespustí;
+//  - soubor se zakázaným příkazem (DROP, TRUNCATE, ALTER … DROP) se vůbec nespustí;
 //  - DB účet webu (Wedos) má jen SELECT/INSERT/UPDATE/DELETE, takže CREATE a ALTER neprovede — ruční SQL admin
 //    účtem v phpMyAdminu; tady se poznají a přeskočí jen tehdy, když už jsou provedené (sloupec / tabulka / index existuje);
 //  - MySQL/MariaDB DDL není transakční: soubor s víc ALTER příkazy, který spadne uprostřed, nechá hotové příkazy
 //    v databázi i po chybě (limit enginu).
 // Tabulku migrace_log si web účet založit nemůže — musí být založená ručně (viz dracak_migrace_sql_log()).
-
-const DRACAK_MIGRACE_ZAKAZANY_VZOR = '/\b(DROP\s+TABLE|DROP\s+COLUMN|DROP\s+DATABASE|TRUNCATE)\b/i';
 
 // Složka s migracemi; jen názvy NNNN_popis.sql (do spouštění se nedostane nic jiného).
 function dracak_migrace_slozka(): string
@@ -32,22 +30,32 @@ function dracak_migrace_sql_log(): string
         . ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;";
 }
 
-// Rozdělí soubor na jednotlivé příkazy. Řádky začínající "--" se zahodí celé, zbytek se prochází znak po znaku
-// a sleduje se, jestli jsme uvnitř řetězcového literálu — středník uvnitř řetězce (běžné u textu z pravidel)
-// se nepočítá jako konec příkazu. Rozpozná zdvojenou ('') i zpětným lomítkem (\') zapsanou uvozovku; není to
-// obecný SQL parser (neřeší dvojité uvozovky ani komentáře /* */ uvnitř řádku).
+// Rozdělí soubor na jednotlivé příkazy. Řádky začínající "--" jsou komentář a zahodí se — ale jen mimo řetězcový literál:
+// víceřádkový text z pravidel, jehož řádek začíná "-- " (odrážka, dialog), se nesmí tiše ořezat. Středník uvnitř řetězce
+// se nepočítá jako konec příkazu. Rozpozná zdvojenou ('') i zpětným lomítkem (\') zapsanou uvozovku; není to obecný SQL
+// parser (neřeší dvojité uvozovky ani komentáře /* */ a komentáře za příkazem na řádku — ty nechává databázi).
 function dracak_migrace_rozdel_sql(string $sql): array
 {
-    $radky = array_filter(explode("\n", $sql), static fn(string $r): bool => strpos(trim($r), '--') !== 0);
-    $clean = implode("\n", $radky);
-
     $prikazy = [];
     $aktualni = '';
-    $delka = strlen($clean);
+    $delka = strlen($sql);
     $vRetezci = false;
     $zpetna = 0;
+    $zacatekRadku = true;   // od začátku řádku byly jen bílé znaky
     for ($i = 0; $i < $delka; $i++) {
-        $ch = $clean[$i];
+        $ch = $sql[$i];
+        if (!$vRetezci && $zacatekRadku && $ch === '-' && ($sql[$i + 1] ?? '') === '-') {
+            $konec = strpos($sql, "\n", $i);
+            $i = $konec === false ? $delka : $konec;   // celý komentářový řádek včetně konce řádku pryč
+            $aktualni = rtrim($aktualni, " \t\r");     // i odsazení, které před ním už bylo načtené
+            $zacatekRadku = true;
+            continue;
+        }
+        if ($ch === "\n") {
+            $zacatekRadku = true;
+        } elseif ($ch !== ' ' && $ch !== "\t" && $ch !== "\r") {
+            $zacatekRadku = false;
+        }
         if ($ch === '\\') {
             $zpetna++;
             $aktualni .= $ch;
@@ -60,7 +68,7 @@ function dracak_migrace_rozdel_sql(string $sql): array
                 $aktualni .= $ch;
                 continue;
             }
-            if ($vRetezci && ($i + 1) < $delka && $clean[$i + 1] === "'") {
+            if ($vRetezci && ($i + 1) < $delka && $sql[$i + 1] === "'") {
                 $aktualni .= "''";
                 $i++;
                 continue;
@@ -87,6 +95,40 @@ function dracak_migrace_rozdel_sql(string $sql): array
     return $prikazy;
 }
 
+// Příkaz bez obsahu řetězců a identifikátorů v zpětných apostrofech — pro kontroly, které se nesmí splést o text z pravidel.
+function dracak_migrace_bez_retezcu(string $prikaz): string
+{
+    $bez = preg_replace("/'(?:[^'\\\\]|\\\\.|'')*'/s", "''", $prikaz);
+    return (string)preg_replace('/`[^`]*`/', '``', (string)$bez);
+}
+
+// Zakázaný příkaz (CLAUDE.md: žádný DROP, TRUNCATE ani jinak destruktivní ALTER bez výslovného schválení)? Vrací název
+// toho, co se našlo, nebo null. Kontroluje se každý příkaz zvlášť a bez textu v řetězcích, takže věta z pravidel se slovem
+// „truncate“ soubor neshodí, a naopak `ALTER TABLE … DROP sloupec` (i bez slova COLUMN), DROP INDEX / FOREIGN KEY / VIEW projde ven.
+function dracak_migrace_zakazany_prikaz(string $prikaz): ?string
+{
+    $bez = dracak_migrace_bez_retezcu($prikaz);
+    if (preg_match('/^\s*(DROP\s+\w+|TRUNCATE)\b/i', $bez, $m)) {
+        return strtoupper((string)preg_replace('/\s+/', ' ', $m[1]));
+    }
+    if (preg_match('/^\s*ALTER\b/i', $bez) && preg_match('/\bDROP\b/i', $bez)) {
+        return 'ALTER … DROP';
+    }
+    return null;
+}
+
+// První zakázaný příkaz v souboru, nebo null.
+function dracak_migrace_zakazany_v_souboru(string $sql): ?string
+{
+    foreach (dracak_migrace_rozdel_sql($sql) as $prikaz) {
+        $nalez = dracak_migrace_zakazany_prikaz($prikaz);
+        if ($nalez !== null) {
+            return $nalez;
+        }
+    }
+    return null;
+}
+
 // Obsahuje soubor CREATE nebo ALTER (DDL)? Web účet ho neprovede — musí se spustit ručně.
 function dracak_migrace_ma_ddl(string $sql): bool
 {
@@ -109,28 +151,83 @@ function dracak_migrace_je_create_if_not_exists(string $prikaz, ?string &$tabulk
     return false;
 }
 
-// Totéž pro ALTER TABLE — jen vzory, které pravidla repa u migrací povolují (ADD sloupec / index / cizí klíč, MODIFY
-// jako rozšíření výčtu ENUM nebo uvolnění na VARCHAR). Cokoli jiného se záměrně nepozná a skončí chybou: radši hlasitá
-// chyba než tiché přeskočení něčeho, co jsme neověřili.
-function dracak_migrace_alter_uz_hotovo(PDO $pdo, string $prikaz, ?string &$popis): bool
+// Rozdělí část ALTER TABLE za názvem tabulky na jednotlivé klauzule (oddělené čárkou mimo závorky a řetězce).
+function dracak_migrace_rozdel_klauzule(string $text): array
 {
-    if (!preg_match('/^ALTER\s+TABLE\s+`?(\w+)`?\s+(.*)$/is', trim($prikaz), $m)) {
-        return false;
+    $klauzule = [];
+    $aktualni = '';
+    $hloubka = 0;
+    $vRetezci = false;
+    $zpetna = 0;
+    $delka = strlen($text);
+    for ($i = 0; $i < $delka; $i++) {
+        $ch = $text[$i];
+        if ($ch === '\\') {
+            $zpetna++;
+            $aktualni .= $ch;
+            continue;
+        }
+        if ($ch === "'") {
+            $escapovana = $vRetezci && ($zpetna % 2) === 1;
+            $zpetna = 0;
+            if (!$escapovana) {
+                if ($vRetezci && ($text[$i + 1] ?? '') === "'") {
+                    $aktualni .= "''";
+                    $i++;
+                    continue;
+                }
+                $vRetezci = !$vRetezci;
+            }
+            $aktualni .= $ch;
+            continue;
+        }
+        $zpetna = 0;
+        if (!$vRetezci) {
+            if ($ch === '(') {
+                $hloubka++;
+            } elseif ($ch === ')') {
+                $hloubka--;
+            } elseif ($ch === ',' && $hloubka === 0) {
+                $klauzule[] = trim($aktualni);
+                $aktualni = '';
+                continue;
+            }
+        }
+        $aktualni .= $ch;
     }
-    $tabulka = $m[1];
-    $zbytek = trim($m[2]);
+    if (trim($aktualni) !== '') {
+        $klauzule[] = trim($aktualni);
+    }
+    return $klauzule;
+}
 
-    if (preg_match('/^ADD\s+(?:COLUMN\s+)?`?(\w+)`?/i', $zbytek, $mm)) {
-        $q = $pdo->prepare('SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?');
-        $q->execute([$tabulka, $mm[1]]);
+// Je jedna klauzule ALTER TABLE už provedená? Jen vzory, které pravidla repa u migrací povolují (ADD sloupec / index /
+// cizí klíč / primární klíč, MODIFY jako rozšíření výčtu ENUM nebo uvolnění na VARCHAR). Cokoli jiného se záměrně nepozná:
+// radši hlasitá chyba než tiché přeskočení něčeho, co jsme neověřili.
+function dracak_migrace_klauzule_hotova(PDO $pdo, string $tabulka, string $klauzule, ?string &$popis): bool
+{
+    $zbytek = trim($klauzule);
+
+    // Indexy a klíče napřed — obecné "ADD <jméno>" níž by jinak za sloupec považovalo slovo INDEX / KEY / CONSTRAINT.
+    if (preg_match('/^ADD\s+PRIMARY\s+KEY\b/i', $zbytek)) {
+        $q = $pdo->prepare('SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = "PRIMARY"');
+        $q->execute([$tabulka]);
         if ((int)$q->fetchColumn() > 0) {
-            $popis = "sloupec $tabulka.{$mm[1]} už existuje";
+            $popis = "tabulka $tabulka už má primární klíč";
             return true;
         }
         return false;
     }
-
-    if (preg_match('/^ADD\s+(?:CONSTRAINT\s+`?\w+`?\s+)?(?:UNIQUE\s+)?(?:KEY|INDEX)\s+`?(\w+)`?/i', $zbytek, $mm)) {
+    if (preg_match('/^ADD\s+CONSTRAINT\s+`?(\w+)`?\s+FOREIGN\s+KEY/i', $zbytek, $mm)) {
+        $q = $pdo->prepare('SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND CONSTRAINT_NAME = ?');
+        $q->execute([$tabulka, $mm[1]]);
+        if ((int)$q->fetchColumn() > 0) {
+            $popis = "cizí klíč $tabulka.{$mm[1]} už existuje";
+            return true;
+        }
+        return false;
+    }
+    if (preg_match('/^ADD\s+(?:CONSTRAINT\s+`?\w+`?\s+)?(?:UNIQUE\s+|FULLTEXT\s+|SPATIAL\s+)?(?:KEY|INDEX)\s+`?(\w+)`?/i', $zbytek, $mm)) {
         $q = $pdo->prepare('SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?');
         $q->execute([$tabulka, $mm[1]]);
         if ((int)$q->fetchColumn() > 0) {
@@ -140,11 +237,12 @@ function dracak_migrace_alter_uz_hotovo(PDO $pdo, string $prikaz, ?string &$popi
         return false;
     }
 
-    if (preg_match('/^ADD\s+CONSTRAINT\s+`?(\w+)`?\s+FOREIGN\s+KEY/i', $zbytek, $mm)) {
-        $q = $pdo->prepare('SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND CONSTRAINT_NAME = ?');
+    if (preg_match('/^ADD\s+(?:COLUMN\s+)?`?(\w+)`?/i', $zbytek, $mm)
+        && !preg_match('/^(CONSTRAINT|INDEX|KEY|UNIQUE|PRIMARY|FULLTEXT|SPATIAL|FOREIGN|CHECK|PERIOD)$/i', $mm[1])) {
+        $q = $pdo->prepare('SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?');
         $q->execute([$tabulka, $mm[1]]);
         if ((int)$q->fetchColumn() > 0) {
-            $popis = "cizí klíč $tabulka.{$mm[1]} už existuje";
+            $popis = "sloupec $tabulka.{$mm[1]} už existuje";
             return true;
         }
         return false;
@@ -184,13 +282,36 @@ function dracak_migrace_alter_uz_hotovo(PDO $pdo, string $prikaz, ?string &$popi
     return false;
 }
 
+// Je celý ALTER TABLE už proveden? Musí být hotová KAŽDÁ klauzule — příkaz s více klauzulemi, z nichž jen první už existuje,
+// se nesmí zapsat jako hotový (druhá by v databázi chyběla).
+function dracak_migrace_alter_uz_hotovo(PDO $pdo, string $prikaz, ?string &$popis): bool
+{
+    if (!preg_match('/^ALTER\s+TABLE\s+`?(\w+)`?\s+(.*)$/is', trim($prikaz), $m)) {
+        return false;
+    }
+    $popisy = [];
+    foreach (dracak_migrace_rozdel_klauzule($m[2]) as $klauzule) {
+        $p = null;
+        if (!dracak_migrace_klauzule_hotova($pdo, $m[1], $klauzule, $p)) {
+            return false;
+        }
+        $popisy[] = $p;
+    }
+    $popis = implode('; ', $popisy);
+    return $popisy !== [];
+}
+
 // Provede jeden příkaz. Vrací poznámku (prázdná, nebo "přeskočeno, protože už hotovo"); při chybě vyhodí PDOException.
+// Přeskočit se smí jen při odepřeném oprávnění (1142 / 1044) — jiná chyba (třeba špatná syntaxe) musí být vidět.
 function dracak_migrace_proved_prikaz(PDO $pdo, string $prikaz): string
 {
     try {
         $pdo->exec($prikaz);
         return '';
     } catch (PDOException $e) {
+        if (!in_array((int)($e->errorInfo[1] ?? 0), [1142, 1044], true)) {
+            throw $e;
+        }
         if (dracak_migrace_je_create_if_not_exists($prikaz, $tabulka)) {
             try {
                 $pdo->query('SELECT 1 FROM `' . $tabulka . '` LIMIT 1');
@@ -271,8 +392,9 @@ function dracak_migrace_spust(PDO $pdo): array
                 $vysledek['chyba'] = "Nejde přečíst $nazev.";
                 return $vysledek;
             }
-            if (preg_match(DRACAK_MIGRACE_ZAKAZANY_VZOR, $sql, $m)) {
-                $vysledek['chyba'] = "Změna $nazev obsahuje zakázaný příkaz ({$m[1]}). DROP a TRUNCATE se sem nikdy nepíší bez výslovného schválení — soubor se vůbec nespustil.";
+            $zakazany = dracak_migrace_zakazany_v_souboru($sql);
+            if ($zakazany !== null) {
+                $vysledek['chyba'] = "Změna $nazev obsahuje zakázaný příkaz ($zakazany). DROP, TRUNCATE ani destruktivní ALTER se sem nikdy nepíší bez výslovného schválení — soubor se vůbec nespustil.";
                 return $vysledek;
             }
             $vysledek['radky'][] = "Spouštím $nazev …";
