@@ -1209,9 +1209,11 @@ stavby“ v návrhu.**
     tj. ~49 HTTP požadavků, ~51 spojení do DB a po úpravě **~156 dotazů za minutu na hráče** (4 dotazy na polling: účet ze session, PJ světa, členství ve světě,
     události). Dřív ~206 — `dracak_vtt_je_pj_sveta()` se v jednom požadavku ptala na `svet.pj_ucet_id` dvakrát, teď si ho pamatuje (zakladatel světa se za provozu
     nemění). **Šest hráčů v rychlém režimu = ~300 požadavků a ~940 dotazů za minutu (5 požadavků / 16 dotazů za vteřinu)**, v klidu (4 s) zhruba třetina; pro
-    MariaDB je to zanedbatelné, limit hostingu na počet souběžných PHP procesů se ukáže až v ostré hře (chybu 503 / 508 by zachytil `admin_log.php` jen z prohlížeče,
-    proto sledovat i log hostingu). Další úspora by šla jen sloučením dotazů nebo delším intervalem; nedělá se, dokud se problém neprojeví.
-22. Rozvržení na tabletu/telefonu (panely, toolbar) [M]
+    MariaDB je to zanedbatelné, limit hostingu na počet souběžných PHP procesů se ukáže až v ostré hře (případné 503 / 508 od hostingu aplikace nezachytí — to je vidět jen v logu
+    hostingu a hráči jako výpadek aktualizací). Další úspora by šla jen sloučením dotazů nebo delším intervalem; nedělá se, dokud se problém neprojeví.
+22. Rozvržení na tabletu/telefonu (panely, toolbar) [M] — **kontrola 2026-10-28** (Playwright, telefon 390×844, tablet 820×1180 a 1180×820, hráč i PJ, mapa a
+    deník): žádné vodorovné přetékání stránky, panely a lišta nástrojů se vejdou, deník na telefonu má záhlaví statické a záložky pod ním; skutečné zařízení a
+    dotyková gesta (pinch, dlouhý stisk) dál čekají na zkoušku uživatele (scénář `docs/zkusebni-scenar-prvni-hra.md`)
 23. Zkušební scénář „první ostrá hra“ (cca 12 kroků) a jeho projití na dvou
     zařízeních [S] — **scénář napsaný: `docs/zkusebni-scenar-prvni-hra.md`** (2026-10-28), projití na dvou zařízeních čeká na uživatele
 

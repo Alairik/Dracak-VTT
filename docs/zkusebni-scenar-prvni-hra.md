@@ -9,6 +9,7 @@ testem toku pozvání, viz konec).
 1. Admin (ty) je přihlášený. **Správa účtů → Nový účet**: jeden účet s rolí PJ, jeden s rolí hráč (heslo aspoň 12 znaků).
 2. **Změny databáze** (menu administrace): pokud tam něco čeká, klikni na „Spustit čekající změny“. Má tam být „Všechno je aplikované“.
 3. **Kontrola nasazení**: po posledním nasazení má být „Všech N souborů sedí“. Tlačítko „Zkontrolovat“ má ukázat zavřené cesty (✓).
+4. **Chybový log** (menu administrace): před hrou ho vymaž tlačítkem „Vymazat log“, ať je po hře vidět jen to, co se stalo při ní.
 
 ## Scénář
 
@@ -26,6 +27,12 @@ testem toku pozvání, viz konec).
 | 10 | PJ | Nasadit efekt (např. Spánek, nebo Dikobraz u postavy s vrhacími zbraněmi). | Štítek na tokenu, trvání se odpočítává na konci kola, vytasení vrhací zbraně bez akce platí. |
 | 11 | PJ | Strhnout hráči životy z panelu tokenu. | Hráč to hned vidí v deníku (nemusí nic obnovovat). |
 | 12 | PJ | **Konec souboje**, pak v deníku postavy: odpočinek/spánek a únava. | Únava klesne podle pravidel, deník to ukáže. |
+
+## Po hře
+
+Otevři v administraci **Chybový log**. Co tam je, byla chyba, kterou hráč mohl cítit jako „nic se nestalo po kliknutí“ — u každého záznamu je čas, stránka,
+zařízení a jméno hráče. Prázdný log je dobrá zpráva. Záznamy typu „Chyba v prohlížeči“ jsou chyby JavaScriptu u hráčů, ostatní jsou chyby serveru.
+Pošli Claudovi pár nejnovějších (rozklikni je a zkopíruj text).
 
 ## Co zapisovat
 
