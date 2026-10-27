@@ -31,7 +31,11 @@ přestavěné podle prototypu; engine (`includes/vtt_denik.php`) a API zůstaly,
 - **Nosnost** bere engine z Tabulky nosnosti (`nosnost_podle_sily`, h1681), ne vzorec 360 + 30 × bonus z prototypu; **pohyblivost po naložení** se
   zaokrouhluje nahoru (b11149), prototyp zaokrouhloval jako obvykle.
 - **ÚČ v záhlaví** = ÚČ zbraně (nejméně 0) + postihy; může tedy vyjít záporné (hod = 1k6+ + ÚČ + opravy), stejně jako v hodu.
-- **Chybí (potřebují DB nebo rozhodnutí):** přesvědčení, šance na seslání a rezerva magů, přeškrtnutí základu vlastností při změně efektem (mechanika efektů
+- **Přesvědčení v záhlaví se nedělá — kniha ho do deníku zakazuje.** „Postava své přesvědčení zpravidla nikomu neprozrazuje … Přesvědčení se nezapisuje do
+  Osobního deníku, aby ho nemohli omylem přečíst jiní hráči“ (h107, b718; podobně b710: povahu a cíle ostatním hráčům hned neříkej). Prototyp (rozhodnutí 2
+  z komentářů) ho v záhlaví měl; platí kniha. Číselník `presvedceni` (pět druhů z h107) v DB je, `postavy` sloupec na přesvědčení nemají — kdyby ho uživatel chtěl
+  někde soukromě (jen PJ / jen vlastník, mimo deník), je to jedna drobná změna struktury a rozhodnutí, kdo to smí vidět.
+- **Chybí (potřebují DB nebo rozhodnutí):** šance na seslání a rezerva magů, přeškrtnutí základu vlastností při změně efektem (mechanika efektů
   vlastnosti zatím nemění).
 
 **Krok 2 hotový (2026-10-27, ruční SQL: `postava_predmety.u_sebe`):** zbraně „u sebe“ a **vytasení / výměna zbraně stojí v boji akci** (rozhodnutí uživatele;

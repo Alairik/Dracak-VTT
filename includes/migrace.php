@@ -244,6 +244,10 @@ function dracak_migrace_stav(PDO $pdo): array
 function dracak_migrace_spust(PDO $pdo): array
 {
     $vysledek = ['radky' => [], 'spusteno' => 0, 'chyba' => null];
+    // Větší datové migrace (stovky kB) můžou trvat déle než výchozí limit hostingu a zavřená záložka nesmí spuštění
+    // utnout uprostřed souboru.
+    ignore_user_abort(true);
+    @set_time_limit(300);
 
     // Dvě současná spuštění (dvojklik, dva admini) by se mohla přetahovat o stejný soubor.
     $zamek = (int)$pdo->query("SELECT GET_LOCK('dracak_migrace', 0)")->fetchColumn();
