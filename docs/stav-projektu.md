@@ -29,14 +29,13 @@ nebo odsouhlasené uživatelem, ne můj odhad).
 
 ### Čeká na ruční spuštění přes phpMyAdmin (admin účet)
 
-`migrate.php` běží pod DML-only účtem, takže DDL nikdy neprovede a **na
-prvním takovém souboru deploy zastaví** (HTTP 500 v posledním kroku
-`deploy.yml`; FTP část proběhne normálně, kód je nasazený). Všechno za
+Migrace běží pod DML-only účtem (od 2026-10-27 ze stránky Změny databáze v administraci, dřív `scripts/migrate.php`), takže DDL nikdy neprovede a **na
+prvním takovém souboru se zastaví** (stránka hlásí, že potřebuje ruční SQL; kód je nasazený). Všechno za
 ním čeká, dokud se to neprovede ručně.
 
 **Ruční DDL blok je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný soubor, ve
 kterém jsou všechny dosud neprovedené DDL příkazy; uživatel ho dostává jako
-text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-27): nic nečeká.** Blok „Zbraně u sebe“ (`0101`, ALTER) i „Vytasení bez akce“ (`0102`, vkládání řádků; do ručního SQL šel, protože migrace z GitHubu teď nejedou — viz „Deploy je od 22. 10. červený“ níž) uživatel provedl, kontroly vyšly 1 a 2, 3, 1. Blok „Iniciativa v2“ + „Zbraně a iniciativa“
+text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-27): nic nečeká.** Blok „Zbraně u sebe“ (`0101`, ALTER) i „Vytasení bez akce“ (`0102`, vkládání řádků; do ručního SQL šel, protože migrace z GitHubu nejely — viz „Deploy po 22. 10. a migrace z administrace“ níž) uživatel provedl, kontroly vyšly 1 a 2, 3, 1. Další migrace s daty se pouští tlačítkem v administraci. Blok „Iniciativa v2“ + „Zbraně a iniciativa“
 uživatel provedl (kontrolní SELECT vyšel 1, 4, 3) po tom, co první „sql proběhlo“ nesedělo — deploy po předčasném přesunu `0093`
 skončil na `1142 ALTER denied`, takže sloupce na serveru nebyly. **Poučení: migraci přesouvat do `database/migrations/` až podle
 čísel z kontrolního SELECTu, ne podle slov.** Migrace `0091`–`0096` jsou v `database/migrations/`: sloupce efektů (`0091`) a data (`0092`),
@@ -122,8 +121,8 @@ MariaDB.** Postup, který v session fungoval:
   opravenou 8.2.35 a uživatel pak přepnul na **PHP 8.4 — ověřeno
   22. 10. 2026 v logu deploye: 8.4.27 (opravená verze), smoke test i
   security checks zelené.** Verzi přepíná jen uživatel v administraci
-  WEDOSu; aktuální verzi vždy ukazuje první řádek výstupu `migrate.php`
-  v logu deploye. Kód běží na 8.4 (lokálně lint jen na 8.3); 8.5
+  WEDOSu; aktuální verzi dřív ukazoval první řádek výstupu `migrate.php`
+  v logu deploye; teď ji zjistíš v administraci WEDOSu. Kód běží na 8.4 (lokálně lint jen na 8.3); 8.5
   netestováno.
 - **Hotovo v kódu:** session cookie `HttpOnly` + `SameSite=Lax` + `Secure`
   (po HTTPS) + `use_strict_mode`; **ochrana proti CSRF** v
@@ -134,15 +133,18 @@ MariaDB.** Postup, který v session fungoval:
   nosniff, Referrer-Policy, HSTS 180 dní, bez X-Powered-By); `migrate.php`
   bere token jen z hlavičky (ne z `?token=`); `admin.php` nevypisuje text
   DB chyby; minimální délka hesla 12 znaků (existující účty se nemění).
-- **Deploy je od 22. 10. červený na kroku migrací — příčina je mimo kód (diagnostika 2026-10-27):** FTP nahrání proběhne a kód je
-  na serveru (FTP výpis kořene potvrdil `index.php`, `hra/`, `scripts/migrate.php`…), ale **z GitHub Actions (runner v USA, Phoenix) vrací
-  doména na všechny stránky aplikace HTTP 404** — `/index.php`, `/dashboard.php`, `/hra/svety.php`, `/assets/js/denik.js`, `scripts/migrate*.php`
-  (i soubor nahraný pod novým náhodným jménem), kdežto `/` (přihlašovací stránka) a `/robots.txt` vrací 200 a `/scripts/` 301. Soubory tedy existují
-  a něco na hostingu (pravidlo ve webu / firewall / blokace zahraničních přístupů — nejspíš z reakce na NÚKIB 22. 10.) je pro runner schová.
-  Důsledek: **všechny HTTP kroky deploye (migrace, smoke test, security checks) z GitHubu teď nemůžou projít**, a protože migrace jsou první z nich,
-  zbylé dva se ani nespustí. Jestli aplikace funguje v prohlížeči z ČR, z repa nejde ověřit. Zkoušený a zahozený postup: jednorázový
-  `migrate-<hex>.php` nahraný přes FTP akci (nahrání i smazání fungují, ale volání po HTTP je blokované stejně). Použitelné cesty
-  (čeká na rozhodnutí uživatele): migrace spouštěné z přihlášeného admin rozhraní (žádný endpoint, žádný token), nebo z cronu hostingu bez HTTP.
+- **Deploy po 22. 10. a migrace z administrace (rozhodnutí uživatele 2026-10-27, varianta A):** z GitHub Actions (runner v USA) vrací doména na všechny stránky
+  aplikace HTTP 404 (`/` a `/robots.txt` 200) — nejspíš blokace po NÚKIB 22. 10., příčina na straně hostingu; FTP nahrání funguje a kód je na serveru. Proto
+  deploy od 2026-10-27 **jen nahrává soubory přes FTP a generuje `config.php`**; kroky, které volaly web z GitHubu (migrace přes `scripts/migrate.php` s tokenem,
+  smoke test, kontrola zabezpečení), jsou pryč a `scripts/migrate.php` i `migrate_token` / secret `MIGRATE_TOKEN` zrušené (FTP deploy smaže soubor ze serveru sám).
+  **Změny databáze se pouští z administrace:** `admin_migrace.php` („Změny databáze“ v postranním menu, dlaždice na dashboardu), jen role admin, logika
+  `includes/migrace.php` (přenesená ze `scripts/migrate.php` beze změny pravidel): spouští jen soubory `NNNN_popis.sql` ze `database/migrations/`, popořadě, jednou
+  (evidence `migrace_log`), zastaví se na první chybě, soubor se zakázaným příkazem (DROP TABLE/COLUMN/DATABASE, TRUNCATE) nespustí vůbec, `CREATE`/`ALTER`,
+  které už ručně proběhly (sloupec / index / cizí klíč / tabulka existuje), přeskočí a zapíše; jiné DDL spadne na 1142 a stránka řekne, že potřebuje ruční SQL.
+  Spuštění je POST s tokenem v relaci (navíc k obraně proti cizímu webu v `auth.php`) a přesměrování (obnovení stránky nespustí nic znovu), souběžné spuštění
+  hlídá `GET_LOCK`. Bez tabulky `migrace_log` ukáže hotový příkaz k ručnímu založení. **Po pushi s novou migrací klikni v administraci na „Spustit čekající
+  změny“.** **Ztraceno s HTTP kroky:** smoke test (hlídal, že FTP nahrálo všechny soubory — to se na tomhle hostingu už stalo) a kontrola zavřených cest, hlaviček a CSRF;
+  teď ručně. Možné řešení (nepostavené): manifest souborů s kontrolními součty z deploye a jeho porovnání na stránce Změny databáze.
 - **Hlídá to deploy:** poslední krok `deploy.yml` („Post-deploy security
   checks“) ověří na ostré doméně zavřené cesty, hlavičky a CSRF
   (POST se stejným Origin = 200, s cizím = 403). Červený krok = hosting

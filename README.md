@@ -56,18 +56,18 @@ hosting je klasický sdílený PHP+MySQL, viz historie commitů.)
 2. V phpMyAdminu naimportuj **jen jednou, ručně**: `database/drd-db-schema-v1.sql`
    (nebo rovnou `drd-db-full-v1.sql`, obsahuje schéma i data), pak
    `database/0002_ucty_a_role.sql`. Cokoliv v `database/migrations/` už
-   NEIMPORTUJ ručně — o to se od téhle chvíle stará automatika (bod 4).
+   NEIMPORTUJ ručně — o to se od téhle chvíle stará stránka „Změny databáze“ (bod 4).
 3. V GitHub repu (Settings → Secrets and variables → Actions) nastav
    `FTP_SERVER`/`FTP_USERNAME`/`FTP_PASSWORD`, `DB_HOST`/`DB_NAME`/
-   `DB_USER`/`DB_PASS` a `MIGRATE_TOKEN` (libovolný dlouhý náhodný
-   řetězec, slouží jen jako sdílené heslo mezi GitHub Actions a
-   `scripts/migrate.php`).
-4. Push na `main` pak automaticky: nahraje soubory na FTP, vygeneruje
-   `config.php` na serveru (vč. `migrate_token`), a nakonec zavolá
-   `scripts/migrate.php` přes HTTPS, který spustí všechny nové soubory
-   z `database/migrations/` a zapíše je do tabulky `migrace_log`. Pokud
-   migrace selže, celý deploy job skončí červeně (žádné tiché
-   přeskočení) — zkontroluj log kroku "Run pending DB migrations".
+   `DB_USER`/`DB_PASS`. (Dřívější `MIGRATE_TOKEN` se už nepoužívá.)
+4. Push na `main` pak automaticky nahraje soubory na FTP a vygeneruje
+   `config.php` na serveru. Nové změny databáze se **nespouštějí samy**:
+   přihlášený admin klikne v administraci na „Změny databáze“
+   (`admin_migrace.php`) na „Spustit čekající změny“ — spustí se nové
+   soubory z `database/migrations/` a zapíšou se do tabulky `migrace_log`.
+   (Hosting od 22. 10. 2026 odmítá HTTP volání z GitHub Actions, takže
+   automatický krok po nasazení nešel. Deploy tedy jen nahrává soubory;
+   zabezpečení a úplnost nahrání je potřeba zkontrolovat ručně.)
 5. Otevři `setup-admin.php` (nahraj ho na hosting ručně přes FTP —
    `setup-admin.php` se z bezpečnostních důvodů nedeployuje automaticky)
    a založ první admin účet. Pak ho zase smaž.
@@ -77,23 +77,25 @@ hosting je klasický sdílený PHP+MySQL, viz historie commitů.)
 
 Nový soubor `database/migrations/NNNN_popis.sql` (číslo o 1 vyšší než
 poslední) — obsahuje jen `CREATE`/`ALTER ... ADD`/`INSERT`, nikdy `DROP`
-ani jinak destruktivní `ALTER` (`migrate.php` takový soubor sám odmítne
-spustit). Po pushi na `main` se sám aplikuje na produkci přes
-`scripts/migrate.php` — nic ručně spouštět nemusíš.
+ani jinak destruktivní `ALTER` (stránka Změny databáze takový soubor sama
+odmítne spustit). Po pushi na `main` se nahraje na server a admin ji pustí
+tlačítkem v administraci. `CREATE`/`ALTER` web účet neprovede (Wedos mu
+nedá právo) — ty se pustí ručně v phpMyAdminu pod admin účtem a stránka je
+pak pozná jako hotové.
 
 Technický detail, který stojí za znalost: MySQL/MariaDB dělá u `CREATE`/
 `ALTER` implicitní commit hned po příkazu (DDL není transakční jako v
-Postgresu). `migrate.php` migraci obaluje transakcí, ale ta reálně chrání
+Postgresu). `includes/migrace.php` migraci obaluje transakcí, ale ta reálně chrání
 jen `INSERT`/`UPDATE`/`DELETE` část — pokud má soubor víc `ALTER`
 příkazů a třetí selže, první dva zůstanou v DB aplikované natrvalo i po
 chybě. Drž proto migrace pokud možno malé, ať je dopad případné chyby
 předvídatelný.
 
-Dřívější pokus o automatizaci (`scripts/run_migrations.php`, GitHub
-Actions se připojoval k MySQL přímo) nefungoval — WEDOS na tomhle
-tarifu vzdálený přístup k MySQL vůbec nenabízí. Současné řešení to
-obchází: `migrate.php` běží přímo na webserveru a k databázi se
-připojuje lokálně, stejně jako zbytek appky.
+Dřívější pokusy o automatizaci nefungovaly: GitHub Actions se k MySQL
+nepřipojí (WEDOS na tomhle tarifu vzdálený přístup nenabízí) a od
+22. 10. 2026 hosting odmítá i HTTP volání z GitHubu. Současné řešení:
+migrace běží přímo na webserveru z přihlášené administrace a k databázi
+se připojují lokálně, stejně jako zbytek appky.
 
 ## Role
 

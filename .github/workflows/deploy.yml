@@ -20,7 +20,6 @@ jobs:
           DB_NAME: ${{ secrets.DB_NAME }}
           DB_USER: ${{ secrets.DB_USER }}
           DB_PASS: ${{ secrets.DB_PASS }}
-          MIGRATE_TOKEN: ${{ secrets.MIGRATE_TOKEN }}
         run: |
           php -r '
           $config = [
@@ -28,7 +27,6 @@ jobs:
               "db_name" => getenv("DB_NAME"),
               "db_user" => getenv("DB_USER"),
               "db_pass" => getenv("DB_PASS"),
-              "migrate_token" => getenv("MIGRATE_TOKEN"),
           ];
           $php = "<?php\n"
               . "// Vygenerováno GitHub Actions při deployi z repozitářových secrets.\n"
@@ -57,79 +55,3 @@ jobs:
             database/RUCNE-*.sql
             docs/**
             setup-admin.php
-
-      - name: Run pending DB migrations
-        run: |
-          response=$(curl -sS -w "\n%{http_code}" -X POST "https://vtt.zvelebil.online/scripts/migrate.php" \
-            -H "X-Migrate-Token: ${{ secrets.MIGRATE_TOKEN }}")
-          http_code=$(echo "$response" | tail -1)
-          body=$(echo "$response" | sed '$d')
-          echo "$body"
-          if [ "$http_code" -ge 400 ]; then
-            echo "::error::migrate.php vrátil HTTP $http_code"
-            exit 1
-          fi
-
-      - name: Post-deploy smoke test
-        run: |
-          # Nezalogovaný request na tyhle stránky vždycky skončí na
-          # dracak_require_login() dřív, než se stihne cokoli jiného —
-          # takže 404/5xx tady může znamenat jen "soubor na serveru
-          # fakticky chybí/spadl", ne "entita nenalezena" (to je jiná
-          # větev kódu, co se sem vůbec nedostane). Řeší nespolehlivost
-          # FTP přenosu na tomhle hostingu, co se v praxi ukázala: FTP
-          # deploy krok výš hlásil úspěch, ale soubor na produkci
-          # reálně chyběl.
-          fail=0
-          for path in dashboard.php editor.php pravidla.php hra/svety.php hra/svet.php hra/mapa.php hra/mapa_obrazek.php hra/denik.php hra/denik_tisk.php hra/druzina.php hra/api/postava_stav.php hra/api/hod_postavy.php hra/api/katalog_hledat.php hra/cesta.php hra/api/cesta_vypocet.php hra/api/mapa_stav.php hra/api/entita_inventar.php hra/api/token_uprava.php hra/api/token_presun_davka.php hra/api/token_duplikovat.php hra/api/kresba_pridat.php hra/api/kresba_smazat.php hra/api/souboj_konec.php hra/api/souboj_start.php hra/api/souboj_ucastnici.php hra/api/souboj_faze.php hra/api/souboj_hod.php hra/api/umysl_nastavit.php hra/api/tah_akce.php hra/api/tah_konec.php hra/api/vyzva_uprava.php hra/api/vyzva_hod.php hra/api/vyzva_zrus.php hra/api/nestvura_denik.php hra/api/akce_uprava.php hra/api/efekt_pridat.php hra/api/efekt_odebrat.php hra/api/obrazky_seznam.php hra/api/obrazek_nahrat.php hra/obrazek.php assets/js/mapa.js assets/js/souboj.js assets/js/kostky3d.js assets/js/hexy.js assets/css/mapa.css; do
-            code=$(curl -sS -o /dev/null -w "%{http_code}" "https://vtt.zvelebil.online/$path")
-            echo "$path -> HTTP $code"
-            if [ "$code" = "404" ] || [ "$code" -ge 500 ]; then
-              echo "::error::$path vrátil HTTP $code — soubor pravděpodobně chybí nebo spadl na serveru"
-              fail=1
-            fi
-          done
-          exit $fail
-
-      - name: Post-deploy security checks
-        run: |
-          # Ověřuje na ostré doméně, že zabezpečení z .htaccess a
-          # includes/auth.php opravdu funguje (hosting nemusí .htaccess
-          # direktivy respektovat — tichý neúspěch je horší než červený krok).
-          base="https://vtt.zvelebil.online"
-          fail=0
-
-          # 1) Soubory a složky, které musí být zvenku zavřené.
-          for path in config.php .ftp-deploy-sync-state.json includes/auth.php content/pravidla-pj.html database/migrations/0100_zbrane_kombinace_chvat.sql uploads/; do
-            code=$(curl -sS -o /dev/null -w "%{http_code}" "$base/$path")
-            echo "$path -> HTTP $code (čekáno 403 nebo 404)"
-            if [ "$code" != "403" ] && [ "$code" != "404" ]; then
-              echo "::error::$path je zvenku dostupné (HTTP $code)"
-              fail=1
-            fi
-          done
-
-          # 2) Bezpečnostní hlavičky.
-          hdrs=$(curl -sSI "$base/index.php")
-          for h in x-frame-options x-content-type-options strict-transport-security; do
-            if echo "$hdrs" | grep -qi "^$h:"; then
-              echo "hlavička $h OK"
-            else
-              echo "::error::chybí hlavička $h (mod_headers / .htaccess se neuplatnil)"
-              fail=1
-            fi
-          done
-          if echo "$hdrs" | grep -qi "^x-powered-by:"; then
-            echo "::warning::server prozrazuje verzi PHP v X-Powered-By"
-          fi
-
-          # 3) Ochrana proti CSRF: POST ze stejného webu projde (špatné
-          # přihlášení = HTTP 200 s formulářem), POST z cizího webu ne (403).
-          ok=$(curl -sS -o /dev/null -w "%{http_code}" -X POST -H "Origin: $base" -d "email=smoke@example.invalid&password=x" "$base/index.php")
-          bad=$(curl -sS -o /dev/null -w "%{http_code}" -X POST -H "Origin: https://evil.example" -d "email=smoke@example.invalid&password=x" "$base/index.php")
-          echo "POST se stejným Origin -> HTTP $ok (čekáno 200)"
-          echo "POST s cizím Origin -> HTTP $bad (čekáno 403)"
-          if [ "$ok" != "200" ]; then echo "::error::legitimní POST ze stejného webu neprošel (HTTP $ok)"; fail=1; fi
-          if [ "$bad" != "403" ]; then echo "::error::POST z cizího webu nebyl odmítnut (HTTP $bad)"; fail=1; fi
-
-          exit $fail

@@ -84,6 +84,7 @@ foreach ($pdo->query('SELECT ucet_id, tabulka FROM ucet_opravneni')->fetchAll() 
     <div class="sidebar-user"><?= htmlspecialchars($user['jmeno']) ?><span class="role-badge">admin</span></div>
     <a class="mock-item" href="dashboard.php">🏠 Dashboard</a>
     <a class="mock-item active" href="admin.php">Správa účtů</a>
+    <a class="mock-item" href="admin_migrace.php">Změny databáze</a>
     <a class="mock-item" href="editor.php">← Zpět do editoru</a>
     <div class="sidebar-bottom">
       <form method="post" action="logout.php"><button class="btn btn-ghost" style="width:100%;">Odhlásit se</button></form>

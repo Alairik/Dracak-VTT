@@ -63,6 +63,11 @@ $isAdmin = $user['role'] === 'admin';
       <div class="tile-title">Správa účtů</div>
       <div class="tile-desc">Zakládání účtů, role, oprávnění.</div>
     </a>
+    <a class="tile" href="admin_migrace.php">
+      <div class="tile-icon">🗄️</div>
+      <div class="tile-title">Změny databáze</div>
+      <div class="tile-desc">Spuštění nových změn po nasazení.</div>
+    </a>
     <?php endif; ?>
   </div>
 </div>

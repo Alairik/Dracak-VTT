@@ -1,10 +1,11 @@
 # Dracak-VTT — pravidla pro práci v repu
 
 - **Nikdy nedávej hesla ani jiné přihlašovací údaje do repa.** `config.php`
-  je v `.gitignore` a musí tam zůstat — reálné přístupy k databázi, FTP i
-  `migrate_token` patří jen do GitHub Secrets (`FTP_SERVER`, `FTP_USERNAME`,
-  `FTP_PASSWORD`, `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASS`,
-  `MIGRATE_TOKEN`) a lokálního `config.php` na hostingu, nikdy do commitu.
+  je v `.gitignore` a musí tam zůstat — reálné přístupy k databázi a FTP
+  patří jen do GitHub Secrets (`FTP_SERVER`, `FTP_USERNAME`,
+  `FTP_PASSWORD`, `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASS`) a lokálního
+  `config.php` na hostingu, nikdy do commitu. (Secret `MIGRATE_TOKEN` už
+  se nepoužívá — migrace se pouští z administrace, viz níž; jde smazat.)
 - **Nikdy nemaž `.ftp-deploy-sync-state.json`.** Je to stavový soubor
   `SamKirkland/FTP-Deploy-Action`, který si drží FTP server mezi nasazeními
   — bez něj by další deploy nahrál/smazal víc, než je potřeba.
@@ -17,53 +18,62 @@
   (fast-forward, bez PR) a pushni; na to se neptej, nečekej na
   potvrzení a nenech hotovou práci ležet na vedlejší větvi. Jediné, co
   uživateli po pushi řekni, je co z toho vyžaduje jeho ruku (typicky
-  migrace s CREATE/ALTER, viz níž — ty `migrate.php` nespustí a zastaví
-  se na nich, takže následující migrace čekají, dokud je neprovede).
+  migrace s CREATE/ALTER, viz níž — ty web účet nespustí a stránka
+  „Změny databáze“ se na nich zastaví, takže následující migrace čekají,
+  dokud je neprovede; a že po nasazení s novou migrací má v administraci
+  kliknout na „Spustit čekající změny“).
 - **Nová DB migrace = nový soubor v `database/migrations/NNNN_popis.sql`,
-  nikdy úprava starého.** Po pushi na `main` se automaticky spustí sama —
-  poslední krok `deploy.yml` po úspěšném FTP Deploy zavolá
-  `scripts/migrate.php` na produkci přes HTTPS (WEDOS nedovoluje GitHub
-  Actions připojit se k MySQL přímo zvenčí, takže migrace běží PHP
-  skriptem přímo na serveru, který se k DB připojuje lokálně —
-  `migrate.php` si drží seznam už spuštěných souborů v tabulce
-  `migrace_log`, takže je bezpečné volat ho po každém deployi).
+  nikdy úprava starého.** Po pushi na `main` se nahraje na server, ale
+  **nespustí se sama**: admin (uživatel) klikne v administraci na stránce
+  „Změny databáze“ (`admin_migrace.php`, logika `includes/migrace.php`) na
+  „Spustit čekající změny“ (rozhodnutí uživatele 2026-10-27, varianta A).
+  Důvod: hosting od 22. 10. 2026 odmítá HTTP volání z GitHub Actions
+  (404), takže dřívější automatický krok `scripts/migrate.php` přes HTTPS
+  s tokenem nešel a byl zrušen; WEDOS navíc nedovoluje připojit se k MySQL
+  zvenčí. Migrace běží PHP přímo na serveru, k DB se připojuje lokálně;
+  seznam už spuštěných souborů drží tabulka `migrace_log`, takže je
+  bezpečné stránku spustit kdykoli. **Po pushi s novou migrací to
+  uživateli řekni** (jedna věta: „po nasazení klikni v administraci na
+  Změny databáze“) — deploy už to nehlídá.
   Jakmile je migrace jednou aplikovaná, její obsah je fixní navždy,
   oprava jde jen dalším novým souborem.
   `database/drd-db-schema-v1.sql`, `drd-db-full-v1.sql` a `0002_ucty_a_role.sql`
   (mimo `migrations/`) jsou jednorázový ruční import odlišný od
-  číslovaných migrací — `migrate.php` se jich netýká.
+  číslovaných migrací — `admin_migrace.php` se jich netýká.
 - **Migrace smí obsahovat jen CREATE, ALTER ADD a INSERT. Nikdy DROP ani
   jinak destruktivní ALTER (DROP COLUMN, DROP DATABASE, TRUNCATE) bez
-  výslovného schválení v konverzaci.** `migrate.php` to navíc vynucuje
+  výslovného schválení v konverzaci.** `includes/migrace.php` to navíc vynucuje
   automaticky — soubor obsahující zakázaný příkaz odmítne spustit celý,
   i tu neškodnou část před ním.
 - **MySQL/MariaDB DDL (CREATE TABLE, ALTER TABLE) není transakční** — dělá
-  implicitní commit hned po příkazu. `migrate.php` obaluje soubor
+  implicitní commit hned po příkazu. `includes/migrace.php` obaluje soubor
   transakcí kvůli INSERT/UPDATE části, ale u migrace s víc ALTER příkazy,
   kde třetí selže, první dva zůstanou v DB natrvalo i po chybě — to je
   limit enginu, ne chyba skriptu. Drž migrace pokud možno malé a
   soustředěné na jednu věc.
-- **DB účet, kterým `migrate.php` běží (`w...`), má na Wedosu natvrdo jen
+- **DB účet, kterým web a stránka Změny databáze běží (`w...`), má na Wedosu natvrdo jen
   DML (SELECT/INSERT/UPDATE/DELETE) — nikdy CREATE ani ALTER.** To není
   nastavitelné, GRANT selže i pod admin účtem (`a...`), Wedos to
   zákazníkovi nedovolí vůbec. Proto:
   - Tabulka `migrace_log` musí zůstat založená ručně přes phpMyAdmin
     pod **admin** účtem. Pokud by někdy zmizela (nová DB, obnova ze
-    zálohy…), `migrate.php` na ní spadne — sám si ji založit nemůže.
+    zálohy…), stránka Změny databáze ji nenajde a ukáže hotový příkaz k ručnímu
+    spuštění — sama si ji založit nemůže.
   - Jakákoli migrace obsahující CREATE/ALTER musí být po pushi **ručně**
     spuštěná přes phpMyAdmin (admin účet) a zapsaná do `migrace_log` —
-    `migrate.php` pod web účtem takový příkaz nikdy neprovede. Migrace
+    stránka Změny databáze pod web účtem takový příkaz nikdy neprovede. Migrace
     obsahující jen INSERT/UPDATE/DELETE proběhnou automaticky v pořádku.
-  - `migrate.php` má fallback na `CREATE TABLE IF NOT EXISTS migrace_log`
-    (zkusí ho, při zamítnutí ověří dostupnost tabulky přes SELECT) — to
-    řeší jen to, že tabulka už existuje, ne založení nové.
+  - Stránka Změny databáze pozná ALTER ADD (sloupec / index / cizí klíč)
+    a CREATE TABLE IF NOT EXISTS, které už ručně proběhly, přeskočí je a
+    zapíše do `migrace_log` — řeší to jen „už existuje“, ne založení nového.
+    Jiné DDL spadne na 1142 a stránka řekne, že potřebuje ruční SQL.
 - **Ruční SQL (DDL) vždy pošli jako hotový text ke zkopírování.**
   Uživatel chce jen Ctrl+C / Ctrl+V do phpMyAdminu — nikdy "spusť
   soubor X", "otevři migraci Y" ani "uprav si to". Uživatel to už
   opakoval ve víc konverzacích, takže se na to neptá a nečeká, že
   si to vyžádá znovu. Vždy:
   1. Udržuj **`docs/sql-k-rucnimu-spusteni.sql`** — jeden blok se
-     VŠEMI dosud neprovedenými příkazy, co `migrate.php` neumí
+     VŠEMI dosud neprovedenými příkazy, co web účet neumí
      (CREATE, ALTER, DROP…), v pořadí, s krátkými komentáři.
   2. V odpovědi uživateli vlož jeho **celý obsah** do code blocku
      (SQL, bez vynechávek a "…"), i když jsi ho posílal už dřív a i
@@ -78,7 +88,8 @@
   4. Než ho pošleš, ověř na lokální MariaDB (postup v
      `docs/stav-projektu.md`), že blok projde na kopii produkčního
      stavu (i po částečném provedení a po druhém spuštění) a že po něm
-     `migrate.php` pod DML-only účtem doběhne bez chyby.
+     stránka Změny databáze (`admin_migrace.php`) pod DML-only účtem doběhne
+     bez chyby.
   5. Po potvrzení, že ho provedl, soubor přepiš na aktuální stav
      (prázdný, nebo jen nové příkazy od té doby).
 - **Otázky uživateli piš lidsky, česky, bez databázové a programátorské
@@ -89,10 +100,14 @@
   které jsou opravdu jeho: co má hra dělat z pohledu hráče/PJ, nebo jak
   to je v knize. Každá otázka: jedna věta co se rozhoduje, příklad z hry,
   a tvoje doporučení.
-- **`scripts/` smí na serveru obsahovat JEN `migrate.php`.** Nic jiného
-  se tam nepřidává, aniž by se zároveň upravil `exclude` v `deploy.yml`
-  — momentálně se `scripts/` nijak nevylučuje (spoléhá se na to, že tam
-  nic jiného není), takže by se cokoliv dalšího nahrálo na veřejný web.
+- **Složka `scripts/` v repu není** (starý `scripts/migrate.php` se
+  tokenem a voláním z GitHubu zrušil 2026-10-27; deploy ho ze serveru
+  smaže sám). Nepřidávej ji zpět s ničím, co jde zavolat přes HTTP bez
+  přihlášení — `deploy.yml` ji nevylučuje, nahrálo by se to na veřejný web.
+- **Deploy (`deploy.yml`) jen nahraje soubory přes FTP.** Kroky, které
+  volaly web z GitHubu (migrace, smoke test, kontrola zabezpečení), jsou
+  pryč — hosting je z GitHubu odmítá. Kontrolu zabezpečení (zavřené cesty,
+  hlavičky, CSRF) i to, že se FTP nahrálo celé, je třeba dělat ručně.
 - **`setup-admin.php` se nikdy nedeployuje** (viz `exclude` v `deploy.yml`)
   — má přístup k DB a zakládá admin účty, nepatří na veřejný web.
 - **`content/` drží fragmenty rulebooku pro `pravidla.php`** (`pravidla-hrac.html`,
