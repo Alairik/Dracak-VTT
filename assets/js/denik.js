@@ -91,15 +91,21 @@
   });
   // Vytasení / výměna zbraně: mimo boj zdarma, v souboji stojí akci (h1606) — server ji odečte a posune tah.
   // Klepnutí na ÚČ v záhlaví vytasí další zbraň z těch, které jde vytasit; „Vytasit“ v tabulce Boj tu zbraň, u které je.
-  async function vytasit(zbranId, nazev) {
+  async function vytasit(zbranId, nazev, zdarma) {
     const koren = document.getElementById('denik');
     const vBoji = !!koren && koren.dataset.boj === '1';
     const bezAkce = !!(document.getElementById('dn-bez-akce') || {}).checked;
-    if (vBoji && !bezAkce && !window.confirm('Vytasit ' + (nazev || 'zbraň') + '? V boji to stojí jednu akci z tvého tahu.')) return;
+    if (vBoji && !bezAkce) {
+      const text = zdarma
+        ? 'Vytasit ' + (nazev || 'zbraň') + ' bez akce (' + zdarma + ')? Využiješ tím možnost, která se obnoví až příští kolo.'
+        : 'Vytasit ' + (nazev || 'zbraň') + '? V boji to stojí jednu akci z tvého tahu.';
+      if (!window.confirm(text)) return;
+    }
     zaneprazdneno = true;
     try {
       const d = await volej('api/zbran_vytasit.php', { postava_id: Number(ID), zbran_id: zbranId, bez_akce: bezAkce });
-      if (d && !d.zdarma) hlaska((nazev || 'Zbraň') + ' vytasena — stálo to akci' + (d.akci_zbyva !== undefined ? ', v této půlce kola ti jich zbývá ' + d.akci_zbyva : '') + '.', true);
+      if (d && d.efekt) hlaska((nazev || 'Zbraň') + ' vytasena bez akce (' + d.efekt + ').', true);
+      else if (d && !d.zdarma) hlaska((nazev || 'Zbraň') + ' vytasena — stálo to akci' + (d.akci_zbyva !== undefined ? ', v této půlce kola ti jich zbývá ' + d.akci_zbyva : '') + '.', true);
     } finally {
       zaneprazdneno = false;
     }
@@ -108,7 +114,7 @@
   document.addEventListener('click', function (ev) {
     const z = ev.target.closest('[data-dalsi-zbran], [data-vytasit]');
     if (!z || !wrap.contains(z) || z.disabled) return;
-    vytasit(Number(z.dataset.dalsiZbran || z.dataset.vytasit), z.dataset.nazev || '');
+    vytasit(Number(z.dataset.dalsiZbran || z.dataset.vytasit), z.dataset.nazev || '', z.dataset.zdarma || '');
   });
 
   // V mapě (iframe) dá deník mapě vědět, že se něco změnilo — mapa si hned stáhne nový stav (životy, inventář…).

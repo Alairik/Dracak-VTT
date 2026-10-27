@@ -236,6 +236,7 @@ function dracak_vtt_zbrane_postavy(PDO $pdo, array $postava, int $bonusSil, int 
             'rodova' => $rodova,
             'drzena' => isset($postava['drzena_zbran_id']) && (int)$postava['drzena_zbran_id'] === (int)$z['id'],
             'u_sebe' => (bool)(int)$z['u_sebe'],
+            'kategorie' => $z['kategorie_zbrane'],
             'uc_tvar_v_tvar' => $uc['uc_tvar_v_tvar'],
             'uc_strelecky' => $uc['uc_strelecky'],
         ];

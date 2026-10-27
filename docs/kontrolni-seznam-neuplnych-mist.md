@@ -436,6 +436,11 @@ knihou a opraví najednou. Pravidlo je v `CLAUDE.md`.
 - [ ] **Elixír Démonní krve** (h1067): „+2 stupeň síly a obratnosti – max 21+5“. Prototyp bere +2 body vlastnosti; pokud je „stupeň“ krok v tabulce
   bonusů (tj. +4 body), je to jinak. Ověř podle knihy.
 
+**Vytasení bez akce (2026-10-27)**
+- [ ] Kniha píše **Erithen** (h1094, b7751–b7755, i h1094 nadpis „Rychlé tasení“), povolání v DB a v ostatních textech je **Erythen**. Pravopis nechán, jak je; jednotný tvar určí korektura.
+- [ ] Past u Rychlého tasení cizí zbraně: „Obr ~ 7 ~ Obr tasení/nic“ (b7752) — zdvojené „Obr“ a smysl čísla 7 jsou v knize nejasné (poznámka b7753), vyhodnocuje PJ.
+- [ ] **U 19 zbraní katalogu chybí `kategorie_zbrane`** (např. Fuuma shuriken, Hvězdice-bumerang, Atlatl, Rachejtle, Řetězový meč, Kouzelný luk); boj je proto nepovažuje za „tváří v tvář“ ani „vrhací“ a Rychlé tasení / Dikobraz se na ně neuplatní (vytasení stojí akci). Doplnit druh, až se projdou.
+
 **Zbraně a iniciativa (2026-10-17, tabulky zbraní uživatele b14664–b14827)**
 - [ ] Základní tabulka zbraní označuje ‡ („vždy ztrácí iniciativu“) i **Válečnou sekeru** (b10672), nová tabulka ji ve „střední
   obouruční“ bez hvězdičky nemá. Podle pravidla „homebrew má přednost“ platí nová tabulka: Válečná sekera (obouruční) postih nemá.

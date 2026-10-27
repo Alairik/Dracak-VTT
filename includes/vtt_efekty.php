@@ -49,6 +49,8 @@ const DRACAK_VTT_EFEKT_SLOZKY = [
     'nehybny' => 'v obraně platí jako nehybný protivník (h1613)',
     'zraneni_x_uroven' => 'zranění útoku na něj se násobí jeho úrovní (spící jako vyřazený, h1613 b10736; postava nejvýš ×9, nestvůra životaschopností)',
     'tik_zivoty' => 'na začátku každého kola hod kostkou: −1 ubírá životy, 1 léčí',
+    'tasit_zdarma' => 'vytasení zbraně nestojí akci (parametr = druhy zbraní: tvt, vrhaci; hodnota = kolikrát za kolo, prázdná = bez omezení)',
+    'pasivni' => 'efekt platí trvale, dokud tvor má schopnost, ke které je připojen (schopnost_efekty) — nenasazuje se jako aktivní efekt',
 ];
 
 function dracak_vtt_efekty_funkce(): bool
@@ -129,6 +131,11 @@ function dracak_vtt_efekt_slozka_text(array $s): string
             return 'v obraně jako nehybný';
         case 'zraneni_x_uroven':
             return 'zranění na něj ×úroveň';
+        case 'tasit_zdarma':
+            $druhy = implode(' nebo ', array_map(static fn(string $d): string => $d === 'vrhaci' ? 'vrhací' : 'tváří v tvář', array_filter(explode(',', (string)$s['parametr']))));
+            return 'vytasení ' . ($druhy !== '' ? $druhy . ' zbraně ' : 'zbraně ') . 'bez akce' . ($s['hodnota'] !== null ? ' (' . (int)$s['hodnota'] . '× za kolo)' : '');
+        case 'pasivni':
+            return 'trvalá schopnost';
         case 'tik_zivoty':
             $k = $s['pocet_kostek'] !== null && $s['typ_kostky'] !== null
                 ? dracak_vtt_kostky_text((int)$s['pocet_kostek'], (string)$s['typ_kostky'], (int)($s['pevny_bonus'] ?? 0)) : 'kostky ze zdroje';
@@ -170,6 +177,7 @@ function dracak_vtt_efekty_aktivni(PDO $pdo, string $typ, int $entitaId): array
 //   ini_duvody                                  texty do logu iniciativy
 //   nemuze_jednat / nemuze_branit / nehybny / zraneni_x_uroven   název efektu, který to způsobuje, jinak null
 //   tiky                                        [{aktivni_id, nazev, znamenko, kostky: "1k4"}] na začátku kola
+//   tasit_zdarma                                [{efekt, limit: ?int za kolo, rozsah: [tvt|vrhaci]}] — vytasení zbraně bez akce
 // Nestackovatelný efekt se počítá jednou, i kdyby ve starých datech byl nasazený víckrát.
 function dracak_vtt_efekty_souhrn(PDO $pdo, string $typ, int $entitaId): array
 {
@@ -177,6 +185,7 @@ function dracak_vtt_efekty_souhrn(PDO $pdo, string $typ, int $entitaId): array
         'uc_bonus' => 0, 'oc_bonus' => 0, 'ini_bonus' => 0, 'beh_hexu' => 0,
         'opravy_uc' => [], 'opravy_oc' => [], 'ini_radky' => [], 'ini_duvody' => [],
         'nemuze_jednat' => null, 'nemuze_branit' => null, 'nehybny' => null, 'zraneni_x_uroven' => null, 'tiky' => [],
+        'tasit_zdarma' => [],
     ];
     if (!in_array($typ, ['postava', 'nestvura_instance'], true) || $entitaId <= 0) {
         return $s;
@@ -224,6 +233,13 @@ function dracak_vtt_efekty_souhrn(PDO $pdo, string $typ, int $entitaId): array
                 case 'nehybny':
                 case 'zraneni_x_uroven':
                     $s[$sl['druh']] ??= $ae['nazev'];
+                    break;
+                case 'tasit_zdarma':
+                    $s['tasit_zdarma'][] = [
+                        'efekt' => $ae['nazev'],
+                        'limit' => $sl['hodnota'] !== null ? (int)$sl['hodnota'] : null,
+                        'rozsah' => array_values(array_filter(array_map('trim', explode(',', (string)$sl['parametr'])))),
+                    ];
                     break;
                 case 'tik_zivoty':
                     $kostky = null;

@@ -78,6 +78,20 @@ function dracak_vtt_souboj_proved_akci(PDO $pdo, array $mapa, bool $jePj, array 
             . ' FROM kolo_iniciativa WHERE mapa_id = ? AND token_id = ? FOR UPDATE');
         $q->execute([$mapaId, $tokenId]);
         $ki = $q->fetch();
+        // Vytasení zbraně bez akce (efekt se složkou tasit_zdarma: Erythen — Rychlé tasení, Dikobraz): neubere akci a není
+        // „akce kola“ (nemění slib úkonu ani pořadí tahu), jen se zapíše do logu a započítá do limitu „jednou za kolo“.
+        $zdarmaEfekt = null;
+        if ($druh === 'vytasit' && $info[$tokenId]['typ_entity'] === 'postava') {
+            $postavaZdarma = dracak_vtt_entity_row('postava', (int)$info[$tokenId]['entita_id']);
+            if ($postavaZdarma) {
+                $zdarmaEfekt = dracak_vtt_zbrane_zdarma($pdo, $postavaZdarma, (int)($data['zbran_id'] ?? 0), [
+                    'mapa_id' => $mapaId, 'token_id' => $tokenId, 'cislo_kola' => $stav['cislo_kola'],
+                ]);
+                if ($zdarmaEfekt !== null) {
+                    $pocet = 0;
+                }
+            }
+        }
         $kvota = $ki ? dracak_vtt_souboj_kvota((int)$ki['akce_celkem'], (int)$ki['akce_zbyvajici'], $stav['polovina']) : 0;
         if ($pocet > $kvota) {
             $konec(422, 'V tomhle tahu smíš odehrát už jen ' . $kvota . ' ' . ($kvota === 1 ? 'akci' : 'akcí') . '.');
@@ -93,7 +107,7 @@ function dracak_vtt_souboj_proved_akci(PDO $pdo, array $mapa, bool $jePj, array 
         if ($ki && $v2 && !empty($ki['zavazek'])) {
             $splniUkon = in_array($druh, DRACAK_VTT_ZAVAZEK_AKCE[$ki['zavazek']] ?? [], true);
             $ukonNazev = DRACAK_VTT_ZAVAZEK_NAZVY[$ki['zavazek']] ?? (string)$ki['zavazek'];
-            $prvniPorusena = !$splniUkon && (int)$ki['akce_hotovo'] === 0;
+            $prvniPorusena = $pocet > 0 && !$splniUkon && (int)$ki['akce_hotovo'] === 0;
         }
 
         // Mapová část akce — pravidla pohybu, čela a dosahu; při porušení skončí chybou.
@@ -187,7 +201,9 @@ function dracak_vtt_souboj_proved_akci(PDO $pdo, array $mapa, bool $jePj, array 
             }
         }
 
-        if ($v2) {
+        if ($pocet === 0) {
+            // vytasení bez akce — počítadla akcí se nemění
+        } elseif ($v2) {
             $pdo->prepare('UPDATE kolo_iniciativa SET akce_zbyvajici = akce_zbyvajici - ?, akce_hotovo = akce_hotovo + ?, zavazek_hotovo = zavazek_hotovo + ? WHERE mapa_id = ? AND token_id = ?')
                 ->execute([$pocet, $pocet, $splniUkon ? $pocet : 0, $mapaId, $tokenId]);
         } else {
@@ -212,7 +228,8 @@ function dracak_vtt_souboj_proved_akci(PDO $pdo, array $mapa, bool $jePj, array 
             'druh' => $druh,
             'druh_nazev' => DRACAK_VTT_AKCE_DRUHY[$druh],
             'zbran_nazev' => $vytasenaZbran,
-            'pocet' => $opakovani,
+            'zdarma_efekt' => $zdarmaEfekt,
+            'pocet' => $pocet,
             'akce_zbyvajici' => (int)$ki['akce_zbyvajici'] - $pocet,
             'cil_token_id' => $pohyb['mapove'] ? $pohyb['cil_token_id'] : null,
             'cil_label' => $pohyb['mapove'] ? $pohyb['cil_label'] : null,
@@ -247,7 +264,7 @@ function dracak_vtt_souboj_proved_akci(PDO $pdo, array $mapa, bool $jePj, array 
         ]), $pohyb['x'], $pohyb['y']);
     };
     return [
-        'odpoved' => ['ok' => true, 'udalost_id' => $eventId, 'posun' => $posun, 'vyzva_id' => $vyzvaId],
+        'odpoved' => ['ok' => true, 'udalost_id' => $eventId, 'posun' => $posun, 'vyzva_id' => $vyzvaId, 'zdarma_efekt' => $zdarmaEfekt],
         'po_commitu' => $poCommitu,
     ];
 }

@@ -9,8 +9,10 @@ require_once __DIR__ . '/../../includes/vtt_souboj_akce.php';
 // zapíše se do logu a tah jde dál stejně jako u každé jiné akce. Postava musí být na tahu a zbraň mít u sebe;
 // PJ může zbraň změnit i bez akce (`bez_akce`), třeba při překvapení nebo opravě omylu.
 //
+// Bez akce to jde i tehdy, když to dovolí efekt (Erythen — Rychlé tasení, Dikobraz): `zdarma` = true a `efekt` = jeho název.
+//
 // Vstup JSON: {postava_id, zbran_id (0 = prázdné ruce), bez_akce?: bool (jen PJ)}
-// Výstup: {ok, zdarma: bool, zbran: ?string, akci_zbyva?: int}
+// Výstup: {ok, zdarma: bool, efekt?: ?string, zbran?: ?string, akci_zbyva?: int}
 header('Content-Type: application/json; charset=utf-8');
 $user = dracak_require_login();
 
@@ -53,7 +55,11 @@ if ($boj !== null && !($jePj && !empty($data['bez_akce']))) {
         ($vysledek['po_commitu'])();
     }
     $po = dracak_vtt_zbrane_boj_kontext($pdo, dracak_vtt_entity_row('postava', $postavaId) ?: $postava);
-    echo json_encode(['ok' => true, 'zdarma' => false, 'akci_zbyva' => $po['akci_zbyva'] ?? 0, 'posun' => $vysledek['odpoved']['posun'] ?? null], JSON_UNESCAPED_UNICODE);
+    $efekt = $vysledek['odpoved']['zdarma_efekt'] ?? null;   // vytasení bez akce díky efektu (Rychlé tasení, Dikobraz)
+    echo json_encode([
+        'ok' => true, 'zdarma' => $efekt !== null, 'efekt' => $efekt,
+        'akci_zbyva' => $po['akci_zbyva'] ?? 0, 'posun' => $vysledek['odpoved']['posun'] ?? null,
+    ], JSON_UNESCAPED_UNICODE);
     exit;
 }
 

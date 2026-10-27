@@ -1642,7 +1642,7 @@ export function initSouboj(ctx) {
         else if (p.polovina === 2) logLine('2. půlka kola.');
         break;
       case 'akce_provedena':
-        logLine(p.label + ': ' + p.druh_nazev + (p.zbran_nazev ? ' (' + p.zbran_nazev + ')' : '') + (p.pocet > 1 ? ' ×' + p.pocet : '') + (p.cil_label ? ' → ' + p.cil_label : '')
+        logLine(p.label + ': ' + p.druh_nazev + (p.zbran_nazev ? ' (' + p.zbran_nazev + ')' : '') + (p.zdarma_efekt ? ' — bez akce, ' + p.zdarma_efekt : '') + (p.pocet > 1 ? ' ×' + p.pocet : '') + (p.cil_label ? ' → ' + p.cil_label : '')
           + (p.unava_plus ? ' (+' + p.unava_plus + ' bod únavy' + (p.unava_nova !== null && p.unava_nova !== undefined ? ', celkem ' + p.unava_nova : '') + ')' : ''));
         break;
       case 'vyzva_hod': {

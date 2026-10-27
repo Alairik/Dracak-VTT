@@ -36,7 +36,7 @@ ním čeká, dokud se to neprovede ručně.
 
 **Ruční DDL blok je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný soubor, ve
 kterém jsou všechny dosud neprovedené DDL příkazy; uživatel ho dostává jako
-text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-17): nic nečeká.** Blok „Iniciativa v2“ + „Zbraně a iniciativa“
+text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-27): čeká jen blok „Vytasení bez akce“ — samé vkládání řádků (migrace `0102`), dává se do ručního SQL, protože migrace z GitHubu teď nejedou (viz „Deploy je od 22. 10. červený“ níž); blok „Zbraně u sebe“ (`0101`, ALTER) je provedený, kontrola vyšla 1.** (Starší stav 2026-10-17: nic nečekalo.) Blok „Iniciativa v2“ + „Zbraně a iniciativa“
 uživatel provedl (kontrolní SELECT vyšel 1, 4, 3) po tom, co první „sql proběhlo“ nesedělo — deploy po předčasném přesunu `0093`
 skončil na `1142 ALTER denied`, takže sloupce na serveru nebyly. **Poučení: migraci přesouvat do `database/migrations/` až podle
 čísel z kontrolního SELECTu, ne podle slov.** Migrace `0091`–`0096` jsou v `database/migrations/`: sloupce efektů (`0091`) a data (`0092`),
@@ -178,8 +178,18 @@ MariaDB.** Postup, který v session fungoval:
   (deník), akce `vytasit` v `hra/api/tah_akce.php` {zbran_id} (stejná logika), `postava_stav.php` akce `zbran_u_sebe`. **UI:** deník → Boj: pruh „Jsi v boji“
   (zbývající akce), sloupec „V ruce“ (štítek / tlačítko Vytasit, zakázané s důvodem), sloupec „U sebe“ (zatržítko, v boji zamčené), klepnutí na ÚČ v záhlaví
   vytasí další použitelnou zbraň (v boji s potvrzením); panel Souboj → „Další akce…“ → „Vytasit zbraň…“ otevře okno deníku na zbraních. Bez ručního SQL
-  vše funguje, jen se nerozlišuje „u sebe“. **Chybí (potřebuje pravidlo):** kolik zbraní se vejde na opasek / do pochev, cena pochev v nosnosti, toulec a šípy
-  jako omezení střelby, Erithenovo Rychlé tasení a Dikobrazovo tasení vrhací zbraně zdarma (b7751, b7754, b9098) — zatím vytasí za akci jako všichni.
+  vše funguje, jen se nerozlišuje „u sebe“ (sloupec je od 2026-10-27 na produkci, kontrolní SELECT vyšel 1; migrace `0101`).
+  **Vytasení bez akce — výjimky z pravidla jsou efekty v DB (migrace `0102`, 2026-10-27, rozhodnutí uživatele „přidej to do DB jako efekt“):** složka efektu
+  `tasit_zdarma` (parametr = druhy zbraní `tvt` / `vrhaci`, hodnota = kolikrát za kolo, prázdná = bez omezení) a složka `pasivni` (efekt platí trvale, dokud má postava
+  schopnost, ke které je připojený přes `schopnost_efekty`). **Erythen — Rychlé tasení** (h1094, b7751–b7755): efekt „Rychlé tasení (Erythen)“ je připojený ke schopnosti
+  Rychlé tasení (6. úroveň) a je pasivní → každý Erythen od 6. úrovně vytasí **jednou za kolo** bez akce zbraň tváří v tvář (dvě zbraně = jedna „kombinace“ katalogu)
+  nebo vrhací zbraň (jeden limit pro oboje); využití se počítá z logu (`akce_provedena.zdarma_efekt` ve stejném kole). **Dikobraz** (Zlaté tetování Velkého lovce, h1411,
+  b9098): efekt „Dikobraz (Zlaté tetování)“ (1 kolo, rychlá volba) nasadí PJ jako každý efekt; vrhací zbraň se pak vytasí bez akce bez omezení počtu. Bezplatné vytasení
+  neubere akci, není „akce kola“ (neposune tah, nespustí trest za slib úkonu, nepřeruší řadu sprintů) a zbraň musí být „u sebe“ (volně dostupná: pochva, holster —
+  b7754). Druh zbraně dává `dracak_vtt_zbran_druh()` z `kategorie_zbrane` (střelné a zbraně bez kategorie se nepočítají). V deníku (Boj) pruh „Bez akce: …, zbývá 1×“ a
+  tlačítko „Vytasit (bez akce)“. **Zůstává na PJ** (efekty jsou ve stavu „cast“): Erythenova vržená zbraň +2 ÚČ, cizí zbraň v dosahu 1 (past Obr–7–Obr), dvojnásobné dostřely
+  Dikobraza; ostatní značky Zlatého tetování (Slon, Kobra…) nejsou v DB. **Chybí (potřebuje pravidlo):** kolik zbraní se vejde na opasek / do pochev, cena pochev v nosnosti,
+  toulec a šípy jako omezení střelby.
 - **Deník postavy v plovoucím okně na mapě (2026-10-19, okno přestavěno 2026-10-27; bez ručního SQL):** v boji se výbava, zbraň v ruce, životy, kouzla…
   upravují ve stejném deníku jako na stránce postavy (`hra/denik.php`), ale **přímo na mapě, bez proklikávání**. **Vstup je v detailu tokenu** (panel Spravovat,
   tlačítko „Otevřít deník“ `#spravovatDenik` nahoře pod jménem; rozhodnutí uživatele 2026-10-20 — v levé liště nástrojů tlačítko není; zobrazí se u tokenu

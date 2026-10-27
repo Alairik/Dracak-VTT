@@ -385,6 +385,9 @@ function dracak_vtt_souboj_sprinty_v_rade(PDO $pdo, int $mapaId, int $tokenId, i
         if ((int)($p['cislo_kola'] ?? 0) !== $cisloKola) {
             break;
         }
+        if (!empty($p['zdarma_efekt'])) {
+            continue;   // vytasení zbraně bez akce není akce kola, řadu sprintů nepřeruší
+        }
         if (in_array($p['druh'] ?? '', ['sprint', 'sprint_utok'], true)) {
             $rada += max(1, (int)($p['pocet'] ?? 1));
         } else {

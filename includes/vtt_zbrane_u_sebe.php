@@ -16,6 +16,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/vtt_denik.php';
 require_once __DIR__ . '/vtt_souboj.php';
+require_once __DIR__ . '/vtt_efekty.php';
 
 // Je na serveru sloupec postava_predmety.u_sebe?
 function dracak_vtt_zbrane_u_sebe_funkce(PDO $pdo): bool
@@ -107,4 +108,126 @@ function dracak_vtt_zbrane_vytasit(PDO $pdo, array $postava, int $zbranId, bool 
         $pdo->prepare('UPDATE postava_predmety SET u_sebe = 1 WHERE postava_id = ? AND predmet_id = ?')->execute([$postavaId, $drzena]);
     }
     return $nazev;
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Vytasení bez akce (efekty se složkou `tasit_zdarma`, includes/vtt_efekty.php)
+//
+//   Erythen — Rychlé tasení (h1094, b7751–b7755): jednou za kolo bez akce vytasí 1–2 zbraně tváří v tvář (dvě zbraně
+//     = jedna „kombinace“ v katalogu) nebo vytasí a hodí jednu vrhací zbraň. Zbraň musí mít volně dostupnou (pochva,
+//     holster; ne batoh, ne z rukou). Trvalá schopnost: efekt „Rychlé tasení (Erythen)“ je připojený ke schopnosti
+//     (schopnost_efekty) a má složku `pasivni`, takže ho má každý Erythen od 6. úrovně sám.
+//   Dikobraz (Zlaté tetování Velkého lovce, h1411, b9098): na 1 kolo tasení vrhací zbraně nestojí akci — efekt
+//     „Dikobraz (Zlaté tetování)“ nasadí PJ jako každý jiný aktivní efekt.
+// Co je „volně dostupná“ střeží příznak u_sebe (viz výše); vržená zbraň +2 ÚČ a cizí zbraň v dosahu 1 (past Obr–7–Obr)
+// zůstává na PJ (efekt je ve stavu „cast“).
+// ---------------------------------------------------------------------------------------------------------------
+
+// Druh zbraně podle katalogu: 'vrhaci', 'tvt' (tváří v tvář), nebo null (střelná zbraň, nebo druh v katalogu chybí).
+function dracak_vtt_zbran_druh(?string $kategorie, string $nazev): ?string
+{
+    $kategorie = (string)$kategorie;
+    if (str_contains($kategorie, 'vrhaci') || preg_match('/vrhací/u', $nazev)) {
+        return 'vrhaci';
+    }
+    if ($kategorie === '' || str_contains($kategorie, 'strelna')) {
+        return null;
+    }
+    return 'tvt';
+}
+
+// Zdroje vytasení bez akce, které postava má: [['efekt' => název, 'limit' => ?int za kolo, 'rozsah' => ['tvt', 'vrhaci']]].
+// Aktivní efekty (Dikobraz) a trvalé schopnosti (Rychlé tasení); neomezené jdou první, ať se nespotřebuje omezený.
+function dracak_vtt_zbrane_zdarma_zdroje(PDO $pdo, array $postava): array
+{
+    if (!dracak_vtt_efekty_funkce()) {
+        return [];
+    }
+    $zdroje = dracak_vtt_efekty_souhrn($pdo, 'postava', (int)$postava['id'])['tasit_zdarma'];
+    $ids = array_column(dracak_vtt_schopnosti_postavy($pdo, $postava), 'id');
+    if ($ids) {
+        $q = $pdo->prepare(
+            'SELECT DISTINCT e.id, e.nazev
+             FROM schopnost_efekty se
+             JOIN efekty e ON e.id = se.efekt_id
+             JOIN efekt_slozky p ON p.efekt_id = e.id AND p.druh = "pasivni"
+             WHERE se.schopnost_id IN (' . implode(',', array_fill(0, count($ids), '?')) . ')'
+        );
+        $q->execute(array_map('intval', $ids));
+        $efekty = $q->fetchAll();
+        $slozky = dracak_vtt_efekt_slozky_pro($pdo, array_column($efekty, 'id'));
+        foreach ($efekty as $e) {
+            foreach ($slozky[(int)$e['id']] ?? [] as $sl) {
+                if ($sl['druh'] === 'tasit_zdarma') {
+                    $zdroje[] = [
+                        'efekt' => (string)$e['nazev'],
+                        'limit' => $sl['hodnota'] !== null ? (int)$sl['hodnota'] : null,
+                        'rozsah' => array_values(array_filter(array_map('trim', explode(',', (string)$sl['parametr'])))),
+                    ];
+                }
+            }
+        }
+    }
+    usort($zdroje, static fn(array $a, array $b): int => ($a['limit'] === null ? 0 : 1) <=> ($b['limit'] === null ? 0 : 1));
+    return $zdroje;
+}
+
+// Kolikrát tvor v tomhle kole využil vytasení bez akce z daného efektu (z událostí akce_provedena).
+function dracak_vtt_zbrane_zdarma_pouzito(PDO $pdo, int $mapaId, int $tokenId, int $cisloKola, string $efekt): int
+{
+    $q = $pdo->prepare('SELECT payload FROM svet_udalosti WHERE mapa_id = ? AND typ = "akce_provedena" ORDER BY id DESC LIMIT 120');
+    $q->execute([$mapaId]);
+    $pocet = 0;
+    foreach ($q->fetchAll(PDO::FETCH_COLUMN) as $json) {
+        $p = json_decode((string)$json, true);
+        if (!is_array($p) || (int)($p['token_id'] ?? 0) !== $tokenId) {
+            continue;
+        }
+        if ((int)($p['cislo_kola'] ?? 0) !== $cisloKola) {
+            break;
+        }
+        if (($p['zdarma_efekt'] ?? null) === $efekt) {
+            $pocet++;
+        }
+    }
+    return $pocet;
+}
+
+// Který efekt dovolí tomuhle tvoru vytasit zbraň daného druhu bez akce právě teď (null = bez akce to nejde).
+// $kontext = ['mapa_id', 'token_id', 'cislo_kola'] boje, ve kterém tvor je (kvůli „jednou za kolo“).
+function dracak_vtt_zbrane_zdarma_efekt(PDO $pdo, array $zdroje, ?string $druh, array $kontext): ?string
+{
+    if ($druh === null) {
+        return null;
+    }
+    foreach ($zdroje as $z) {
+        if (!in_array($druh, $z['rozsah'], true)) {
+            continue;
+        }
+        if ($z['limit'] === null
+            || dracak_vtt_zbrane_zdarma_pouzito($pdo, (int)$kontext['mapa_id'], (int)$kontext['token_id'], (int)$kontext['cislo_kola'], $z['efekt']) < $z['limit']) {
+            return $z['efekt'];
+        }
+    }
+    return null;
+}
+
+// Totéž pro konkrétní zbraň z inventáře (id předmětu): zbraň musí být u sebe („volně dostupná“).
+function dracak_vtt_zbrane_zdarma(PDO $pdo, array $postava, int $zbranId, array $kontext): ?string
+{
+    if ($zbranId <= 0) {
+        return null;
+    }
+    $maUSebe = dracak_vtt_zbrane_u_sebe_funkce($pdo);
+    $q = $pdo->prepare(
+        'SELECT p.nazev, p.kategorie_zbrane' . ($maUSebe ? ', pp.u_sebe' : ', 1 AS u_sebe') . '
+         FROM postava_predmety pp JOIN predmety p ON p.id = pp.predmet_id
+         WHERE pp.postava_id = ? AND pp.predmet_id = ? AND p.typ = "zbran"'
+    );
+    $q->execute([(int)$postava['id'], $zbranId]);
+    $r = $q->fetch();
+    if (!$r || !(int)$r['u_sebe']) {
+        return null;
+    }
+    return dracak_vtt_zbrane_zdarma_efekt($pdo, dracak_vtt_zbrane_zdarma_zdroje($pdo, $postava), dracak_vtt_zbran_druh($r['kategorie_zbrane'], (string)$r['nazev']), $kontext);
 }

@@ -130,11 +130,17 @@ $aktivniZbran = dracak_vtt_denik_aktivni_zbran($d);
 // smí jen na vlastním tahu a hráč jen zbraň, kterou má u sebe (PJ jakoukoli).
 $souboj = dracak_vtt_zbrane_boj_kontext($pdo, $postava);
 $maUSebe = dracak_vtt_zbrane_u_sebe_funkce($pdo);
-$vytasiPodle = static function (array $z) use ($souboj, $maUSebe, $jePj): ?string {
+// Zdroje vytasení bez akce (Erythen — Rychlé tasení, efekt Dikobraz…) a které zbraně jde teď vytasit zdarma.
+$zdarmaZdroje = $souboj !== null ? dracak_vtt_zbrane_zdarma_zdroje($pdo, $postava) : [];
+$zdarmaEfekt = static function (array $z) use ($pdo, $souboj, $maUSebe, $zdarmaZdroje): ?string {
+    if ($souboj === null || !$souboj['na_tahu'] || ($maUSebe && !$z['u_sebe'])) { return null; }
+    return dracak_vtt_zbrane_zdarma_efekt($pdo, $zdarmaZdroje, dracak_vtt_zbran_druh($z['kategorie'] ?? null, (string)$z['nazev']), $souboj);
+};
+$vytasiPodle = static function (array $z) use ($souboj, $maUSebe, $jePj, $zdarmaEfekt): ?string {
     if ($z['drzena']) { return 'drzena'; }
     if ($souboj === null || $jePj) { return null; }   // PJ smí vždy (mimo tah jen zatržením „bez akce“, hlídá server)
     if (!$souboj['na_tahu']) { return 'Zbraň vytasíš na svém tahu — v boji to stojí akci.'; }
-    if ($souboj['akci_zbyva'] < 1) { return 'V tomhle tahu už nemáš akci.'; }
+    if ($souboj['akci_zbyva'] < 1 && $zdarmaEfekt($z) === null) { return 'V tomhle tahu už nemáš akci.'; }
     if ($maUSebe && !$z['u_sebe']) { return 'Zbraň není u sebe — v boji ji nevytasíš.'; }
     return null;
 };
@@ -144,7 +150,7 @@ $zbranIds = array_column($d['zbrane'], 'id');
 $poradi = $aktivniZbran ? array_search($aktivniZbran['id'], $zbranIds, true) : -1;
 for ($i = 1; $i <= count($zbranIds); $i++) {
     $z = $d['zbrane'][($poradi + $i) % count($zbranIds)];
-    if (!$z['drzena'] && !($aktivniZbran && $z['id'] === $aktivniZbran['id']) && $vytasiPodle($z) === null) { $dalsiZbranId = $z['id']; $dalsiZbranNazev = $z['nazev']; break; }
+    if (!$z['drzena'] && !($aktivniZbran && $z['id'] === $aktivniZbran['id']) && $vytasiPodle($z) === null) { $dalsiZbranId = $z['id']; $dalsiZbranNazev = $z['nazev']; $dalsiZbranZdarma = $zdarmaEfekt($z); break; }
 }
 $maKouzla = $maMag || (bool)$d['kouzla'];
 // Vysvětlení k číslu: při najetí (title) i klepnutí (data-info), ať jde i na dotyku.
@@ -210,7 +216,7 @@ $cilKouzla = $svetId > 0;
           <span class="dn-velke-h"><?php if ($hl['oc']['zaklad'] !== null): ?><s><?= (int)$hl['oc']['zaklad'] ?></s> <?php endif; ?><?= $hl['oc']['hodnota'] !== null ? $cislo((int)$hl['oc']['hodnota']) : '—' ?></span>
         </div>
         <?php if ($dalsiZbranId !== null && $ma('drzena_zbran_id')): ?>
-          <button type="button" class="dn-velke dn-velke-btn" title="<?= $e($hl['uc']['title']) ?>" aria-label="Aktivní zbraň: <?= $e($hl['uc']['popis']) ?>. Klepnutím vytasíš další zbraň<?= $souboj !== null ? ' (stojí akci)' : '' ?>." data-dalsi-zbran="<?= (int)$dalsiZbranId ?>" data-nazev="<?= $e($dalsiZbranNazev ?? '') ?>">
+          <button type="button" class="dn-velke dn-velke-btn" title="<?= $e($hl['uc']['title']) ?>" aria-label="Aktivní zbraň: <?= $e($hl['uc']['popis']) ?>. Klepnutím vytasíš další zbraň<?= $souboj !== null ? ' (stojí akci)' : '' ?>." data-dalsi-zbran="<?= (int)$dalsiZbranId ?>" data-nazev="<?= $e($dalsiZbranNazev ?? '') ?>" data-zdarma="<?= $e($dalsiZbranZdarma ?? '') ?>">
         <?php else: ?>
           <div class="dn-velke dn-velke-jedna" title="<?= $e($hl['uc']['title']) ?>">
         <?php endif; ?>
@@ -388,6 +394,17 @@ $cilKouzla = $svetId > 0;
                 <strong>Jsi v boji.</strong>
                 <?php if ($souboj['na_tahu']): ?>Jsi na tahu, zbývá ti <?= (int)$souboj['akci_zbyva'] ?> <?= $souboj['akci_zbyva'] >= 1 && $souboj['akci_zbyva'] <= 4 ? 'akce' : 'akcí' ?> — vytasení nebo výměna zbraně stojí jednu.
                 <?php else: ?>Zbraň vytasíš na svém tahu; vytasení nebo výměna stojí jednu akci.<?php endif; ?>
+                <?php
+                $bezAkce = [];
+                foreach ($zdarmaZdroje as $zd) {
+                    $zbyva = $zd['limit'] === null ? null : $zd['limit'] - dracak_vtt_zbrane_zdarma_pouzito($pdo, $souboj['mapa_id'], $souboj['token_id'], $souboj['cislo_kola'], $zd['efekt']);
+                    if ($zbyva === null || $zbyva > 0) {
+                        $druhyText = implode(' / ', array_map(static fn(string $r): string => $r === 'vrhaci' ? 'vrhací' : 'tváří v tvář', $zd['rozsah']));
+                        $bezAkce[] = $zd['efekt'] . ' — ' . $druhyText . ($zbyva !== null ? ', zbývá ' . $zbyva . '× v tomhle kole' : '');
+                    }
+                }
+                ?>
+                <?php if ($bezAkce): ?><br>Bez akce: <strong><?= $e(implode('; ', $bezAkce)) ?></strong>.<?php endif; ?>
                 <?php if ($jePj): ?><label class="dn-bez-akce"><input type="checkbox" id="dn-bez-akce"> bez akce (PJ)</label><?php endif; ?>
               </p>
             <?php endif; ?>
@@ -398,11 +415,11 @@ $cilKouzla = $svetId > 0;
                 <?php foreach ($d['zbrane'] as $z): ?>
                   <tr class="<?= $z['drzena'] ? 'drzena' : '' ?>">
                     <td>
-                      <?php $duvod = $vytasiPodle($z); ?>
+                      <?php $duvod = $vytasiPodle($z); $zdarmaZ = $duvod === null ? $zdarmaEfekt($z) : null; ?>
                       <?php if ($z['drzena']): ?><span class="dn-stitek dn-vruce">v ruce</span>
                       <?php elseif ($ma('drzena_zbran_id')): ?>
-                        <button type="button" class="dn-pm" data-vytasit="<?= $z['id'] ?>" data-nazev="<?= $e($z['nazev']) ?>" <?= $duvod !== null ? 'disabled' : '' ?>
-                          title="<?= $e($duvod ?? ($souboj !== null ? 'Vytasit — stojí jednu akci' : 'Vzít do ruky (mimo boj zdarma)')) ?>">Vytasit</button>
+                        <button type="button" class="dn-pm" data-vytasit="<?= $z['id'] ?>" data-nazev="<?= $e($z['nazev']) ?>" data-zdarma="<?= $e($zdarmaZ ?? '') ?>" <?= $duvod !== null ? 'disabled' : '' ?>
+                          title="<?= $e($duvod ?? ($zdarmaZ !== null ? 'Vytasit bez akce — ' . $zdarmaZ : ($souboj !== null ? 'Vytasit — stojí jednu akci' : 'Vzít do ruky (mimo boj zdarma)'))) ?>"><?= $zdarmaZ !== null ? 'Vytasit (bez akce)' : 'Vytasit' ?></button>
                       <?php endif; ?>
                     </td>
                     <?php if ($maUSebe): ?>
