@@ -537,6 +537,7 @@ $cilKouzla = $svetId > 0;
             $druhyInv = ['zbran' => 'Zbraně', 'zbroj' => 'Zbroje', 'vybaveni' => 'Vybavení', 'surovina' => 'Suroviny', 'artefakt' => 'Artefakty', 'lektvar' => 'Lektvary'];
             $pocetDruh = array_count_values(array_column($d['inventar'], 'typ'));
             ?>
+            <?php if (count($d['inventar']) >= 6): /* u malého inventáře by hledání a filtry jen překážely */ ?>
             <div class="dn-inv-filtr" role="search">
               <input type="search" id="dn-inv-hledej" class="dn-inv-hledej" placeholder="Hledat v inventáři…" aria-label="Hledat v inventáři" autocomplete="off">
               <div class="dn-inv-chipy" role="group" aria-label="Druh předmětu">
@@ -546,6 +547,7 @@ $cilKouzla = $svetId > 0;
                 <?php endforeach; ?>
               </div>
             </div>
+            <?php endif; ?>
             <div class="dn-tab-wrap">
               <table class="dn-tab" id="dn-inv-tab">
                 <thead><tr><th>Předmět</th><th>Druh</th><th class="c">ks</th><th class="c">váha / ks</th><th class="c">váha celkem</th><th></th></tr></thead>

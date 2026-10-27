@@ -129,6 +129,8 @@
     const tab = document.getElementById('dn-inv-tab');
     if (!tab) return;
     const hledej = document.getElementById('dn-inv-hledej');
+    // Malý inventář filtr nemá — starý uložený filtr pak nesmí skrývat řádky.
+    if (!hledej) filtr = { typ: '', q: '' };
     if (hledej && document.activeElement !== hledej) hledej.value = filtr.q;
     document.querySelectorAll('#denik [data-inv-filtr]').forEach(function (c) {
       c.classList.toggle('on', c.dataset.invFiltr === filtr.typ);

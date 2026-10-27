@@ -135,7 +135,10 @@
 
 /* Inventář: hledání a filtr podle druhu */
 .dn-inv-filtr { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 10px; }
-.dn-inv-hledej { flex: 1 1 200px; min-width: 160px; max-width: 320px; }
+.dn-inv-hledej {
+  flex: 1 1 200px; min-width: 160px; max-width: 320px; width: auto; padding: 6px 10px; font-size: 13px;
+  border: 1px solid var(--color-neutral-400); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text);
+}
 .dn-inv-chipy { display: flex; flex-wrap: wrap; gap: 6px; }
 .dn-filtr-chip {
   display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 12px;

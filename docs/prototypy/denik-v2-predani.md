@@ -47,7 +47,7 @@ Podrobnosti, API a chybějící pravidla: `docs/stav-projektu.md`, sekce Boj (�
 klik otevře plovoucí kartu „Detail položky“ (`#dn-detail`, vpravo dole, na telefonu spodní list) s hodnotami z katalogu (váha, cena přepočtená na zl / st / md,
 u zbraní SZ, útočnost, OZ, délka, dostřel, druh, držení, třída, postih k iniciativě; u zbroje KZ; u lektvaru výrobce, příprava, kostky, efekty) a popisem —
 **žádná prázdná karta, ukáže se až po výběru** (rozhodnutí 7 z komentářů k prototypu); zavře ji ✕, Esc nebo druhé klepnutí na tutéž položku, přežije obnovu
-deníku. Data dává `hra/api/polozka_detail.php` (katalog je obsah pravidel, jen přihlášení). Inventář má hledání (bez ohledu na diakritiku) a chipy podle druhu
+deníku. Data dává `hra/api/polozka_detail.php` (katalog je obsah pravidel, jen přihlášení). Inventář od 6 položek má hledání (bez ohledu na diakritiku) a chipy podle druhu
 s počty (Vše / Zbraně / Zbroje / Vybavení / Suroviny / Artefakty / Lektvary — jen druhy, které postava má); filtr se drží i po překreslení a v rámci
 záložky prohlížeče (`sessionStorage`), jen zobrazení, nic se neukládá do DB.
 
