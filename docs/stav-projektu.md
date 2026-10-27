@@ -171,6 +171,13 @@ MariaDB.** Postup, který v session fungoval:
   detail (požadavek, stránka, prohlížeč, stopa) po rozkliknutí, jméno účtu, „Vymazat log“ (POST s tokenem v relaci). Kontrola nasazení teď hlídá i `logs/`
   (spustitelný soubor tam = nález; `logs/aplikace.log` se mezi „navíc“ nehlásí) a zkouší zvenku `/logs/aplikace.log`. Testy: `log_unit.php` (zápis, čtení, ořez,
   maskování, limity), `log_ui.js` (JS chyba → log → admin stránka → smazání, hráč 403, injekce řádku, XSS), obslužné funkce přes CLI (výjimka, DB, varování, fatální).
+- **Záloha databáze (2026-10-28, plán #19; bez ručního SQL):** `admin_zaloha.php` (jen admin, POST s tokenem v relaci, GET jen ukáže stránku) stáhne `.sql` s celou
+  databází: `includes/zaloha.php` — struktura (`SHOW CREATE TABLE` → `CREATE TABLE IF NOT EXISTS`) a data všech tabulek (stránkování podle primárního klíče, binární
+  sloupce jako `0x…`, hodnoty přes `PDO::quote`), **bez DROP** (omylem pustěná na ostrou DB nic nesmaže, jen spadne na duplicitě). Stačí SELECT, tedy i DML-only
+  účet webu. Konec souboru nese řádek „Konec zálohy: N tabulek, M řádků“ (bez něj je neúplná; při chybě uprostřed stahování se připíše `-- CHYBA`). Ověřeno: obnova
+  do prázdné DB (88 tabulek, shodné počty i `CHECKSUM TABLE`), BLOB a diakritika, druhý import nic nepřepíše, dump pod DML-only účtem; stránka (stažení, 403 bez
+  tokenu / pro hráče). Neověřeno na ostrém hostingu: limit phpMyAdminu na velikost importu. Návod: `docs/zalohy.md`. Společně s tím je menu administrace v jednom
+  souboru (`includes/admin_menu.php`), nová stránka = jeden řádek v `DRACAK_ADMIN_POLOZKY`.
 - **Kdo to hlídá:** zavřené cesty a hlavičky ověří stránka „Kontrola nasazení“
   (`admin_nasazeni.php`, tlačítko „Zkontrolovat“); dřívější krok `deploy.yml`
   „Post-deploy security checks“ je od 2026-10-27 pryč (hosting odmítá HTTP z
@@ -1200,7 +1207,8 @@ stavby“ v návrhu.**
 *D. Příprava na ostré hraní*
 18. ✔ (2026-10-28, automatický průchod: účty → svět → pozvání → wizard postavy → co kdo vidí, 23 kontrol) Ověřit celý tok pozvání: PJ vytvoří svět → pozve hráče → hráč založí
     postavu → vidí jen své [M]
-19. Zálohy databáze i `uploads/` na WEDOSu + ověřený postup obnovy [S]
+19. ✔ (2026-10-28) Zálohy databáze i `uploads/` na WEDOSu + ověřený postup obnovy [S] — `admin_zaloha.php` (stažení celé DB jedním kliknutím), obrázky
+    z `uploads/` jen ručně přes FTP; postup a co je ověřené: `docs/zalohy.md`
 20. ✔ (2026-10-28) Chybový log čitelný pro admina (aby se chyby z ostré hry nemusely
     popisovat z paměti) [S] — `admin_log.php`, viz „Chybový log“ v sekci Bezpečnost
 21. ✔ (2026-10-28) Zátěž polling: adaptivní interval (rychle v boji, pomalu v klidu, stop při

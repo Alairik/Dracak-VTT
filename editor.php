@@ -247,6 +247,7 @@ if ($nastroj === null) {
         <a class="mock-item" href="admin_migrace.php">🗄️ Změny databáze</a>
         <a class="mock-item" href="admin_nasazeni.php">🛡️ Kontrola nasazení</a>
         <a class="mock-item" href="admin_log.php">🐞 Chybový log</a>
+        <a class="mock-item" href="admin_zaloha.php">💾 Záloha databáze</a>
       <?php endif; ?>
       <form method="post" action="logout.php"><button class="btn btn-ghost" style="width:100%;margin-top:6px;">Odhlásit se</button></form>
     </div>

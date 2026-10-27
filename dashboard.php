@@ -78,6 +78,11 @@ $isAdmin = $user['role'] === 'admin';
       <div class="tile-title">Chybový log</div>
       <div class="tile-desc">Co spadlo na serveru nebo v prohlížeči hráčů.</div>
     </a>
+    <a class="tile" href="admin_zaloha.php">
+      <div class="tile-icon">💾</div>
+      <div class="tile-title">Záloha databáze</div>
+      <div class="tile-desc">Stažení celé databáze před hrou.</div>
+    </a>
     <?php endif; ?>
   </div>
 </div>

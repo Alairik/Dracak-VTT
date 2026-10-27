@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/includes/admin_menu.php';
 require_once __DIR__ . '/includes/nasazeni.php';
 
 // Kontrola nasazení (jen admin): sedí soubory na serveru s tím, co deploy nahrával, nic nechybí ani nepřebývá,
@@ -53,19 +54,7 @@ $seznam = static function (array $polozky) use ($e): string {
 <button class="menu-btn" id="menuBtn" type="button" aria-label="Otevřít navigaci">☰</button>
 <div class="backdrop" id="backdrop"></div>
 <div class="shell">
-  <aside class="sidebar" id="sidebar">
-    <a class="brand" href="dashboard.php" style="text-decoration:none;color:inherit;">🏠 Dračák VTT</a>
-    <div class="sidebar-user"><?= $e($user['jmeno']) ?><span class="role-badge">admin</span></div>
-    <a class="mock-item" href="dashboard.php">🏠 Dashboard</a>
-    <a class="mock-item" href="admin.php">Správa účtů</a>
-    <a class="mock-item" href="admin_migrace.php">Změny databáze</a>
-    <a class="mock-item active" href="admin_nasazeni.php">Kontrola nasazení</a>
-    <a class="mock-item" href="admin_log.php">Chybový log</a>
-    <a class="mock-item" href="editor.php">← Zpět do editoru</a>
-    <div class="sidebar-bottom">
-      <form method="post" action="logout.php"><button class="btn btn-ghost" style="width:100%;">Odhlásit se</button></form>
-    </div>
-  </aside>
+  <?php dracak_admin_menu('nasazeni', $user); ?>
 
   <main class="main">
     <h1 class="page-title">Kontrola nasazení</h1>
