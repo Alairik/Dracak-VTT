@@ -34,10 +34,19 @@ function dracak_vtt_je_pj_sveta(array $user, int $svetId): bool
     if ($user['role'] === 'admin') {
         return true;
     }
-    $stmt = dracak_db()->prepare('SELECT pj_ucet_id FROM svet WHERE id = ?');
-    $stmt->execute([$svetId]);
-    $pjUcetId = $stmt->fetchColumn();
-    return $pjUcetId !== false && (int)$pjUcetId === (int)$user['id'];
+    // Zakladatel světa se za provozu nemění, takže stačí jeden dotaz na požadavek (polling se ptá desítkykrát za minutu na hráče;
+    // dracak_vtt_svet_access i filtry v udalosti.php volají tuhle funkci opakovaně). Neexistující svět se nepamatuje.
+    static $pjSveta = [];
+    if (!isset($pjSveta[$svetId])) {
+        $stmt = dracak_db()->prepare('SELECT pj_ucet_id FROM svet WHERE id = ?');
+        $stmt->execute([$svetId]);
+        $pjUcetId = $stmt->fetchColumn();
+        if ($pjUcetId === false) {
+            return false;
+        }
+        $pjSveta[$svetId] = (int)$pjUcetId;
+    }
+    return $pjSveta[$svetId] === (int)$user['id'];
 }
 
 function dracak_vtt_require_svet(array $user, int $svetId): array

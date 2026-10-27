@@ -1203,8 +1203,14 @@ stavby“ v návrhu.**
 19. Zálohy databáze i `uploads/` na WEDOSu + ověřený postup obnovy [S]
 20. ✔ (2026-10-28) Chybový log čitelný pro admina (aby se chyby z ostré hry nemusely
     popisovat z paměti) [S] — `admin_log.php`, viz „Chybový log“ v sekci Bezpečnost
-21. Zátěž polling: adaptivní interval (rychle v boji, pomalu v klidu, stop při
-    skryté záložce), spočítat počet dotazů/min pro 6 hráčů [S–M]
+21. ✔ (2026-10-28) Zátěž polling: adaptivní interval (rychle v boji, pomalu v klidu, stop při
+    skryté záložce), spočítat počet dotazů/min pro 6 hráčů [S–M] — adaptivní interval už byl (1,5 s do 30 s po poslední akci, pak 2,5 s, po 2 min 4 s, skrytá
+    záložka 10 s). **Změřeno** (general log MariaDB + Playwright, hráč na otevřené mapě, rychlý režim): ~41 požadavků `udalosti.php` + ~9 `mlha_stav.php` za minutu,
+    tj. ~49 HTTP požadavků, ~51 spojení do DB a po úpravě **~156 dotazů za minutu na hráče** (4 dotazy na polling: účet ze session, PJ světa, členství ve světě,
+    události). Dřív ~206 — `dracak_vtt_je_pj_sveta()` se v jednom požadavku ptala na `svet.pj_ucet_id` dvakrát, teď si ho pamatuje (zakladatel světa se za provozu
+    nemění). **Šest hráčů v rychlém režimu = ~300 požadavků a ~940 dotazů za minutu (5 požadavků / 16 dotazů za vteřinu)**, v klidu (4 s) zhruba třetina; pro
+    MariaDB je to zanedbatelné, limit hostingu na počet souběžných PHP procesů se ukáže až v ostré hře (chybu 503 / 508 by zachytil `admin_log.php` jen z prohlížeče,
+    proto sledovat i log hostingu). Další úspora by šla jen sloučením dotazů nebo delším intervalem; nedělá se, dokud se problém neprojeví.
 22. Rozvržení na tabletu/telefonu (panely, toolbar) [M]
 23. Zkušební scénář „první ostrá hra“ (cca 12 kroků) a jeho projití na dvou
     zařízeních [S] — **scénář napsaný: `docs/zkusebni-scenar-prvni-hra.md`** (2026-10-28), projití na dvou zařízeních čeká na uživatele
