@@ -21,8 +21,9 @@
   se na nich, takže následující migrace čekají, dokud je neprovede).
 - **Nová DB migrace = nový soubor v `database/migrations/NNNN_popis.sql`,
   nikdy úprava starého.** Po pushi na `main` se automaticky spustí sama —
-  poslední krok `deploy.yml` po úspěšném FTP Deploy zavolá
-  `scripts/migrate.php` na produkci přes HTTPS (WEDOS nedovoluje GitHub
+  kroky `deploy.yml` po úspěšném FTP Deploy nahrají `scripts/migrate.php`
+  pod náhodným jménem, zavolají ho na produkci přes HTTPS a hned smažou
+  (WEDOS nedovoluje GitHub
   Actions připojit se k MySQL přímo zvenčí, takže migrace běží PHP
   skriptem přímo na serveru, který se k DB připojuje lokálně —
   `migrate.php` si drží seznam už spuštěných souborů v tabulce
@@ -89,10 +90,12 @@
   které jsou opravdu jeho: co má hra dělat z pohledu hráče/PJ, nebo jak
   to je v knize. Každá otázka: jedna věta co se rozhoduje, příklad z hry,
   a tvoje doporučení.
-- **`scripts/` smí na serveru obsahovat JEN `migrate.php`.** Nic jiného
-  se tam nepřidává, aniž by se zároveň upravil `exclude` v `deploy.yml`
-  — momentálně se `scripts/` nijak nevylučuje (spoléhá se na to, že tam
-  nic jiného není), takže by se cokoliv dalšího nahrálo na veřejný web.
+- **`scripts/migrate.php` na serveru trvale nezůstává** (rozhodnutí
+  2026-10-27, po upozornění NÚKIB na PHP RCE: vstup do DB nemá viset na
+  webu). Je v `exclude` hlavního FTP Deploy; `deploy.yml` ho nahraje jako
+  `scripts/migrate-<32 hex>.php`, zavolá s tokenem a smaže (úklid běží i po
+  chybě, pak se ověří, že cesta zvenku zmizela). Nikdy ho nenahrávej
+  natrvalo zpátky a do `scripts/` na server nic jiného nedávej.
 - **`setup-admin.php` se nikdy nedeployuje** (viz `exclude` v `deploy.yml`)
   — má přístup k DB a zakládá admin účty, nepatří na veřejný web.
 - **`content/` drží fragmenty rulebooku pro `pravidla.php`** (`pravidla-hrac.html`,

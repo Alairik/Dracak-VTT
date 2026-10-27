@@ -134,6 +134,21 @@ MariaDB.** Postup, který v session fungoval:
   nosniff, Referrer-Policy, HSTS 180 dní, bez X-Powered-By); `migrate.php`
   bere token jen z hlavičky (ne z `?token=`); `admin.php` nevypisuje text
   DB chyby; minimální délka hesla 12 znaků (existující účty se nemění).
+- **`migrate.php` jen jednorázově (2026-10-27):** dřív visel na serveru trvale
+  (token v hlavičce, ale pořád vstup do DB zvenku); po upozornění NÚKIB ho
+  uživatel ze serveru zřejmě odstranil a od 22. 10. deploy končil červeně na
+  „migrate.php vrátil HTTP 404“ (FTP nahrání proběhlo, kód byl nasazený, ale
+  smoke test a security checks se kvůli tomu nespustily). Teď je
+  `scripts/migrate.php` v `exclude` hlavního nahrávání a `deploy.yml` ho
+  **nahraje pod náhodným jménem `scripts/migrate-<32 hex>.php`, zavolá s tokenem
+  a hned smaže** (stejnou FTP akcí → stejné nastavení FTPS; stav v
+  `scripts/.ftp-deploy-sync-state.json`, dotfile je zavřený v `.htaccess`).
+  Smazání běží i po selhání migrací a pak se ověří, že cesta zvenku je 403/404;
+  security checks navíc hlídají, že `scripts/migrate.php` a stavový soubor jsou
+  zavřené. Soubor na serveru existuje pár sekund; kdyby se nahrání přerušilo
+  uprostřed, zbytek chrání náhodné jméno a token. Lokálně ověřeno jen
+  shellová část (403 bez tokenu, soubor po smazání 404); chování FTP akce
+  (smazání přes prázdnou složku) se ověří až prvním během na GitHubu.
 - **Hlídá to deploy:** poslední krok `deploy.yml` („Post-deploy security
   checks“) ověří na ostré doméně zavřené cesty, hlavičky a CSRF
   (POST se stejným Origin = 200, s cizím = 403). Červený krok = hosting
