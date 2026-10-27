@@ -117,6 +117,127 @@
     vytasit(Number(z.dataset.dalsiZbran || z.dataset.vytasit), z.dataset.nazev || '', z.dataset.zdarma || '');
   });
 
+  // ----- inventář: hledání a filtr podle druhu (jen zobrazení, nic se neukládá do DB) -----
+  const KLIC_FILTR = 'dracak_denik_inv_' + ID;
+  let filtr = { typ: '', q: '' };
+  try { filtr = Object.assign(filtr, JSON.parse(sessionStorage.getItem(KLIC_FILTR) || '{}')); } catch (e) { /* soukromé okno */ }
+  const bezDiakritiky = (t) => String(t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  function ulozFiltr() {
+    try { sessionStorage.setItem(KLIC_FILTR, JSON.stringify(filtr)); } catch (e) { /* soukromé okno */ }
+  }
+  function aplikujFiltr() {
+    const tab = document.getElementById('dn-inv-tab');
+    if (!tab) return;
+    const hledej = document.getElementById('dn-inv-hledej');
+    if (hledej && document.activeElement !== hledej) hledej.value = filtr.q;
+    document.querySelectorAll('#denik [data-inv-filtr]').forEach(function (c) {
+      c.classList.toggle('on', c.dataset.invFiltr === filtr.typ);
+    });
+    // Druh, který už v inventáři není (poslední kus odebrán), se nesmí držet jako neviditelný filtr.
+    if (filtr.typ && !document.querySelector('#denik [data-inv-filtr="' + filtr.typ + '"]')) filtr.typ = '';
+    const q = bezDiakritiky(filtr.q.trim());
+    let zobrazeno = 0;
+    tab.querySelectorAll('tbody tr[data-inv-typ]').forEach(function (tr) {
+      const ok = (!filtr.typ || tr.dataset.invTyp === filtr.typ) && (!q || bezDiakritiky(tr.dataset.invNazev).indexOf(q) >= 0);
+      tr.hidden = !ok;
+      if (ok) zobrazeno++;
+    });
+    const nic = document.getElementById('dn-inv-nic');
+    if (nic) nic.hidden = zobrazeno > 0;
+  }
+  document.addEventListener('input', function (ev) {
+    if (ev.target.id !== 'dn-inv-hledej' || !wrap.contains(ev.target)) return;
+    filtr.q = ev.target.value;
+    ulozFiltr();
+    aplikujFiltr();
+  });
+  document.addEventListener('click', function (ev) {
+    const c = ev.target.closest('[data-inv-filtr]');
+    if (!c || !wrap.contains(c)) return;
+    filtr.typ = c.dataset.invFiltr;
+    ulozFiltr();
+    aplikujFiltr();
+  });
+
+  // ----- detail položky z katalogu (hra/api/polozka_detail.php): plovoucí karta po kliknutí na název -----
+  let detail = null;   // {typ, id, data} — přežije obnovu deníku
+  function vykresliDetail() {
+    const el = document.getElementById('dn-detail');
+    if (!el) return;
+    el.textContent = '';
+    if (!detail) { el.hidden = true; return; }
+    const d = detail.data;
+    const hlava = document.createElement('div');
+    hlava.className = 'dn-detail-hlava';
+    const nadpis = document.createElement('div');
+    const h = document.createElement('h3');
+    h.className = 'dn-h3';
+    h.textContent = d.nazev;
+    const pod = document.createElement('div');
+    pod.className = 'note';
+    pod.textContent = d.podtitul;
+    nadpis.append(h, pod);
+    const zavrit = document.createElement('button');
+    zavrit.type = 'button';
+    zavrit.className = 'dn-detail-zavrit';
+    zavrit.setAttribute('aria-label', 'Zavřít detail');
+    zavrit.dataset.detailZavrit = '1';
+    zavrit.textContent = '✕';
+    hlava.append(nadpis, zavrit);
+    el.append(hlava);
+    if (d.radky.length) {
+      const dl = document.createElement('dl');
+      dl.className = 'dn-detail-radky';
+      d.radky.forEach(function (r) {
+        const dt = document.createElement('dt');
+        dt.textContent = r[0];
+        const dd = document.createElement('dd');
+        dd.textContent = r[1];
+        dl.append(dt, dd);
+      });
+      el.append(dl);
+    }
+    if (d.efekty && d.efekty.length) {
+      const p = document.createElement('p');
+      p.className = 'dn-detail-efekty';
+      p.textContent = 'Efekty: ' + d.efekty.join(', ');
+      el.append(p);
+    }
+    if (d.popis) {
+      const p = document.createElement('p');
+      p.className = 'dn-detail-popis';
+      p.textContent = d.popis;
+      el.append(p);
+    }
+    if (!d.radky.length && !d.popis && !(d.efekty && d.efekty.length)) {
+      const p = document.createElement('p');
+      p.className = 'note';
+      p.textContent = 'V katalogu k téhle položce nejsou další údaje.';
+      el.append(p);
+    }
+    el.hidden = false;
+  }
+  async function ukazDetail(typ, id) {
+    if (detail && detail.typ === typ && detail.id === id) { detail = null; vykresliDetail(); return; }   // druhé klepnutí zavře
+    try {
+      const r = await fetch('api/polozka_detail.php?typ=' + encodeURIComponent(typ) + '&id=' + encodeURIComponent(id), { credentials: 'same-origin' });
+      const data = await r.json();
+      if (!r.ok || data.error) throw new Error(data.error || 'Detail se nenačetl.');
+      detail = { typ: typ, id: id, data: data };
+      vykresliDetail();
+    } catch (e) {
+      hlaska(e.message);
+    }
+  }
+  document.addEventListener('click', function (ev) {
+    const o = ev.target.closest('[data-detail]');
+    if (o && wrap.contains(o)) { ukazDetail(o.dataset.detail, Number(o.dataset.id)); return; }
+    if (ev.target.closest('[data-detail-zavrit]')) { detail = null; vykresliDetail(); }
+  });
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape' && detail) { detail = null; vykresliDetail(); }
+  });
+
   // V mapě (iframe) dá deník mapě vědět, že se něco změnilo — mapa si hned stáhne nový stav (životy, inventář…).
   function oznamZmenu() {
     if (window.parent === window) return;
@@ -164,6 +285,8 @@
       const modHodnota = modPred ? modPred.value : null;
       stary.replaceWith(novy);
       ukazTab(aktivniTab);
+      aplikujFiltr();
+      vykresliDetail();
       const modPo = document.getElementById('dn-mod');
       if (modPo && modHodnota !== null) modPo.value = modHodnota;
       if (cilHodnota !== null) {
@@ -459,4 +582,5 @@
   }
   setInterval(obnovPokudNepise, 5000);
   ukazTab(aktivniTab);
+  aplikujFiltr();
 })();

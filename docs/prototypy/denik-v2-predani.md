@@ -39,7 +39,15 @@ kniha h1606 b10619: v kole jde jeden úkon, „vyměnit zbraň“ je úkon, „v
 **„u sebe“** u zbraně v inventáři (sloupec „U sebe“ v tabulce Boj) — pevné číslované sloty se nedělají, dokud kniha neřekne, kolik se jich na opasek/do pochev vejde.
 Podrobnosti, API a chybějící pravidla: `docs/stav-projektu.md`, sekce Boj („Vytasení / výměna zbraně“).
 
-**Zbývá:** figurína a sloty (krok 3, DDL), detail předmětu, hledání a filtry v inventáři,
+**Krok 3a hotový (2026-10-28, bez ručního SQL): detail předmětu a hledání / filtry v inventáři.** Název v inventáři i v tabulce zbraní (Boj) je odkaz;
+klik otevře plovoucí kartu „Detail položky“ (`#dn-detail`, vpravo dole, na telefonu spodní list) s hodnotami z katalogu (váha, cena přepočtená na zl / st / md,
+u zbraní SZ, útočnost, OZ, délka, dostřel, druh, držení, třída, postih k iniciativě; u zbroje KZ; u lektvaru výrobce, příprava, kostky, efekty) a popisem —
+**žádná prázdná karta, ukáže se až po výběru** (rozhodnutí 7 z komentářů k prototypu); zavře ji ✕, Esc nebo druhé klepnutí na tutéž položku, přežije obnovu
+deníku. Data dává `hra/api/polozka_detail.php` (katalog je obsah pravidel, jen přihlášení). Inventář má hledání (bez ohledu na diakritiku) a chipy podle druhu
+s počty (Vše / Zbraně / Zbroje / Vybavení / Suroviny / Artefakty / Lektvary — jen druhy, které postava má); filtr se drží i po překreslení a v rámci
+záložky prohlížeče (`sessionStorage`), jen zobrazení, nic se neukládá do DB.
+
+**Zbývá:** figurína a sloty (krok 3, DDL), hledání a filtry v inventáři,
 Dovednosti (krok 5, DDL), Společníci (krok 6, DDL), připnutá kouzla.
 
 ## Rozhodnutí uživatele 2026-10-27 (po kroku 1) — vzhled ano, vymyšlená mechanika ne

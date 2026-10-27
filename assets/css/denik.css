@@ -128,6 +128,46 @@
 }
 .dn-wrap [data-info] { cursor: help; }
 
+/* Odkaz na detail položky (název v inventáři a v tabulce zbraní) */
+.dn-odkaz { all: unset; cursor: pointer; text-align: left; color: inherit; border-bottom: 1px dotted var(--color-neutral-500); }
+.dn-odkaz:hover, .dn-odkaz:focus-visible { color: var(--color-accent-800); border-bottom-color: var(--color-accent-800); }
+.dn-odkaz:focus-visible { outline: 2px solid var(--color-accent-400); outline-offset: 2px; }
+
+/* Inventář: hledání a filtr podle druhu */
+.dn-inv-filtr { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 10px; }
+.dn-inv-hledej { flex: 1 1 200px; min-width: 160px; max-width: 320px; }
+.dn-inv-chipy { display: flex; flex-wrap: wrap; gap: 6px; }
+.dn-filtr-chip {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 12px;
+  border: 1px solid var(--color-neutral-400); border-radius: 999px; background: var(--color-surface);
+  color: var(--color-neutral-800); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.dn-filtr-chip:hover { background: var(--color-accent-100); border-color: var(--color-accent-300); }
+.dn-filtr-chip.on { background: var(--color-accent-100); border-color: var(--color-accent-500, var(--color-accent-400)); color: var(--color-accent-800); }
+.dn-filtr-chip .dn-pocet { padding: 0 6px; }
+.dn-tab tr[hidden], .dn-tab tbody[hidden] { display: none; }
+
+/* Detail položky z katalogu: plave u pravého dolního rohu, až po kliknutí na název */
+.dn-detail {
+  position: fixed; right: 16px; bottom: 16px; z-index: 40;
+  width: min(380px, calc(100vw - 32px)); max-height: min(70vh, 560px); overflow: auto;
+  padding: 14px 16px; background: var(--color-surface); border: 1px solid var(--color-neutral-300);
+  border-radius: var(--radius-lg, 14px); box-shadow: var(--shadow-lg);
+}
+.dn-detail[hidden] { display: none; }
+.dn-detail-hlava { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 8px; }
+.dn-detail-hlava .dn-h3 { margin: 0; }
+.dn-detail-zavrit {
+  flex: none; width: 32px; height: 32px; border: 1px solid var(--color-neutral-400); border-radius: var(--radius-sm);
+  background: var(--color-surface); color: var(--color-neutral-800); font-size: 14px; cursor: pointer;
+}
+.dn-detail-zavrit:hover { background: var(--color-accent-100); }
+.dn-detail-radky { display: grid; grid-template-columns: max-content 1fr; gap: 3px 14px; margin: 0 0 10px; font-size: 13.5px; }
+.dn-detail-radky dt { color: var(--color-neutral-700); }
+.dn-detail-radky dd { margin: 0; font-weight: 600; }
+.dn-detail-efekty { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
+.dn-detail-popis { margin: 0; font-size: 13.5px; line-height: 1.5; white-space: pre-line; }
+
 /* ---------- Tělo: záložky ---------- */
 .dk-body { max-width: 1280px; margin: 0 auto; padding: 14px 16px 40px; }
 .dk-tabbar { display: flex; align-items: flex-end; gap: 8px 16px; flex-wrap: wrap; margin-bottom: 16px; border-bottom: 2px solid var(--color-neutral-300); }
@@ -258,6 +298,7 @@
   .dk-grid2 { grid-template-columns: 1fr; }
 }
 @media (max-width: 720px) {
+  .dn-detail { left: 8px; right: 8px; bottom: 8px; width: auto; max-height: 55vh; }
   .dn-pas { position: static; padding: 12px 14px 8px; }
   .dn-cell.main, .dn-cell.aux { flex: 1 1 100%; }
   .dn-pm, .dn-cell .dn-pm { min-height: 44px; min-width: 44px; }

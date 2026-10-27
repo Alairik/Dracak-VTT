@@ -425,7 +425,7 @@ $cilKouzla = $svetId > 0;
                     <?php if ($maUSebe): ?>
                       <td class="c"><input type="checkbox" aria-label="U sebe: <?= $e($z['nazev']) ?>" data-zmena="zbran_u_sebe" data-id="<?= $z['id'] ?>" <?= $z['u_sebe'] || $z['drzena'] ? 'checked' : '' ?> <?= ($souboj !== null && !$jePj) || $z['drzena'] ? 'disabled' : '' ?>></td>
                     <?php endif; ?>
-                    <td><strong><?= $e($z['nazev']) ?></strong><?= $z['mnozstvi'] > 1 ? ' ×' . $z['mnozstvi'] : '' ?><?= $z['rodova'] ? ' <span class="dn-stitek" title="Rodová zbraň rasy: +1 k ÚČ">rodová</span>' : '' ?></td>
+                    <td><button type="button" class="dn-odkaz" data-detail="predmet" data-id="<?= (int)$z['id'] ?>" title="Ukázat detail"><strong><?= $e($z['nazev']) ?></strong></button><?= $z['mnozstvi'] > 1 ? ' ×' . $z['mnozstvi'] : '' ?><?= $z['rodova'] ? ' <span class="dn-stitek" title="Rodová zbraň rasy: +1 k ÚČ">rodová</span>' : '' ?></td>
                     <td class="c"><?= $z['sz'] ?? '—' ?></td>
                     <td class="c"><?= $znam($z['utocnost']) ?></td>
                     <td class="c" title="Obrana zbraně (nepovinné pravidlo, h1611): při obraně zbraní se přičítá k hodu na obranu."><?= $znam($z['oz']) ?></td>
@@ -533,13 +533,26 @@ $cilKouzla = $svetId > 0;
           <?= $picker(['predmet', 'lektvar']) ?>
           <?php if (!$d['inventar']): ?><p class="note">Inventář je prázdný. Najdi položku v katalogu výše a klikni na ni.</p>
           <?php else: ?>
+            <?php
+            $druhyInv = ['zbran' => 'Zbraně', 'zbroj' => 'Zbroje', 'vybaveni' => 'Vybavení', 'surovina' => 'Suroviny', 'artefakt' => 'Artefakty', 'lektvar' => 'Lektvary'];
+            $pocetDruh = array_count_values(array_column($d['inventar'], 'typ'));
+            ?>
+            <div class="dn-inv-filtr" role="search">
+              <input type="search" id="dn-inv-hledej" class="dn-inv-hledej" placeholder="Hledat v inventáři…" aria-label="Hledat v inventáři" autocomplete="off">
+              <div class="dn-inv-chipy" role="group" aria-label="Druh předmětu">
+                <button type="button" class="dn-filtr-chip on" data-inv-filtr="">Vše <span class="dn-pocet"><?= count($d['inventar']) ?></span></button>
+                <?php foreach ($druhyInv as $kod => $nazevDruhu): if (empty($pocetDruh[$kod])) { continue; } ?>
+                  <button type="button" class="dn-filtr-chip" data-inv-filtr="<?= $e($kod) ?>"><?= $e($nazevDruhu) ?> <span class="dn-pocet"><?= (int)$pocetDruh[$kod] ?></span></button>
+                <?php endforeach; ?>
+              </div>
+            </div>
             <div class="dn-tab-wrap">
-              <table class="dn-tab">
+              <table class="dn-tab" id="dn-inv-tab">
                 <thead><tr><th>Předmět</th><th>Druh</th><th class="c">ks</th><th class="c">váha / ks</th><th class="c">váha celkem</th><th></th></tr></thead>
                 <tbody>
                 <?php foreach ($d['inventar'] as $i): ?>
-                  <tr>
-                    <td><strong><?= $e($i['nazev']) ?></strong></td>
+                  <tr data-inv-typ="<?= $e($i['typ']) ?>" data-inv-nazev="<?= $e($i['nazev']) ?>">
+                    <td><button type="button" class="dn-odkaz" data-detail="<?= $i['kategorie'] === 'lektvar' ? 'lektvar' : 'predmet' ?>" data-id="<?= (int)$i['id'] ?>" title="Ukázat detail"><strong><?= $e($i['nazev']) ?></strong></button></td>
                     <td><span class="dn-stitek"><?= $e($i['typ']) ?></span></td>
                     <td class="c"><?= (int)$i['mnozstvi'] ?></td>
                     <td class="c"><?= $i['vaha_ks'] !== null ? $mn($i['vaha_ks']) : '<span class="dn-stitek neuplne" title="Váha v katalogu chybí">bez váhy</span>' ?></td>
@@ -551,6 +564,7 @@ $cilKouzla = $svetId > 0;
                   </tr>
                 <?php endforeach; ?>
                 </tbody>
+                <tbody id="dn-inv-nic" hidden><tr><td colspan="6" class="note">Nic neodpovídá hledání ani filtru.</td></tr></tbody>
                 <tfoot>
                   <tr><td colspan="4">Vybavení (základní náklad)</td><td class="c"><strong><?= $mn($nakl['naklad_mn'] - $nakl['penize_mn']) ?> mn</strong></td><td></td></tr>
                   <?php if ($nakl['penize_pocitany']): ?><tr><td colspan="4">Peníze (1 mince = 1 mn)</td><td class="c"><?= $mn($nakl['penize_mn']) ?> mn</td><td></td></tr><?php endif; ?>
@@ -715,6 +729,9 @@ $cilKouzla = $svetId > 0;
     </div>
 
   </div>
+
+  <!-- Detail položky z katalogu: plave nad záložkami, objeví se až po kliknutí na název (naplní ho denik.js). -->
+  <aside class="dn-detail" id="dn-detail" role="dialog" aria-label="Detail položky" hidden></aside>
 </div>
 <?php if (!$fragment): ?>
 </div>

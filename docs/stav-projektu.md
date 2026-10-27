@@ -921,7 +921,7 @@ důvody v `docs/navrh-kontejnery-a-nosice.md`).
 **`docs/prototypy/denik-v2-predani.md`** (rozhodnutí uživatele, vzorce,
 otevřené otázky, návrh postupu stavby). **Krok 1 stavby je v kódu** (záhlaví, měřidla, záložky — podrobně a s odchylkami od
 prototypu v části „Stav stavby“ předávacího dokumentu); popis v1 níže platí pro
-data, API a funkce, vzhled je už v2. **Krok 2 (zbraně u sebe, vytasení za akci) je hotový** — viz sekce Boj výše. Další kroky: figurína
+data, API a funkce, vzhled je už v2. **Krok 2 (zbraně u sebe, vytasení za akci) je hotový** — viz sekce Boj výše. **Krok 3a (2026-10-28): detail předmětu (`hra/api/polozka_detail.php`, plovoucí karta po kliknutí na název) a hledání + filtry podle druhu v inventáři** — viz `docs/prototypy/denik-v2-predani.md`. Další kroky: figurína
 a sloty, dovednosti, společníci (část z nich potřebuje ruční SQL). Otevřené otázky k pravidlům a datům
 (Elixír, únava 30, váha, Torna, „Vyřazení 34“, postřeh, základ šance na
 seslání) jsou v předávacím dokumentu.
