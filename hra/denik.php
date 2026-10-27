@@ -46,7 +46,8 @@ $d = dracak_vtt_denik_data($pdo, $postava);
 
 // --- pomůcky pro šablonu ---
 $e = static fn($v): string => htmlspecialchars((string)$v, ENT_QUOTES);
-$znam = static fn(?int $n): string => $n === null ? '—' : (($n > 0 ? '+' : '') . $n);
+$znam = static fn(?int $n): string => $n === null ? '—' : dracak_vtt_znam($n);
+$cislo = static fn(int $n): string => $n < 0 ? '−' . abs($n) : (string)$n;
 $mn = static function ($n): string {
     $n = (float)$n;
     return rtrim(rtrim(number_format($n, 1, ',', ' '), '0'), ',');
@@ -120,6 +121,21 @@ if ($hlavniZbran === null && count($d['zbrane']) === 1) {
     $hlavniZbran = $d['zbrane'][0];
 }
 
+// Záhlaví v2 (vlastnosti, OČ, ÚČ aktivní zbraně) a žebříček naložení.
+$hl = dracak_vtt_denik_hlavicka($d);
+$zebricek = dracak_vtt_denik_zebricek_nalozeni($pdo, $d);
+$aktivniZbran = dracak_vtt_denik_aktivni_zbran($d);
+$dalsiZbranId = null;   // další zbraň v pořadí; bez aktivní zbraně první z inventáře
+$zbranIds = array_column($d['zbrane'], 'id');
+if ($zbranIds && !$aktivniZbran) {
+    $dalsiZbranId = $zbranIds[0];
+} elseif ($aktivniZbran && count($zbranIds) > 1) {
+    $dalsiZbranId = $zbranIds[(array_search($aktivniZbran['id'], $zbranIds, true) + 1) % count($zbranIds)];
+}
+$maKouzla = $maMag || (bool)$d['kouzla'];
+// Vysvětlení k číslu: při najetí (title) i klepnutí (data-info), ať jde i na dotyku.
+$info = static fn(string $t): string => 'title="' . htmlspecialchars($t, ENT_QUOTES) . '" data-info="' . htmlspecialchars($t, ENT_QUOTES) . '"';
+
 // Výběry zbroje/štítu z inventáře.
 $zbrojeInv = [];
 $stityInv = [];
@@ -139,322 +155,137 @@ if (!$fragment) {
     dracak_vtt_page_start($postava['nazev'] . ' — deník', $user, true, ['../assets/css/denik.css']);
 }
 $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' => 'Odolnost', 'inteligence' => 'Inteligence', 'charisma' => 'Charisma'];
+$cilKouzla = $svetId > 0;
 ?>
 <?php if (!$fragment): ?>
 <div class="dn-wrap<?= $embed ? ' dn-embed' : '' ?>" data-postava-id="<?= $postavaId ?>" data-svet-id="<?= $svetId ?>">
 <?php endif; ?>
-<div class="dn" id="denik">
+<div class="dn" id="denik" data-ma-kouzla="<?= $maKouzla ? '1' : '0' ?>">
 
+  <!-- ===================== ZÁHLAVÍ (trvale viditelné) ===================== -->
   <header class="dn-pas">
     <div class="dn-hlava">
-      <div class="dn-avatar" aria-hidden="true"><?= $e($inicialy) ?></div>
+      <span class="dn-av" aria-hidden="true"><?= $e($inicialy) ?></span>
       <div class="dn-id">
-        <div class="dn-nav-horni">
-          <?php if (!$embed): ?>
-          <a class="svet-pill svet-pill-ghost" href="<?= $svetId > 0 ? 'svet.php?id=' . $svetId : 'postavy_moje.php' ?>">← <?= $svetId > 0 ? $e($postava['svet_nazev']) : 'Moje postavy' ?></a>
-          <a class="svet-pill svet-pill-ghost" href="postava.php?id=<?= $postavaId ?>">Upravit základní údaje</a>
-          <?php endif; ?>
-          <a class="svet-pill svet-pill-ghost" href="denik_tisk.php?id=<?= $postavaId ?>" target="_blank" rel="noopener">Tisk</a>
-        </div>
         <h1 class="dn-jmeno"><?= $e($postava['nazev']) ?></h1>
-        <div class="dn-pod">
-          <?= $e(implode(' · ', array_filter([
-              $postava['rasa_nazev'] ?? null,
-              $postava['povolani_nazev'] ?? null,
-              (int)$postava['uroven'] . '. úroveň',
-              $d['velikost'] ? 'velikost ' . $d['velikost'] : null,
-          ]))) ?>
-          <span class="dn-pod-sed">· hráč <?= $e($postava['vlastnik_jmeno']) ?></span>
-        </div>
+        <p class="dn-pod"><?= $e(implode(' · ', array_filter([
+            $postava['rasa_nazev'] ?? null,
+            $postava['povolani_nazev'] ?? null,
+            (int)$postava['uroven'] . '. úroveň',
+        ]))) ?></p>
       </div>
+      <div class="dn-attrs" role="group" aria-label="Vlastnosti a jejich bonusy">
+        <?php foreach ($hl['atributy'] as $at): ?>
+          <span class="dn-attr<?= $at['zmena'] ? ' zm' : '' ?>" <?= $info($at['title']) ?>>
+            <span class="dn-attr-k"><?= $e($at['zkratka']) ?></span>
+            <span class="dn-attr-h"><?php if ($at['stupen_zaklad'] !== null): ?><s><?= (int)$at['stupen_zaklad'] ?></s> <?php endif; ?><?= $at['stupen'] ?? '—' ?></span>
+            <span class="dn-attr-b<?= ($at['bonus'] ?? 0) < 0 ? ' minus' : '' ?>"><?php if ($at['bonus_zaklad'] !== null): ?><s><?= $e($znam($at['bonus_zaklad'])) ?></s> <?php endif; ?><?= $e($znam($at['bonus'])) ?></span>
+          </span>
+        <?php endforeach; ?>
+      </div>
+      <?php if ($hl['postrech']): ?>
+        <div class="dn-postreh" <?= $info($hl['postrech']['title']) ?>>
+          <span class="dn-attr-k">Postřeh</span>
+          <span class="dn-ps">objekty <strong><?= $hl['postrech']['objekty'] ?> %</strong></span>
+          <span class="dn-ps">mechanismy <strong><?= $hl['postrech']['mechanismy'] ?> %</strong></span>
+        </div>
+      <?php endif; ?>
       <div class="dn-bojcisla">
-        <div class="dn-velke" title="Obranné číslo = kvalita zbroje + bonus za obratnost">
+        <div class="dn-velke" <?= $info($hl['oc']['title']) ?>>
           <span class="dn-velke-k">OČ</span>
-          <span class="dn-velke-h"><?= $d['obrana'] ? (int)$d['obrana']['oc'] : '—' ?></span>
-          <?php if ($d['obrana'] && $d['obrana']['bonus_stit']): ?><span class="dn-velke-p">+1 štít</span><?php endif; ?>
+          <span class="dn-velke-h"><?php if ($hl['oc']['zaklad'] !== null): ?><s><?= (int)$hl['oc']['zaklad'] ?></s> <?php endif; ?><?= $hl['oc']['hodnota'] !== null ? $cislo((int)$hl['oc']['hodnota']) : '—' ?></span>
         </div>
-        <div class="dn-velke" title="Útočné číslo držené zbraně (síla zbraně + bonus za sílu)">
+        <?php if ($dalsiZbranId !== null && $ma('drzena_zbran_id')): ?>
+          <button type="button" class="dn-velke dn-velke-btn" title="<?= $e($hl['uc']['title']) ?>" aria-label="Aktivní zbraň: <?= $e($hl['uc']['popis']) ?>. Klepnutím přepneš na další zbraň." data-dalsi-zbran="<?= (int)$dalsiZbranId ?>">
+        <?php else: ?>
+          <div class="dn-velke dn-velke-jedna" title="<?= $e($hl['uc']['title']) ?>">
+        <?php endif; ?>
           <span class="dn-velke-k">ÚČ</span>
-          <span class="dn-velke-h"><?= $hlavniZbran && $hlavniZbran['uc_tvar_v_tvar'] !== null ? (int)$hlavniZbran['uc_tvar_v_tvar'] : '—' ?></span>
-          <span class="dn-velke-p"><?= $hlavniZbran ? $e($hlavniZbran['nazev']) : 'vyber zbraň' ?></span>
-        </div>
+          <span class="dn-velke-h"><?php if ($hl['uc']['zaklad'] !== null): ?><s><?= (int)$hl['uc']['zaklad'] ?></s> <?php endif; ?><?= $hl['uc']['hodnota'] !== null ? $cislo((int)$hl['uc']['hodnota']) : '—' ?></span>
+          <span class="dn-velke-p"><?= $e($hl['uc']['popis']) ?></span>
+        <?= $dalsiZbranId !== null && $ma('drzena_zbran_id') ? '</button>' : '</div>' ?>
       </div>
+      <?php if (!$embed): ?>
+        <a class="btn btn-secondary dn-zavrit" href="<?= $svetId > 0 ? 'svet.php?id=' . $svetId : 'postavy_moje.php' ?>" data-zavrit>✕ Zavřít deník</a>
+      <?php endif; ?>
     </div>
 
-    <div class="dn-metry">
+    <div class="dn-stav">
       <!-- Životy -->
-      <section class="dn-metr" aria-label="Životy">
-        <div class="dn-metr-hlava"><span>Životy</span>
-          <?php if ($hpStav === 'out'): ?><span class="dn-stitek nebezpeci">vyřazena z boje</span>
-          <?php elseif ($hpStav === 'low'): ?><span class="dn-stitek varovani">postih <?= $znam($boj['postih_pod_tretinou']) ?> k útoku i obraně</span><?php endif; ?>
+      <section class="dn-cell main" aria-label="Životy">
+        <div class="dn-cell-id">
+          <div class="dn-cell-top"><span class="dn-cell-l">Životy</span>
+            <?php if ($hpStav === 'out'): ?><span class="dn-stitek nebezpeci">vyřazena z boje</span>
+            <?php elseif ($hpStav === 'low'): ?><span class="dn-stitek varovani">postih <?= $znam($boj['postih_pod_tretinou']) ?> k ÚČ a OČ</span><?php endif; ?>
+          </div>
+          <span class="dn-cell-v dn-metr-cislo"><strong><?= $hp ?></strong><span>/ <?= $maxHp ?></span></span>
         </div>
-        <div class="dn-metr-cislo"><strong><?= $hp ?></strong><span>/ <?= $maxHp ?></span></div>
-        <div class="dn-bar <?= $hpStav ?>" role="meter" aria-valuemin="0" aria-valuemax="<?= $maxHp ?>" aria-valuenow="<?= $hp ?>"><i style="width:<?= $hpProcent ?>%"></i></div>
-        <?php if ($boj): ?><div class="dn-metr-pozn">mez vyřazení <?= (int)$boj['mez_vyrazeni'] ?> · postih pod <?= $e(rtrim(rtrim(number_format($maxHp / 3, 1, ',', ''), '0'), ',')) ?> živ.</div><?php endif; ?>
+        <div class="dn-cell-mid"><div class="dn-bar thin <?= $hpStav ?>" role="meter" aria-label="Životy" aria-valuemin="0" aria-valuemax="<?= $maxHp ?>" aria-valuenow="<?= $hp ?>"><i style="width:<?= $hpProcent ?>%"></i></div></div>
         <div class="dn-pms"><?= $tlacitka('hp', [-5, -1, 1, 5]) ?></div>
+        <?php if ($boj): ?>
+          <button type="button" class="dn-cell-i" aria-label="Vysvětlení: životy" <?= $info('Mez vyřazení ' . (int)$boj['mez_vyrazeni'] . ' životů: na ní a pod ní postava nebojuje (h1610). Méně než třetina max. životů (' . rtrim(rtrim(number_format($maxHp / 3, 1, ',', ''), '0'), ',') . '): postih ' . $znam($boj['postih_pod_tretinou']) . ' k útoku i obraně' . ($boj['pod_tretinou'] ? ' (platí teď).' : ' (zatím se neuplatňuje).')) ?>>i</button>
+        <?php endif; ?>
       </section>
 
       <?php if ($maMag): ?>
-      <section class="dn-metr" aria-label="Magenergie">
-        <div class="dn-metr-hlava"><span>Magenergie</span></div>
-        <div class="dn-metr-cislo"><strong><?= (int)$postava['aktualni_magenergie'] ?></strong><span>/ <?= (int)$postava['max_magenergie'] ?></span></div>
-        <div class="dn-bar mag"><i style="width:<?= (int)$postava['max_magenergie'] > 0 ? max(0, min(100, round((int)$postava['aktualni_magenergie'] / (int)$postava['max_magenergie'] * 100))) : 0 ?>%"></i></div>
-        <div class="dn-metr-pozn">magů</div>
+      <!-- Magenergie -->
+      <section class="dn-cell main" aria-label="Magenergie">
+        <div class="dn-cell-id">
+          <div class="dn-cell-top"><span class="dn-cell-l">Magy</span></div>
+          <span class="dn-cell-v dn-metr-cislo"><strong><?= (int)$postava['aktualni_magenergie'] ?></strong><span>/ <?= (int)$postava['max_magenergie'] ?></span></span>
+        </div>
+        <div class="dn-cell-mid"><div class="dn-bar thin mag" role="meter" aria-label="Magenergie" aria-valuemin="0" aria-valuemax="<?= (int)$postava['max_magenergie'] ?>" aria-valuenow="<?= (int)$postava['aktualni_magenergie'] ?>"><i style="width:<?= (int)$postava['max_magenergie'] > 0 ? max(0, min(100, round((int)$postava['aktualni_magenergie'] / (int)$postava['max_magenergie'] * 100))) : 0 ?>%"></i></div></div>
         <div class="dn-pms"><?= $tlacitka('magenergie', [-5, -1, 1, 5]) ?></div>
       </section>
       <?php endif; ?>
 
       <!-- Únava -->
-      <section class="dn-metr" aria-label="Únava">
-        <div class="dn-metr-hlava"><span>Únava</span>
-          <?php if ($unava && $unava['stupen'] > 0): ?><span class="dn-stitek <?= $unava['stupen'] >= 3 ? 'nebezpeci' : 'varovani' ?>"><?= $e($unava['nazev']) ?></span><?php endif; ?>
+      <section class="dn-cell aux" aria-label="Únava">
+        <div class="dn-cell-id">
+          <div class="dn-cell-top"><span class="dn-cell-l">Únava</span>
+            <?php if ($unava && $unava['stupen'] > 0): ?><span class="dn-stitek <?= $unava['stupen'] >= 2 ? 'nebezpeci' : 'varovani' ?>"><?= $e($unava['nazev']) ?></span><?php endif; ?>
+          </div>
+          <?php if ($unava): ?><span class="dn-cell-v dn-metr-cislo"><strong><?= (int)$unava['body'] ?></strong><span>/ <?= (int)$unava['vytrvalost'] ?> vytrvalost</span></span>
+          <?php else: ?><span class="dn-cell-v"><span>Doplň odolnost</span></span><?php endif; ?>
         </div>
         <?php if ($unava): ?>
-          <div class="dn-metr-cislo"><strong><?= (int)$unava['body'] ?></strong><span>/ <?= (int)$unava['vytrvalost'] ?> vytrvalost</span></div>
-          <div class="dn-bar <?= $unava['stupen'] === 0 ? 'ok' : ($unava['stupen'] >= 3 ? 'out' : 'low') ?>"><i style="width:<?= max(0, min(100, round($unava['body'] / (max(1, $unava['vytrvalost']) * 4) * 100))) ?>%"></i><b style="left:25%"></b><b style="left:50%"></b><b style="left:75%"></b></div>
-          <?php if ($unava['dusledky']): ?>
-            <ul class="dn-dusledky"><?php foreach ($unava['dusledky'] as $du): ?><li><?= $e($du) ?></li><?php endforeach; ?></ul>
-            <?php if (!$d['nastaveni_pohybu']['auto_unava']): ?><div class="dn-metr-pozn"><strong>Postihy se automaticky neuplatňují</strong> (PJ je ve světě vypnul) — řeší je PJ ručně.</div><?php endif; ?>
-          <?php else: ?><div class="dn-metr-pozn">bez únavy</div><?php endif; ?>
-        <?php else: ?>
-          <div class="dn-metr-pozn">Doplň odolnost (vytrvalost = odolnost).</div>
+          <div class="dn-cell-mid"><div class="dn-bar thin <?= $unava['stupen'] === 0 ? 'ok' : ($unava['stupen'] >= 2 ? 'out' : 'low') ?>" role="meter" aria-label="Únava" aria-valuemin="0" aria-valuemax="<?= (int)$unava['vytrvalost'] * 4 ?>" aria-valuenow="<?= (int)$unava['body'] ?>"><i style="width:<?= max(0, min(100, round($unava['body'] / (max(1, $unava['vytrvalost']) * 4) * 100))) ?>%"></i><b style="left:25%"></b><b style="left:50%"></b><b style="left:75%"></b></div></div>
         <?php endif; ?>
-        <?php if ($ma('unava')): ?><div class="dn-pms"><?= $tlacitka('unava', [-5, -1, 1, 5]) ?></div>
-          <?php if ($d['spanek'] && (int)$unava['body'] > 0): ?>
-            <button type="button" class="btn btn-secondary dn-spanek" data-akce="spanek" data-hodin="<?= (int)$d['spanek']['hodin'] ?>" data-bodu="<?= (int)$d['spanek']['bodu'] ?>" title="Podle pravidel (h1634): kolik hodin spánku sníží únavu o stupeň a kolik bodů tím zmizí">Prospat <?= (int)$d['spanek']['hodin'] ?> h (−<?= (int)$d['spanek']['bodu'] ?> b.)</button>
+        <?php if ($ma('unava') && $unava): ?><div class="dn-pms"><?= $tlacitka('unava', [-1, 1]) ?></div><?php endif; ?>
+        <?php if ($unava): ?>
+          <button type="button" class="dn-cell-i" aria-label="Vysvětlení: únava" <?= $info('Únava ' . (int)$unava['body'] . ', vytrvalost (= Odolnost) ' . (int)$unava['vytrvalost'] . '. ' . ($unava['popis'] ?? 'Bez postihu.') . '. Prahy: unavená nad ' . (int)$unava['vytrvalost'] . ', vyčerpaná nad ' . 2 * (int)$unava['vytrvalost'] . ', úplně vyčerpaná nad ' . 3 * (int)$unava['vytrvalost'] . ', vysílená nad ' . 4 * (int)$unava['vytrvalost'] . '.' . (!$d['nastaveni_pohybu']['auto_unava'] ? ' Postihy se automaticky neuplatňují (PJ je ve světě vypnul), řeší je PJ ručně.' : '')) ?>>i</button>
+          <?php if ($d['spanek'] && (int)$unava['body'] > 0 && $ma('unava')): ?>
+            <button type="button" class="btn btn-secondary sm dn-spanek" data-akce="spanek" data-hodin="<?= (int)$d['spanek']['hodin'] ?>" data-bodu="<?= (int)$d['spanek']['bodu'] ?>" title="Podle pravidel (h1634): kolik hodin spánku sníží únavu o stupeň a kolik bodů tím zmizí">Prospat <?= (int)$d['spanek']['hodin'] ?> h</button>
           <?php endif; ?>
-        <?php else: ?><div class="dn-metr-pozn">Únava se zatím nedá ukládat (čeká na migraci 0065).</div><?php endif; ?>
+        <?php endif; ?>
       </section>
 
       <!-- Naložení -->
-      <section class="dn-metr dn-metr-siroky" aria-label="Naložení">
-        <div class="dn-metr-hlava"><span>Naložení</span>
-          <?php if ($nalozeni): ?><span class="dn-stitek <?= $naklStav === 'out' ? 'nebezpeci' : ($naklStav === 'low' ? 'varovani' : '') ?>"><?= $e($nalozeniNazvy[$nalozeni['kod']]) ?></span><?php endif; ?>
-          <?php if ($nakl['neuplny']): ?><span class="dn-stitek neuplne" title="Bez váhy: <?= $e(implode(', ', $nakl['bez_vahy'])) ?>">neúplný součet</span><?php endif; ?>
+      <section class="dn-cell aux" aria-label="Naložení">
+        <div class="dn-cell-id">
+          <div class="dn-cell-top"><span class="dn-cell-l">Naložení</span>
+            <?php if ($nalozeni && $nalozeni['kod'] !== 'zadne'): ?><span class="dn-stitek <?= $naklStav === 'out' ? 'nebezpeci' : 'varovani' ?>"><?= $e($nalozeniNazvy[$nalozeni['kod']]) ?></span><?php endif; ?>
+            <?php if ($nakl['neuplny']): ?><span class="dn-stitek neuplne" title="Bez váhy: <?= $e(implode(', ', $nakl['bez_vahy'])) ?>">neúplný součet</span><?php endif; ?>
+          </div>
+          <span class="dn-cell-v dn-metr-cislo"><strong><?= $mn($nakl['naklad_mn']) ?></strong><span>mn<?= $nosnost ? ' / ' . $nosnost : '' ?></span></span>
         </div>
-        <div class="dn-metr-cislo"><strong><?= $mn($nakl['naklad_mn']) ?></strong><span>mn<?= $nosnost ? ' / nosnost ' . $nosnost : '' ?></span></div>
         <?php if ($nosnost): ?>
-        <div class="dn-bar nalozeni <?= $naklStav ?>" aria-label="Náklad v násobcích nosnosti">
-          <i style="width:<?= round($naklPct, 1) ?>%"></i>
-          <b style="left:25%"><em>×1</em></b><b style="left:50%"><em>×2</em></b><b style="left:75%"><em>×3</em></b>
-        </div>
-        <div class="dn-metr-pozn"><?= $e(implode(' · ', array_map(fn($h, $k) => $k . ' ' . $h, $d['hranice_nalozeni'], ['žádné do', 'mírné do', 'střední do', 'velké do']))) ?> mn<?= $velkeNalozeni ? ' · −1 k útoku i obraně' : '' ?></div>
-        <?php else: ?>
-        <div class="dn-metr-pozn">Doplň sílu, aby šla spočítat nosnost.</div>
-        <?php endif; ?>
-        <?php if (!$d['nastaveni_pohybu']['auto_naklad']): ?><div class="dn-metr-pozn"><strong>Naložení se nevyhodnocuje</strong> (PJ vypnul automatiku nákladu) — váha se jen sčítá.</div><?php endif; ?>
-      </section>
-
-      <!-- Pohyblivost -->
-      <section class="dn-metr" aria-label="Pohyblivost">
-        <div class="dn-metr-hlava"><span>Pohyblivost</span></div>
-        <?php if ($poh && $poh['rucne']): ?>
-          <div class="dn-metr-cislo"><strong><?= $poh['pohyblivost'] ?? '—' ?></strong><span><?= $poh['bonus_pohyblivosti'] !== null ? 'bonus ' . $znam($poh['bonus_pohyblivosti']) : '' ?></span></div>
-          <div class="dn-metr-pozn">Pohyblivost se v tomhle světě zadává ručně (PJ vypnul výpočet).</div>
-          <?php if ($ma('pohyblivost_rucne')): ?>
-            <div class="field"><label for="pohyblivost_rucne">Pohyblivost</label>
-              <input type="number" id="pohyblivost_rucne" min="1" max="60" step="1" value="<?= $poh['pohyblivost'] !== null ? (int)$poh['pohyblivost'] : '' ?>" data-zmena="pohyblivost_rucne"></div>
-          <?php else: ?><div class="dn-metr-pozn">Ruční zadání čeká na migraci 0078.</div><?php endif; ?>
-          <?php if ($poh['rasovy_zaklad'] !== null && !$poh['omdleva']): ?><div class="dn-metr-pozn">výpočet by dal <?= (int)$poh['zakladni'] ?> před naložením</div><?php endif; ?>
-          <?php if ($d['rychlost']): $ry = $d['rychlost']; ?>
-            <div class="dn-metr-pozn">chůze za hodinu: procházka <strong><?= (int)$ry['chuze']['prochazka'] ?></strong> · chůze <strong><?= (int)$ry['chuze']['chuze'] ?></strong> · spěch <strong><?= (int)$ry['chuze']['spech'] ?></strong> bodů</div>
-            <div class="dn-metr-pozn">běh za kolo: poklus <strong><?= (int)$ry['beh']['poklus'] ?></strong> · běh <strong><?= (int)$ry['beh']['beh'] ?></strong> · sprint <strong><?= (int)$ry['beh']['sprint'] ?></strong> bodů</div>
-          <?php endif; ?>
-        <?php elseif ($poh): ?>
-          <div class="dn-metr-cislo"><strong><?= $poh['pohyblivost'] ?? '—' ?></strong><span><?= $poh['bonus_pohyblivosti'] !== null ? 'bonus ' . $znam($poh['bonus_pohyblivosti']) : '' ?></span></div>
-          <div class="dn-metr-pozn">základní <?= (int)$poh['zakladni'] ?> = rasa <?= (int)$poh['rasovy_zaklad'] ?>, obr. <?= $znam($poh['bonus_obratnost'] - $poh['unava_postih']) ?>, 2× síla (<?= $znam($poh['bonus_sila'] - $poh['unava_postih']) ?>)<?= $nalozeni && $nalozeni['kod'] !== 'zadne' ? ' · po naložení' : '' ?></div>
-          <?php if ($poh['unava_postih'] > 0): ?><div class="dn-metr-pozn">únava: bez ní by základní pohyblivost byla <?= (int)$poh['zakladni_bez_unavy'] ?></div><?php endif; ?>
-          <?php if ($poh['omdleva']): ?><div class="dn-metr-pozn"><strong>postava omdlévá — nepohybuje se</strong></div><?php endif; ?>
-          <?php if ($d['rychlost']): $ry = $d['rychlost']; ?>
-            <div class="dn-metr-pozn">chůze za hodinu: procházka <strong><?= (int)$ry['chuze']['prochazka'] ?></strong> · chůze <strong><?= (int)$ry['chuze']['chuze'] ?></strong> · spěch <strong><?= (int)$ry['chuze']['spech'] ?></strong> bodů</div>
-            <div class="dn-metr-pozn">běh za kolo: poklus <strong><?= (int)$ry['beh']['poklus'] ?></strong> · běh <strong><?= (int)$ry['beh']['beh'] ?></strong> · sprint <strong><?= (int)$ry['beh']['sprint'] ?></strong> bodů</div>
-          <?php elseif ($poh['bonus_pohyblivosti'] !== null): ?>
-            <div class="dn-metr-pozn">Rychlost pohybu: bonus <?= $znam($poh['bonus_pohyblivosti']) ?> je mimo Tabulky rychlosti (−5 až +10) nebo čeká na migraci 0074.</div>
-          <?php endif; ?>
-          <?php if ($d['doprava'] && $d['doprava']['typ'] === 'zvire'): $z = $d['doprava']['zvire']; ?>
-            <div class="dn-metr-pozn">jede na: <strong><?= $e($z['nazev']) ?></strong> (pohyblivost <?= (int)$z['pohyblivost'] ?>)</div>
-          <?php endif; ?>
-        <?php else: ?>
-          <div class="dn-metr-cislo"><strong>—</strong></div>
-          <div class="dn-metr-pozn">Doplň rasu, sílu a obratnost.</div>
+          <div class="dn-cell-mid"><div class="dn-bar thin nalozeni <?= $naklStav ?>" role="meter" aria-label="Naložení" aria-valuemin="0" aria-valuemax="<?= $nosnost * 4 ?>" aria-valuenow="<?= (int)round($nakl['naklad_mn']) ?>"><i style="width:<?= round($naklPct, 1) ?>%"></i><b style="left:25%"></b><b style="left:50%"></b><b style="left:75%"></b></div></div>
+          <button type="button" class="dn-cell-i" aria-label="Vysvětlení: naložení" <?= $info('Nosnost ' . $nosnost . ' mn' . ($poh && $poh['pohyblivost'] !== null ? '. Pohyblivost ' . (int)$poh['zakladni'] . ' → ' . (int)$poh['pohyblivost'] . ' po naložení' : '') . '. Velké naložení (nad 3× nosnost) dává −1 k útoku i obraně' . ($velkeNalozeni ? ' (platí teď)' : ' (zatím se neuplatňuje)') . '.' . (!$d['nastaveni_pohybu']['auto_naklad'] ? ' Naložení se nevyhodnocuje (PJ vypnul automatiku nákladu), váha se jen sčítá.' : '')) ?>>i</button>
         <?php endif; ?>
       </section>
     </div>
-
-    <nav class="dn-nav" aria-label="Sekce deníku">
-      <a href="#prehled">Přehled</a><a href="#boj">Boj</a><a href="#schopnosti">Schopnosti a kouzla</a><a href="#vybaveni">Vybavení</a><a href="#postava">Postava</a>
-    </nav>
   </header>
 
-  <!-- ===================== PŘEHLED ===================== -->
-  <section class="dn-sekce" id="prehled">
-    <h2 class="dn-h2">Přehled</h2>
-    <div class="dn-grid">
-
-      <div class="dn-karta dn-sirka-2">
-        <h3 class="dn-h3">Vlastnosti</h3>
-        <div class="dn-vlastnosti">
-          <?php foreach ($vlastnostiNazvy as $kl => $nazev): ?>
-            <div class="dn-vlast">
-              <span class="dn-vlast-k"><?= $e($nazev) ?></span>
-              <?php $stEf = $d['stupne_ef'][$kl] ?? null; $stZ = $d['stupne'][$kl] ?? null; $boEf = $d['bonusy_ef'][$kl] ?? null; $boZ = $d['bonusy'][$kl] ?? null; ?>
-              <span class="dn-vlast-h"><?php if ($stEf !== null && $stEf !== $stZ): ?><s title="bez únavy"><?= (int)$stZ ?></s> <?= (int)$stEf ?><?php else: ?><?= $stZ ?? '—' ?><?php endif; ?></span>
-              <span class="dn-vlast-b <?= ($boEf ?? 0) < 0 ? 'minus' : '' ?>"><?php if ($boEf !== null && $boEf !== $boZ): ?><s title="bez únavy"><?= $znam($boZ) ?></s> <?= $znam($boEf) ?><?php else: ?><?= $znam($boZ) ?><?php endif; ?></span>
-            </div>
-          <?php endforeach; ?>
-        </div>
-        <p class="note">Stupeň vlastnosti (1–21) a z něj bonus/postih podle Tabulky postihů a bonusů.<?= $unava && $unava['stupen'] > 0 && $unava['stupen'] < 4 && $d['nastaveni_pohybu']['auto_unava'] ? ' Přeškrtnuto = bez únavy; únava (' . $e($unava['nazev']) . ') snižuje bonus za sílu a obratnost' . ($unava['postih_int'] ? ', stupeň inteligence' . ($unava['postih_cha'] ? ' a charismy' : '') : '') . '.' : '' ?></p>
-      </div>
-
-      <div class="dn-karta">
-        <h3 class="dn-h3">Postřeh</h3>
-        <?php if ($d['postrech']): ?>
-          <div class="dn-dvojice"><span>na objekty</span><strong><?= (int)$d['postrech']['objekty'] ?> %</strong></div>
-          <div class="dn-dvojice"><span>na mechanismy</span><strong><?= (int)$d['postrech']['mechanismy'] ?> %</strong></div>
-          <p class="note">Hledání: hoď k% a odečti postřeh (h1683).</p>
-        <?php else: ?><p class="note">Doplň inteligenci.</p><?php endif; ?>
-      </div>
-
-      <div class="dn-karta">
-        <h3 class="dn-h3">Zkušenost</h3>
-        <?php $zk = $d['zkusenost']; ?>
-        <?php if ($ma('zkusenost')): ?>
-          <div class="dn-metr-cislo"><strong><?= (int)$zk['zkusenost'] ?></strong><span>zt<?= $zk['potrebne'] !== null ? ' / ' . (int)$zk['potrebne'] . ' na ' . (int)$zk['dalsi_uroven'] . '. úroveň' : '' ?></span></div>
-          <?php if ($zk['potrebne'] !== null): ?>
-            <div class="dn-bar ok"><i style="width:<?= max(0, min(100, round($zk['zkusenost'] / max(1, $zk['potrebne']) * 100))) ?>%"></i></div>
-            <div class="dn-metr-pozn"><?= $zk['muze_postoupit'] ? 'Zkušeností je dost — postup je po výcviku (2 měsíce bez dobrodružství, ' . (int)$zk['cena_vycviku_zl'] . ' zl).' : 'Výcvik na další úroveň: ' . (int)$zk['cena_vycviku_zl'] . ' zl.' ?></div>
-          <?php else: ?><div class="dn-metr-pozn">Tabulka zkušeností pro tohle povolání nemá další úroveň.</div><?php endif; ?>
-          <?php if ($smiZkusenost): ?><div class="dn-pms"><?= $tlacitka('zkusenost', [-50, -10, 10, 50]) ?></div>
-          <?php else: ?><div class="dn-metr-pozn">Zkušenost přiděluje PJ.</div><?php endif; ?>
-        <?php else: ?>
-          <p class="note">Zkušenost se zatím nedá ukládat (čeká na migraci 0070).</p>
-        <?php endif; ?>
-      </div>
-
-      <div class="dn-karta">
-        <h3 class="dn-h3">Rasa a doprava</h3>
-        <div class="dn-dvojice"><span>rodová zbraň</span><strong><?= $d['rodova_zbran'] ? $e($d['rodova_zbran']) . ' (+1 ÚČ)' : '—' ?></strong></div>
-        <div class="dn-dvojice"><span>velikost</span>
-          <?php if ($ma('velikost') && !isset(DRACAK_VTT_VELIKOST_RASY[$d['zakladni_rasa'] ?? ''])): ?>
-            <select class="dn-select-mini" data-zmena="velikost" aria-label="Velikost">
-              <option value="">—</option>
-              <?php foreach (['A0', 'A', 'B', 'C', 'D', 'E'] as $v): ?><option value="<?= $v ?>" <?= ($postava['velikost'] ?? '') === $v ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?>
-            </select>
-          <?php else: ?><strong><?= $e($d['velikost'] ?? '—') ?></strong><?php endif; ?>
-        </div>
-        <div class="dn-dvojice"><span>doprava</span><strong><?= $d['doprava'] && $d['doprava']['typ'] === 'zvire' ? $e($d['doprava']['zvire']['nazev']) : 'pěšky' ?></strong></div>
-        <div class="dn-dvojice"><span>jazyky</span><strong><?= $d['jazyky'] ? $e(implode(', ', $d['jazyky'])) : '—' ?></strong></div>
-      </div>
-
-      <div class="dn-karta">
-        <h3 class="dn-h3">Aktivní efekty</h3>
-        <?php if (!$d['efekty']): ?><p class="note">Žádné aktivní efekty.</p>
-        <?php else: ?>
-          <ul class="dn-efekty">
-            <?php foreach ($d['efekty'] as $ef): ?>
-              <li class="dn-efekt <?= $e($ef['typ']) ?>" title="<?= $e($ef['tooltip_text']) ?>">
-                <strong><?= $e($ef['nazev']) ?></strong> <span class="dn-stitek"><?= $e($ef['typ']) ?></span>
-                <span class="dn-efekt-kola"><?= $ef['zbyva_kol'] !== null ? (int)$ef['zbyva_kol'] . ' kol' : 'trvale' ?></span>
-                <?php if (!empty($ef['shrnuti']) || !empty($ef['stav_nazev'])): ?>
-                  <small class="note"><?= $e($ef['shrnuti'] ? implode(', ', $ef['shrnuti']) : $ef['stav_nazev']) ?><?= $ef['shrnuti'] && in_array($ef['stav'], ['cast'], true) ? ' · zbytek posoudí PJ' : '' ?></small>
-                <?php endif; ?>
-              </li>
-            <?php endforeach; ?>
-          </ul>
-        <?php endif; ?>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===================== BOJ ===================== -->
-  <section class="dn-sekce" id="boj">
-    <h2 class="dn-h2">Boj</h2>
-    <div class="dn-grid">
-
-      <div class="dn-karta">
-        <h3 class="dn-h3">Obrana</h3>
-        <?php $ob = $d['obrana']; ?>
-        <?php if ($ob): ?>
-          <div class="dn-vzorec">
-            <span class="dn-vz"><small>KZ</small><b><?= (int)$ob['kz'] ?></b></span><span class="dn-op">+</span>
-            <span class="dn-vz"><small>obr.</small><b><?= $znam($ob['bonus_obratnost']) ?></b></span><span class="dn-op">=</span>
-            <span class="dn-vz dn-vysledek"><small>OČ</small><b><?= (int)$ob['oc'] ?></b></span>
-          </div>
-          <p class="note">Obranné číslo = kvalita zbroje + bonus za obratnost, nikdy méně než 0. Bez zbroje je KZ 1 (šaty). Štít: +1 k hodu na obranu.</p>
-          <div class="dn-hod-akce"><button type="button" class="btn btn-primary" data-hod="obrana">Hod na obranu (1k6+ + OČ)</button></div>
-          <?php if ($ma('zbroj_id')): ?>
-            <div class="field"><label for="zbroj_id">Zbroj na těle</label>
-              <select id="zbroj_id" data-zmena="vyber" data-pole="zbroj_id">
-                <option value="">— šaty (KZ 1)</option>
-                <?php foreach ($zbrojeInv as $i): ?><option value="<?= (int)$i['id'] ?>" <?= (int)($postava['zbroj_id'] ?? 0) === $i['id'] ? 'selected' : '' ?>><?= $e($i['nazev']) ?></option><?php endforeach; ?>
-              </select>
-            </div>
-            <div class="field"><label for="stit_id">Štít</label>
-              <select id="stit_id" data-zmena="vyber" data-pole="stit_id">
-                <option value="">— bez štítu</option>
-                <?php foreach ($stityInv as $i): ?><option value="<?= (int)$i['id'] ?>" <?= (int)($postava['stit_id'] ?? 0) === $i['id'] ? 'selected' : '' ?>><?= $e($i['nazev']) ?></option><?php endforeach; ?>
-              </select>
-            </div>
-            <?php if (!$zbrojeInv && !$stityInv): ?><p class="note">Zbroj ani štít nemáš v inventáři.</p><?php endif; ?>
-          <?php else: ?><p class="note">Výběr zbroje a štítu čeká na migraci 0070.</p><?php endif; ?>
-          <p class="note">Další části zbroje (rukavice, přilbice, boty) se do OČ zatím nepočítají — pravidla v přepisu neříkají, jak se skládají.</p>
-        <?php else: ?><p class="note">Doplň obratnost.</p><?php endif; ?>
-      </div>
-
-      <div class="dn-karta">
-        <h3 class="dn-h3">Stav v boji</h3>
-        <?php if ($boj): ?>
-          <div class="dn-dvojice"><span>mez vyřazení</span><strong><?= (int)$boj['mez_vyrazeni'] ?> živ.</strong></div>
-          <div class="dn-dvojice"><span>postih pod 1/3 životů</span><strong><?= $znam($boj['postih_pod_tretinou']) ?></strong></div>
-          <div class="dn-dvojice"><span>velké naložení</span><strong><?= $velkeNalozeni ? '−1' : '0' ?></strong></div>
-          <p class="note">Postih k hodu na útok i obranu: méně než třetina životů (podle odolnosti), velké naložení −1. Při životech na mezi vyřazení a pod ní postava nebojuje (h1610).</p>
-        <?php else: ?><p class="note">Doplň odolnost.</p><?php endif; ?>
-        <div class="dn-dvojice"><span>únava</span><strong><?= $unava ? $e($unava['nazev']) : '—' ?></strong></div>
-        <?php if ($unava && $unava['stupen'] > 0 && $unava['stupen'] < 4 && $d['nastaveni_pohybu']['auto_unava']): ?><p class="note">Únava snižuje bonus za sílu i obratnost o <?= (int)$unava['postih_sil_obr'] ?> — ÚČ a OČ výše to už zahrnují.<?= in_array('sprint', $unava['zakazy'], true) ? ' Nesmí sprintovat' . (in_array('beh', $unava['zakazy'], true) ? ' ani běžet (poklus smí)' : '') . '.' : '' ?></p><?php endif; ?>
-        <?php if ($unava && $unava['omdleva']): ?><p class="note"><strong>Postava omdlévá</strong> — bez pomoci umírá během 1k6 hodin.</p><?php endif; ?>
-      </div>
-
-      <div class="dn-karta dn-sirka-cela">
-        <h3 class="dn-h3">Zbraně
-          <label class="dn-mod" for="dn-mod">ruční oprava k hodu <input type="number" id="dn-mod" value="0" step="1" min="-30" max="30" title="Rozdíl velikostí, dostřel (malý +1, velký −1), úkryt… podle situace"></label>
-        </h3>
-        <?php if (!$d['zbrane']): ?>
-          <p class="note">Žádná zbraň v inventáři.</p>
-        <?php else: ?>
-          <div class="dn-tab-wrap">
-            <table class="dn-tab">
-              <thead><tr><th></th><th>Zbraň</th><th class="c">SZ</th><th class="c">Útočnost</th><th class="c">OZ</th><th class="c">Délka</th><th class="c">ÚČ tváří v tvář</th><th class="c">ÚČ střelecký</th><th class="c">Dostřel</th><th class="c">Hod</th></tr></thead>
-              <tbody>
-              <?php foreach ($d['zbrane'] as $z): ?>
-                <tr class="<?= $z['drzena'] ? 'drzena' : '' ?>">
-                  <td><?php if ($ma('drzena_zbran_id')): ?><input type="radio" name="drzena" aria-label="Držím <?= $e($z['nazev']) ?>" data-zmena="vyber" data-pole="drzena_zbran_id" value="<?= $z['id'] ?>" <?= $z['drzena'] ? 'checked' : '' ?>><?php endif; ?></td>
-                  <td><strong><?= $e($z['nazev']) ?></strong><?= $z['mnozstvi'] > 1 ? ' ×' . $z['mnozstvi'] : '' ?><?= $z['rodova'] ? ' <span class="dn-stitek" title="Rodová zbraň rasy: +1 k ÚČ">rodová</span>' : '' ?></td>
-                  <td class="c"><?= $z['sz'] ?? '—' ?></td>
-                  <td class="c"><?= $znam($z['utocnost']) ?></td>
-                  <td class="c"><?= $znam($z['oz']) ?></td>
-                  <td class="c"><?= $e($z['delka'] ?? '—') ?></td>
-                  <td class="c uc"><?= $z['uc_tvar_v_tvar'] ?? '—' ?></td>
-                  <td class="c uc"><?= $z['uc_strelecky'] ?? '—' ?></td>
-                  <td class="c"><?= $z['dostrel'] ? implode(' / ', $z['dostrel']) : '—' ?></td>
-                  <td class="c dn-hod-bunka">
-                    <?php if ($z['uc_tvar_v_tvar'] !== null): ?><button type="button" class="dn-pm" data-hod="utok" data-zbran="<?= $z['id'] ?>">Útok</button><?php endif; ?>
-                    <?php if ($z['uc_strelecky'] !== null): ?><button type="button" class="dn-pm" data-hod="strelba" data-zbran="<?= $z['id'] ?>">Střelba</button><?php endif; ?>
-                  </td>
-                </tr>
-              <?php endforeach; ?>
-              </tbody>
-            </table>
-          </div>
-          <p class="note">ÚČ tváří v tvář = síla zbraně + bonus za sílu (+1 rodová zbraň), střelecký = síla zbraně + bonus za obratnost, nikdy méně než 0. Dostřel malý / střední / velký v sázích: ≤ malý +1 k útoku, > střední −1. Kouzelné a artefaktové zbraně bez síly zbraně v katalogu mají ÚČ „—“. Hod = 1k6 s opakováním po šestce + ÚČ, s opravami za málo životů a velké naložení (rozdíl velikostí a dostřel zadej do ruční opravy).</p>
-        <?php endif; ?>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===================== SCHOPNOSTI A KOUZLA ===================== -->
-  <section class="dn-sekce" id="schopnosti">
-    <h2 class="dn-h2">Schopnosti a kouzla
-      <?php if ($svetId > 0): ?>
+  <div class="dk-body">
+    <div class="dk-tabbar">
+      <nav class="dk-tabs" role="tablist" aria-label="Sekce deníku">
+        <button type="button" role="tab" class="dk-tab on" data-tab="postava" aria-selected="true">Postava</button>
+        <button type="button" role="tab" class="dk-tab" data-tab="inventar" aria-selected="false">Inventář <span class="dn-pocet"><?= count($d['inventar']) ?></span></button>
+        <?php if ($maKouzla): ?><button type="button" role="tab" class="dk-tab" data-tab="kouzla" aria-selected="false">Kouzla <span class="dn-pocet"><?= count($d['kouzla']) ?></span></button><?php endif; ?>
+        <button type="button" role="tab" class="dk-tab" data-tab="schopnosti" aria-selected="false">Schopnosti <span class="dn-pocet"><?= count($d['schopnosti']) ?></span></button>
+      </nav>
+      <?php if ($cilKouzla): ?>
       <label class="dn-mod dn-cil" for="dn-cil">cíl kouzla / lektvaru
         <select id="dn-cil">
           <option value="">na sebe</option>
@@ -462,10 +293,353 @@ $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' =>
         </select>
       </label>
       <?php endif; ?>
-    </h2>
-    <div class="dn-grid">
-      <div class="dn-karta dn-sirka-cela">
-        <h3 class="dn-h3">Zvláštní schopnosti a dovednosti <span class="dn-pocet"><?= count($d['schopnosti']) ?></span></h3>
+    </div>
+
+    <!-- ===================== POSTAVA ===================== -->
+    <div class="dk-panel" role="tabpanel" data-panel="postava" aria-label="Postava">
+      <div class="dk-grid2">
+
+        <section class="dn-karta" id="prehled">
+          <h2 class="dn-h3">Postup</h2>
+          <?php $zk = $d['zkusenost']; ?>
+          <?php if ($ma('zkusenost')): ?>
+            <div class="dn-dvojice"><span>Zkušenost</span><strong><?= (int)$zk['zkusenost'] ?> zt<?= $zk['potrebne'] !== null ? ' / ' . (int)$zk['potrebne'] . ' na ' . (int)$zk['dalsi_uroven'] . '. úroveň' : '' ?></strong></div>
+            <?php if ($zk['potrebne'] !== null): ?>
+              <div class="dn-bar thin ok" role="meter" aria-label="Zkušenost do další úrovně" aria-valuemin="0" aria-valuemax="<?= (int)$zk['potrebne'] ?>" aria-valuenow="<?= (int)$zk['zkusenost'] ?>"><i style="width:<?= max(0, min(100, round($zk['zkusenost'] / max(1, $zk['potrebne']) * 100))) ?>%"></i></div>
+              <div class="dn-metr-pozn"><?= $zk['muze_postoupit'] ? 'Zkušeností je dost — postup je po výcviku (2 měsíce bez dobrodružství, ' . (int)$zk['cena_vycviku_zl'] . ' zl).' : 'Výcvik na další úroveň: ' . (int)$zk['cena_vycviku_zl'] . ' zl.' ?></div>
+            <?php else: ?><div class="dn-metr-pozn">Tabulka zkušeností pro tohle povolání nemá další úroveň.</div><?php endif; ?>
+            <?php if ($smiZkusenost): ?><div class="dn-pms dn-pms-mala"><?= $tlacitka('zkusenost', [-50, -10, 10, 50]) ?></div>
+            <?php else: ?><div class="dn-metr-pozn">Zkušenost přiděluje PJ. Hráč ji jen čte.</div><?php endif; ?>
+          <?php else: ?>
+            <p class="note">Zkušenost se zatím nedá ukládat (čeká na migraci 0070).</p>
+          <?php endif; ?>
+          <div class="dn-ident">
+            <div class="dn-dvojice"><span>velikost</span>
+              <?php if ($ma('velikost') && !isset(DRACAK_VTT_VELIKOST_RASY[$d['zakladni_rasa'] ?? ''])): ?>
+                <select class="dn-select-mini" data-zmena="velikost" aria-label="Velikost">
+                  <option value="">—</option>
+                  <?php foreach (['A0', 'A', 'B', 'C', 'D', 'E'] as $v): ?><option value="<?= $v ?>" <?= ($postava['velikost'] ?? '') === $v ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?>
+                </select>
+              <?php else: ?><strong><?= $e($d['velikost'] ?? '—') ?></strong><?php endif; ?>
+            </div>
+            <div class="dn-dvojice"><span>rodová zbraň</span><strong><?= $d['rodova_zbran'] ? $e($d['rodova_zbran']) . ' (+1 ÚČ)' : '—' ?></strong></div>
+            <div class="dn-dvojice"><span>doprava</span><strong><?= $d['doprava'] && $d['doprava']['typ'] === 'zvire' ? $e($d['doprava']['zvire']['nazev']) : 'pěšky' ?></strong></div>
+            <div class="dn-dvojice"><span>jazyky</span><strong><?= $d['jazyky'] ? $e(implode(', ', $d['jazyky'])) : '—' ?></strong></div>
+          </div>
+          <div class="dn-karta-akce">
+            <?php if (!$embed): ?><a class="btn btn-secondary sm" href="postava.php?id=<?= $postavaId ?>">Upravit základní údaje</a><?php endif; ?>
+            <a class="btn btn-ghost sm" href="denik_tisk.php?id=<?= $postavaId ?>" target="_blank" rel="noopener">Tisk deníku</a>
+          </div>
+        </section>
+
+        <section class="dn-karta" id="obrana">
+          <h2 class="dn-h3">Obrana</h2>
+          <?php $ob = $d['obrana']; ?>
+          <?php if ($ob): ?>
+            <div class="dn-vzorec">
+              <span class="dn-vz"><small>KZ</small><b><?= (int)$ob['kz'] ?></b></span><span class="dn-op">+</span>
+              <span class="dn-vz"><small>obr.</small><b><?= $znam($ob['bonus_obratnost']) ?></b></span><span class="dn-op">=</span>
+              <span class="dn-vz dn-vysledek"><small>OČ</small><b><?= (int)$ob['oc'] ?></b></span>
+            </div>
+            <p class="note">Obranné číslo = kvalita zbroje + bonus za obratnost, nikdy méně než 0. Bez zbroje je KZ 1 (šaty). Štít: +1 k hodu na obranu; postihy za málo životů a velké naložení jsou v čísle v záhlaví.</p>
+            <div class="dn-hod-akce"><button type="button" class="btn btn-primary" data-hod="obrana">Hod na obranu (1k6+ + OČ)</button></div>
+            <?php if ($ma('zbroj_id')): ?>
+              <div class="field"><label for="zbroj_id">Zbroj na těle</label>
+                <select id="zbroj_id" data-zmena="vyber" data-pole="zbroj_id">
+                  <option value="">— šaty (KZ 1)</option>
+                  <?php foreach ($zbrojeInv as $i): ?><option value="<?= (int)$i['id'] ?>" <?= (int)($postava['zbroj_id'] ?? 0) === $i['id'] ? 'selected' : '' ?>><?= $e($i['nazev']) ?></option><?php endforeach; ?>
+                </select>
+              </div>
+              <div class="field"><label for="stit_id">Štít</label>
+                <select id="stit_id" data-zmena="vyber" data-pole="stit_id">
+                  <option value="">— bez štítu</option>
+                  <?php foreach ($stityInv as $i): ?><option value="<?= (int)$i['id'] ?>" <?= (int)($postava['stit_id'] ?? 0) === $i['id'] ? 'selected' : '' ?>><?= $e($i['nazev']) ?></option><?php endforeach; ?>
+                </select>
+              </div>
+              <?php if (!$zbrojeInv && !$stityInv): ?><p class="note">Zbroj ani štít nemáš v inventáři.</p><?php endif; ?>
+            <?php else: ?><p class="note">Výběr zbroje a štítu čeká na migraci 0070.</p><?php endif; ?>
+            <p class="note">Další části zbroje (rukavice, přilbice, boty) se do OČ zatím nepočítají — pravidla v přepisu neříkají, jak se skládají.</p>
+          <?php else: ?><p class="note">Doplň obratnost.</p><?php endif; ?>
+        </section>
+
+        <section class="dn-karta dk-span2" id="boj">
+          <h2 class="dn-h3">Boj
+            <label class="dn-mod" for="dn-mod">ruční oprava k hodu <input type="number" id="dn-mod" value="0" step="1" min="-30" max="30" title="Rozdíl velikostí, dostřel (malý +1, velký −1), úkryt… podle situace"></label>
+          </h2>
+          <?php if (!$d['zbrane']): ?>
+            <p class="note">Žádná zbraň v inventáři.</p>
+          <?php else: ?>
+            <div class="dn-tab-wrap">
+              <table class="dn-tab">
+                <thead><tr><th>Aktivní</th><th>Zbraň</th><th class="c">SZ</th><th class="c">Útočnost</th><th class="c">OZ</th><th class="c">Délka</th><th class="c">ÚČ tváří v tvář</th><th class="c">ÚČ střelecký</th><th class="c">Dostřel</th><th class="c">Hod</th></tr></thead>
+                <tbody>
+                <?php foreach ($d['zbrane'] as $z): ?>
+                  <tr class="<?= $z['drzena'] ? 'drzena' : '' ?>">
+                    <td><?php if ($ma('drzena_zbran_id')): ?><input type="radio" name="drzena" aria-label="Aktivní zbraň: <?= $e($z['nazev']) ?>" data-zmena="vyber" data-pole="drzena_zbran_id" value="<?= $z['id'] ?>" <?= $z['drzena'] ? 'checked' : '' ?>><?php endif; ?></td>
+                    <td><strong><?= $e($z['nazev']) ?></strong><?= $z['mnozstvi'] > 1 ? ' ×' . $z['mnozstvi'] : '' ?><?= $z['rodova'] ? ' <span class="dn-stitek" title="Rodová zbraň rasy: +1 k ÚČ">rodová</span>' : '' ?></td>
+                    <td class="c"><?= $z['sz'] ?? '—' ?></td>
+                    <td class="c"><?= $znam($z['utocnost']) ?></td>
+                    <td class="c" title="Obrana zbraně (nepovinné pravidlo, h1611): při obraně zbraní se přičítá k hodu na obranu."><?= $znam($z['oz']) ?></td>
+                    <td class="c"><?= $e($z['delka'] ?? '—') ?></td>
+                    <td class="c uc"><?= $z['uc_tvar_v_tvar'] ?? '—' ?></td>
+                    <td class="c uc"><?= $z['uc_strelecky'] ?? '—' ?></td>
+                    <td class="c"><?= $z['dostrel'] ? implode(' / ', $z['dostrel']) : '—' ?></td>
+                    <td class="c dn-hod-bunka">
+                      <?php if ($z['uc_tvar_v_tvar'] !== null): ?><button type="button" class="dn-pm" data-hod="utok" data-zbran="<?= $z['id'] ?>">Útok</button><?php endif; ?>
+                      <?php if ($z['uc_strelecky'] !== null): ?><button type="button" class="dn-pm" data-hod="strelba" data-zbran="<?= $z['id'] ?>">Střelba</button><?php endif; ?>
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+            <p class="note">ÚČ tváří v tvář = síla zbraně + bonus za sílu (+1 rodová zbraň), střelecký = síla zbraně + bonus za obratnost, nikdy méně než 0. Dostřel malý / střední / velký v sázích: ≤ malý +1 k útoku, > střední −1. Kouzelné a artefaktové zbraně bez síly zbraně v katalogu mají ÚČ „—“. Hod = 1k6 s opakováním po šestce + ÚČ, s opravami za málo životů a velké naložení (rozdíl velikostí a dostřel zadej do ruční opravy). Aktivní zbraň je ta v záhlaví.</p>
+          <?php endif; ?>
+        </section>
+
+        <section class="dn-karta" id="pohyb">
+          <h2 class="dn-h3">Pohyb a naložení</h2>
+          <?php if ($poh && $poh['rucne']): ?>
+            <div class="dn-dvojice"><span>pohyblivost</span><strong><?= $poh['pohyblivost'] ?? '—' ?><?= $poh['bonus_pohyblivosti'] !== null ? ' (bonus ' . $znam($poh['bonus_pohyblivosti']) . ')' : '' ?></strong></div>
+            <p class="note">Pohyblivost se v tomhle světě zadává ručně (PJ vypnul výpočet).</p>
+            <?php if ($ma('pohyblivost_rucne')): ?>
+              <div class="field"><label for="pohyblivost_rucne">Pohyblivost</label>
+                <input type="number" id="pohyblivost_rucne" min="1" max="60" step="1" value="<?= $poh['pohyblivost'] !== null ? (int)$poh['pohyblivost'] : '' ?>" data-zmena="pohyblivost_rucne"></div>
+            <?php else: ?><p class="note">Ruční zadání čeká na migraci 0078.</p><?php endif; ?>
+            <?php if ($poh['rasovy_zaklad'] !== null && !$poh['omdleva']): ?><p class="note">výpočet by dal <?= (int)$poh['zakladni'] ?> před naložením</p><?php endif; ?>
+          <?php elseif ($poh): ?>
+            <div class="dn-dvojice"><span>pohyblivost</span><strong><?= $poh['pohyblivost'] ?? '—' ?><?= $poh['bonus_pohyblivosti'] !== null ? ' (bonus ' . $znam($poh['bonus_pohyblivosti']) . ')' : '' ?></strong></div>
+            <p class="note">Základní <?= (int)$poh['zakladni'] ?> = rasa <?= (int)$poh['rasovy_zaklad'] ?>, obr. <?= $znam($poh['bonus_obratnost'] - $poh['unava_postih']) ?>, 2× síla (<?= $znam($poh['bonus_sila'] - $poh['unava_postih']) ?>)<?= $nalozeni && $nalozeni['kod'] !== 'zadne' ? ' · po naložení' : '' ?>.<?= $poh['unava_postih'] > 0 ? ' Bez únavy by byla základní pohyblivost ' . (int)$poh['zakladni_bez_unavy'] . '.' : '' ?></p>
+            <?php if ($poh['omdleva']): ?><p class="note"><strong>Postava omdlévá — nepohybuje se.</strong></p><?php endif; ?>
+          <?php else: ?>
+            <p class="note">Doplň rasu, sílu a obratnost.</p>
+          <?php endif; ?>
+          <?php if ($zebricek): ?>
+            <table class="dn-tab dk-ladder">
+              <thead><tr><th>Naložení</th><th class="r">Do</th><th class="r">Pohyblivost</th><th class="r">Bonus</th></tr></thead>
+              <tbody>
+              <?php foreach ($zebricek as $r): ?>
+                <tr class="<?= $r['aktualni'] ? 'cur' : '' ?>"><td><?= $e($r['nazev']) ?></td><td class="r"><?= (int)$r['mez'] ?> mn</td><td class="r"><?= (int)$r['pohyblivost'] ?></td><td class="r"><?= $e($znam($r['bonus'])) ?></td></tr>
+              <?php endforeach; ?>
+              </tbody>
+            </table>
+            <?php if (($nalozeni['kod'] ?? null) === 'prilis_velke'): ?><p class="note"><span class="dn-stitek nebezpeci">neunese</span> Náklad je nad čtyřnásobkem nosnosti — tabulka tu pohyblivost nemá.</p><?php endif; ?>
+          <?php endif; ?>
+          <?php if ($d['rychlost']): $ry = $d['rychlost']; ?>
+            <div class="dn-dvojice"><span>chůze za hodinu</span><strong>procházka <?= (int)$ry['chuze']['prochazka'] ?> · chůze <?= (int)$ry['chuze']['chuze'] ?> · spěch <?= (int)$ry['chuze']['spech'] ?></strong></div>
+            <div class="dn-dvojice"><span>běh za kolo</span><strong>poklus <?= (int)$ry['beh']['poklus'] ?> · běh <?= (int)$ry['beh']['beh'] ?> · sprint <?= (int)$ry['beh']['sprint'] ?></strong></div>
+          <?php elseif ($poh && $poh['bonus_pohyblivosti'] !== null): ?>
+            <p class="note">Rychlost pohybu: bonus <?= $znam($poh['bonus_pohyblivosti']) ?> je mimo Tabulky rychlosti (−5 až +10) nebo čeká na migraci 0074.</p>
+          <?php endif; ?>
+          <?php if ($d['doprava'] && $d['doprava']['typ'] === 'zvire'): $z = $d['doprava']['zvire']; ?>
+            <p class="note">Jede na: <strong><?= $e($z['nazev']) ?></strong> (pohyblivost <?= (int)$z['pohyblivost'] ?>).</p>
+          <?php endif; ?>
+        </section>
+
+        <section class="dn-karta" id="efekty">
+          <h2 class="dn-h3">Aktivní efekty <span class="dn-pocet"><?= count($d['efekty']) ?></span></h2>
+          <?php if (!$d['efekty']): ?><p class="note">Žádné aktivní efekty.</p>
+          <?php else: ?>
+            <ul class="dn-efekty">
+              <?php foreach ($d['efekty'] as $ef): ?>
+                <li class="dn-efekt <?= $e($ef['typ']) ?>" title="<?= $e($ef['tooltip_text']) ?>">
+                  <strong><?= $e($ef['nazev']) ?></strong> <span class="dn-stitek"><?= $e($ef['typ']) ?></span>
+                  <span class="dn-efekt-kola"><?= $ef['zbyva_kol'] !== null ? (int)$ef['zbyva_kol'] . ' kol' : 'trvale' ?></span>
+                  <?php if (!empty($ef['shrnuti']) || !empty($ef['stav_nazev'])): ?>
+                    <small class="note"><?= $e($ef['shrnuti'] ? implode(', ', $ef['shrnuti']) : $ef['stav_nazev']) ?><?= $ef['shrnuti'] && in_array($ef['stav'], ['cast'], true) ? ' · zbytek posoudí PJ' : '' ?></small>
+                  <?php endif; ?>
+                </li>
+              <?php endforeach; ?>
+            </ul>
+          <?php endif; ?>
+        </section>
+
+        <section class="dn-karta dk-span2" id="postava">
+          <h2 class="dn-h3"><span aria-hidden="true">🔒</span> Příběh a poznámky <span class="dn-stitek">soukromé</span></h2>
+          <div class="dk-texty">
+          <?php foreach ([
+              'puvod' => ['Původ', 'Odkud postava pochází, kdo byla její rodina, co ji formovalo.'],
+              'osobnost' => ['Povaha, zvyky, sny a cíle', 'Asi čtyři povahové rysy, pravidelné zvyky, sny. Ostatním hráčům hned neříkej — má to vyplynout ze hry.'],
+              'poznamky' => ['Poznámky', 'Cokoli, co si chceš pamatovat.'],
+          ] as $pole => [$nadpis, $napoveda]): ?>
+            <div class="dk-text-blok">
+              <h3 class="dn-h4"><?= $e($nadpis) ?></h3>
+              <?php if ($ma($pole)): ?>
+                <textarea class="dn-text" data-text-pole="<?= $pole ?>" rows="5" placeholder="<?= $e($napoveda) ?>"><?= $e($postava[$pole] ?? '') ?></textarea>
+                <div class="dn-text-akce"><button type="button" class="btn btn-secondary sm" data-akce="text" data-pole="<?= $pole ?>">Uložit</button><span class="dn-ulozeno" aria-live="polite"></span></div>
+              <?php else: ?><p class="note">Čeká na migraci 0070.</p><?php endif; ?>
+            </div>
+          <?php endforeach; ?>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- ===================== INVENTÁŘ ===================== -->
+    <div class="dk-panel" role="tabpanel" data-panel="inventar" id="vybaveni" aria-label="Inventář" hidden>
+      <div class="dk-inv">
+        <section class="dn-karta">
+          <h2 class="dn-h3">Inventář <span class="dn-pocet"><?= count($d['inventar']) ?></span></h2>
+          <?= $picker(['predmet', 'lektvar']) ?>
+          <?php if (!$d['inventar']): ?><p class="note">Inventář je prázdný. Najdi položku v katalogu výše a klikni na ni.</p>
+          <?php else: ?>
+            <div class="dn-tab-wrap">
+              <table class="dn-tab">
+                <thead><tr><th>Předmět</th><th>Druh</th><th class="c">ks</th><th class="c">váha / ks</th><th class="c">váha celkem</th><th></th></tr></thead>
+                <tbody>
+                <?php foreach ($d['inventar'] as $i): ?>
+                  <tr>
+                    <td><strong><?= $e($i['nazev']) ?></strong></td>
+                    <td><span class="dn-stitek"><?= $e($i['typ']) ?></span></td>
+                    <td class="c"><?= (int)$i['mnozstvi'] ?></td>
+                    <td class="c"><?= $i['vaha_ks'] !== null ? $mn($i['vaha_ks']) : '<span class="dn-stitek neuplne" title="Váha v katalogu chybí">bez váhy</span>' ?></td>
+                    <td class="c"><?= $i['vaha_celkem'] !== null ? $mn($i['vaha_celkem']) : '—' ?></td>
+                    <td class="c dn-inv-akce"><?php if ($i['kategorie'] === 'lektvar' && $svetId > 0): ?> <button type="button" class="dn-pm dn-pm-mini" data-pouzij="lektvar" data-polozka="<?= (int)$i['id'] ?>" data-nazev="<?= $e($i['nazev']) ?>"<?= !empty($i['skodi']) ? ' data-skodi="1"' : '' ?>>Vypít</button><?php endif; ?>
+                      <?php if (!empty($i['kapacita_mn']) && $d['kontejnery_dostupne']): ?><button type="button" class="dn-pm dn-pm-mini" data-kont-akce="rozbalit" data-predmet="<?= (int)$i['id'] ?>" title="Změnit na kontejner, do kterého jde něco vložit">Použít jako kontejner</button><?php endif; ?>
+                      <button type="button" class="dn-pm dn-pm-mini" data-inv="zmena" data-typ="<?= $e($i['kategorie']) ?>" data-id="<?= (int)$i['id'] ?>" data-delta="-1" aria-label="Ubrat kus">−</button><button type="button" class="dn-pm dn-pm-mini" data-inv="zmena" data-typ="<?= $e($i['kategorie']) ?>" data-id="<?= (int)$i['id'] ?>" data-delta="1" aria-label="Přidat kus">+</button><button type="button" class="dn-pm dn-pm-mini" data-inv="odebrat" data-typ="<?= $e($i['kategorie']) ?>" data-id="<?= (int)$i['id'] ?>" data-nazev="<?= $e($i['nazev']) ?>" aria-label="Odebrat z inventáře">✕</button>
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
+                </tbody>
+                <tfoot>
+                  <tr><td colspan="4">Vybavení (základní náklad)</td><td class="c"><strong><?= $mn($nakl['naklad_mn'] - $nakl['penize_mn']) ?> mn</strong></td><td></td></tr>
+                  <?php if ($nakl['penize_pocitany']): ?><tr><td colspan="4">Peníze (1 mince = 1 mn)</td><td class="c"><?= $mn($nakl['penize_mn']) ?> mn</td><td></td></tr><?php endif; ?>
+                  <tr class="celkem"><td colspan="4">Celkový náklad</td><td class="c"><strong><?= $mn($nakl['naklad_mn']) ?> mn</strong></td><td></td></tr>
+                </tfoot>
+              </table>
+            </div>
+            <?php if ($nakl['neuplny']): ?><p class="note"><span class="dn-stitek neuplne">neúplný součet</span> Bez uvedené váhy (v součtu chybí): <?= $e(implode(', ', $nakl['bez_vahy'])) ?>.</p><?php endif; ?>
+            <p class="note">Do nákladu se počítá volný inventář, kontejnery (vlastní váha + obsah) a peníze. Oblečení, jídlo a další vybavení z ceníku najdeš v katalogu pod „předmět“.</p>
+          <?php endif; ?>
+        </section>
+
+        <section class="dn-karta" id="kontejnery">
+          <h2 class="dn-h3">Kontejnery <small class="note">vaky, truhly, soudky, trakař…</small></h2>
+          <?php if (!$d['kontejnery_dostupne']): ?>
+            <p class="note">Kontejnery čekají na úpravu databáze (ruční SQL).</p>
+          <?php else: ?>
+            <?php
+              $jedeNaZvireti = $d['doprava'] && $d['doprava']['typ'] === 'zvire';
+              $volnePredmety = array_filter($d['inventar'], fn($i) => $i['kategorie'] === 'predmet' && empty($i['kapacita_mn']));
+            ?>
+            <?php if (!$d['kontejnery']): ?>
+              <p class="note">Zatím žádný kontejner. V katalogu výše vyhledej třeba „vak“, „truhla“ nebo „soudek“ (hledání „předmět“) a přidej ho — pak do něj můžeš věci vkládat.</p>
+            <?php endif; ?>
+            <div class="dn-kont-seznam">
+            <?php foreach ($d['kontejnery'] as $k):
+                $pct = $k['kapacita_mn'] ? max(0, min(100, $k['obsah_vaha'] / $k['kapacita_mn'] * 100)) : 0; ?>
+              <div class="dn-kont" data-kontejner="<?= (int)$k['id'] ?>">
+                <div class="dn-kont-hlava">
+                  <strong><?= $e($k['vlastni_nazev'] ?: $k['nazev']) ?></strong>
+                  <?php if ($k['vlastni_nazev']): ?><span class="note">(<?= $e($k['nazev']) ?>)</span><?php endif; ?>
+                  <span class="dn-stitek">vlastní váha <?= $k['vaha_vlastni'] !== null ? $mn($k['vaha_vlastni']) . ' mn' : '—' ?></span>
+                  <?php if ($k['plne']): ?><span class="dn-stitek nebezpeci">přeplněno</span><?php endif; ?>
+                </div>
+                <?php if ($k['kapacita_mn'] !== null): ?>
+                  <div class="dn-bar thin <?= $k['plne'] ? 'out' : ($pct >= 90 ? 'low' : 'ok') ?>" aria-label="Zaplnění kontejneru"><i style="width:<?= round($pct, 1) ?>%"></i></div>
+                  <div class="dn-metr-pozn"><?= $mn($k['obsah_vaha']) ?> / <?= $mn($k['kapacita_mn']) ?> mn<?= $k['volne'] !== null && !$k['plne'] ? ' · volno ' . $mn($k['volne']) . ' mn' : '' ?></div>
+                <?php endif; ?>
+                <?php if ($k['obsah']): ?>
+                  <table class="dn-tab dn-kont-obsah"><tbody>
+                  <?php foreach ($k['obsah'] as $o): ?>
+                    <tr>
+                      <td><?= $e($o['nazev']) ?></td>
+                      <td class="c"><?= (int)$o['mnozstvi'] ?> ks</td>
+                      <td class="c"><?= $o['vaha_celkem'] !== null ? $mn($o['vaha_celkem']) . ' mn' : '<span class="dn-stitek neuplne">bez váhy</span>' ?></td>
+                      <td class="c dn-inv-akce">
+                        <button type="button" class="dn-pm dn-pm-mini" data-kont-akce="vyndej" data-kontejner="<?= (int)$k['id'] ?>" data-predmet="<?= (int)$o['predmet_id'] ?>" data-mnozstvi="1" aria-label="Vyndat kus">−1</button>
+                        <button type="button" class="dn-pm dn-pm-mini" data-kont-akce="vyndej" data-kontejner="<?= (int)$k['id'] ?>" data-predmet="<?= (int)$o['predmet_id'] ?>" data-mnozstvi="" aria-label="Vyndat vše">vyndat vše</button>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                  </tbody></table>
+                <?php else: ?><p class="note">Prázdný.</p><?php endif; ?>
+                <?php if ($volnePredmety): ?>
+                  <div class="dn-kont-vloz">
+                    <select class="dn-kont-predmet" aria-label="Co vložit">
+                      <?php foreach ($volnePredmety as $v): ?><option value="<?= (int)$v['id'] ?>" data-max="<?= (int)$v['mnozstvi'] ?>"><?= $e($v['nazev']) ?> (<?= (int)$v['mnozstvi'] ?> ks)</option><?php endforeach; ?>
+                    </select>
+                    <input type="number" class="dn-kont-ks" min="1" value="1" aria-label="Kolik kusů">
+                    <button type="button" class="btn btn-secondary sm" data-kont-akce="vloz" data-kontejner="<?= (int)$k['id'] ?>">Vložit</button>
+                  </div>
+                <?php endif; ?>
+                <div class="dn-kont-pata">
+                  <label>Nese:
+                    <select class="dn-kont-nosic" data-kontejner="<?= (int)$k['id'] ?>" <?= $jedeNaZvireti || $k['nosic'] === 'zvire' ? '' : 'disabled title="Postava nejede na zvířeti"' ?>>
+                      <option value="postava" <?= $k['nosic'] === 'postava' ? 'selected' : '' ?>>postava</option>
+                      <option value="zvire" <?= $k['nosic'] === 'zvire' ? 'selected' : '' ?>>zvíře<?= $jedeNaZvireti ? ' (' . $e($d['doprava']['zvire']['nazev']) . ')' : '' ?></option>
+                    </select>
+                  </label>
+                  <button type="button" class="btn btn-ghost sm" data-kont-akce="prejmenovat" data-kontejner="<?= (int)$k['id'] ?>" data-nazev="<?= $e($k['vlastni_nazev'] ?? '') ?>">Přejmenovat</button>
+                  <button type="button" class="btn btn-ghost sm" data-kont-akce="odebrat" data-kontejner="<?= (int)$k['id'] ?>" data-nazev="<?= $e($k['vlastni_nazev'] ?: $k['nazev']) ?>">Odebrat kontejner</button>
+                </div>
+              </div>
+            <?php endforeach; ?>
+            </div>
+            <?php if ($d['naklad']['naklad_zvire_mn'] > 0): ?><p class="note">Na zvířeti: <strong><?= $mn($d['naklad']['naklad_zvire_mn']) ?> mn</strong> — počítá se jemu (spolu s jezdcem), ne postavě.</p><?php endif; ?>
+            <p class="note">Kapacita je jen hlídaná — když ji překročíš, hra upozorní a ty rozhodneš. Věc vložená do kontejneru zmizí z volného inventáře; váha se počítá pořád.</p>
+          <?php endif; ?>
+        </section>
+
+        <section class="dn-karta" id="penize">
+          <h2 class="dn-h3"><span aria-hidden="true">🪙</span> Peníze</h2>
+          <?php if ($d['penize'] !== null): $pn = $d['penize']; ?>
+            <div class="dk-money">
+            <?php foreach (['zl' => 'zlaťáky', 'st' => 'stříbrňáky', 'md' => 'měďáky'] as $m => $popisek): ?>
+              <div class="dn-penize">
+                <label for="penize_<?= $m ?>"><?= $e($popisek) ?> (<?= $m ?>)</label>
+                <input type="number" min="0" id="penize_<?= $m ?>" value="<?= (int)$pn[$m] ?>" data-zmena="penize" data-mena="<?= $m ?>">
+              </div>
+            <?php endforeach; ?>
+            </div>
+            <div class="dn-dvojice"><span>hodnota celkem</span><strong><?= $e(number_format($pn['hodnota_md'] / 100, 2, ',', ' ')) ?> zl</strong></div>
+            <p class="note">1 zl = 10 st = 100 md. Každá mince váží 1 mn, ať je z čehokoli.</p>
+          <?php else: ?><p class="note">Peníze se zatím nedají ukládat (čeká na migraci 0070).</p><?php endif; ?>
+        </section>
+      </div>
+    </div>
+
+    <?php if ($maKouzla): ?>
+    <!-- ===================== KOUZLA ===================== -->
+    <div class="dk-panel" role="tabpanel" data-panel="kouzla" id="kouzla" aria-label="Kouzla" hidden>
+      <section class="dn-karta">
+        <h2 class="dn-h3">Kouzla <span class="dn-pocet"><?= count($d['kouzla']) ?></span></h2>
+        <?php if ($maMag): ?><p class="note">Magenergie <?= (int)$postava['aktualni_magenergie'] ?> / <?= (int)$postava['max_magenergie'] ?>. Cena u každého kouzla je základ, víc magů odečteš u měřidla v záhlaví.</p><?php endif; ?>
+        <?php if ($unava && in_array('kouzla', $unava['zakazy'], true)): ?><p class="note"><span class="dn-stitek nebezpeci"><?= $e($unava['nazev']) ?></span> Vyčerpaná postava nesmí sesílat kouzla.</p><?php endif; ?>
+        <?= $picker(['kouzlo']) ?>
+        <?php if (!$d['kouzla']): ?><p class="note">Postava zatím nezná žádné kouzlo.</p>
+        <?php else: ?>
+          <div class="dn-seznam">
+            <?php foreach ($d['kouzla'] as $k): ?>
+              <details class="dn-pol" data-id="k<?= (int)$k['id'] ?>">
+                <summary>
+                  <span class="dn-stitek"><?= (int)$k['uroven_kouzla'] ?>.</span>
+                  <span class="dn-pol-nazev"><?= $e($k['nazev']) ?></span>
+                  <?php if ($k['cena_magenergie']): ?><span class="dn-stitek varovani"><?= $e($k['cena_magenergie']) ?></span><?php endif; ?>
+                  <?php if ($k['dosah']): ?><span class="dn-stitek">dosah <?= $e($k['dosah']) ?></span><?php endif; ?>
+                  <?php if ($k['doba_trvani']): ?><span class="dn-stitek">trvání <?= $e($k['doba_trvani']) ?></span><?php endif; ?>
+                  <?php if ($k['typ_unavy']): ?><span class="dn-stitek"><?= $e($k['typ_unavy']) ?></span><?php endif; ?>
+                </summary>
+                <div class="dn-pol-telo">
+                  <div class="dn-hod-akce">
+                  <?php if ($svetId > 0): ?><button type="button" class="btn btn-primary sm" data-pouzij="kouzlo" data-polozka="<?= (int)$k['id'] ?>" data-nazev="<?= $e($k['nazev']) ?>"<?= $k['skodi'] ? ' data-skodi="1"' : '' ?><?= $unava && in_array('kouzla', $unava['zakazy'], true) ? ' data-unava-zakaz="' . $e($unava['nazev']) . '"' : '' ?>>Seslat<?= $k['cena_magenergie'] ? ' (' . $e($k['cena_magenergie']) . ')' : '' ?></button><?php endif; ?>
+                    <button type="button" class="btn btn-ghost sm" data-inv="odebrat" data-typ="kouzlo" data-id="<?= (int)$k['id'] ?>" data-nazev="<?= $e($k['nazev']) ?>">Zapomenout</button>
+                  </div>
+                  <p class="note"><?= $e(implode(' · ', array_filter([$k['seznam'], $k['rozsah'] ? 'rozsah ' . $k['rozsah'] : null, $k['doba_seslani'] ? 'sesílání ' . $k['doba_seslani'] : null]))) ?></p>
+                  <?= nl2br($e($k['popis'] ?? '')) ?>
+                </div>
+              </details>
+            <?php endforeach; ?>
+          </div>
+        <?php endif; ?>
+      </section>
+    </div>
+    <?php endif; ?>
+
+    <!-- ===================== SCHOPNOSTI ===================== -->
+    <div class="dk-panel" role="tabpanel" data-panel="schopnosti" id="schopnosti" aria-label="Schopnosti" hidden>
+      <section class="dn-karta">
+        <h2 class="dn-h3">Zvláštní schopnosti a dovednosti <span class="dn-pocet"><?= count($d['schopnosti']) ?></span></h2>
         <?php if (!$d['schopnosti']): ?><p class="note">Zatím žádné (povolání a rasa je v katalogu nemají pro tuhle úroveň).</p>
         <?php else: ?>
           <div class="dn-seznam">
@@ -487,183 +661,10 @@ $vlastnostiNazvy = ['sila' => 'Síla', 'obratnost' => 'Obratnost', 'odolnost' =>
             <?php endforeach; ?>
           </div>
         <?php endif; ?>
-      </div>
-
-      <div class="dn-karta dn-sirka-cela">
-        <h3 class="dn-h3">Kouzla <span class="dn-pocet"><?= count($d['kouzla']) ?></span></h3>
-        <?= $picker(['kouzlo']) ?>
-        <?php if (!$d['kouzla']): ?><p class="note">Postava zatím nezná žádné kouzlo.</p>
-        <?php else: ?>
-          <div class="dn-seznam">
-            <?php foreach ($d['kouzla'] as $k): ?>
-              <details class="dn-pol" data-id="k<?= (int)$k['id'] ?>">
-                <summary>
-                  <span class="dn-stitek"><?= (int)$k['uroven_kouzla'] ?>.</span>
-                  <span class="dn-pol-nazev"><?= $e($k['nazev']) ?></span>
-                  <?php if ($k['cena_magenergie']): ?><span class="dn-stitek varovani"><?= $e($k['cena_magenergie']) ?></span><?php endif; ?>
-                  <?php if ($k['dosah']): ?><span class="dn-stitek">dosah <?= $e($k['dosah']) ?></span><?php endif; ?>
-                  <?php if ($k['doba_trvani']): ?><span class="dn-stitek">trvání <?= $e($k['doba_trvani']) ?></span><?php endif; ?>
-                  <?php if ($k['typ_unavy']): ?><span class="dn-stitek"><?= $e($k['typ_unavy']) ?></span><?php endif; ?>
-                </summary>
-                <div class="dn-pol-telo">
-                  <div class="dn-hod-akce">
-                  <?php if ($svetId > 0): ?><button type="button" class="btn btn-primary" data-pouzij="kouzlo" data-polozka="<?= (int)$k['id'] ?>" data-nazev="<?= $e($k['nazev']) ?>"<?= $k['skodi'] ? ' data-skodi="1"' : '' ?><?= $unava && in_array('kouzla', $unava['zakazy'], true) ? ' data-unava-zakaz="' . $e($unava['nazev']) . '"' : '' ?>>Seslat<?= $k['cena_magenergie'] ? ' (' . $e($k['cena_magenergie']) . ')' : '' ?></button><?php endif; ?>
-                    <button type="button" class="btn btn-ghost" data-inv="odebrat" data-typ="kouzlo" data-id="<?= (int)$k['id'] ?>" data-nazev="<?= $e($k['nazev']) ?>">Zapomenout</button>
-                  </div>
-                  <p class="note"><?= $e(implode(' · ', array_filter([$k['seznam'], $k['rozsah'] ? 'rozsah ' . $k['rozsah'] : null, $k['doba_seslani'] ? 'sesílání ' . $k['doba_seslani'] : null]))) ?></p>
-                  <?= nl2br($e($k['popis'] ?? '')) ?>
-                </div>
-              </details>
-            <?php endforeach; ?>
-          </div>
-        <?php endif; ?>
-      </div>
+      </section>
     </div>
-  </section>
 
-  <!-- ===================== VYBAVENÍ ===================== -->
-  <section class="dn-sekce" id="vybaveni">
-    <h2 class="dn-h2">Vybavení</h2>
-    <div class="dn-grid">
-      <div class="dn-karta dn-sirka-2">
-        <h3 class="dn-h3">Inventář</h3>
-        <?= $picker(['predmet', 'lektvar']) ?>
-        <?php if (!$d['inventar']): ?><p class="note">Inventář je prázdný. Najdi položku v katalogu výše a klikni na ni.</p>
-        <?php else: ?>
-          <div class="dn-tab-wrap">
-            <table class="dn-tab">
-              <thead><tr><th>Předmět</th><th>Druh</th><th class="c">ks</th><th class="c">váha / ks</th><th class="c">váha celkem</th><th></th></tr></thead>
-              <tbody>
-              <?php foreach ($d['inventar'] as $i): ?>
-                <tr>
-                  <td><strong><?= $e($i['nazev']) ?></strong></td>
-                  <td><span class="dn-stitek"><?= $e($i['typ']) ?></span></td>
-                  <td class="c"><?= (int)$i['mnozstvi'] ?></td>
-                  <td class="c"><?= $i['vaha_ks'] !== null ? $mn($i['vaha_ks']) : '<span class="dn-stitek neuplne" title="Váha v katalogu chybí">bez váhy</span>' ?></td>
-                  <td class="c"><?= $i['vaha_celkem'] !== null ? $mn($i['vaha_celkem']) : '—' ?></td>
-                  <td class="c dn-inv-akce"><?php if ($i['kategorie'] === 'lektvar' && $svetId > 0): ?> <button type="button" class="dn-pm dn-pm-mini" data-pouzij="lektvar" data-polozka="<?= (int)$i['id'] ?>" data-nazev="<?= $e($i['nazev']) ?>"<?= !empty($i['skodi']) ? ' data-skodi="1"' : '' ?>>Vypít</button><?php endif; ?>
-                    <?php if (!empty($i['kapacita_mn']) && $d['kontejnery_dostupne']): ?><button type="button" class="dn-pm dn-pm-mini" data-kont-akce="rozbalit" data-predmet="<?= (int)$i['id'] ?>" title="Změnit na kontejner, do kterého jde něco vložit">Použít jako kontejner</button><?php endif; ?>
-                    <button type="button" class="dn-pm dn-pm-mini" data-inv="zmena" data-typ="<?= $e($i['kategorie']) ?>" data-id="<?= (int)$i['id'] ?>" data-delta="-1" aria-label="Ubrat kus">−</button><button type="button" class="dn-pm dn-pm-mini" data-inv="zmena" data-typ="<?= $e($i['kategorie']) ?>" data-id="<?= (int)$i['id'] ?>" data-delta="1" aria-label="Přidat kus">+</button><button type="button" class="dn-pm dn-pm-mini" data-inv="odebrat" data-typ="<?= $e($i['kategorie']) ?>" data-id="<?= (int)$i['id'] ?>" data-nazev="<?= $e($i['nazev']) ?>" aria-label="Odebrat z inventáře">✕</button>
-                  </td>
-                </tr>
-              <?php endforeach; ?>
-              </tbody>
-              <tfoot>
-                <tr><td colspan="4">Vybavení (základní náklad)</td><td class="c"><strong><?= $mn($nakl['naklad_mn'] - $nakl['penize_mn']) ?> mn</strong></td><td></td></tr>
-                <?php if ($nakl['penize_pocitany']): ?><tr><td colspan="4">Peníze (1 mince = 1 mn)</td><td class="c"><?= $mn($nakl['penize_mn']) ?> mn</td><td></td></tr><?php endif; ?>
-                <tr class="celkem"><td colspan="4">Celkový náklad</td><td class="c"><strong><?= $mn($nakl['naklad_mn']) ?> mn</strong></td><td></td></tr>
-              </tfoot>
-            </table>
-          </div>
-          <?php if ($nakl['neuplny']): ?><p class="note"><span class="dn-stitek neuplne">neúplný součet</span> Bez uvedené váhy (v součtu chybí): <?= $e(implode(', ', $nakl['bez_vahy'])) ?>.</p><?php endif; ?>
-          <p class="note">Do nákladu se počítá volný inventář, kontejnery (vlastní váha + obsah) a peníze. Oblečení, jídlo a další vybavení z ceníku najdeš v katalogu pod „předmět“.</p>
-        <?php endif; ?>
-      </div>
-
-
-      <div class="dn-karta dn-sirka-cela" id="kontejnery">
-        <h3 class="dn-h3">Kontejnery <small class="note">vaky, truhly, soudky, trakař…</small></h3>
-        <?php if (!$d['kontejnery_dostupne']): ?>
-          <p class="note">Kontejnery čekají na úpravu databáze (ruční SQL).</p>
-        <?php else: ?>
-          <?php
-            $jedeNaZvireti = $d['doprava'] && $d['doprava']['typ'] === 'zvire';
-            $volnePredmety = array_filter($d['inventar'], fn($i) => $i['kategorie'] === 'predmet' && empty($i['kapacita_mn']));
-          ?>
-          <?php if (!$d['kontejnery']): ?>
-            <p class="note">Zatím žádný kontejner. V katalogu výše vyhledej třeba „vak“, „truhla“ nebo „soudek“ (hledání „předmět“) a přidej ho — pak do něj můžeš věci vkládat.</p>
-          <?php endif; ?>
-          <div class="dn-kont-seznam">
-          <?php foreach ($d['kontejnery'] as $k):
-              $pct = $k['kapacita_mn'] ? max(0, min(100, $k['obsah_vaha'] / $k['kapacita_mn'] * 100)) : 0; ?>
-            <div class="dn-kont" data-kontejner="<?= (int)$k['id'] ?>">
-              <div class="dn-kont-hlava">
-                <strong><?= $e($k['vlastni_nazev'] ?: $k['nazev']) ?></strong>
-                <?php if ($k['vlastni_nazev']): ?><span class="note">(<?= $e($k['nazev']) ?>)</span><?php endif; ?>
-                <span class="dn-stitek">vlastní váha <?= $k['vaha_vlastni'] !== null ? $mn($k['vaha_vlastni']) . ' mn' : '—' ?></span>
-                <?php if ($k['plne']): ?><span class="dn-stitek nebezpeci">přeplněno</span><?php endif; ?>
-              </div>
-              <?php if ($k['kapacita_mn'] !== null): ?>
-                <div class="dn-bar <?= $k['plne'] ? 'out' : ($pct >= 90 ? 'low' : 'ok') ?>" aria-label="Zaplnění kontejneru"><i style="width:<?= round($pct, 1) ?>%"></i></div>
-                <div class="dn-metr-pozn"><?= $mn($k['obsah_vaha']) ?> / <?= $mn($k['kapacita_mn']) ?> mn<?= $k['volne'] !== null && !$k['plne'] ? ' · volno ' . $mn($k['volne']) . ' mn' : '' ?></div>
-              <?php endif; ?>
-              <?php if ($k['obsah']): ?>
-                <table class="dn-tab dn-kont-obsah"><tbody>
-                <?php foreach ($k['obsah'] as $o): ?>
-                  <tr>
-                    <td><?= $e($o['nazev']) ?></td>
-                    <td class="c"><?= (int)$o['mnozstvi'] ?> ks</td>
-                    <td class="c"><?= $o['vaha_celkem'] !== null ? $mn($o['vaha_celkem']) . ' mn' : '<span class="dn-stitek neuplne">bez váhy</span>' ?></td>
-                    <td class="c dn-inv-akce">
-                      <button type="button" class="dn-pm dn-pm-mini" data-kont-akce="vyndej" data-kontejner="<?= (int)$k['id'] ?>" data-predmet="<?= (int)$o['predmet_id'] ?>" data-mnozstvi="1" aria-label="Vyndat kus">−1</button>
-                      <button type="button" class="dn-pm dn-pm-mini" data-kont-akce="vyndej" data-kontejner="<?= (int)$k['id'] ?>" data-predmet="<?= (int)$o['predmet_id'] ?>" data-mnozstvi="" aria-label="Vyndat vše">vyndat vše</button>
-                    </td>
-                  </tr>
-                <?php endforeach; ?>
-                </tbody></table>
-              <?php else: ?><p class="note">Prázdný.</p><?php endif; ?>
-              <?php if ($volnePredmety): ?>
-                <div class="dn-kont-vloz">
-                  <select class="dn-kont-predmet" aria-label="Co vložit">
-                    <?php foreach ($volnePredmety as $v): ?><option value="<?= (int)$v['id'] ?>" data-max="<?= (int)$v['mnozstvi'] ?>"><?= $e($v['nazev']) ?> (<?= (int)$v['mnozstvi'] ?> ks)</option><?php endforeach; ?>
-                  </select>
-                  <input type="number" class="dn-kont-ks" min="1" value="1" aria-label="Kolik kusů">
-                  <button type="button" class="btn btn-secondary" data-kont-akce="vloz" data-kontejner="<?= (int)$k['id'] ?>">Vložit</button>
-                </div>
-              <?php endif; ?>
-              <div class="dn-kont-pata">
-                <label>Nese:
-                  <select class="dn-kont-nosic" data-kontejner="<?= (int)$k['id'] ?>" <?= $jedeNaZvireti || $k['nosic'] === 'zvire' ? '' : 'disabled title="Postava nejede na zvířeti"' ?>>
-                    <option value="postava" <?= $k['nosic'] === 'postava' ? 'selected' : '' ?>>postava</option>
-                    <option value="zvire" <?= $k['nosic'] === 'zvire' ? 'selected' : '' ?>>zvíře<?= $jedeNaZvireti ? ' (' . $e($d['doprava']['zvire']['nazev']) . ')' : '' ?></option>
-                  </select>
-                </label>
-                <button type="button" class="btn btn-ghost" data-kont-akce="prejmenovat" data-kontejner="<?= (int)$k['id'] ?>" data-nazev="<?= $e($k['vlastni_nazev'] ?? '') ?>">Přejmenovat</button>
-                <button type="button" class="btn btn-ghost" data-kont-akce="odebrat" data-kontejner="<?= (int)$k['id'] ?>" data-nazev="<?= $e($k['vlastni_nazev'] ?: $k['nazev']) ?>">Odebrat kontejner</button>
-              </div>
-            </div>
-          <?php endforeach; ?>
-          </div>
-          <?php if ($d['naklad']['naklad_zvire_mn'] > 0): ?><p class="note">Na zvířeti: <strong><?= $mn($d['naklad']['naklad_zvire_mn']) ?> mn</strong> — počítá se jemu (spolu s jezdcem), ne postavě.</p><?php endif; ?>
-          <p class="note">Kapacita je jen hlídaná — když ji překročíš, hra upozorní a ty rozhodneš. Věc vložená do kontejneru zmizí z volného inventáře; váha se počítá pořád.</p>
-        <?php endif; ?>
-      </div>
-      <div class="dn-karta">
-        <h3 class="dn-h3">Peníze</h3>
-        <?php if ($d['penize'] !== null): $pn = $d['penize']; ?>
-          <?php foreach (['zl' => 'zlaťáky', 'st' => 'stříbrňáky', 'md' => 'měďáky'] as $m => $popisek): ?>
-            <div class="dn-penize">
-              <label for="penize_<?= $m ?>"><?= $e($popisek) ?> (<?= $m ?>)</label>
-              <input type="number" min="0" id="penize_<?= $m ?>" value="<?= (int)$pn[$m] ?>" data-zmena="penize" data-mena="<?= $m ?>">
-            </div>
-          <?php endforeach; ?>
-          <div class="dn-dvojice"><span>hodnota celkem</span><strong><?= $e(number_format($pn['hodnota_md'] / 100, 2, ',', ' ')) ?> zl</strong></div>
-          <p class="note">1 zl = 10 st = 100 md. Každá mince váží 1 mn, ať je z čehokoli.</p>
-        <?php else: ?><p class="note">Peníze se zatím nedají ukládat (čeká na migraci 0070).</p><?php endif; ?>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===================== POSTAVA ===================== -->
-  <section class="dn-sekce" id="postava">
-    <h2 class="dn-h2">Postava</h2>
-    <div class="dn-grid">
-      <?php foreach ([
-          'puvod' => ['Původ', 'Odkud postava pochází, kdo byla její rodina, co ji formovalo.'],
-          'osobnost' => ['Povaha, zvyky, sny a cíle', 'Asi čtyři povahové rysy, pravidelné zvyky, sny. Ostatním hráčům hned neříkej — má to vyplynout ze hry.'],
-          'poznamky' => ['Poznámky', 'Cokoli, co si chceš pamatovat.'],
-      ] as $pole => [$nadpis, $napoveda]): ?>
-        <div class="dn-karta <?= $pole === 'poznamky' ? 'dn-sirka-cela' : '' ?>">
-          <h3 class="dn-h3"><?= $e($nadpis) ?></h3>
-          <?php if ($ma($pole)): ?>
-            <textarea class="dn-text" data-text-pole="<?= $pole ?>" rows="6" placeholder="<?= $e($napoveda) ?>"><?= $e($postava[$pole] ?? '') ?></textarea>
-            <div class="dn-text-akce"><button type="button" class="btn btn-secondary" data-akce="text" data-pole="<?= $pole ?>">Uložit</button><span class="dn-ulozeno" aria-live="polite"></span></div>
-          <?php else: ?><p class="note">Čeká na migraci 0070.</p><?php endif; ?>
-        </div>
-      <?php endforeach; ?>
-    </div>
-  </section>
-
+  </div>
 </div>
 <?php if (!$fragment): ?>
 </div>

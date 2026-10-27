@@ -624,3 +624,139 @@ function dracak_vtt_stav_pro_pj(array $d): array
     return ['radky' => $radky, 'pj_rozhoduje' => $pj, 'ma_vliv' => $radky !== []];
 }
 
+// ---------------------------------------------------------------------------
+// Hlavička deníku v2 (docs/prototypy/denik-v2-predani.md): vlastnosti s
+// bonusy, OČ a ÚČ aktivní zbraně i s postihy, a žebříček naložení. Vše se
+// skládá z hodnot, které engine už počítá ($d = dracak_vtt_denik_data());
+// nová pravidla tu nejsou. Čísla v hlavičce jsou stejná, jaká použije hod
+// z deníku (hra/api/hod_postavy.php): základ + opravy za málo životů, velké
+// naložení a štít — proto se nikdy nerozejdou.
+
+// Znaménkové číslo: +2, −1, 0.
+function dracak_vtt_znam(int $n): string
+{
+    return $n > 0 ? '+' . $n : ($n < 0 ? '−' . abs($n) : '0');
+}
+
+// Postih k hodu na útok a obranu: málo životů (h1610) a velké naložení (h1611).
+// ['hodnota' => záporné nebo 0, 'text' => ' − …', 'zivoty' => int, 'nalozeni' => int]
+function dracak_vtt_denik_postihy(array $d): array
+{
+    $zivoty = (int)($d['bojeschopnost']['postih_aktualni'] ?? 0);
+    $velke = in_array($d['pohyblivost']['nalozeni']['kod'] ?? null, ['velke', 'prilis_velke'], true);
+    $nalozeni = $velke ? -1 : 0;
+    $casti = [];
+    if ($zivoty !== 0) { $casti[] = 'méně než 1/3 životů ' . dracak_vtt_znam($zivoty); }
+    if ($nalozeni !== 0) { $casti[] = 'velké naložení −1'; }
+    return ['hodnota' => $zivoty + $nalozeni, 'text' => $casti ? ' (' . implode(', ', $casti) . ')' : '', 'zivoty' => $zivoty, 'nalozeni' => $nalozeni];
+}
+
+// Aktivní zbraň = držená, jinak jediná zbraň v inventáři; null, když žádná není.
+function dracak_vtt_denik_aktivni_zbran(array $d): ?array
+{
+    foreach ($d['zbrane'] as $z) {
+        if ($z['drzena']) { return $z; }
+    }
+    return count($d['zbrane']) === 1 ? $d['zbrane'][0] : null;
+}
+
+// Údaje pro záhlaví: ['atributy' => [...], 'oc' => [...], 'uc' => [...], 'postrech' => [...]|null].
+function dracak_vtt_denik_hlavicka(array $d): array
+{
+    $nazvy = ['sila' => ['Sil', 'Síla'], 'obratnost' => ['Obr', 'Obratnost'], 'odolnost' => ['Odl', 'Odolnost'], 'inteligence' => ['Int', 'Inteligence'], 'charisma' => ['Cha', 'Charisma']];
+    $atributy = [];
+    foreach ($nazvy as $kl => [$zkratka, $nazev]) {
+        $st = $d['stupne'][$kl] ?? null;
+        $stEf = $d['stupne_ef'][$kl] ?? $st;
+        $bo = $d['bonusy'][$kl] ?? null;
+        $boEf = $d['bonusy_ef'][$kl] ?? $bo;
+        $zmenaSt = $st !== null && $stEf !== null && $st !== $stEf;
+        $zmenaBo = $bo !== null && $boEf !== null && $bo !== $boEf;
+        $title = $nazev . ' ' . ($stEf ?? '—') . ($zmenaSt ? ' (základ ' . $st . ', únava ' . dracak_vtt_znam($stEf - $st) . ')' : '')
+            . ($boEf !== null ? ', bonus ' . dracak_vtt_znam($boEf) . ($zmenaBo ? ' (bez únavy ' . dracak_vtt_znam($bo) . ')' : '') : '');
+        $atributy[] = [
+            'zkratka' => $zkratka, 'nazev' => $nazev,
+            'stupen' => $stEf, 'stupen_zaklad' => $zmenaSt ? $st : null,
+            'bonus' => $boEf, 'bonus_zaklad' => $zmenaBo ? $bo : null,
+            'zmena' => $zmenaSt || $zmenaBo, 'title' => $title,
+        ];
+    }
+
+    $postihy = dracak_vtt_denik_postihy($d);
+    $zbran = dracak_vtt_denik_aktivni_zbran($d);
+
+    // OČ: KZ zbroje + bonus za obratnost (h1611), štít +1 k hodu, postihy. OZ držené zbraně (nepovinné
+    // pravidlo, h1611) se do čísla v záhlaví nepočítá — hod z deníku ji taky nepřičítá; je jen v tabulce Boj.
+    $ob = $d['obrana'];
+    $oc = ['hodnota' => null, 'zaklad' => null, 'title' => 'Doplň obratnost, ať jde spočítat obranné číslo.'];
+    if ($ob) {
+        $bezPostihu = (int)$ob['oc'] + (int)$ob['bonus_stit'];
+        $oc = [
+            'hodnota' => $bezPostihu + $postihy['hodnota'],
+            'zaklad' => $postihy['hodnota'] !== 0 ? $bezPostihu : null,
+            'title' => 'OČ = kvalita zbroje ' . (int)$ob['kz'] . ($ob['zbroj'] ? ' (' . $ob['zbroj'] . ')' : ' (bez zbroje)')
+                . ' + bonus Obr ' . dracak_vtt_znam((int)$ob['bonus_obratnost']) . ' (nejméně 0 → ' . (int)$ob['oc'] . ')'
+                . ($ob['bonus_stit'] ? ' + štít 1 (' . $ob['stit'] . ')' : '') . $postihy['text']
+                . ' = ' . ($bezPostihu + $postihy['hodnota']) . '. Je to číslo, ke kterému se při hodu na obranu přičte 1k6+.',
+        ];
+    }
+
+    // ÚČ aktivní zbraně: tváří v tvář, jinak střelecké (zbraň bez síly zbraně číslo nemá).
+    $uc = ['hodnota' => null, 'zaklad' => null, 'popis' => 'vyber zbraň', 'dalsi' => false, 'title' => 'Žádná zbraň v inventáři.'];
+    if ($zbran) {
+        $naDalku = $zbran['uc_tvar_v_tvar'] === null && $zbran['uc_strelecky'] !== null;
+        $cislo = $naDalku ? $zbran['uc_strelecky'] : $zbran['uc_tvar_v_tvar'];
+        $jednoZbran = count($d['zbrane']) < 2;
+        if ($cislo === null) {
+            $uc = ['hodnota' => null, 'zaklad' => null, 'popis' => $zbran['nazev'], 'dalsi' => !$jednoZbran,
+                   'title' => $zbran['nazev'] . ': útočné číslo se nedá spočítat (v katalogu chybí síla zbraně).'];
+        } else {
+            $uc = [
+                'hodnota' => $cislo + $postihy['hodnota'],
+                'zaklad' => $postihy['hodnota'] !== 0 ? $cislo : null,
+                'popis' => $zbran['nazev'] . ' · ' . ($naDalku ? 'na dálku' : 'na blízko'),
+                'dalsi' => !$jednoZbran,
+                'title' => 'ÚČ ' . $zbran['nazev'] . ' (' . ($naDalku ? 'na dálku' : 'na blízko') . ') = síla zbraně ' . (int)$zbran['sz']
+                    . ' + bonus ' . ($naDalku ? 'Obr' : 'Sil') . ' (únava započtena)' . ($zbran['rodova'] ? ' + 1 rodová zbraň' : '') . ' (nejméně 0 → ' . $cislo . ')'
+                    . $postihy['text'] . ' = ' . ($cislo + $postihy['hodnota']) . '.'
+                    . (!$jednoZbran ? ' Klepnutím přepneš na další zbraň (' . count($d['zbrane']) . ' v inventáři).' : ' Máš jen jednu zbraň.'),
+            ];
+        }
+    }
+
+    $postrech = null;
+    if ($d['postrech']) {
+        $int = $d['stupne_ef']['inteligence'];
+        $postrech = [
+            'objekty' => (int)$d['postrech']['objekty'], 'mechanismy' => (int)$d['postrech']['mechanismy'],
+            'title' => 'Postřeh na objekty = Inteligence ' . $int . ' %' . ((int)$d['postrech']['objekty'] !== $int ? ' + 5 % (bonus rasy)' : '')
+                . '. Na mechanismy = ½ Inteligence (' . intdiv((int)$int, 2) . ')' . ((int)$d['postrech']['mechanismy'] !== intdiv((int)$int, 2) ? ' + 5 % (bonus rasy)' : '') . ' %. Mění se s Inteligencí (únavou). Hledání: hoď k% a odečti postřeh (h1683).',
+        ];
+    }
+    return ['atributy' => $atributy, 'oc' => $oc, 'uc' => $uc, 'postrech' => $postrech, 'postihy' => $postihy];
+}
+
+// Žebříček naložení (TABULKA NALOŽENÍ, h1681): pro každé pásmo horní mez nákladu, pohyblivost
+// a její bonus — stejnými funkcemi jako zbytek enginu (zaokrouhlení nahoru, b11149).
+// Vrací [] , když nejde spočítat nosnost nebo základní pohyblivost.
+function dracak_vtt_denik_zebricek_nalozeni(PDO $pdo, array $d): array
+{
+    $poh = $d['pohyblivost'] ?? null;
+    if (!$poh || ($poh['rucne'] ?? false) || $poh['nosnost_mn'] === null || ($poh['zakladni'] ?? null) === null) {
+        return [];
+    }
+    $nazvy = [1 => 'žádné', 2 => 'mírné', 3 => 'střední', 4 => 'velké'];
+    $ctvrtiny = [1 => 4, 2 => 3, 3 => 2, 4 => 1];
+    $aktualni = $poh['nalozeni']['kod'] ?? null;
+    $kody = [1 => 'zadne', 2 => 'mirne', 3 => 'stredni', 4 => 'velke'];
+    $radky = [];
+    foreach ($nazvy as $k => $nazev) {
+        $pohyb = dracak_vtt_pohyblivost_po_nalozeni((int)$poh['zakladni'], $ctvrtiny[$k]);
+        $radky[] = [
+            'nazev' => $nazev, 'mez' => (int)$poh['nosnost_mn'] * $k, 'pohyblivost' => $pohyb,
+            'bonus' => dracak_vtt_obratnost_bonus($pdo, max(1, $pohyb)), 'aktualni' => $aktualni === $kody[$k],
+        ];
+    }
+    return $radky;
+}
+

@@ -1,6 +1,6 @@
 // Osobní deník (hra/denik.php): rychlé zápisy přes hra/api/postava_stav.php,
 // po každé změně i při pollingu se překreslí jen blok #denik (fragment).
-// Rozbalené <details> a rozepsané texty se zachovají; polling se přeskočí,
+// Rozbalené <details>, aktivní záložka a rozepsané texty se zachovají; polling se přeskočí,
 // dokud hráč píše do pole nebo má rozepsaný text.
 (function () {
   const wrap = document.querySelector('.dn-wrap');
@@ -9,6 +9,92 @@
   const API = 'api/postava_stav.php';
   let zaneprazdneno = false;
   let rozepsano = false;
+
+  // ----- záložky (Postava / Inventář / Kouzla / Schopnosti) -----
+  const KLIC_TAB = 'dracak_denik_tab_' + ID;
+  let aktivniTab = 'postava';
+  try { aktivniTab = sessionStorage.getItem(KLIC_TAB) || 'postava'; } catch (e) { /* soukromé okno */ }
+  function ukazTab(id) {
+    const koren = document.getElementById('denik');
+    if (!koren) return;
+    if (!koren.querySelector('[data-tab="' + id + '"]')) id = 'postava';
+    aktivniTab = id;
+    try { sessionStorage.setItem(KLIC_TAB, id); } catch (e) { /* soukromé okno */ }
+    koren.querySelectorAll('[data-tab]').forEach(function (t) {
+      const on = t.dataset.tab === id;
+      t.classList.toggle('on', on);
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    koren.querySelectorAll('[data-panel]').forEach(function (p) { p.hidden = p.dataset.panel !== id; });
+    zavriInfo();
+  }
+  // Id sekcí, na které se dá odkázat z mapy (okno deníku: skoky Boj / Kouzla / Výbava) — viz docs/stav-projektu.md.
+  const SEKCE_TAB = {
+    prehled: 'postava', obrana: 'postava', boj: 'postava', pohyb: 'postava', efekty: 'postava', postava: 'postava',
+    vybaveni: 'inventar', kontejnery: 'inventar', penize: 'inventar', kouzla: 'kouzla', schopnosti: 'schopnosti',
+  };
+  const PANELY = ['vybaveni', 'kouzla', 'schopnosti'];   // id celého panelu: srolovat na lištu záložek
+  function ukazSekci(id) {
+    let tab = SEKCE_TAB[id];
+    if (!tab) return false;
+    if (!document.querySelector('#denik [data-tab="' + tab + '"]')) tab = tab === 'kouzla' ? 'schopnosti' : 'postava';
+    ukazTab(tab);
+    const cil = PANELY.indexOf(id) >= 0 ? document.querySelector('#denik .dk-tabbar') : document.getElementById(id);
+    if (!cil) return true;
+    const pas = document.querySelector('#denik .dn-pas');
+    const drziSe = pas && ['sticky', 'fixed'].indexOf(window.getComputedStyle(pas).position) >= 0;
+    const odsazeni = (drziSe ? pas.getBoundingClientRect().height : 0) + 8;
+    window.scrollTo({ top: window.scrollY + cil.getBoundingClientRect().top - odsazeni, behavior: 'smooth' });
+    return true;
+  }
+  window.dracakDenik = { ukazSekci: ukazSekci, ukazTab: ukazTab };
+  document.addEventListener('click', function (ev) {
+    const t = ev.target.closest('[data-tab]');
+    if (t && wrap.contains(t)) ukazTab(t.dataset.tab);
+  });
+
+  // ----- vysvětlení k číslu na klepnutí (title se na dotyku ani z klávesnice neukáže) -----
+  let infoEl = null;
+  let infoCil = null;
+  function zavriInfo() {
+    if (infoEl) { infoEl.remove(); infoEl = null; infoCil = null; }
+  }
+  document.addEventListener('click', function (ev) {
+    const t = ev.target.closest('[data-info]');
+    const stejny = !!t && t === infoCil;
+    zavriInfo();
+    if (!t || !wrap.contains(t) || stejny) return;
+    infoEl = document.createElement('div');
+    infoEl.id = 'dn-info';
+    infoEl.setAttribute('role', 'status');
+    infoEl.textContent = t.dataset.info;
+    document.body.appendChild(infoEl);
+    infoCil = t;
+    const r = t.getBoundingClientRect();
+    const w = infoEl.offsetWidth;
+    infoEl.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
+    infoEl.style.top = Math.min(r.bottom + 6, window.innerHeight - infoEl.offsetHeight - 8) + 'px';
+  });
+  window.addEventListener('scroll', zavriInfo, { passive: true });
+  document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') zavriInfo(); });
+
+  // „Zavřít deník“ na samostatné stránce vrací tam, odkud se deník otevřel (overlay nad obrazovkou); bez historie na odkaz.
+  document.addEventListener('click', function (ev) {
+    const a = ev.target.closest('[data-zavrit]');
+    if (!a || !wrap.contains(a)) return;
+    try {
+      if (document.referrer && new URL(document.referrer).origin === window.location.origin && window.history.length > 1) {
+        ev.preventDefault();
+        window.history.back();
+      }
+    } catch (e) { /* bez návratu — platí odkaz */ }
+  });
+  // Klepnutí na ÚČ v záhlaví přepne aktivní zbraň na další v inventáři.
+  document.addEventListener('click', function (ev) {
+    const z = ev.target.closest('[data-dalsi-zbran]');
+    if (!z || !wrap.contains(z)) return;
+    zapis({ akce: 'vyber', pole: 'drzena_zbran_id', hodnota: Number(z.dataset.dalsiZbran) });
+  });
 
   // V mapě (iframe) dá deník mapě vědět, že se něco změnilo — mapa si hned stáhne nový stav (životy, inventář…).
   function oznamZmenu() {
@@ -56,6 +142,7 @@
       const modPred = document.getElementById('dn-mod');
       const modHodnota = modPred ? modPred.value : null;
       stary.replaceWith(novy);
+      ukazTab(aktivniTab);
       const modPo = document.getElementById('dn-mod');
       if (modPo && modHodnota !== null) modPo.value = modHodnota;
       if (cilHodnota !== null) {
@@ -348,4 +435,5 @@
     obnov();
   }
   setInterval(obnovPokudNepise, 5000);
+  ukazTab(aktivniTab);
 })();

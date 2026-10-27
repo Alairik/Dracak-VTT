@@ -136,11 +136,14 @@ export function initDenikDock(ctx) {
     frame.src = 'denik.php?id=' + postavaId + '&embed=1';
   }
 
-  // Skok na sekci deníku (id sekce z nabídky deníku: prehled, boj, schopnosti, vybaveni, postava). Pokud se hlavička deníku
-  // při posunu drží nahoře, sekce se srovná až pod ni; když sekce v deníku není, deník zůstane tam, kde je.
+  // Skok na sekci deníku (id sekce: boj, kouzla, schopnosti, vybaveni, prehled, postava). Deník přepne záložku a srovná sekci pod
+  // hlavičku; když sekce v deníku není, deník zůstane tam, kde je.
   let cekajici = null;   // {postava, sekce, kdy} — rámeček se ještě načítá, skok proběhne po načtení
   function skocNaSekci(sekce) {
     try {
+      // Nový deník ví sám, na kterou záložku sekce patří (window.dracakDenik v assets/js/denik.js).
+      const okno = frame.contentWindow;
+      if (okno && okno.dracakDenik && typeof okno.dracakDenik.ukazSekci === 'function') return okno.dracakDenik.ukazSekci(sekce);
       const doc = frame.contentDocument;
       const el = doc && doc.getElementById(sekce);
       if (!el) return false;

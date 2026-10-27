@@ -534,7 +534,7 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
       <button class="btn btn-secondary denik-otevrit" type="button" id="spravovatDenik"><?php dracak_icon('book-open-text', 16); ?> Otevřít deník</button>
       <div class="denik-skoky" aria-label="Rovnou na sekci deníku">
         <button class="btn btn-ghost" type="button" data-denik-sekce="boj" title="Zbraně, obrana, stav v boji">Boj</button>
-        <button class="btn btn-ghost" type="button" data-denik-sekce="schopnosti" title="Schopnosti a kouzla">Kouzla</button>
+        <button class="btn btn-ghost" type="button" data-denik-sekce="kouzla" title="Kouzla (a schopnosti, když postava kouzla nemá)">Kouzla</button>
         <button class="btn btn-ghost" type="button" data-denik-sekce="vybaveni" title="Inventář, kontejnery, peníze">Výbava</button>
       </div>
     </div>

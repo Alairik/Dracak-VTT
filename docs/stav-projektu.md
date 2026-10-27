@@ -174,8 +174,9 @@ MariaDB.** Postup, který v session fungoval:
   **pevně** jednu (ruční výběr v seznamu přepne na „pevně“); nestvůra deník postavy nemá, takže výběr nestvůry postavu nemění. PJ otevře deník kterékoli
   postavy světa, hráč jen svých (server to hlídá znovu, cizí deník dá 403). Deník a mapa si dávají vědět přes `postMessage` (`denik_zmena` → mapa hned
   obnoví stav, `denik_obnov` → deník se obnoví po zásahu na mapě; obnova se nepřeskočí, jen když zrovna píšeš). Zavřené okno nic nenačítá ani neobnovuje.
-  Test: `denik_dock.js`. **Kontrakt pro přepracování deníku (viz `docs/prototypy/denik-v2-predani.md`):** ponechat `id` sekcí `prehled`, `boj`,
-  `schopnosti`, `vybaveni`, `postava` a třídu `.dn-pas` u hlavičky — mapa na nich stojí; když zmizí, skok se prostě neprovede a deník zůstane nahoře.
+  Test: `denik_dock.js`. **Skoky z mapy (od deníku v2):** okno volá `window.dracakDenik.ukazSekci(id)` z `assets/js/denik.js` — deník přepne záložku a srovná sekci pod
+  hlavičku; id: `boj`, `kouzla` (bez kouzel → Schopnosti), `schopnosti`, `vybaveni`, `prehled`, `obrana`, `pohyb`, `efekty`, `postava`, `kontejnery`,
+  `penize`. Neznámé id → `false`, nic se nestane.
   **Nepokryto:** nestvůry (výbava nestvůry se dál spravuje v panelu tokenu a v malém deníku nestvůry). **Plán — zjednodušený postavový deník nestvůry
   (zadání uživatele 2026-10-20):** nestvůry mají mít podobný deník, ale ne pro úpravy za boje, nýbrž **před bojem** (příprava výbavy a čísel); stejný vstup —
   tlačítko v detailu tokenu nestvůry (`#spravovatDenik` se u nestvůry teď záměrně skrývá). Uživatel navrhuje design sám, implementace čeká na něj.
@@ -869,15 +870,16 @@ důvody v `docs/navrh-kontejnery-a-nosice.md`).
 
 ---
 
-## Osobní deník postavy (v1 v kódu; návrh v2 od Claude Design hotový, čeká na stavbu)
+## Osobní deník postavy (v2 se staví po krocích; krok 1 hotový 2026-10-27)
 
 **Stav 2026-10-27:** návrh od Claude Design je hotový jako funkční prototyp
 (vzorová postava Ronan, Warlock 13) a uložený v repu:
 **`docs/prototypy/denik-v2.dc.html`** (zdroj) a
 **`docs/prototypy/denik-v2-predani.md`** (rozhodnutí uživatele, vzorce,
-otevřené otázky, návrh postupu stavby). V kódu zatím běží jen v1 níže;
-uživatel chce návrh „dostat do code“, tedy přestavba `hra/denik.php` podle
-předávacího dokumentu je další krok. Otevřené otázky k pravidlům a datům
+otevřené otázky, návrh postupu stavby). **Krok 1 stavby je v kódu** (záhlaví, měřidla, záložky — podrobně a s odchylkami od
+prototypu v části „Stav stavby“ předávacího dokumentu); popis v1 níže platí pro
+data, API a funkce, vzhled je už v2. Další kroky: aktivní zbraň ze slotů, figurína
+a sloty, dovednosti, společníci (část z nich potřebuje ruční SQL). Otevřené otázky k pravidlům a datům
 (Elixír, únava 30, váha, Torna, „Vyřazení 34“, postřeh, základ šance na
 seslání) jsou v předávacím dokumentu.
 

@@ -5,6 +5,38 @@ v kódu (`hra/denik.php`, `assets/css/denik.css`, `assets/js/denik.js`) je
 zatím **jen deník v1**. Pokyn uživatele: „Potřebuju to dostat do code.“
 Tohle je podklad, ze kterého se v1 přestaví.
 
+## Stav stavby (průběžně)
+
+**Krok 1 hotový (2026-10-27, bez ručního SQL): záhlaví, měřidla a záložky.** `hra/denik.php`, `assets/css/denik.css`, `assets/js/denik.js`
+přestavěné podle prototypu; engine (`includes/vtt_denik.php`) a API zůstaly, přibyly jen pomocné funkce `dracak_vtt_denik_hlavicka()`,
+`dracak_vtt_denik_postihy()`, `dracak_vtt_denik_aktivni_zbran()`, `dracak_vtt_denik_zebricek_nalozeni()`. Co je hotové:
+
+- Záhlaví přilepené nahoře přes celou šířku, kompaktní, při posunu se zúží (CSS `animation-timeline`, bez JS); na šířce ≤ 720 px je statické.
+  Avatar, jméno, „rasa · povolání · úroveň“, pět vlastností s bonusem (základ přeškrtnutý, když ho mění únava), postřeh, OČ, ÚČ aktivní zbraně,
+  „Zavřít deník“ (jen na samostatné stránce; v okně na mapě má okno vlastní ✕, tlačítko vrací tam, odkud se deník otevřel).
+- Měřidla Životy, Magy (jen s magenergií), Únava, Naložení; Pohyblivost přešla do karty „Pohyb a naložení“ se žebříčkem pásem.
+- Vysvětlení k číslům: tooltip při najetí **i klepnutí** (`data-info`, tlačítko „i“) — řeší upozornění z bodu 4 rozhodnutí.
+- Záložky Postava (Postup, Obrana, Boj, Pohyb a naložení, Aktivní efekty, Příběh a poznámky), Inventář (+ Kontejnery, Peníze),
+  Kouzla (jen když postava má magenergii nebo kouzla), Schopnosti. Aktivní záložka se pamatuje a přežije obnovu deníku.
+- Aktivní zbraň: klepnutí na ÚČ v záhlaví přepne na další zbraň z inventáře (`postavy.drzena_zbran_id`); radio v tabulce Boj dělá totéž.
+- Skoky z mapy: `window.dracakDenik.ukazSekci(id)` — `boj`, `kouzla`, `schopnosti`, `vybaveni` (a `prehled`, `obrana`, `pohyb`, `efekty`,
+  `postava`, `kontejnery`, `penize`) přepne záložku a srovná sekci.
+
+**Odchylky od prototypu (z pravidel, ne podle odhadu):**
+
+- **OČ v záhlaví nezahrnuje OZ držené zbraně.** Kniha (h1611): OČ = KZ zbroje + bonus Obr; štít je **+1 k hodu na obranu** (ne část KZ); obrana zbraní je
+  *nepovinné pravidlo* a bez ní/po vyčerpání obran je −3. Číslo v záhlaví = základ + štít + postihy za málo životů a velké naložení, tedy přesně to, co přičítá hod
+  z deníku (`hra/api/hod_postavy.php`) — záhlaví a hod se nerozejdou. „Obrana s ní“ (OČ + OZ) z prototypu **zatím není**; čeká na rozhodnutí uživatele, jestli se
+  nepovinné pravidlo OZ má do deníku i do hodu zapojit.
+- **Nosnost** bere engine z Tabulky nosnosti (`nosnost_podle_sily`, h1681), ne vzorec 360 + 30 × bonus z prototypu; **pohyblivost po naložení** se
+  zaokrouhluje nahoru (b11149), prototyp zaokrouhloval jako obvykle.
+- **ÚČ v záhlaví** = ÚČ zbraně (nejméně 0) + postihy; může tedy vyjít záporné (hod = 1k6+ + ÚČ + opravy), stejně jako v hodu.
+- **Chybí (potřebují DB nebo rozhodnutí):** přesvědčení, šance na seslání a rezerva magů, přeškrtnutí základu vlastností při změně efektem (mechanika efektů
+  vlastnosti zatím nemění).
+
+**Zbývá:** figurína a sloty (krok 3, DDL), aktivní zbraň ze slotů Zbraň 1–4 / Střelná 1–2 (krok 2), detail předmětu, hledání a filtry v inventáři,
+Dovednosti (krok 5, DDL), Společníci (krok 6, DDL), připnutá kouzla.
+
 ## Co v repu přibylo
 
 - **`docs/prototypy/denik-v2.dc.html`** — zdroj prototypu ve formátu Claude
