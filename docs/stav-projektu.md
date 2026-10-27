@@ -1172,7 +1172,7 @@ stavby“ v návrhu.**
     spánkem [M]
 
 *D. Příprava na ostré hraní*
-18. Ověřit celý tok pozvání: PJ vytvoří svět → pozve hráče → hráč založí
+18. ✔ (2026-10-28, automatický průchod: účty → svět → pozvání → wizard postavy → co kdo vidí, 23 kontrol) Ověřit celý tok pozvání: PJ vytvoří svět → pozve hráče → hráč založí
     postavu → vidí jen své [M]
 19. Zálohy databáze i `uploads/` na WEDOSu + ověřený postup obnovy [S]
 20. Chybový log čitelný pro admina (aby se chyby z ostré hry nemusely
@@ -1181,7 +1181,7 @@ stavby“ v návrhu.**
     skryté záložce), spočítat počet dotazů/min pro 6 hráčů [S–M]
 22. Rozvržení na tabletu/telefonu (panely, toolbar) [M]
 23. Zkušební scénář „první ostrá hra“ (cca 12 kroků) a jeho projití na dvou
-    zařízeních [S]
+    zařízeních [S] — **scénář napsaný: `docs/zkusebni-scenar-prvni-hra.md`** (2026-10-28), projití na dvou zařízeních čeká na uživatele
 
 *E. Vidění, světlo a stíny (přidáno 2026-10-14; zatím jen seznam, nic nestaví)*
 24. **Stíny za zdmi** — plný viditelnostní polygon z tokenu (zatemnění všeho, co
