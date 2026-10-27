@@ -118,6 +118,13 @@
   jen ručně. `deploy-manifest.json` je v `.htaccess` zavřený zvenčí.
   FTP-Deploy nahrává jen změněné soubory, takže chybějící soubor další
   deploy sám nedoplní — oprava = drobná změna v tom souboru, nebo ruční FTP.
+- **Chybový log (`logs/aplikace.log`, `includes/log.php`, stránka `admin_log.php`)
+  je data za provozu, ne obsah repa** — `logs/*` je v `.gitignore` kromě
+  `logs/.htaccess` (zavírá složku zvenčí, musí v repu zůstat). Nezapisuj do něj
+  hesla, tokeny ani obsah soukromých polí; do adres se tajné hodnoty
+  maskují samy. Server o chybě v JS ví díky `assets/js/chyby.js` (načítá
+  ho `dracak_vtt_page_start` a `hra/mapa.php`) — nová samostatná stránka
+  bez `dracak_vtt_page_start` ho musí přidat sama.
 - **`setup-admin.php` se nikdy nedeployuje** (viz `exclude` v `deploy.yml`)
   — má přístup k DB a zakládá admin účty, nepatří na veřejný web.
 - **`content/` drží fragmenty rulebooku pro `pravidla.php`** (`pravidla-hrac.html`,

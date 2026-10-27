@@ -1,0 +1,10 @@
+# Log aplikace (aplikace.log, čte ho admin_log.php) nesmí jít stáhnout přes HTTP. Platí jen tady (.htaccess se dědí jen do
+# podadresářů). Appka do logu zapisuje a čte z něj přes PHP, ne přes HTTP, takže to nic nerozbije.
+
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

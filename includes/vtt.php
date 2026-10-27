@@ -338,6 +338,7 @@ function dracak_vtt_page_start(string $title, array $user, bool $wide = false, a
 <?php foreach ($extraCss as $css): $cssFile = realpath(__DIR__ . '/../hra/' . $css); ?>
 <link rel="stylesheet" href="<?= htmlspecialchars($css) ?>?v=<?= $cssFile ? filemtime($cssFile) : 0 ?>">
 <?php endforeach; ?>
+<script src="../assets/js/chyby.js?v=<?= filemtime(__DIR__ . '/../assets/js/chyby.js') ?>"></script>
 </head>
 <body>
 <?php if ($wide): ?>

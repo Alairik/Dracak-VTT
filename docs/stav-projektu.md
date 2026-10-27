@@ -160,6 +160,17 @@ MariaDB.** Postup, který v session fungoval:
   jinak by hosting odpovídající 404 na všechno vyrobil falešné „zavřeno“; hostitel jen z `Host` a IP / localhost jen při vývoji z loopbacku (SSRF); (5) sken serveru
   přeskočí nečitelné složky a logy hostingu; (6) počet využití „jednou za kolo“ se čte po stránkách od startu souboje, ne z pevného okna; (7) `manifest.php` ukončí blok
   `exclude` podle odsazení a na nepodporovanou syntaxi vzoru (`!`, `{}`, `[]`) deploy zastaví; (8) `zbran_vytasit.php` nemá předčasnou kontrolu akcí (bezplatné vytasení akci nepotřebuje).
+- **Chybový log (2026-10-28, plán #20; bez ručního SQL):** `includes/log.php` zapisuje do `logs/aplikace.log` (jeden řádek JSON na záznam; složka má vlastní
+  `.htaccess` „Require all denied“, `logs/*` je v `.gitignore` kromě `.htaccess`; kdyby deploy `.htaccess` nenahrál, appka ho při prvním zápisu založí sama).
+  Co se zapisuje: neošetřené výjimky a chyby DB (`set_exception_handler` v `includes/db.php`, teď i s `soubor:řádek` a zkrácenou stopou — dřív jen text), varování PHP
+  (`E_WARNING`, `E_USER_*`; vypnuté nebo potlačené `@` ne; PHP dál píše i do vlastního logu), fatální chyby (shutdown handler) a **chyby JavaScriptu z prohlížečů**
+  (`assets/js/chyby.js` → `hra/api/klient_chyba.php`; načítá se v hlavičce všech stránek z `dracak_vtt_page_start` a v `hra/mapa.php`; nehlásí rozšíření, cizí
+  skripty, prázdné „Script error.“ ani nenačtené obrázky, nejvýš 5 hlášení na načtení stránky a 60 na relaci, jen přihlášení, vstup zkrácený a jen jako JSON).
+  Do adres se nezapisují tajné hodnoty (`token`, `heslo`, `pozvanka`, `kod`, `secret` → `***`). Jeden požadavek zapíše nejvýš 20 záznamů, log se nad 1 MB ořízne na
+  poslední půlku. **Čte ho `admin_log.php`** (jen admin; menu, dlaždice na dashboardu, editor): nejnovější nahoře, stejné chyby sloučené („×N“), filtr podle druhu,
+  detail (požadavek, stránka, prohlížeč, stopa) po rozkliknutí, jméno účtu, „Vymazat log“ (POST s tokenem v relaci). Kontrola nasazení teď hlídá i `logs/`
+  (spustitelný soubor tam = nález; `logs/aplikace.log` se mezi „navíc“ nehlásí) a zkouší zvenku `/logs/aplikace.log`. Testy: `log_unit.php` (zápis, čtení, ořez,
+  maskování, limity), `log_ui.js` (JS chyba → log → admin stránka → smazání, hráč 403, injekce řádku, XSS), obslužné funkce přes CLI (výjimka, DB, varování, fatální).
 - **Kdo to hlídá:** zavřené cesty a hlavičky ověří stránka „Kontrola nasazení“
   (`admin_nasazeni.php`, tlačítko „Zkontrolovat“); dřívější krok `deploy.yml`
   „Post-deploy security checks“ je od 2026-10-27 pryč (hosting odmítá HTTP z
@@ -1190,8 +1201,8 @@ stavby“ v návrhu.**
 18. ✔ (2026-10-28, automatický průchod: účty → svět → pozvání → wizard postavy → co kdo vidí, 23 kontrol) Ověřit celý tok pozvání: PJ vytvoří svět → pozve hráče → hráč založí
     postavu → vidí jen své [M]
 19. Zálohy databáze i `uploads/` na WEDOSu + ověřený postup obnovy [S]
-20. Chybový log čitelný pro admina (aby se chyby z ostré hry nemusely
-    popisovat z paměti) [S]
+20. ✔ (2026-10-28) Chybový log čitelný pro admina (aby se chyby z ostré hry nemusely
+    popisovat z paměti) [S] — `admin_log.php`, viz „Chybový log“ v sekci Bezpečnost
 21. Zátěž polling: adaptivní interval (rychle v boji, pomalu v klidu, stop při
     skryté záložce), spočítat počet dotazů/min pro 6 hráčů [S–M]
 22. Rozvržení na tabletu/telefonu (panely, toolbar) [M]

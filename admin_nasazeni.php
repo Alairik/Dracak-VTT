@@ -60,6 +60,7 @@ $seznam = static function (array $polozky) use ($e): string {
     <a class="mock-item" href="admin.php">Správa účtů</a>
     <a class="mock-item" href="admin_migrace.php">Změny databáze</a>
     <a class="mock-item active" href="admin_nasazeni.php">Kontrola nasazení</a>
+    <a class="mock-item" href="admin_log.php">Chybový log</a>
     <a class="mock-item" href="editor.php">← Zpět do editoru</a>
     <div class="sidebar-bottom">
       <form method="post" action="logout.php"><button class="btn btn-ghost" style="width:100%;">Odhlásit se</button></form>
@@ -116,7 +117,7 @@ $seznam = static function (array $polozky) use ($e): string {
         <p class="note">Zkus to z prohlížeče: otevři <code>/config.php</code>, <code>/includes/auth.php</code> a <code>/deploy-manifest.json</code> — všude musí být „Forbidden“ nebo „Not Found“.</p>
       <?php else: ?>
         <p class="note">Ověřeno z adresy <code><?= $e($cesty['zakladna']) ?></code>.</p>
-        <table class="dn-tab" style="width:100%;font-size:13px;">
+        <div class="table-wrap"><table class="table">
           <thead><tr><th style="text-align:left;">Adresa</th><th style="text-align:left;">Kód</th><th style="text-align:left;">Výsledek</th></tr></thead>
           <tbody>
             <?php foreach ($cesty['cesty'] as [$cesta, $kod, $ok, $pozn]): ?>
@@ -134,7 +135,7 @@ $seznam = static function (array $polozky) use ($e): string {
               </tr>
             <?php endforeach; ?>
           </tbody>
-        </table>
+        </table></div>
         <p class="note" style="margin-top:10px;"><a href="admin_nasazeni.php?cesty=1">Zkontrolovat znovu</a></p>
       <?php endif; ?>
     </div>

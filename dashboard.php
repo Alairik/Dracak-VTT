@@ -73,6 +73,11 @@ $isAdmin = $user['role'] === 'admin';
       <div class="tile-title">Kontrola nasazení</div>
       <div class="tile-desc">Sedí soubory na serveru, jsou zavřené cesty.</div>
     </a>
+    <a class="tile" href="admin_log.php">
+      <div class="tile-icon">🐞</div>
+      <div class="tile-title">Chybový log</div>
+      <div class="tile-desc">Co spadlo na serveru nebo v prohlížeči hráčů.</div>
+    </a>
     <?php endif; ?>
   </div>
 </div>

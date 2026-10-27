@@ -9,9 +9,14 @@ ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 header_remove('X-Powered-By');
 
+// Čitelný log pro admina (admin_log.php) vedle PHP error logu hostingu: výjimky, chyby DB, varování a fatální chyby.
+require_once __DIR__ . '/log.php';
+dracak_log_registruj();
+
 function dracak_fail_safely(string $logMessage): void
 {
     error_log('[dracak-vtt] ' . $logMessage);
+    dracak_log_zapis('db', $logMessage);
     http_response_code(500);
     die('Nastala chyba na serveru. Zkus to prosím znovu později.');
 }
@@ -19,12 +24,11 @@ function dracak_fail_safely(string $logMessage): void
 // Zachytí i PDOException vyhozenou později při dotazech (PDO::ATTR_ERRMODE
 // je nastavený na ERRMODE_EXCEPTION) — bez tohohle by neošetřená výjimka
 // z libovolného SELECT/INSERT jinde v appce vypsala do prohlížeče dotaz
-// i cestu k souboru. Jiné výjimky necháváme projít normálně.
+// i cestu k souboru. Uživatel vidí jen obecnou hlášku, podrobnosti jdou do logů.
 set_exception_handler(function (Throwable $e): void {
-    if ($e instanceof PDOException) {
-        dracak_fail_safely('DB chyba: ' . $e->getMessage());
-    }
-    error_log('[dracak-vtt] Neošetřená výjimka: ' . $e->getMessage());
+    dracak_log_vyjimka($e);
+    error_log('[dracak-vtt] ' . ($e instanceof PDOException ? 'DB chyba' : 'Neošetřená výjimka') . ': ' . $e->getMessage()
+        . ' (' . $e->getFile() . ':' . $e->getLine() . ')');
     http_response_code(500);
     die('Nastala chyba na serveru. Zkus to prosím znovu později.');
 });

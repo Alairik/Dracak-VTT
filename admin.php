@@ -86,6 +86,7 @@ foreach ($pdo->query('SELECT ucet_id, tabulka FROM ucet_opravneni')->fetchAll() 
     <a class="mock-item active" href="admin.php">Správa účtů</a>
     <a class="mock-item" href="admin_migrace.php">Změny databáze</a>
     <a class="mock-item" href="admin_nasazeni.php">Kontrola nasazení</a>
+    <a class="mock-item" href="admin_log.php">Chybový log</a>
     <a class="mock-item" href="editor.php">← Zpět do editoru</a>
     <div class="sidebar-bottom">
       <form method="post" action="logout.php"><button class="btn btn-ghost" style="width:100%;">Odhlásit se</button></form>

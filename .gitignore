@@ -3,3 +3,7 @@ config.php
 # Claude Code harness scratch space (isolated worktrees for background
 # subagents) — local tooling state, never project content.
 .claude/
+
+# Log aplikace (vzniká za provozu, viz includes/log.php); .htaccess ve složce zůstává v repu.
+logs/*
+!logs/.htaccess

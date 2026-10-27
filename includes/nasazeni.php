@@ -55,8 +55,8 @@ function dracak_nasazeni_kontrola(): array
         }
     }
 
-    // Co leží na serveru navíc. Nahraná data (uploads/), konfigurace, evidence FTP a samotný manifest se přeskakují;
-    // v uploads/ se hledají jen spustitelné soubory (tam smí být jen obrázky).
+    // Co leží na serveru navíc. Nahraná data (uploads/), log aplikace (logs/), konfigurace, evidence FTP a samotný manifest se přeskakují;
+    // v uploads/ a logs/ se hledají jen spustitelné soubory (tam smí být jen obrázky, resp. aplikace.log).
     // Co patří hostingu a ne nám (logy, složky pro CGI a ověření domény), se nehlásí — jinak by se admin naučil hlášení ignorovat.
     // `.user.ini` a `php.ini` se naopak hlásí: umí před každým skriptem načíst cizí kód.
     $preskocit = ['config.php', 'deploy-manifest.json', '.ftp-deploy-sync-state.json', 'error_log', 'php_errorlog'];
@@ -83,7 +83,7 @@ function dracak_nasazeni_kontrola(): array
         if (isset($soubory[$rel])) {
             continue;
         }
-        if (str_starts_with($rel, 'uploads/')) {
+        if (str_starts_with($rel, 'uploads/') || str_starts_with($rel, 'logs/')) {   // data za provozu (obrázky, log): hledají se jen spustitelné soubory
             if (preg_match($spustitelne, $rel)) {
                 $vysledek['uploads_spustitelne'][] = $rel;
             }
@@ -160,7 +160,7 @@ function dracak_nasazeni_zavrene_cesty(string $hostHlavicka, bool $https, string
 
     $migrace = glob(dracak_nasazeni_koren() . '/database/migrations/*.sql') ?: [];
     sort($migrace);
-    $cesty = ['config.php', '.ftp-deploy-sync-state.json', 'deploy-manifest.json', 'includes/auth.php', 'content/pravidla-pj.html', 'uploads/'];
+    $cesty = ['config.php', '.ftp-deploy-sync-state.json', 'deploy-manifest.json', 'includes/auth.php', 'content/pravidla-pj.html', 'uploads/', 'logs/aplikace.log'];
     if ($migrace) {
         $cesty[] = 'database/migrations/' . basename((string)end($migrace));
     }

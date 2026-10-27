@@ -138,6 +138,7 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/organic.css?v=<?= filemtime(__DIR__ . '/../assets/css/organic.css') ?>">
 <link rel="stylesheet" href="../assets/css/mapa.css?v=<?= filemtime(__DIR__ . '/../assets/css/mapa.css') ?>">
+<script src="../assets/js/chyby.js?v=<?= filemtime(__DIR__ . '/../assets/js/chyby.js') ?>"></script>
 </head>
 <body>
 

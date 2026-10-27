@@ -60,6 +60,7 @@ $e = static fn($v): string => htmlspecialchars((string)$v, ENT_QUOTES);
     <a class="mock-item" href="admin.php">Správa účtů</a>
     <a class="mock-item active" href="admin_migrace.php">Změny databáze</a>
     <a class="mock-item" href="admin_nasazeni.php">Kontrola nasazení</a>
+    <a class="mock-item" href="admin_log.php">Chybový log</a>
     <a class="mock-item" href="editor.php">← Zpět do editoru</a>
     <div class="sidebar-bottom">
       <form method="post" action="logout.php"><button class="btn btn-ghost" style="width:100%;">Odhlásit se</button></form>
@@ -112,14 +113,14 @@ $e = static fn($v): string => htmlspecialchars((string)$v, ENT_QUOTES);
 
       <details style="max-width:760px; margin:16px 0;">
         <summary>Už aplikované změny (<?= count($hotove) ?>)</summary>
-        <table class="dn-tab" style="width:100%;margin-top:8px;font-size:13px;">
+        <div class="table-wrap"><table class="table" style="margin-top:8px;">
           <thead><tr><th style="text-align:left;">Soubor</th><th style="text-align:left;">Kdy</th></tr></thead>
           <tbody>
             <?php foreach (array_reverse($hotove) as $s): ?>
               <tr><td><code><?= $e($s['soubor']) ?></code></td><td><?= $e($s['kdy']) ?></td></tr>
             <?php endforeach; ?>
           </tbody>
-        </table>
+        </table></div>
       </details>
     <?php endif; ?>
   </main>
