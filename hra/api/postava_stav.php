@@ -3,6 +3,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/vtt.php';
 require_once __DIR__ . '/../../includes/vtt_predmety.php';
 require_once __DIR__ . '/../../includes/vtt_kontejnery.php';
+require_once __DIR__ . '/../../includes/vtt_zbrane_u_sebe.php';
 
 // Rychlé zápisy z Osobního deníku (hra/denik.php): životy, magenergie,
 // únava, zkušenost, peníze, co postava nosí/drží, osobní texty. Na rozdíl
@@ -12,7 +13,7 @@ require_once __DIR__ . '/../../includes/vtt_kontejnery.php';
 //
 // Vstup JSON: {postava_id, akce, ...}. Akce:
 //   hp {delta} · magenergie {delta} · unava {delta} · spanek {} · zkusenost {delta}
-//   penize {mena: zl|st|md, hodnota} · vyber {pole, hodnota} · text {pole, hodnota}
+//   penize {mena: zl|st|md, hodnota} · vyber {pole, hodnota} · zbran_u_sebe {polozka_id, hodnota 0|1} · text {pole, hodnota}
 //   velikost {hodnota} · pohyblivost_rucne {hodnota|null}
 //   inventar_pridat {typ_polozky: predmet|lektvar|kouzlo, polozka_id, mnozstvi}
 //   inventar_zmena {typ_polozky: predmet|lektvar, polozka_id, delta} · inventar_odebrat {typ_polozky, polozka_id}
@@ -136,6 +137,10 @@ switch ($akce) {
             odpoved(422, ['error' => 'Tohle pole se zatím nedá ukládat (chybí migrace 0070).']);
         }
         $predmetId = (int)($data['hodnota'] ?? 0);
+        // Zbraň v ruce se v boji mění akcí „vytasit“ (hra/api/zbran_vytasit.php) — tady jen mimo boj nebo jako PJ.
+        if ($pole === 'drzena_zbran_id' && !$jePj && dracak_vtt_zbrane_boj_kontext($pdo, $postava) !== null) {
+            odpoved(422, ['error' => 'V boji se zbraň mění vytasením — stojí akci.']);
+        }
         if ($predmetId > 0) {
             // Jen předmět, který postava má v inventáři, a správného typu.
             $typ = $pole === 'drzena_zbran_id' ? 'zbran' : 'zbroj';
@@ -149,6 +154,27 @@ switch ($akce) {
             }
         }
         $pdo->prepare("UPDATE postavy SET $pole = ? WHERE id = ?")->execute([$predmetId > 0 ? $predmetId : null, $postavaId]);
+        odpoved(200, ['ok' => true]);
+    }
+    case 'zbran_u_sebe': {
+        // Zbraň při těle (opasek, pochva, závěs, toulec) — v boji ji lze vytasit. V boji se výbava nepřebaluje (jen PJ).
+        if (!dracak_vtt_zbrane_u_sebe_funkce($pdo)) {
+            odpoved(422, ['error' => 'Zbraně u sebe se zatím nedají ukládat (chybí ruční SQL, docs/sql-k-rucnimu-spusteni.sql).']);
+        }
+        if (!$jePj && dracak_vtt_zbrane_boj_kontext($pdo, $postava) !== null) {
+            odpoved(422, ['error' => 'V boji se výbava nepřebaluje — zbraň si dej k tělu mimo boj.']);
+        }
+        $predmetId = (int)($data['polozka_id'] ?? 0);
+        $stmt = $pdo->prepare(
+            'UPDATE postava_predmety pp JOIN predmety p ON p.id = pp.predmet_id
+             SET pp.u_sebe = ? WHERE pp.postava_id = ? AND pp.predmet_id = ? AND p.typ = "zbran"'
+        );
+        $stmt->execute([!empty($data['hodnota']) ? 1 : 0, $postavaId, $predmetId]);
+        $stmt = $pdo->prepare('SELECT 1 FROM postava_predmety pp JOIN predmety p ON p.id = pp.predmet_id WHERE pp.postava_id = ? AND pp.predmet_id = ? AND p.typ = "zbran"');
+        $stmt->execute([$postavaId, $predmetId]);
+        if (!$stmt->fetchColumn()) {
+            odpoved(422, ['error' => 'Tuhle zbraň postava nemá.']);
+        }
         odpoved(200, ['ok' => true]);
     }
     case 'text': {

@@ -3,6 +3,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../includes/vtt.php';
 require_once __DIR__ . '/../includes/vtt_denik.php';
 require_once __DIR__ . '/../includes/vtt_predmety.php';
+require_once __DIR__ . '/../includes/vtt_zbrane_u_sebe.php';
 
 // Osobní deník postavy — hlavní obrazovka hráče (zadání:
 // docs/zadani-osobni-denik-design.md, kolonky z content/pravidla-hrac.html
@@ -125,12 +126,25 @@ if ($hlavniZbran === null && count($d['zbrane']) === 1) {
 $hl = dracak_vtt_denik_hlavicka($d);
 $zebricek = dracak_vtt_denik_zebricek_nalozeni($pdo, $d);
 $aktivniZbran = dracak_vtt_denik_aktivni_zbran($d);
-$dalsiZbranId = null;   // další zbraň v pořadí; bez aktivní zbraně první z inventáře
+// Vytasení zbraně (includes/vtt_zbrane_u_sebe.php): mimo boj zdarma a kteroukoli z inventáře; v boji stojí akci,
+// smí jen na vlastním tahu a hráč jen zbraň, kterou má u sebe (PJ jakoukoli).
+$souboj = dracak_vtt_zbrane_boj_kontext($pdo, $postava);
+$maUSebe = dracak_vtt_zbrane_u_sebe_funkce($pdo);
+$vytasiPodle = static function (array $z) use ($souboj, $maUSebe, $jePj): ?string {
+    if ($z['drzena']) { return 'drzena'; }
+    if ($souboj === null || $jePj) { return null; }   // PJ smí vždy (mimo tah jen zatržením „bez akce“, hlídá server)
+    if (!$souboj['na_tahu']) { return 'Zbraň vytasíš na svém tahu — v boji to stojí akci.'; }
+    if ($souboj['akci_zbyva'] < 1) { return 'V tomhle tahu už nemáš akci.'; }
+    if ($maUSebe && !$z['u_sebe']) { return 'Zbraň není u sebe — v boji ji nevytasíš.'; }
+    return null;
+};
+// Další zbraň, kterou jde vytasit: po aktivní v pořadí inventáře; bez aktivní první použitelná.
+$dalsiZbranId = null;
 $zbranIds = array_column($d['zbrane'], 'id');
-if ($zbranIds && !$aktivniZbran) {
-    $dalsiZbranId = $zbranIds[0];
-} elseif ($aktivniZbran && count($zbranIds) > 1) {
-    $dalsiZbranId = $zbranIds[(array_search($aktivniZbran['id'], $zbranIds, true) + 1) % count($zbranIds)];
+$poradi = $aktivniZbran ? array_search($aktivniZbran['id'], $zbranIds, true) : -1;
+for ($i = 1; $i <= count($zbranIds); $i++) {
+    $z = $d['zbrane'][($poradi + $i) % count($zbranIds)];
+    if (!$z['drzena'] && !($aktivniZbran && $z['id'] === $aktivniZbran['id']) && $vytasiPodle($z) === null) { $dalsiZbranId = $z['id']; $dalsiZbranNazev = $z['nazev']; break; }
 }
 $maKouzla = $maMag || (bool)$d['kouzla'];
 // Vysvětlení k číslu: při najetí (title) i klepnutí (data-info), ať jde i na dotyku.
@@ -160,7 +174,7 @@ $cilKouzla = $svetId > 0;
 <?php if (!$fragment): ?>
 <div class="dn-wrap<?= $embed ? ' dn-embed' : '' ?>" data-postava-id="<?= $postavaId ?>" data-svet-id="<?= $svetId ?>">
 <?php endif; ?>
-<div class="dn" id="denik" data-ma-kouzla="<?= $maKouzla ? '1' : '0' ?>">
+<div class="dn" id="denik" data-ma-kouzla="<?= $maKouzla ? '1' : '0' ?>" data-boj="<?= $souboj !== null ? '1' : '0' ?>">
 
   <!-- ===================== ZÁHLAVÍ (trvale viditelné) ===================== -->
   <header class="dn-pas">
@@ -196,7 +210,7 @@ $cilKouzla = $svetId > 0;
           <span class="dn-velke-h"><?php if ($hl['oc']['zaklad'] !== null): ?><s><?= (int)$hl['oc']['zaklad'] ?></s> <?php endif; ?><?= $hl['oc']['hodnota'] !== null ? $cislo((int)$hl['oc']['hodnota']) : '—' ?></span>
         </div>
         <?php if ($dalsiZbranId !== null && $ma('drzena_zbran_id')): ?>
-          <button type="button" class="dn-velke dn-velke-btn" title="<?= $e($hl['uc']['title']) ?>" aria-label="Aktivní zbraň: <?= $e($hl['uc']['popis']) ?>. Klepnutím přepneš na další zbraň." data-dalsi-zbran="<?= (int)$dalsiZbranId ?>">
+          <button type="button" class="dn-velke dn-velke-btn" title="<?= $e($hl['uc']['title']) ?>" aria-label="Aktivní zbraň: <?= $e($hl['uc']['popis']) ?>. Klepnutím vytasíš další zbraň<?= $souboj !== null ? ' (stojí akci)' : '' ?>." data-dalsi-zbran="<?= (int)$dalsiZbranId ?>" data-nazev="<?= $e($dalsiZbranNazev ?? '') ?>">
         <?php else: ?>
           <div class="dn-velke dn-velke-jedna" title="<?= $e($hl['uc']['title']) ?>">
         <?php endif; ?>
@@ -369,13 +383,31 @@ $cilKouzla = $svetId > 0;
           <?php if (!$d['zbrane']): ?>
             <p class="note">Žádná zbraň v inventáři.</p>
           <?php else: ?>
+            <?php if ($souboj !== null): ?>
+              <p class="dn-boj-stav" role="status">
+                <strong>Jsi v boji.</strong>
+                <?php if ($souboj['na_tahu']): ?>Jsi na tahu, zbývá ti <?= (int)$souboj['akci_zbyva'] ?> <?= $souboj['akci_zbyva'] >= 1 && $souboj['akci_zbyva'] <= 4 ? 'akce' : 'akcí' ?> — vytasení nebo výměna zbraně stojí jednu.
+                <?php else: ?>Zbraň vytasíš na svém tahu; vytasení nebo výměna stojí jednu akci.<?php endif; ?>
+                <?php if ($jePj): ?><label class="dn-bez-akce"><input type="checkbox" id="dn-bez-akce"> bez akce (PJ)</label><?php endif; ?>
+              </p>
+            <?php endif; ?>
             <div class="dn-tab-wrap">
               <table class="dn-tab">
-                <thead><tr><th>Aktivní</th><th>Zbraň</th><th class="c">SZ</th><th class="c">Útočnost</th><th class="c">OZ</th><th class="c">Délka</th><th class="c">ÚČ tváří v tvář</th><th class="c">ÚČ střelecký</th><th class="c">Dostřel</th><th class="c">Hod</th></tr></thead>
+                <thead><tr><th>V ruce</th><?php if ($maUSebe): ?><th class="c" title="Zbraň má postava při těle (opasek, pochva, závěs, toulec) — v boji ji může vytasit">U sebe</th><?php endif; ?><th>Zbraň</th><th class="c">SZ</th><th class="c">Útočnost</th><th class="c">OZ</th><th class="c">Délka</th><th class="c">ÚČ tváří v tvář</th><th class="c">ÚČ střelecký</th><th class="c">Dostřel</th><th class="c">Hod</th></tr></thead>
                 <tbody>
                 <?php foreach ($d['zbrane'] as $z): ?>
                   <tr class="<?= $z['drzena'] ? 'drzena' : '' ?>">
-                    <td><?php if ($ma('drzena_zbran_id')): ?><input type="radio" name="drzena" aria-label="Aktivní zbraň: <?= $e($z['nazev']) ?>" data-zmena="vyber" data-pole="drzena_zbran_id" value="<?= $z['id'] ?>" <?= $z['drzena'] ? 'checked' : '' ?>><?php endif; ?></td>
+                    <td>
+                      <?php $duvod = $vytasiPodle($z); ?>
+                      <?php if ($z['drzena']): ?><span class="dn-stitek dn-vruce">v ruce</span>
+                      <?php elseif ($ma('drzena_zbran_id')): ?>
+                        <button type="button" class="dn-pm" data-vytasit="<?= $z['id'] ?>" data-nazev="<?= $e($z['nazev']) ?>" <?= $duvod !== null ? 'disabled' : '' ?>
+                          title="<?= $e($duvod ?? ($souboj !== null ? 'Vytasit — stojí jednu akci' : 'Vzít do ruky (mimo boj zdarma)')) ?>">Vytasit</button>
+                      <?php endif; ?>
+                    </td>
+                    <?php if ($maUSebe): ?>
+                      <td class="c"><input type="checkbox" aria-label="U sebe: <?= $e($z['nazev']) ?>" data-zmena="zbran_u_sebe" data-id="<?= $z['id'] ?>" <?= $z['u_sebe'] || $z['drzena'] ? 'checked' : '' ?> <?= ($souboj !== null && !$jePj) || $z['drzena'] ? 'disabled' : '' ?>></td>
+                    <?php endif; ?>
                     <td><strong><?= $e($z['nazev']) ?></strong><?= $z['mnozstvi'] > 1 ? ' ×' . $z['mnozstvi'] : '' ?><?= $z['rodova'] ? ' <span class="dn-stitek" title="Rodová zbraň rasy: +1 k ÚČ">rodová</span>' : '' ?></td>
                     <td class="c"><?= $z['sz'] ?? '—' ?></td>
                     <td class="c"><?= $znam($z['utocnost']) ?></td>
@@ -394,6 +426,7 @@ $cilKouzla = $svetId > 0;
               </table>
             </div>
             <p class="note">ÚČ tváří v tvář = síla zbraně + bonus za sílu (+1 rodová zbraň), střelecký = síla zbraně + bonus za obratnost, nikdy méně než 0. Dostřel malý / střední / velký v sázích: ≤ malý +1 k útoku, > střední −1. Kouzelné a artefaktové zbraně bez síly zbraně v katalogu mají ÚČ „—“. Hod = 1k6 s opakováním po šestce + ÚČ, s opravami za málo životů a velké naložení (rozdíl velikostí a dostřel zadej do ruční opravy). Aktivní zbraň je ta v záhlaví.</p>
+            <p class="note">V ruce je vždy jen jedna zbraň. <strong>Vytasení nebo výměna zbraně v boji stojí akci</strong> — v jednom kole nejde „vytasit meč a použít jej“ (kapitola Čas v souboji). Mimo boj se zbraň mění zdarma.<?php if ($maUSebe): ?> V boji jde vytasit jen zbraň „u sebe“ (opasek, pochva, závěs, toulec — k nošení zbraní je potřeba pochva či závěs); zbraň z ruky se zasune k tělu sama. Zbraně si k tělu dáváš mimo boj.<?php else: ?> Rozlišení „u sebe“ čeká na ruční SQL.<?php endif; ?></p>
           <?php endif; ?>
         </section>
 

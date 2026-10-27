@@ -18,6 +18,7 @@ const AKCE_DRUHY = {
   utok: 'Útok', obrana: 'Obrana', krok: 'Krok', beh: 'Běh', sprint: 'Sprint', otocka: 'Otočka', krok_utok: 'Krok a útok',
   beh_utok: 'Běh a útok', sprint_utok: 'Sprint a útok',
   otocka_utok: 'Otočka a útok', obrana_krok: 'Obrana a krok', kouzleni: 'Kouzlení', jina: 'Jiná činnost', cekani: 'Čekání',
+  vytasit: 'Vytasení zbraně',
 };
 const SMER_SIPKY = ['→', '↘', '↙', '←', '↖', '↗'];
 // Pohyb a tvary tvorů: data posílá server (tabulky souboj_pohyb, tvary_tvoru; jinak výchozí hodnoty),
@@ -408,6 +409,13 @@ export function initSouboj(ctx) {
     });
     if (jeHex()) {
       box.append(tlacitko('Obrana a krok', 'btn-ghost akce-btn mapova', () => zahajitPlan('obrana_krok'), 'Obrana a krok na sousední hex (1 akce) — vybereš na mapě'));
+    }
+    // Vytasení / výměna zbraně stojí akci (h1606); zbraň se vybírá v deníku postavy (tabulka Boj → „Vytasit“).
+    const naTahu = tokenPodleId(kolo.aktivni_token_id);
+    if (naTahu && naTahu.typ_entity === 'postava') {
+      box.append(tlacitko('Vytasit zbraň…', 'btn-ghost akce-btn', () => {
+        document.dispatchEvent(new CustomEvent('dracak:otevri-denik', {detail: {entitaId: naTahu.entita_id, sekce: 'boj'}}));
+      }, 'Otevře deník postavy na zbraních — vytasení stojí jednu akci'));
     }
     d.append(box);
     akceEl.append(d);
@@ -1634,7 +1642,7 @@ export function initSouboj(ctx) {
         else if (p.polovina === 2) logLine('2. půlka kola.');
         break;
       case 'akce_provedena':
-        logLine(p.label + ': ' + p.druh_nazev + (p.pocet > 1 ? ' ×' + p.pocet : '') + (p.cil_label ? ' → ' + p.cil_label : '')
+        logLine(p.label + ': ' + p.druh_nazev + (p.zbran_nazev ? ' (' + p.zbran_nazev + ')' : '') + (p.pocet > 1 ? ' ×' + p.pocet : '') + (p.cil_label ? ' → ' + p.cil_label : '')
           + (p.unava_plus ? ' (+' + p.unava_plus + ' bod únavy' + (p.unava_nova !== null && p.unava_nova !== undefined ? ', celkem ' + p.unava_nova : '') + ')' : ''));
         break;
       case 'vyzva_hod': {

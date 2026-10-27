@@ -166,6 +166,20 @@ MariaDB.** Postup, který v session fungoval:
   měřítko px→sáh (`dracak_vtt_px_na_sah`).
 
 ### Boj
+- **Vytasení / výměna zbraně stojí akci a zbraně „u sebe“ (2026-10-27, rozhodnutí uživatele: „vytasení stojí akci, ano“; ruční SQL: sloupec `postava_predmety.u_sebe`,
+  `docs/sql-k-rucnimu-spusteni.sql`):** kniha — v jednom kole jde provést jeden úkon, „například švihnout mečem, seslat kouzlo nebo vyměnit zbraň“, a nejde
+  „vytasit meč a použít jej“ (h1606, b10619); zbraně při sobě postava nosí v pochvě či závěsu (h2058, b14698). **V ruce je vždy jen jedna** (`postavy.drzena_zbran_id`).
+  Mimo boj se zbraň mění zdarma; **v boji je to akce tahu `vytasit`** (`DRACAK_VTT_AKCE_DRUHY`, `dracak_vtt_souboj_proved_akci`): odečte akci z kvóty půlky,
+  zapíše `akce_provedena` s `zbran_nazev` do logu, tah jde dál, a protože nesplní slíbený úkon, první akce kola = vytasení se trestá stejně jako každá jiná
+  (−3 v příštím kole, h1622). Hráč smí jen na vlastním tahu a jen zbraň **u sebe** (`u_sebe = 1`: opasek, pochva, závěs, toulec; výchozí pro všechny zbraně,
+  protože kniha neříká, kolik se jich na opasek vejde); zbraň z ruky se zasune k tělu sama (`u_sebe = 1`). PJ smí zbraň změnit i bez akce (`bez_akce`, zatržítko
+  „bez akce (PJ)“ v deníku). V boji hráč nemění výbavu (`zbran_u_sebe`) ani nevybírá zbraň přes `vyber` (422). „V boji“ = postava má token na mapě světa,
+  kde běží souboj, a je jeho účastník (`dracak_vtt_zbrane_boj_kontext`, `includes/vtt_zbrane_u_sebe.php`). **API:** `hra/api/zbran_vytasit.php` {postava_id, zbran_id, bez_akce?}
+  (deník), akce `vytasit` v `hra/api/tah_akce.php` {zbran_id} (stejná logika), `postava_stav.php` akce `zbran_u_sebe`. **UI:** deník → Boj: pruh „Jsi v boji“
+  (zbývající akce), sloupec „V ruce“ (štítek / tlačítko Vytasit, zakázané s důvodem), sloupec „U sebe“ (zatržítko, v boji zamčené), klepnutí na ÚČ v záhlaví
+  vytasí další použitelnou zbraň (v boji s potvrzením); panel Souboj → „Další akce…“ → „Vytasit zbraň…“ otevře okno deníku na zbraních. Bez ručního SQL
+  vše funguje, jen se nerozlišuje „u sebe“. **Chybí (potřebuje pravidlo):** kolik zbraní se vejde na opasek / do pochev, cena pochev v nosnosti, toulec a šípy
+  jako omezení střelby, Erithenovo Rychlé tasení a Dikobrazovo tasení vrhací zbraně zdarma (b7751, b7754, b9098) — zatím vytasí za akci jako všichni.
 - **Deník postavy v plovoucím okně na mapě (2026-10-19, okno přestavěno 2026-10-27; bez ručního SQL):** v boji se výbava, zbraň v ruce, životy, kouzla…
   upravují ve stejném deníku jako na stránce postavy (`hra/denik.php`), ale **přímo na mapě, bez proklikávání**. **Vstup je v detailu tokenu** (panel Spravovat,
   tlačítko „Otevřít deník“ `#spravovatDenik` nahoře pod jménem; rozhodnutí uživatele 2026-10-20 — v levé liště nástrojů tlačítko není; zobrazí se u tokenu
@@ -879,7 +893,7 @@ důvody v `docs/navrh-kontejnery-a-nosice.md`).
 
 ---
 
-## Osobní deník postavy (v2 se staví po krocích; krok 1 hotový 2026-10-27)
+## Osobní deník postavy (v2 se staví po krocích; kroky 1 a 2 hotové 2026-10-27)
 
 **Stav 2026-10-27:** návrh od Claude Design je hotový jako funkční prototyp
 (vzorová postava Ronan, Warlock 13) a uložený v repu:
@@ -887,7 +901,7 @@ důvody v `docs/navrh-kontejnery-a-nosice.md`).
 **`docs/prototypy/denik-v2-predani.md`** (rozhodnutí uživatele, vzorce,
 otevřené otázky, návrh postupu stavby). **Krok 1 stavby je v kódu** (záhlaví, měřidla, záložky — podrobně a s odchylkami od
 prototypu v části „Stav stavby“ předávacího dokumentu); popis v1 níže platí pro
-data, API a funkce, vzhled je už v2. Další kroky: aktivní zbraň ze slotů, figurína
+data, API a funkce, vzhled je už v2. **Krok 2 (zbraně u sebe, vytasení za akci) je hotový** — viz sekce Boj výše. Další kroky: figurína
 a sloty, dovednosti, společníci (část z nich potřebuje ruční SQL). Otevřené otázky k pravidlům a datům
 (Elixír, únava 30, váha, Torna, „Vyřazení 34“, postřeh, základ šance na
 seslání) jsou v předávacím dokumentu.

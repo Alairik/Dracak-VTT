@@ -89,11 +89,26 @@
       }
     } catch (e) { /* bez návratu — platí odkaz */ }
   });
-  // Klepnutí na ÚČ v záhlaví přepne aktivní zbraň na další v inventáři.
+  // Vytasení / výměna zbraně: mimo boj zdarma, v souboji stojí akci (h1606) — server ji odečte a posune tah.
+  // Klepnutí na ÚČ v záhlaví vytasí další zbraň z těch, které jde vytasit; „Vytasit“ v tabulce Boj tu zbraň, u které je.
+  async function vytasit(zbranId, nazev) {
+    const koren = document.getElementById('denik');
+    const vBoji = !!koren && koren.dataset.boj === '1';
+    const bezAkce = !!(document.getElementById('dn-bez-akce') || {}).checked;
+    if (vBoji && !bezAkce && !window.confirm('Vytasit ' + (nazev || 'zbraň') + '? V boji to stojí jednu akci z tvého tahu.')) return;
+    zaneprazdneno = true;
+    try {
+      const d = await volej('api/zbran_vytasit.php', { postava_id: Number(ID), zbran_id: zbranId, bez_akce: bezAkce });
+      if (d && !d.zdarma) hlaska((nazev || 'Zbraň') + ' vytasena — stálo to akci' + (d.akci_zbyva !== undefined ? ', v této půlce kola ti jich zbývá ' + d.akci_zbyva : '') + '.', true);
+    } finally {
+      zaneprazdneno = false;
+    }
+    await obnov();
+  }
   document.addEventListener('click', function (ev) {
-    const z = ev.target.closest('[data-dalsi-zbran]');
-    if (!z || !wrap.contains(z)) return;
-    zapis({ akce: 'vyber', pole: 'drzena_zbran_id', hodnota: Number(z.dataset.dalsiZbran) });
+    const z = ev.target.closest('[data-dalsi-zbran], [data-vytasit]');
+    if (!z || !wrap.contains(z) || z.disabled) return;
+    vytasit(Number(z.dataset.dalsiZbran || z.dataset.vytasit), z.dataset.nazev || '');
   });
 
   // V mapě (iframe) dá deník mapě vědět, že se něco změnilo — mapa si hned stáhne nový stav (životy, inventář…).
@@ -413,6 +428,8 @@
     const zmena = el.dataset.zmena;
     if (zmena === 'vyber') {
       zapis({ akce: 'vyber', pole: el.dataset.pole, hodnota: Number(el.value) || 0 });
+    } else if (zmena === 'zbran_u_sebe') {
+      zapis({ akce: 'zbran_u_sebe', polozka_id: Number(el.dataset.id), hodnota: el.checked ? 1 : 0 });
     } else if (zmena === 'penize') {
       zapis({ akce: 'penize', mena: el.dataset.mena, hodnota: Math.max(0, Number(el.value) || 0) });
     } else if (zmena === 'velikost') {

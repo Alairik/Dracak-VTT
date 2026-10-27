@@ -20,6 +20,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/vtt_souboj_pohyb.php';
 require_once __DIR__ . '/vtt_tokeny.php';
+require_once __DIR__ . '/vtt_zbrane_u_sebe.php';
 
 function dracak_vtt_souboj_proved_akci(PDO $pdo, array $mapa, bool $jePj, array $user, array $data, bool $vTransakci = false): array
 {
@@ -117,6 +118,24 @@ function dracak_vtt_souboj_proved_akci(PDO $pdo, array $mapa, bool $jePj, array 
                 $konec(422, 'Postava je ' . $stupen['nazev'] . ' — ' . ($rezimPohybu === 'sprint' ? 'sprintovat' : 'běhat') . ' nesmí.');
             }
         }
+        // Vytasení / výměna zbraně (h1606): stojí akci jako každý úkon; zbraň se změní hned, v téže transakci.
+        $vytasenaZbran = null;
+        if ($druh === 'vytasit') {
+            if ($info[$tokenId]['typ_entity'] !== 'postava') {
+                $konec(422, 'Zbraň vytasí jen postava.');
+            }
+            $q = $pdo->prepare('SELECT * FROM postavy WHERE id = ? FOR UPDATE');
+            $q->execute([(int)$info[$tokenId]['entita_id']]);
+            $postavaZbran = $q->fetch();
+            if (!$postavaZbran) {
+                $konec(404, 'Postava nenalezena.');
+            }
+            try {
+                $vytasenaZbran = dracak_vtt_zbrane_vytasit($pdo, $postavaZbran, (int)($data['zbran_id'] ?? 0), !$jePj) ?? 'prázdné ruce';
+            } catch (RuntimeException $ex) {
+                $konec(422, $ex->getMessage());
+            }
+        }
         // Čtvrtý hex sprintu bez dovednosti: cesta se ověří, jako by dovednost platila; provede se až po úspěšném hodu.
         $vstupPohyb = $data;
         $potrebujePast = false;
@@ -192,6 +211,7 @@ function dracak_vtt_souboj_proved_akci(PDO $pdo, array $mapa, bool $jePj, array 
             'label' => $info[$tokenId]['label'],
             'druh' => $druh,
             'druh_nazev' => DRACAK_VTT_AKCE_DRUHY[$druh],
+            'zbran_nazev' => $vytasenaZbran,
             'pocet' => $opakovani,
             'akce_zbyvajici' => (int)$ki['akce_zbyvajici'] - $pocet,
             'cil_token_id' => $pohyb['mapove'] ? $pohyb['cil_token_id'] : null,

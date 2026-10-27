@@ -1437,6 +1437,11 @@ function otevritDenikVybrane(sekce) {
   if (window.innerWidth <= 760) spravovatPanel.classList.remove('open');
 }
 if (denikDock) {
+  // Z panelu souboje (např. „Vytasit zbraň…“ v menu akcí): otevři deník dané postavy na dané sekci.
+  document.addEventListener('dracak:otevri-denik', (ev) => {
+    const d = ev.detail || {};
+    if (d.entitaId && denikDock.smi(d.entitaId)) denikDock.otevriPro(d.entitaId, d.sekce || null);
+  });
   const denikOtevritBtn = document.getElementById('spravovatDenik');
   if (denikOtevritBtn) denikOtevritBtn.addEventListener('click', () => otevritDenikVybrane());
   document.querySelectorAll('#spravovatDenikBlok [data-denik-sekce]').forEach((b) => {

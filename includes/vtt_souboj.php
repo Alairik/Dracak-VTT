@@ -42,6 +42,8 @@ const DRACAK_VTT_AKCE_DRUHY = [
     'krok_utok' => 'krok a útok', 'otocka_utok' => 'otočka a útok', 'obrana_krok' => 'obrana a krok',
     'jina' => 'jiná činnost', 'kouzleni' => 'kouzlení', 'beh' => 'běh', 'sprint' => 'sprint',
     'beh_utok' => 'běh a útok', 'sprint_utok' => 'sprint a útok',
+    // Vytasení nebo výměna zbraně je úkon kola (h1606, b10619); zbraň se mění v includes/vtt_zbrane_u_sebe.php.
+    'vytasit' => 'vytasení zbraně',
 ];
 // Cena v akcích: každé provedení stojí jednu akci — i krok, běh nebo sprint spojený s útokem
 // (rozhodnutí uživatele 2026-10-16, docs/navrh-tahu-v2.md).

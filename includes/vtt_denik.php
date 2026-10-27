@@ -199,9 +199,11 @@ function dracak_vtt_zbrane_postavy(PDO $pdo, array $postava, int $bonusSil, int 
     // zbraně fungují, jen bez ÚČ.
     $maSz = dracak_vtt_ma_sloupec($pdo, 'predmety', 'sila_zbrane');
     $szSql = $maSz ? 'p.sila_zbrane, p.delka_zbrane' : 'NULL AS sila_zbrane, NULL AS delka_zbrane';
+    // u_sebe (zbraň při těle, includes/vtt_zbrane_u_sebe.php) přibyl ruční DDL; bez něj je u sebe vše (jen se nerozlišuje).
+    $uSebeSql = dracak_vtt_ma_sloupec($pdo, 'postava_predmety', 'u_sebe') ? 'pp.u_sebe' : '1 AS u_sebe';
     $stmt = $pdo->prepare(
         "SELECT p.id, p.nazev, $szSql, p.utocnost, p.oc, p.vaha,
-                p.dostrel_maly, p.dostrel_stredni, p.dostrel_velky, p.kategorie_zbrane, pp.mnozstvi
+                p.dostrel_maly, p.dostrel_stredni, p.dostrel_velky, p.kategorie_zbrane, pp.mnozstvi, $uSebeSql
          FROM postava_predmety pp JOIN predmety p ON p.id = pp.predmet_id
          WHERE pp.postava_id = ? AND p.typ = 'zbran' ORDER BY p.nazev"
     );
@@ -233,6 +235,7 @@ function dracak_vtt_zbrane_postavy(PDO $pdo, array $postava, int $bonusSil, int 
                 ? [(int)$dostrelRadek['dostrel_maly'], (int)$dostrelRadek['dostrel_stredni'], (int)$dostrelRadek['dostrel_velky']] : null,
             'rodova' => $rodova,
             'drzena' => isset($postava['drzena_zbran_id']) && (int)$postava['drzena_zbran_id'] === (int)$z['id'],
+            'u_sebe' => (bool)(int)$z['u_sebe'],
             'uc_tvar_v_tvar' => $uc['uc_tvar_v_tvar'],
             'uc_strelecky' => $uc['uc_strelecky'],
         ];

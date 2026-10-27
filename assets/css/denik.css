@@ -89,6 +89,8 @@
 .dn-pm:hover { background: var(--color-accent-100); border-color: var(--color-accent-300); }
 .dn-pm:active { transform: translateY(1px); }
 .dn-cell .dn-pm { flex: none; min-width: 26px; min-height: 22px; padding: 0 4px; font-size: 11px; }
+.dn-pm:disabled { opacity: .45; cursor: not-allowed; }
+.dn-pm:disabled:hover { background: var(--color-surface); border-color: var(--color-neutral-400); }
 .dn-pms-mala { margin-top: 6px; }
 .dn-pms-mala .dn-pm { min-height: 28px; }
 
@@ -109,6 +111,12 @@
 .dn-cell .dn-stitek { font-size: 10px; padding: 0 6px; }
 .dn-stitek.varovani { background: var(--color-accent-100); color: var(--color-accent-800); }
 .dn-stitek.nebezpeci { background: var(--color-danger-100); color: var(--color-danger); }
+.dn-stitek.dn-vruce { background: var(--color-accent-2-100); color: var(--color-accent-2-800); }
+.dn-boj-stav {
+  margin: 0 0 10px; padding: 8px 12px; border-radius: var(--radius-sm);
+  background: var(--color-accent-100); color: var(--color-accent-800); font-size: 13px; line-height: 1.5;
+}
+.dn-bez-akce { margin-left: 10px; font-size: 12px; white-space: nowrap; }
 .dn-stitek.dobre { background: var(--color-accent-2-100); color: var(--color-accent-2-800); }
 .dn-stitek.neuplne { background: transparent; border: 1px dashed var(--color-neutral-500); color: var(--color-neutral-700); }
 

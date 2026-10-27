@@ -34,7 +34,12 @@ přestavěné podle prototypu; engine (`includes/vtt_denik.php`) a API zůstaly,
 - **Chybí (potřebují DB nebo rozhodnutí):** přesvědčení, šance na seslání a rezerva magů, přeškrtnutí základu vlastností při změně efektem (mechanika efektů
   vlastnosti zatím nemění).
 
-**Zbývá:** figurína a sloty (krok 3, DDL), aktivní zbraň ze slotů Zbraň 1–4 / Střelná 1–2 (krok 2), detail předmětu, hledání a filtry v inventáři,
+**Krok 2 hotový (2026-10-27, ruční SQL: `postava_predmety.u_sebe`):** zbraně „u sebe“ a **vytasení / výměna zbraně stojí v boji akci** (rozhodnutí uživatele;
+kniha h1606 b10619: v kole jde jeden úkon, „vyměnit zbraň“ je úkon, „vytasit meč a použít jej“ ne). Sloty „Zbraň 1–X“ z prototypu jsou v kódu jako příznak
+**„u sebe“** u zbraně v inventáři (sloupec „U sebe“ v tabulce Boj) — pevné číslované sloty se nedělají, dokud kniha neřekne, kolik se jich na opasek/do pochev vejde.
+Podrobnosti, API a chybějící pravidla: `docs/stav-projektu.md`, sekce Boj („Vytasení / výměna zbraně“).
+
+**Zbývá:** figurína a sloty (krok 3, DDL), detail předmětu, hledání a filtry v inventáři,
 Dovednosti (krok 5, DDL), Společníci (krok 6, DDL), připnutá kouzla.
 
 ## Rozhodnutí uživatele 2026-10-27 (po kroku 1) — vzhled ano, vymyšlená mechanika ne
@@ -113,6 +118,10 @@ Dovednosti (krok 5, DDL), Společníci (krok 6, DDL), připnutá kouzla.
     doplnit, dokud kouzlo trvá) je v měřidle šrafovaně.
 
 ## Vzorce v prototypu (před stavbou ověřit v `content/pravidla-*.html`)
+
+**Pozor — dva vzorce níže v kódu platí jinak (opraveno podle knihy, uživatel 2026-10-27: „co nesedí s knihou a víš, že je špatně, uprav“):**
+nosnost bere kód z Tabulky nosnosti (`nosnost_podle_sily`, h1681), ne `360 + 30 × bonus`; a OČ je KZ zbroje + bonus Obr (štít je **+1 k hodu na obranu**,
+ne část OČ; OZ zbraně je nepovinné pravidlo h1611). Zbytek seznamu je podklad, ne zdroj pravdy.
 
 Podle pravidla repa platí text pravidel, ne tenhle seznam. Hodnoty byly
 v prototypu ověřeny proti příkladům z pravidel a Ronanovu Excelu:
