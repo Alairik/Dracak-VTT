@@ -36,7 +36,7 @@ ním čeká, dokud se to neprovede ručně.
 
 **Ruční DDL blok je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný soubor, ve
 kterém jsou všechny dosud neprovedené DDL příkazy; uživatel ho dostává jako
-text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-27): čeká jen blok „Vytasení bez akce“ — samé vkládání řádků (migrace `0102`), dává se do ručního SQL, protože migrace z GitHubu teď nejedou (viz „Deploy je od 22. 10. červený“ níž); blok „Zbraně u sebe“ (`0101`, ALTER) je provedený, kontrola vyšla 1.** (Starší stav 2026-10-17: nic nečekalo.) Blok „Iniciativa v2“ + „Zbraně a iniciativa“
+text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-27): nic nečeká.** Blok „Zbraně u sebe“ (`0101`, ALTER) i „Vytasení bez akce“ (`0102`, vkládání řádků; do ručního SQL šel, protože migrace z GitHubu teď nejedou — viz „Deploy je od 22. 10. červený“ níž) uživatel provedl, kontroly vyšly 1 a 2, 3, 1. Blok „Iniciativa v2“ + „Zbraně a iniciativa“
 uživatel provedl (kontrolní SELECT vyšel 1, 4, 3) po tom, co první „sql proběhlo“ nesedělo — deploy po předčasném přesunu `0093`
 skončil na `1142 ALTER denied`, takže sloupce na serveru nebyly. **Poučení: migraci přesouvat do `database/migrations/` až podle
 čísel z kontrolního SELECTu, ne podle slov.** Migrace `0091`–`0096` jsou v `database/migrations/`: sloupce efektů (`0091`) a data (`0092`),
