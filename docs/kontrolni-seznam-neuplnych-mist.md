@@ -431,6 +431,11 @@ Sem patří věci, kde jsem **převzal údaj z knihy tak, jak je** (při rozporu
 podle homebrew), nebo si text musel vyložit. Na konci se projdou společně s
 knihou a opraví najednou. Pravidlo je v `CLAUDE.md`.
 
+**Deník postavy, prototyp v2 (2026-10-27)**
+- [ ] Tabulka **Objevení mechanismů** uvádí násobek 3× Obr, text u ní 2× Obr. Rozpor nechán, jak je; nezjištěno, který údaj platí.
+- [ ] **Elixír Démonní krve** (h1067): „+2 stupeň síly a obratnosti – max 21+5“. Prototyp bere +2 body vlastnosti; pokud je „stupeň“ krok v tabulce
+  bonusů (tj. +4 body), je to jinak. Ověř podle knihy.
+
 **Zbraně a iniciativa (2026-10-17, tabulky zbraní uživatele b14664–b14827)**
 - [ ] Základní tabulka zbraní označuje ‡ („vždy ztrácí iniciativu“) i **Válečnou sekeru** (b10672), nová tabulka ji ve „střední
   obouruční“ bez hvězdičky nemá. Podle pravidla „homebrew má přednost“ platí nová tabulka: Válečná sekera (obouruční) postih nemá.

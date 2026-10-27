@@ -865,7 +865,17 @@ důvody v `docs/navrh-kontejnery-a-nosice.md`).
 
 ---
 
-## Osobní deník postavy (první verze hotová, čeká na návrh od Claude Design)
+## Osobní deník postavy (v1 v kódu; návrh v2 od Claude Design hotový, čeká na stavbu)
+
+**Stav 2026-10-27:** návrh od Claude Design je hotový jako funkční prototyp
+(vzorová postava Ronan, Warlock 13) a uložený v repu:
+**`docs/prototypy/denik-v2.dc.html`** (zdroj) a
+**`docs/prototypy/denik-v2-predani.md`** (rozhodnutí uživatele, vzorce,
+otevřené otázky, návrh postupu stavby). V kódu zatím běží jen v1 níže;
+uživatel chce návrh „dostat do code“, tedy přestavba `hra/denik.php` podle
+předávacího dokumentu je další krok. Otevřené otázky k pravidlům a datům
+(Elixír, únava 30, váha, Torna, „Vyřazení 34“, postřeh, základ šance na
+seslání) jsou v předávacím dokumentu.
 
 Požadavek uživatele: "ultimátní detailní přehled postavy, hráči tam budou
 trávit spoustu času". Podklady: **`docs/zadani-osobni-denik-design.md`**

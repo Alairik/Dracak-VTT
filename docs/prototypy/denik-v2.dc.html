@@ -1,0 +1,1923 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Deník postavy</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&amp;display=swap" rel="stylesheet">
+<style>
+:root{
+  --color-bg:#f5ead8;--color-surface:#fffaf1;--color-text:#201e1d;
+  --color-neutral-100:#f5ead8;--color-neutral-200:#ece0cb;--color-neutral-300:#ddd0b8;--color-neutral-400:#c9bda0;--color-neutral-500:#a89a83;--color-neutral-600:#8a7960;--color-neutral-700:#6b5d49;--color-neutral-800:#4a4038;--color-neutral-900:#2c2621;
+  --color-accent:#c67139;--color-accent-100:#f7e3d3;--color-accent-200:#f0c7a8;--color-accent-300:#e5a877;--color-accent-400:#d68a54;--color-accent-500:#c67139;--color-accent-600:#a85c2c;--color-accent-700:#874a25;--color-accent-800:#66391c;--color-accent-900:#452712;
+  --color-accent-2:#7a8a5e;--color-accent-2-100:#e8ecdf;--color-accent-2-200:#d1d9c0;--color-accent-2-300:#b3c096;--color-accent-2-500:#7a8a5e;--color-accent-2-600:#647249;--color-accent-2-700:#4f5a38;--color-accent-2-800:#3a4229;--color-accent-2-900:#262c1b;
+  --color-danger:#a3402a;--color-danger-100:#f6ddd5;--color-mana:#5f7aa8;
+  --color-hairline:rgba(32,30,29,.08);--color-hover-wash:rgba(198,113,57,.1);
+  --radius-xs:6px;--radius-sm:8px;--radius-md:16px;--radius-lg:28px;
+  --shadow-sm:0 1px 3px rgba(44,38,33,.1),0 1px 2px rgba(44,38,33,.08);--shadow-md:0 4px 14px rgba(44,38,33,.12);--shadow-lg:0 12px 32px rgba(44,38,33,.16);
+  --font:'Playfair Display',serif;
+}
+body{margin:0;background:var(--color-bg)}
+.dk{font-family:var(--font);font-size:15px;line-height:1.5;color:var(--color-text);background:var(--color-bg);min-height:100vh;font-variant-numeric:lining-nums tabular-nums}
+.dk *,.dk *::before,.dk *::after{box-sizing:border-box}
+.dk button,.dk input,.dk textarea{font-family:inherit}
+.dk h1,.dk h2,.dk h3,.dk p,.dk ul{margin:0}
+.dk ul{padding:0;list-style:none}
+.dk :focus-visible{outline:2px solid var(--color-accent);outline-offset:1px}
+.dk-ic{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.dk-ic.l{width:22px;height:22px}
+.dk-ic.s{width:14px;height:14px}
+.note{color:var(--color-neutral-700);font-size:12.5px;line-height:1.4}
+
+/* tlačítka, štítky */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:13px;font-weight:600;padding:8px 16px;min-height:36px;border-radius:999px;border:1px solid transparent;cursor:pointer;text-decoration:none;line-height:1.2;transition:background .15s ease,border-color .15s ease}
+.btn-primary{background:var(--color-accent-600);color:#fff}
+.btn-primary:hover{background:var(--color-accent-700)}
+.btn-secondary{background:var(--color-neutral-200);color:var(--color-text);border-color:var(--color-neutral-400)}
+.btn-secondary:hover{background:var(--color-neutral-300)}
+.btn-ghost{background:transparent;color:var(--color-accent-700)}
+.btn-ghost:hover{background:var(--color-hover-wash)}
+.btn.sm{padding:4px 12px;min-height:30px;font-size:12px}
+.btn.btn-icon{width:32px;height:32px;min-height:0;padding:0}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.svet-pill{display:inline-flex;align-items:center;gap:8px;flex:none;font-size:13px;font-weight:600;padding:8px 16px;min-height:36px;border-radius:999px;color:var(--color-text);background:var(--color-neutral-200);border:1px solid var(--color-neutral-400);cursor:pointer}
+.tag{display:inline-block;font-size:11px;padding:2px 9px;border-radius:999px;background:var(--color-neutral-200);color:var(--color-neutral-700)}
+.tag-accent{background:var(--color-accent-100);color:var(--color-accent-800)}
+.dn-stitek{display:inline-block;padding:1px 8px;border-radius:999px;background:var(--color-neutral-200);color:var(--color-neutral-800);font-size:11px;font-weight:600;letter-spacing:0;text-transform:none;white-space:nowrap}
+.dn-stitek.varovani{background:var(--color-accent-100);color:var(--color-accent-800)}
+.dn-stitek.nebezpeci{background:var(--color-danger-100);color:var(--color-danger)}
+.dn-stitek.dobre{background:var(--color-accent-2-100);color:var(--color-accent-2-800)}
+.dn-stitek.neuplne{background:transparent;border:1px dashed var(--color-neutral-500);color:var(--color-neutral-700)}
+.dn-pocet{font-size:12px;font-weight:600;background:var(--color-neutral-200);border-radius:999px;padding:0 8px;color:var(--color-neutral-700)}
+
+/* avatar */
+.dk-av{display:grid;place-items:center;flex:none;width:56px;height:56px;border-radius:50%;color:#fff;font-weight:700;font-size:20px;box-shadow:var(--shadow-sm)}
+.av-0{background:var(--color-accent-600)}
+
+/* stránky */
+.dk-host{min-height:100vh;padding:24px}
+.dk-hostcard{display:flex;flex-direction:column;align-items:flex-start;gap:12px;max-width:520px;margin:80px auto}
+.dk-overlay{position:fixed;left:0;top:0;right:0;bottom:0;z-index:50;overflow-y:auto;background:var(--color-bg)}
+.dk-sheet{min-height:100%;background:var(--color-bg)}
+.dk-h2{font-size:20px;font-weight:700;line-height:1.2}
+.dk-h3{font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.dk-card{background:var(--color-surface);border:1px solid var(--color-hairline);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);padding:18px 22px;min-width:0}
+
+/* stavový pás deníku */
+.dn-pas{position:sticky;top:0;z-index:20;background:var(--color-surface);border-bottom:1px solid var(--color-neutral-300);box-shadow:var(--shadow-md);padding:6px 16px 6px;padding-left:max(16px,calc((100% - 1280px) / 2));padding-right:max(16px,calc((100% - 1280px) / 2))}
+.dn-hlava{display:flex;align-items:center;gap:4px 12px;flex-wrap:wrap}
+.dn-av{width:30px;height:30px;font-size:12px}
+.dn-id{flex:1 1 180px;min-width:0}
+.dn-jmeno{font-size:17px;line-height:1.15;font-weight:700}
+.dn-pod{color:var(--color-neutral-700);font-size:12px;line-height:1.25}
+.dn-attrs{display:flex;flex-wrap:wrap;gap:4px}
+.dn-attr{display:inline-flex;align-items:baseline;gap:4px;padding:1px 8px;border-radius:999px;background:var(--color-bg);border:1px solid var(--color-neutral-300)}
+.dn-attr.zm{background:var(--color-accent-100);border-color:var(--color-accent-200)}
+.dn-attr-k{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--color-neutral-700)}
+.dn-attr-h{font-size:14px;font-weight:700;line-height:1.2}
+.dn-attr-h s{font-size:11px;font-weight:400;color:var(--color-neutral-700);margin-right:4px}
+.dn-attr-b{font-size:11px;font-weight:700;color:var(--color-accent-2-700)}
+.dn-attr-b s{font-weight:400;color:var(--color-neutral-700)}
+.dn-attr-b.minus{color:var(--color-danger)}
+.dn-postreh{display:inline-flex;align-items:baseline;gap:2px 8px;flex-wrap:wrap;padding:1px 8px;border-radius:999px;background:var(--color-bg);border:1px solid var(--color-neutral-300)}
+.dn-ps{font-size:11px;color:var(--color-neutral-700);white-space:nowrap}
+.dn-ps strong{font-size:13px;color:var(--color-text)}
+.dn-bojcisla{display:flex;gap:8px}
+.dn-velke{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 5px;padding:1px 10px;background:var(--color-accent-100);border:1px solid var(--color-accent-200);border-radius:var(--radius-md)}
+.dn-velke-k{font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--color-accent-800)}
+.dn-velke-h{font-size:18px;font-weight:700;line-height:1.15;color:var(--color-accent-900)}
+.dn-velke-h s{font-size:11px;font-weight:600;color:var(--color-accent-700);margin-left:4px}
+.dn-velke-p{font-size:10px;color:var(--color-accent-800);max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dn-velke-btn{flex-wrap:nowrap;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.dn-velke-btn:hover{background:var(--color-accent-200)}
+.dn-velke-btn.jedna{cursor:default}
+.dn-velke-btn.jedna:hover{background:var(--color-accent-100)}
+.dk-slot.akt{border-color:var(--color-accent-600);box-shadow:0 0 0 2px var(--color-accent-200)}
+.dk-akt{min-height:26px;padding:0 10px;border:1px solid var(--color-neutral-400);border-radius:999px;background:var(--color-surface);color:var(--color-neutral-800);font:inherit;font-size:12px;cursor:pointer}
+.dk-akt:hover{background:var(--color-accent-100);border-color:var(--color-accent-300)}
+.dk-akt.on{background:var(--color-accent-100);border-color:var(--color-accent-400);color:var(--color-accent-800);font-weight:700;cursor:default}
+.dk-boj tr.akt td{background:var(--color-accent-100)}
+.dn-zavrit{margin-left:auto;min-height:28px;padding:0 12px;font-size:13px}
+.dn-stav{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}
+.dn-cell{display:flex;align-items:center;gap:8px;min-width:0;padding:2px 8px;background:var(--color-bg);border:1px solid var(--color-neutral-300);border-radius:var(--radius-md)}
+.dn-cell.main{flex:1 1 240px}
+.dn-cell.aux{flex:1 1 190px}
+.dn-cell-id{display:flex;flex-direction:column;gap:0;min-width:78px}
+.dn-cell-top{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.dn-cell-l{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--color-neutral-700)}
+.dn-cell-v{display:flex;align-items:baseline;gap:5px;white-space:nowrap}
+.dn-cell-v strong{font-size:15px;line-height:1.15}
+.dn-cell-v span{font-size:11px;color:var(--color-neutral-700)}
+.dn-cell-mid{flex:1 1 40px;min-width:40px}
+.dn-pms{display:flex;gap:4px}
+.dn-pm{flex:1;min-height:32px;padding:0 6px;border:1px solid var(--color-neutral-400);border-radius:var(--radius-sm);background:var(--color-surface);color:var(--color-neutral-800);font-size:13px;font-weight:600;cursor:pointer}
+.dn-pm:hover{background:var(--color-accent-100);border-color:var(--color-accent-300)}
+.dn-pm[disabled]{opacity:.45;cursor:not-allowed}
+.dn-cell .dn-pm{flex:none;min-width:26px;min-height:22px;padding:0 4px;font-size:11px}
+.dn-cell .dn-bar.thin{height:4px}
+.dn-cell .dn-stitek{font-size:10px;padding:0 6px}
+.dn-bar{position:relative;height:10px;border-radius:999px;background:var(--color-neutral-200)}
+.dn-bar.thin{height:6px}
+.dn-bar>i{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:var(--color-accent-2-500);transition:width .25s ease}
+.dn-bar.low>i{background:var(--color-accent-400)}
+.dn-bar.out>i{background:var(--color-danger)}
+.dn-bar.mag>i{background:var(--color-mana)}
+.dn-bar>b{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--color-neutral-500);opacity:.7}
+.dn-bar>u{position:absolute;right:0;top:0;bottom:0;border-radius:0 999px 999px 0;text-decoration:none;opacity:.85;background:repeating-linear-gradient(135deg,var(--color-neutral-600) 0 3px,var(--color-neutral-200) 3px 6px)}
+
+/* tělo deníku */
+.dk-body{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start;max-width:1280px;margin:0 auto;padding:16px 16px 40px}
+.dk-levy{flex:1 1 400px;max-width:460px;min-width:0;display:flex;flex-direction:column;gap:16px}
+.dk-pravy{flex:999 1 520px;min-width:0}
+.dk-tabs{display:flex;flex-wrap:wrap;gap:2px;margin-bottom:16px;border-bottom:2px solid var(--color-neutral-300)}
+.dk-tab{display:inline-flex;align-items:center;gap:8px;margin-bottom:-2px;padding:8px 20px;min-height:44px;border:2px solid transparent;border-bottom:0;border-radius:var(--radius-md) var(--radius-md) 0 0;background:none;font-size:15px;font-weight:600;color:var(--color-neutral-700);cursor:pointer}
+.dk-tab:hover{background:var(--color-accent-100);color:var(--color-accent-800)}
+.dk-tab.on{background:var(--color-surface);border-color:var(--color-neutral-300);color:var(--color-accent-800);padding-bottom:10px}
+
+/* figurína a sloty */
+.dk-dollgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);grid-auto-rows:minmax(76px,auto);gap:8px;margin-top:4px}
+.dk-fig{grid-column:2;grid-row:1/span 4;display:grid;place-items:center;min-height:0}
+.dk-fig svg{width:100%;height:100%;max-height:330px}
+.dk-slot{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:100%;min-width:0;padding:7px 9px;border:1px solid var(--color-neutral-300);border-radius:var(--radius-md);background:var(--color-surface);box-shadow:var(--shadow-sm);color:var(--color-text);text-align:left;cursor:pointer;transition:background .15s ease,border-color .15s ease,transform .15s ease,box-shadow .15s ease}
+.dk-slot:hover{border-color:var(--color-accent-300);box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.dk-slot.empty{background:transparent;border:1px dashed var(--color-neutral-500);box-shadow:none;color:var(--color-neutral-700)}
+.dk-slot.locked{opacity:.62;cursor:not-allowed}
+.dk-slot.locked:hover{transform:none;box-shadow:none;border-color:var(--color-neutral-500)}
+.dk-slot.ok{background:var(--color-accent-100);border:2px solid var(--color-accent-500);padding:6px 8px}
+.dk-slot.pick,.dk-slot.cur{background:var(--color-accent-100);border:2px solid var(--color-accent-700);padding:6px 8px}
+.dk-slot.s{min-height:58px}
+.dk-slot-l{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--color-neutral-700)}
+.dk-slot-b{display:flex;gap:6px;align-items:flex-start;min-width:0;width:100%;flex:1}
+.dk-slot-n{font-size:12.5px;font-weight:600;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
+.dk-slot.empty .dk-slot-n{font-weight:400;font-style:italic}
+.dk-slot-img{width:30px;height:30px;object-fit:cover;border-radius:var(--radius-xs);flex:none}
+.dk-slot-badge{align-self:flex-end;font-size:11px;font-weight:700;background:var(--color-accent-100);color:var(--color-accent-800);border-radius:999px;padding:0 8px}
+.dk-slot.ok .dk-slot-badge,.dk-slot.cur .dk-slot-badge{background:var(--color-surface)}
+.dk-slot-lock{position:absolute;right:8px;top:8px}
+.dk-group{margin-top:14px;display:flex;flex-direction:column;gap:6px}
+.dk-grouphead{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.dk-ringrow{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}
+.dk-armrow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+
+/* detail předmětu */
+.dk-detailhead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.dk-detailtop{display:flex;gap:12px;align-items:flex-start}
+.dk-imgbox{width:64px;height:64px;flex:none;display:grid;place-items:center;border:1px dashed var(--color-neutral-500);border-radius:var(--radius-md);background:var(--color-bg);color:var(--color-neutral-700);overflow:hidden}
+.dk-imgbox img{width:100%;height:100%;object-fit:cover}
+.dk-detailhead .dk-h3{margin-bottom:6px}
+.dk-tags2{display:flex;flex-wrap:wrap;gap:6px}
+.dn-vzorec{display:flex;align-items:center;gap:6px;margin:12px 0 8px;flex-wrap:wrap}
+.dk-vzw{display:flex;align-items:center;gap:6px}
+.dn-vz{display:flex;flex-direction:column;align-items:center;min-width:54px;padding:6px 10px;border-radius:var(--radius-md);background:var(--color-bg);border:1px solid var(--color-neutral-300)}
+.dn-vz small{font-size:11px;font-weight:700;text-transform:uppercase;color:var(--color-neutral-700)}
+.dn-vz b{font-size:24px;line-height:1.1}
+.dn-vz.dn-vysledek{background:var(--color-accent-100);border-color:var(--color-accent-300)}
+.dn-op{font-size:20px;color:var(--color-neutral-600)}
+.dn-dvojice{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:5px 0;border-bottom:1px dotted var(--color-neutral-300);font-size:14px}
+.dn-dvojice:last-of-type{border-bottom:none}
+.dn-dvojice>span{color:var(--color-neutral-700);font-size:13px}
+.dn-dvojice>strong{text-align:right}
+.dk-popis{font-size:13.5px;line-height:1.5;margin-top:8px}
+.dk-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.dk-moves{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:12px}
+
+/* karty záložky Postava */
+.dk-grid2{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.dk-span2{grid-column:1/-1}
+.dn-efekty{display:flex;flex-direction:column;gap:6px}
+.dn-efekt{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 10px;border-radius:var(--radius-sm);background:var(--color-bg);border-left:4px solid var(--color-neutral-400)}
+.dn-efekt.buff{border-left-color:var(--color-accent-2-500)}
+.dn-efekt.debuff{border-left-color:var(--color-danger)}
+.dn-efekt-kola{margin-left:auto;font-size:12px;color:var(--color-neutral-700)}
+.dk-text{width:100%;min-height:120px;font-size:14px;line-height:1.5;padding:9px 12px;border:1px solid var(--color-neutral-400);border-radius:var(--radius-sm);background:var(--color-surface);color:var(--color-text);resize:vertical}
+.dk-ladder{width:100%;border-collapse:collapse;font-size:13.5px}
+.dk-ladder th{text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--color-neutral-700);padding:4px 6px;border-bottom:2px solid var(--color-neutral-300)}
+.dk-ladder td{padding:5px 6px;border-bottom:1px solid var(--color-neutral-200)}
+.dk-ladder .r{text-align:right}
+.dk-ladder tr.cur td{background:var(--color-accent-100);font-weight:700}
+.dk-boj{width:100%;border-collapse:collapse;font-size:13.5px}
+.dk-boj th{text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--color-neutral-700);padding:4px 6px;border-bottom:2px solid var(--color-neutral-300);white-space:nowrap}
+.dk-boj td{padding:6px;border-bottom:1px solid var(--color-neutral-200)}
+.dk-boj .r{text-align:right;white-space:nowrap}
+.dk-boj td.uc{font-size:18px;font-weight:700;color:var(--color-accent-800)}
+.dk-xp{display:flex;flex-direction:column;gap:6px;margin-bottom:6px}
+
+/* hledání, filtry */
+.dk-toolbar{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;margin-bottom:12px}
+.dk-search{display:flex;align-items:center;gap:8px;flex:1 1 220px;padding:0 12px;border:1px solid var(--color-neutral-400);border-radius:var(--radius-sm);background:var(--color-surface);color:var(--color-neutral-700)}
+.dk-search input{flex:1;min-width:0;border:0;background:none;padding:9px 0;font-size:14px;color:var(--color-text)}
+.dk-search input:focus-visible{outline:none}
+.dk-search:focus-within{outline:2px solid var(--color-accent);outline-offset:1px}
+.dk-chips{display:flex;flex-wrap:wrap;gap:6px}
+.dk-chip{border:1px solid var(--color-neutral-400);background:var(--color-surface);color:var(--color-neutral-800);border-radius:999px;padding:5px 14px;min-height:32px;font-size:13px;font-weight:600;cursor:pointer}
+.dk-chip:hover{background:var(--color-accent-100)}
+.dk-chip.on{background:var(--color-accent-100);border-color:var(--color-accent-300);color:var(--color-accent-800)}
+.dk-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:10px 14px;margin-bottom:12px;border-radius:var(--radius-md);background:var(--color-accent-100);border:1px solid var(--color-accent-200);font-size:14px;font-weight:600;color:var(--color-accent-900)}
+
+/* kontejnery */
+.dn-kont-seznam{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(320px,1fr))}
+.dn-kont{background:var(--color-surface);border:1px solid var(--color-neutral-300);border-radius:var(--radius-md);padding:12px 14px;min-width:0}
+.dn-kont-hlava{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.dn-tab{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:6px}
+.dn-tab th{text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--color-neutral-700);padding:6px 4px;border-bottom:2px solid var(--color-neutral-300);white-space:nowrap}
+.dn-tab td{padding:2px 4px;border-bottom:1px solid var(--color-neutral-200);vertical-align:middle}
+.dn-tab .r{text-align:right;white-space:nowrap}
+.dn-tab tr.on td{background:var(--color-accent-100)}
+.dn-tab tfoot td{border-bottom:none;padding-top:8px;color:var(--color-neutral-700);font-size:12.5px}
+.dk-rowbtn{display:flex;align-items:center;gap:8px;width:100%;min-height:36px;padding:2px 4px;border:0;background:none;text-align:left;font-size:13.5px;color:var(--color-text);cursor:pointer;border-radius:var(--radius-xs)}
+.dk-rowbtn:hover{background:var(--color-hover-wash)}
+.dk-rowbtn svg{color:var(--color-neutral-700)}
+.dk-money{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.dk-coin{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border-radius:var(--radius-md);background:var(--color-bg);border:1px solid var(--color-neutral-300)}
+.dk-coin-l{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--color-neutral-700)}
+.dk-coin-c{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.dk-coin-c strong{font-size:22px}
+.dk-coin-c .dn-pm{flex:none;width:32px}
+.dk-res{display:flex;flex-direction:column;gap:2px;margin-top:10px}
+.dk-resbtn{display:flex;justify-content:space-between;align-items:baseline;gap:10px;width:100%;padding:8px 12px;min-height:40px;border:0;border-radius:var(--radius-sm);background:none;color:var(--color-text);font-size:14px;text-align:left;cursor:pointer}
+.dk-resbtn:hover{background:var(--color-accent-100)}
+.dk-resbtn small{color:var(--color-neutral-700);font-size:12px}
+.dk-inv{display:flex;flex-direction:column;gap:16px}
+
+/* seznamy: kouzla, schopnosti, dovednosti */
+.dk-khead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+.dk-khead .dk-h3{margin-bottom:2px}
+.dn-seznam{display:flex;flex-direction:column;gap:4px}
+.dn-pol{border:1px solid var(--color-neutral-200);border-radius:var(--radius-sm);background:var(--color-bg)}
+.dn-pol.open{background:var(--color-surface);border-color:var(--color-neutral-400)}
+.dn-pol.zam{opacity:.7}
+.dn-pol-head{display:flex;align-items:center;gap:6px;padding:2px 8px 2px 4px;flex-wrap:wrap}
+.dn-pol-toggle{display:flex;align-items:center;gap:8px;flex:1 1 220px;min-width:0;min-height:40px;padding:4px 6px;border:0;background:none;text-align:left;font-size:14px;color:var(--color-text);cursor:pointer;flex-wrap:wrap}
+.dn-pol-toggle .chev{color:var(--color-neutral-600);transition:transform .15s ease}
+.dn-pol.open .chev{transform:rotate(90deg)}
+.dn-pol-nazev{font-weight:700;margin-right:4px}
+.dn-pol-telo{padding:2px 14px 12px 34px;font-size:14px;line-height:1.5}
+.dn-pol-telo .dn-dvojice{font-size:13.5px}
+.dk-star{display:grid;place-items:center;width:34px;height:34px;border:0;border-radius:50%;background:none;color:var(--color-neutral-600);cursor:pointer}
+.dk-star:hover{background:var(--color-hover-wash)}
+.dk-star.on{color:var(--color-accent-600)}
+.dk-star.on svg{fill:var(--color-accent-500)}
+.dk-why{flex:1 0 100%;padding:0 12px 8px 46px;font-size:12.5px;color:var(--color-accent-800)}
+.dk-skwrap{display:flex;flex-direction:column;gap:16px}
+.dk-gh{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.dk-gh .dk-h3{margin-bottom:0}
+.dk-pool{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--color-neutral-700)}
+.dk-pool .dn-bar{width:120px}
+.dk-st{display:inline-block;padding:1px 10px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap}
+.st0{background:var(--color-danger-100);color:var(--color-danger)}
+.st1{background:var(--color-accent-200);color:var(--color-accent-900)}
+.st2{background:var(--color-accent-100);color:var(--color-accent-800)}
+.st3{background:var(--color-neutral-200);color:var(--color-neutral-800)}
+.st4{background:var(--color-accent-2-100);color:var(--color-accent-2-800)}
+.st5{background:var(--color-accent-2-200);color:var(--color-accent-2-900)}
+.st6{background:var(--color-accent-2-300);color:var(--color-accent-2-900)}
+.dk-past{font-size:12px;color:var(--color-neutral-700);min-width:48px;text-align:right}
+.dk-step{display:flex;gap:4px}
+.dk-step .dn-pm{flex:none;width:32px}
+.dk-prog{display:flex;align-items:center;gap:10px;margin:6px 0 8px;font-size:13px;color:var(--color-neutral-700)}
+.dk-prog .dn-bar{flex:1;max-width:240px}
+.dk-res4{display:flex;flex-direction:column;gap:4px;margin-top:6px;font-size:13.5px}
+.dk-res4 b{font-weight:700}
+
+/* společníci */
+.dk-comp{display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid var(--color-neutral-300);border-radius:var(--radius-md);background:var(--color-surface)}
+.dk-comphead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.dk-comphead input{flex:1 1 160px;min-width:0;font-size:16px;font-weight:700;border:1px solid transparent;border-radius:var(--radius-sm);background:none;padding:4px 8px;color:var(--color-text)}
+.dk-comphead input:hover,.dk-comphead input:focus{border-color:var(--color-neutral-400);background:var(--color-surface)}
+.dk-compgrid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));align-items:center}
+.dk-num{width:72px;font-size:14px;padding:4px 8px;border:1px solid var(--color-neutral-400);border-radius:var(--radius-sm);background:var(--color-surface);color:var(--color-text)}
+
+.dk-toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:100;max-width:min(580px,calc(100vw - 32px));padding:10px 20px;border-radius:999px;background:var(--color-neutral-900);color:var(--color-surface);font-size:13.5px;font-weight:600;box-shadow:var(--shadow-lg);text-align:center}
+
+@media (max-width:960px){
+  .dk-levy{max-width:none;flex-basis:100%}
+}
+@media (max-width:720px){
+  .dn-pas{position:static;padding:12px 14px 8px}
+  .dn-pas{padding-left:14px;padding-right:14px}
+  .dn-pm,.dn-cell .dn-pm{min-height:44px;min-width:44px}
+  .dk-money{grid-template-columns:1fr}
+  .dk-slot{min-height:80px}
+  .dk-tab{padding:8px 12px}
+}
+@media (min-width:721px){
+  @supports (animation-timeline: scroll()){
+    .dn-pas{animation:dn-pas-zbal linear both;animation-timeline:scroll(nearest block);animation-range:0 120px}
+    .dn-pas .dn-attrs,.dn-pas .dn-postreh{flex-wrap:nowrap;overflow:hidden;animation:dn-skryj-sirka linear both;animation-timeline:scroll(nearest block);animation-range:0 120px}
+    .dn-pas .dn-pod{overflow:hidden;animation:dn-skryj-vysku linear both;animation-timeline:scroll(nearest block);animation-range:0 120px}
+  }
+}
+@keyframes dn-pas-zbal{from{padding-top:6px;padding-bottom:6px}to{padding-top:3px;padding-bottom:3px}}
+@keyframes dn-skryj-sirka{from{max-width:900px;opacity:1}to{max-width:0;opacity:0;padding-left:0;padding-right:0;border-width:0}}
+@keyframes dn-skryj-vysku{from{max-height:20px;opacity:1}to{max-height:0;opacity:0}}
+@media (prefers-reduced-motion:reduce){
+  .dk *{transition:none !important}
+  .dn-pas,.dn-pas *{animation:none !important}
+}
+</style>
+</helmet>
+
+<div class="dk">
+
+<svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden">
+<defs>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+<symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></symbol>
+<symbol id="i-sword" viewBox="0 0 24 24"><path d="m11 19-6-6"/><path d="m5 21-2-2"/><path d="m8 16-4 4"/><path d="M9.5 17.5 21 6V3h-3L6.5 14.5"/></symbol>
+<symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol>
+<symbol id="i-gem" viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 13L2 9Z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/></symbol>
+<symbol id="i-shirt" viewBox="0 0 24 24"><path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/></symbol>
+<symbol id="i-hardhat" viewBox="0 0 24 24"><path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5"/><path d="M14 6a6 6 0 0 1 6 6v3"/><path d="M4 15v-3a6 6 0 0 1 6-6"/><rect x="2" y="15" width="20" height="4" rx="1"/></symbol>
+<symbol id="i-hand" viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2"/><path d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></symbol>
+<symbol id="i-footprints" viewBox="0 0 24 24"><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"/><path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/><path d="M16 17h4"/><path d="M4 13h4"/></symbol>
+<symbol id="i-book" viewBox="0 0 24 24"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></symbol>
+<symbol id="i-ring" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="1"/></symbol>
+<symbol id="i-flask" viewBox="0 0 24 24"><path d="M10 2v7.527a2 2 0 0 1-.211.896L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45l-5.069-10.127A2 2 0 0 1 14 9.527V2"/><path d="M8.5 2h7"/><path d="M7 16h10"/></symbol>
+<symbol id="i-package" viewBox="0 0 24 24"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.29 7 8.71 5 8.71-5"/><path d="m7.5 4.27 9 5.15"/></symbol>
+<symbol id="i-coins" viewBox="0 0 24 24"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></symbol>
+<symbol id="i-paw" viewBox="0 0 24 24"><circle cx="11" cy="4" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="20" cy="16" r="2"/><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/></symbol>
+</defs>
+</svg>
+
+<!-- obrazovka pod deníkem: sem se vrací Zavřít deník (v produkci mapa světa nebo přehled družiny) -->
+<main class="dk-host">
+  <div class="dk-card dk-hostcard">
+    <h1 class="dk-h2">Obrazovka pod deníkem</h1>
+    <p class="note">Tady by byla mapa světa nebo přehled družiny, odkud se deník otevřel. Deník se vždy otevírá nad ní a „Zavřít deník“ vrací zpátky na ni.</p>
+    <button type="button" class="btn btn-primary" onClick="{{otevri}}">Otevřít deník</button>
+  </div>
+</main>
+
+<!-- ============ DENÍK POSTAVY (overlay) ============ -->
+<sc-if value="{{open}}" hint-placeholder-val="{{ true }}">
+<div class="dk-overlay">
+<div class="dk-sheet dn" role="dialog" aria-modal="true" aria-label="{{d.dialogLabel}}">
+
+  <header class="dn-pas">
+    <div class="dn-hlava">
+      <span class="dk-av dn-av {{d.avCls}}">{{d.initials}}</span>
+      <div class="dn-id">
+        <h1 class="dn-jmeno">{{d.jmeno}}</h1>
+        <p class="dn-pod">{{d.sub}} · <span class="dn-stitek {{d.presvCls}}">{{d.presvedceni}}</span></p>
+      </div>
+      <div class="dn-attrs" role="group" aria-label="Vlastnosti a jejich bonusy">
+        <sc-for list="{{d.attrs}}" as="v" hint-placeholder-count="5">
+          <span class="dn-attr {{v.zm}}" title="{{v.aria}}"><span class="dn-attr-k">{{v.k}}</span><span class="dn-attr-h"><sc-if value="{{v.hasBase}}" hint-placeholder-val="{{ false }}"><s>{{v.base}}</s></sc-if>{{v.h}}</span><span class="dn-attr-b {{v.bCls}}"><sc-if value="{{v.hasStruck}}" hint-placeholder-val="{{ false }}"><s>{{v.struck}}</s> </sc-if>{{v.b}}</span></span>
+        </sc-for>
+      </div>
+      <div class="dn-postreh" title="{{d.postreh.title}}">
+        <span class="dn-attr-k">Postřeh</span>
+        <span class="dn-ps">objekty <strong>{{d.postreh.obj}}</strong></span>
+        <span class="dn-ps">mechanismy <strong>{{d.postreh.mech}}</strong></span>
+      </div>
+      <div class="dn-bojcisla">
+        <div class="dn-velke" title="{{d.oc.title}}">
+          <span class="dn-velke-k">OČ</span>
+          <span class="dn-velke-h">{{d.oc.h}}<sc-if value="{{d.oc.hasBase}}" hint-placeholder-val="{{ false }}"><s>{{d.oc.base}}</s></sc-if></span>
+        </div>
+        <button type="button" class="dn-velke dn-velke-btn {{d.uc.cls}}" title="{{d.uc.title}}" aria-label="{{d.uc.aria}}" onClick="{{d.uc.dalsi}}">
+          <span class="dn-velke-k">ÚČ</span>
+          <span class="dn-velke-h">{{d.uc.h}}<sc-if value="{{d.uc.hasBase}}" hint-placeholder-val="{{ false }}"><s>{{d.uc.base}}</s></sc-if></span>
+          <span class="dn-velke-p">{{d.uc.popis}}</span>
+        </button>
+      </div>
+      <button type="button" class="btn btn-secondary dn-zavrit" onClick="{{zavri}}"><svg class="dk-ic" aria-hidden="true"><use href="#i-x"></use></svg>Zavřít deník</button>
+    </div>
+
+    <div class="dn-stav">
+      <sc-for list="{{d.meters}}" as="m" hint-placeholder-count="4">
+        <div class="dn-cell {{m.wide}}" title="{{m.pozn}}">
+          <div class="dn-cell-id">
+            <div class="dn-cell-top">
+              <span class="dn-cell-l">{{m.label}}</span>
+              <sc-for list="{{m.stitky}}" as="st" hint-placeholder-count="1">
+                <span class="dn-stitek {{st.cls}}">{{st.txt}}</span>
+              </sc-for>
+            </div>
+            <span class="dn-cell-v"><strong>{{m.cislo}}</strong><span>{{m.max}}</span></span>
+          </div>
+          <div class="dn-cell-mid">
+            <div class="dn-bar thin {{m.barCls}}" role="meter" aria-label="{{m.label}}" aria-valuemin="0" aria-valuemax="{{m.ariaMax}}" aria-valuenow="{{m.ariaNow}}">
+              <i style="width: {{m.pct}}%"></i>
+              <sc-if value="{{m.hasRez}}" hint-placeholder-val="{{ false }}"><u style="width: {{m.rezPct}}%"></u></sc-if>
+              <sc-for list="{{m.markers}}" as="mk" hint-placeholder-count="0">
+                <b style="left: {{mk.pct}}%"></b>
+              </sc-for>
+            </div>
+          </div>
+          <sc-if value="{{m.hasPms}}" hint-placeholder-val="{{ true }}">
+            <div class="dn-pms">
+              <sc-for list="{{m.pms}}" as="pm" hint-placeholder-count="4">
+                <button type="button" class="dn-pm" onClick="{{pm.klik}}" aria-label="{{pm.aria}}">{{pm.lbl}}</button>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </header>
+
+  <div class="dk-body">
+
+    <!-- levý sloupec: figurína a detail předmětu -->
+    <aside class="dk-levy" aria-label="Výbava na postavě">
+      <section class="dk-card">
+        <h2 class="dk-h3">Výbava na postavě</h2>
+        <div class="dk-dollgrid">
+          <div class="dk-fig" aria-hidden="true">
+            <svg viewBox="0 0 160 280" preserveAspectRatio="xMidYMid meet">
+              <ellipse cx="80" cy="140" rx="68" ry="128" fill="#ece0cb"/>
+              <g fill="#ddd0b8" stroke="#a89a83" stroke-width="2" stroke-linejoin="round">
+                <circle cx="80" cy="46" r="21"/>
+                <path d="M70 66h20v14H70z"/>
+                <path d="M50 84q30-12 60 0l8 82q-38 12-76 0z"/>
+                <path d="M50 88 28 160l12 6 22-60"/>
+                <path d="m110 88 22 72-12 6-22-60"/>
+                <path d="M52 170l-6 96h24l10-78 10 78h24l-6-96z"/>
+              </g>
+            </svg>
+          </div>
+          <sc-for list="{{d.slots}}" as="s" hint-placeholder-count="9">
+            <button type="button" class="dk-slot {{s.cls}}" style="grid-column: {{s.col}}; grid-row: {{s.row}}" onClick="{{s.klik}}" aria-label="{{s.aria}}">
+              <span class="dk-slot-l">{{s.label}}</span>
+              <span class="dk-slot-b">
+                <sc-if value="{{s.hasImg}}" hint-placeholder-val="{{ false }}"><img class="dk-slot-img" src="{{s.img}}" alt=""></sc-if>
+                <sc-if value="{{s.noImg}}" hint-placeholder-val="{{ true }}"><svg class="dk-ic l" aria-hidden="true"><use href="{{s.icon}}"></use></svg></sc-if>
+                <span class="dk-slot-n">{{s.nazev}}</span>
+              </span>
+              <sc-if value="{{s.hasBadge}}" hint-placeholder-val="{{ false }}"><span class="dk-slot-badge">{{s.badge}}</span></sc-if>
+              <sc-if value="{{s.locked}}" hint-placeholder-val="{{ false }}"><svg class="dk-ic s dk-slot-lock" aria-hidden="true"><use href="#i-lock"></use></svg></sc-if>
+            </button>
+          </sc-for>
+        </div>
+
+        <div class="dk-group">
+          <div class="dk-grouphead">
+            <span class="dk-slot-l">Zbraně a střelné zbraně</span>
+          </div>
+          <div class="dk-armrow">
+            <sc-for list="{{d.arm}}" as="s" hint-placeholder-count="6">
+              <button type="button" class="dk-slot s {{s.cls}}" onClick="{{s.klik}}" aria-label="{{s.aria}}">
+                <span class="dk-slot-l">{{s.label}}</span>
+                <span class="dk-slot-b"><svg class="dk-ic" aria-hidden="true"><use href="{{s.icon}}"></use></svg><span class="dk-slot-n">{{s.nazev}}</span></span>
+                <sc-if value="{{s.hasBadge}}" hint-placeholder-val="{{ false }}"><span class="dk-slot-badge">{{s.badge}}</span></sc-if>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+
+        <div class="dk-group">
+          <div class="dk-grouphead">
+            <span class="dk-slot-l">Prsteny <span class="dn-pocet">{{d.ringsN}}</span></span>
+            <button type="button" class="btn btn-ghost sm" onClick="{{d.addRing}}" aria-label="Přidat slot na prsten"><svg class="dk-ic s" aria-hidden="true"><use href="#i-plus"></use></svg>Slot</button>
+          </div>
+          <div class="dk-ringrow">
+            <sc-for list="{{d.rings}}" as="s" hint-placeholder-count="2">
+              <button type="button" class="dk-slot s {{s.cls}}" onClick="{{s.klik}}" aria-label="{{s.aria}}">
+                <span class="dk-slot-l">{{s.label}}</span>
+                <span class="dk-slot-b"><svg class="dk-ic" aria-hidden="true"><use href="{{s.icon}}"></use></svg><span class="dk-slot-n">{{s.nazev}}</span></span>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+
+        <p class="note" style="margin-top:12px">{{d.dollNote}}</p>
+      </section>
+
+      <sc-if value="{{d.sel.has}}" hint-placeholder-val="{{ false }}">
+      <section class="dk-card" aria-live="polite">
+        <sc-if value="{{d.sel.has}}" hint-placeholder-val="{{ false }}">
+          <div class="dk-detailhead">
+            <div class="dk-detailtop">
+              <div class="dk-imgbox" title="Obrázek předmětu">
+                <sc-if value="{{d.sel.hasImg}}" hint-placeholder-val="{{ false }}"><img src="{{d.sel.img}}" alt=""></sc-if>
+                <sc-if value="{{d.sel.noImg}}" hint-placeholder-val="{{ true }}"><svg class="dk-ic l" aria-hidden="true"><use href="{{d.sel.icon}}"></use></svg></sc-if>
+              </div>
+              <div>
+                <h2 class="dk-h3">{{d.sel.nazev}}</h2>
+                <div class="dk-tags2">
+                  <span class="tag tag-accent">{{d.sel.typ}}</span>
+                  <span class="tag">{{d.sel.kde}}</span>
+                  <sc-if value="{{d.sel.noW}}" hint-placeholder-val="{{ false }}"><span class="dn-stitek neuplne">bez váhy</span></sc-if>
+                  <sc-if value="{{d.sel.noImg}}" hint-placeholder-val="{{ true }}"><span class="dn-stitek neuplne">bez obrázku</span></sc-if>
+                </div>
+              </div>
+            </div>
+            <button type="button" class="btn btn-ghost btn-icon" onClick="{{d.sel.zavri}}" aria-label="Zavřít detail předmětu"><svg class="dk-ic" aria-hidden="true"><use href="#i-x"></use></svg></button>
+          </div>
+          <sc-if value="{{d.sel.hasVz}}" hint-placeholder-val="{{ false }}">
+            <div class="dn-vzorec">
+              <sc-for list="{{d.sel.vz}}" as="z" hint-placeholder-count="3">
+                <div class="dk-vzw">
+                  <sc-if value="{{z.hasOp}}" hint-placeholder-val="{{ false }}"><span class="dn-op">{{z.op}}</span></sc-if>
+                  <div class="dn-vz {{z.cls}}"><small>{{z.k}}</small><b>{{z.v}}</b></div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+          <div>
+            <sc-for list="{{d.sel.rows}}" as="r" hint-placeholder-count="4">
+              <div class="dn-dvojice"><span>{{r.k}}</span><strong>{{r.v}}</strong></div>
+            </sc-for>
+          </div>
+          <sc-if value="{{d.sel.hasPopis}}" hint-placeholder-val="{{ false }}"><p class="dk-popis">{{d.sel.popis}}</p></sc-if>
+          <div class="dk-actions">
+            <sc-for list="{{d.sel.act}}" as="a" hint-placeholder-count="2">
+              <button type="button" class="btn {{a.cls}}" onClick="{{a.klik}}">{{a.lbl}}</button>
+            </sc-for>
+          </div>
+          <sc-if value="{{d.sel.hasMoves}}" hint-placeholder-val="{{ false }}">
+            <div class="dk-moves">
+              <span class="note">Přesunout do:</span>
+              <sc-for list="{{d.sel.moves}}" as="mv" hint-placeholder-count="1">
+                <button type="button" class="btn btn-secondary sm" onClick="{{mv.klik}}">{{mv.lbl}}</button>
+              </sc-for>
+            </div>
+          </sc-if>
+        </sc-if>
+      </section>
+      </sc-if>
+    </aside>
+
+    <!-- pravý sloupec: záložky -->
+    <section class="dk-pravy">
+
+      <nav class="dk-tabs" role="tablist" aria-label="Sekce deníku">
+        <sc-for list="{{d.tabs}}" as="t" hint-placeholder-count="6">
+          <button type="button" role="tab" class="dk-tab {{t.cls}}" aria-selected="{{t.on}}" onClick="{{t.klik}}">{{t.label}}<sc-if value="{{t.hasN}}" hint-placeholder-val="{{ true }}"><span class="dn-pocet">{{t.n}}</span></sc-if></button>
+        </sc-for>
+      </nav>
+
+      <div role="tabpanel" aria-label="{{d.tabLabel}}">
+
+      <!-- Postava -->
+      <sc-if value="{{d.tabPostava}}" hint-placeholder-val="{{ true }}">
+      <div class="dk-grid2">
+
+        <section class="dk-card">
+          <h2 class="dk-h3">Postup</h2>
+          <div class="dk-xp">
+            <div class="dn-dvojice"><span>Zkušenost</span><strong>{{d.p.xp.txt}}</strong></div>
+            <div class="dn-bar thin" role="meter" aria-label="Zkušenost do další úrovně" aria-valuemin="0" aria-valuemax="{{d.p.xp.max}}" aria-valuenow="{{d.p.xp.now}}"><i style="width: {{d.p.xp.pct}}%"></i></div>
+          </div>
+          <sc-for list="{{d.p.ident}}" as="r" hint-placeholder-count="5">
+            <div class="dn-dvojice"><span>{{r.k}}</span><strong>{{r.v}}</strong></div>
+          </sc-for>
+          <p class="note" style="margin-top:8px">Zkušenost přiděluje PJ. Hráč ji jen čte.</p>
+        </section>
+
+        <section class="dk-card dk-span2">
+          <h2 class="dk-h3">Boj</h2>
+          <table class="dk-boj">
+            <thead><tr><th>Aktivní</th><th>Zbraň</th><th class="r">SZ</th><th class="r">ÚČ</th><th class="r">Útočnost</th><th class="r">OZ</th><th class="r">Obrana s ní</th></tr></thead>
+            <tbody>
+              <sc-for list="{{d.p.boj}}" as="b" hint-placeholder-count="2">
+                <tr class="{{b.cls}}"><td><button type="button" class="dk-akt {{b.aktCls}}" aria-pressed="{{b.akt}}" aria-label="{{b.aria}}" onClick="{{b.vyber}}">{{b.aktTxt}}</button></td><td>{{b.nazev}} <span class="dn-stitek">{{b.druh}}</span><sc-if value="{{b.hasDostrel}}" hint-placeholder-val="{{ false }}"> <span class="dn-stitek">dostřely {{b.dostrel}}</span></sc-if></td><td class="r">{{b.sz}}</td><td class="r uc" title="{{b.ucTitle}}">{{b.uc}}</td><td class="r">{{b.ut}}</td><td class="r">{{b.oz}}</td><td class="r" title="{{b.obTitle}}">{{b.ob}}</td></tr>
+              </sc-for>
+            </tbody>
+          </table>
+          <sc-if value="{{d.p.bojPrazdny}}" hint-placeholder-val="{{ false }}"><p class="note" style="margin-top:6px">Žádná zbraň ve slotu.</p></sc-if>
+          <p class="note" style="margin-top:8px">{{d.p.ocText}}</p>
+        </section>
+
+        <section class="dk-card">
+          <h2 class="dk-h3">Pohyb a naložení</h2>
+          <table class="dk-ladder">
+            <thead><tr><th>Naložení</th><th class="r">Do</th><th class="r">Pohyblivost</th><th class="r">Bonus</th></tr></thead>
+            <tbody>
+              <sc-for list="{{d.p.ladder}}" as="r" hint-placeholder-count="4">
+                <tr class="{{r.cls}}"><td>{{r.nazev}}</td><td class="r">{{r.mez}} mn</td><td class="r">{{r.poh}}</td><td class="r">{{r.bonus}}</td></tr>
+              </sc-for>
+            </tbody>
+          </table>
+          <sc-if value="{{d.p.neunese}}" hint-placeholder-val="{{ false }}"><p class="note" style="margin-top:6px"><span class="dn-stitek nebezpeci">neunese</span> Náklad je nad čtyřnásobkem nosnosti.</p></sc-if>
+        </section>
+
+        <section class="dk-card">
+          <h2 class="dk-h3">Aktivní efekty <span class="dn-pocet">{{d.p.efektyN}}</span></h2>
+          <sc-if value="{{d.p.hasEfekty}}" hint-placeholder-val="{{ true }}">
+            <ul class="dn-efekty">
+              <sc-for list="{{d.p.efekty}}" as="e" hint-placeholder-count="1">
+                <li class="dn-efekt {{e.typ}}">
+                  <span class="dn-stitek">{{e.tag}}</span>
+                  <strong>{{e.nazev}}</strong>
+                  <span class="dn-efekt-kola">{{e.zbyva}}</span>
+                  <button type="button" class="btn btn-ghost sm" onClick="{{e.odeber}}" aria-label="{{e.aria}}">Odebrat</button>
+                  <sc-if value="{{e.hasMods}}" hint-placeholder-val="{{ false }}"><span class="note" style="flex:1 0 100%">{{e.mods}}</span></sc-if>
+                </li>
+              </sc-for>
+            </ul>
+          </sc-if>
+          <sc-if value="{{d.p.noEfekty}}" hint-placeholder-val="{{ false }}"><p class="note">Žádné aktivní efekty.</p></sc-if>
+        </section>
+
+        <section class="dk-card dk-span2">
+          <h2 class="dk-h3"><svg class="dk-ic" aria-hidden="true"><use href="#i-lock"></use></svg>Příběh a poznámky <span class="dn-stitek">soukromé</span></h2>
+          <p class="note" style="margin-bottom:8px">Původ, povahové rysy, zvyky, sny a cíle. Ostatní hráči to nevidí.</p>
+          <textarea class="dk-text" rows="5" value="{{d.p.poznamky}}" onChange="{{d.p.onPozn}}" placeholder="Zatím prázdné. Napiš, odkud postava pochází a co chce." aria-label="Příběh a poznámky"></textarea>
+        </section>
+      </div>
+      </sc-if>
+
+      <!-- Inventář -->
+      <sc-if value="{{d.tabInv}}" hint-placeholder-val="{{ false }}">
+      <div class="dk-inv">
+        <section class="dk-card">
+          <div class="dk-toolbar">
+            <label class="dk-search"><svg class="dk-ic" aria-hidden="true"><use href="#i-search"></use></svg><input type="search" placeholder="Hledat v inventáři" value="{{d.inv.q}}" onChange="{{d.inv.onQ}}" aria-label="Hledat v inventáři"></label>
+            <div class="dk-chips">
+              <sc-for list="{{d.inv.chips}}" as="ch" hint-placeholder-count="5">
+                <button type="button" class="dk-chip {{ch.cls}}" aria-pressed="{{ch.on}}" onClick="{{ch.klik}}">{{ch.lbl}}</button>
+              </sc-for>
+            </div>
+          </div>
+          <sc-if value="{{d.inv.hasBanner}}" hint-placeholder-val="{{ false }}">
+            <div class="dk-banner"><span>{{d.inv.banner}}</span><button type="button" class="btn btn-secondary sm" onClick="{{d.inv.zrus}}">Zrušit výběr</button></div>
+          </sc-if>
+          <div class="dn-kont-seznam">
+            <sc-for list="{{d.inv.kont}}" as="k" hint-placeholder-count="2">
+              <section class="dn-kont">
+                <div class="dn-kont-hlava"><strong>{{k.nazev}}</strong><span class="dn-stitek {{k.kapStitek}}">{{k.kapTxt}}</span></div>
+                <sc-if value="{{k.hasKap}}" hint-placeholder-val="{{ true }}">
+                  <div class="dn-bar thin {{k.kapCls}}" role="meter" aria-label="Zaplnění: {{k.nazev}}" aria-valuemin="0" aria-valuemax="{{k.kap}}" aria-valuenow="{{k.used}}"><i style="width: {{k.kapPct}}%"></i></div>
+                </sc-if>
+                <table class="dn-tab">
+                  <thead><tr><th>Předmět</th><th class="r">Váha</th></tr></thead>
+                  <tbody>
+                    <sc-for list="{{k.rows}}" as="r" hint-placeholder-count="3">
+                      <tr class="{{r.cls}}">
+                        <td><button type="button" class="dk-rowbtn" onClick="{{r.klik}}" aria-label="{{r.aria}}"><svg class="dk-ic" aria-hidden="true"><use href="{{r.icon}}"></use></svg><span>{{r.nazev}}</span><sc-if value="{{r.hasKs}}" hint-placeholder-val="{{ false }}"><span class="dn-pocet">{{r.ks}}</span></sc-if><sc-if value="{{r.hasSlot}}" hint-placeholder-val="{{ false }}"><span class="dn-stitek varovani">{{r.slot}}</span></sc-if></button></td>
+                        <td class="r">{{r.vaha}}<sc-if value="{{r.noW}}" hint-placeholder-val="{{ false }}"> <span class="dn-stitek neuplne">bez váhy</span></sc-if></td>
+                      </tr>
+                    </sc-for>
+                  </tbody>
+                  <tfoot><tr><td colspan="2">{{k.pata}}</td></tr></tfoot>
+                </table>
+                <sc-if value="{{k.prazdne}}" hint-placeholder-val="{{ false }}"><p class="note">{{k.prazdneTxt}}</p></sc-if>
+              </section>
+            </sc-for>
+          </div>
+        </section>
+
+        <div class="dk-grid2">
+          <section class="dk-card">
+            <h2 class="dk-h3"><svg class="dk-ic" aria-hidden="true"><use href="#i-coins"></use></svg>Peníze</h2>
+            <div class="dk-money">
+              <sc-for list="{{d.inv.money}}" as="mo" hint-placeholder-count="3">
+                <div class="dk-coin">
+                  <span class="dk-coin-l">{{mo.lbl}}</span>
+                  <div class="dk-coin-c">
+                    <button type="button" class="dn-pm" onClick="{{mo.minus}}" aria-label="{{mo.ariaM}}">−</button>
+                    <strong>{{mo.val}}</strong>
+                    <button type="button" class="dn-pm" onClick="{{mo.plus}}" aria-label="{{mo.ariaP}}">+</button>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+            <p class="note" style="margin-top:8px">{{d.inv.mincTxt}}</p>
+          </section>
+
+          <section class="dk-card">
+            <h2 class="dk-h3">Přidat z katalogu</h2>
+            <label class="dk-search"><svg class="dk-ic" aria-hidden="true"><use href="#i-search"></use></svg><input type="search" placeholder="Název předmětu, např. kopí" value="{{d.inv.katQ}}" onChange="{{d.inv.onKat}}" aria-label="Hledat v katalogu pravidel"></label>
+            <sc-if value="{{d.inv.hasRes}}" hint-placeholder-val="{{ false }}">
+              <ul class="dk-res">
+                <sc-for list="{{d.inv.res}}" as="rs" hint-placeholder-count="3">
+                  <li><button type="button" class="dk-resbtn" onClick="{{rs.klik}}"><span>{{rs.nazev}}</span><small>{{rs.meta}}</small></button></li>
+                </sc-for>
+              </ul>
+            </sc-if>
+            <sc-if value="{{d.inv.noRes}}" hint-placeholder-val="{{ false }}"><p class="note" style="margin-top:8px">Nic takového v katalogu není.</p></sc-if>
+            <sc-if value="{{d.inv.hintKat}}" hint-placeholder-val="{{ true }}"><p class="note" style="margin-top:8px">Začni psát. Předmět skončí v prvním vaku, kam se vejde, jinak ho nosíš u sebe.</p></sc-if>
+          </section>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- Kouzla -->
+      <sc-if value="{{d.tabKouzla}}" hint-placeholder-val="{{ false }}">
+      <section class="dk-card">
+        <div class="dk-khead">
+          <div>
+            <h2 class="dk-h3">Kouzla <span class="dn-pocet">{{d.k.count}}</span></h2>
+            <p class="note">{{d.k.magyTxt}}</p>
+            <p class="note">{{d.k.sanceTxt}}</p>
+          </div>
+          <sc-if value="{{d.k.hasBlok}}" hint-placeholder-val="{{ false }}"><span class="dn-stitek nebezpeci">{{d.k.blok}}</span></sc-if>
+        </div>
+        <div class="dk-toolbar">
+          <label class="dk-search"><svg class="dk-ic" aria-hidden="true"><use href="#i-search"></use></svg><input type="search" placeholder="Hledat kouzlo" value="{{d.k.q}}" onChange="{{d.k.onQ}}" aria-label="Hledat kouzlo"></label>
+          <div class="dk-chips">
+            <sc-for list="{{d.k.chips}}" as="ch" hint-placeholder-count="4">
+              <button type="button" class="dk-chip {{ch.cls}}" aria-pressed="{{ch.on}}" onClick="{{ch.klik}}">{{ch.lbl}}</button>
+            </sc-for>
+          </div>
+        </div>
+        <div class="dn-seznam">
+          <sc-for list="{{d.k.rows}}" as="r" hint-placeholder-count="6">
+            <div class="dn-pol {{r.cls}}">
+              <div class="dn-pol-head">
+                <button type="button" class="dk-star {{r.pinCls}}" onClick="{{r.pinKlik}}" aria-label="{{r.pinAria}}" aria-pressed="{{r.pinned}}"><svg class="dk-ic" aria-hidden="true"><use href="#i-star"></use></svg></button>
+                <button type="button" class="dn-pol-toggle" onClick="{{r.toggle}}" aria-expanded="{{r.open}}">
+                  <svg class="dk-ic chev" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+                  <span class="dn-pol-nazev">{{r.nazev}}</span>
+                  <span class="dn-stitek varovani">{{r.chip}}</span>
+                  <sc-if value="{{r.rez}}" hint-placeholder-val="{{ false }}"><span class="dn-stitek">rezerva</span></sc-if>
+                </button>
+                <button type="button" class="btn {{r.btnCls}} sm" onClick="{{r.sesli}}" disabled="{{r.dis}}">Seslat</button>
+              </div>
+              <sc-if value="{{r.hasWhy}}" hint-placeholder-val="{{ false }}"><p class="dk-why">{{r.why}}</p></sc-if>
+              <sc-if value="{{r.open}}" hint-placeholder-val="{{ false }}">
+                <div class="dn-pol-telo">
+                  <div class="dn-dvojice"><span>Magenergie</span><strong>{{r.cenaText}}</strong></div>
+                  <div class="dn-dvojice"><span>Vyvolání</span><strong>{{r.sesil}}</strong></div>
+                  <div class="dn-dvojice"><span>Dosah a rozsah</span><strong>{{r.dosah}}</strong></div>
+                  <div class="dn-dvojice"><span>Trvání</span><strong>{{r.trvani}}</strong></div>
+                  <p style="margin-top:8px">{{r.popis}}</p>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+        <sc-if value="{{d.k.empty}}" hint-placeholder-val="{{ false }}"><p class="note">Žádné kouzlo neodpovídá hledání.</p></sc-if>
+      </section>
+      </sc-if>
+
+      <!-- Schopnosti -->
+      <sc-if value="{{d.tabSchop}}" hint-placeholder-val="{{ false }}">
+      <section class="dk-card">
+        <h2 class="dk-h3">Schopnosti povolání <span class="dn-pocet">{{d.sch.count}}</span></h2>
+        <div class="dn-seznam">
+          <sc-for list="{{d.sch.rows}}" as="r" hint-placeholder-count="5">
+            <div class="dn-pol {{r.cls}}">
+              <div class="dn-pol-head">
+                <button type="button" class="dn-pol-toggle" onClick="{{r.toggle}}" aria-expanded="{{r.open}}">
+                  <svg class="dk-ic chev" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+                  <span class="dn-pol-nazev">{{r.nazev}}</span>
+                  <span class="dn-stitek {{r.odCls}}">{{r.od}}</span>
+                </button>
+              </div>
+              <sc-if value="{{r.open}}" hint-placeholder-val="{{ false }}"><div class="dn-pol-telo"><p>{{r.popis}}</p></div></sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+      </sc-if>
+
+      <!-- Dovednosti -->
+      <sc-if value="{{d.tabDov}}" hint-placeholder-val="{{ false }}">
+      <div class="dk-skwrap">
+        <section class="dk-card">
+          <div class="dk-toolbar" style="margin-bottom:0">
+            <label class="dk-search"><svg class="dk-ic" aria-hidden="true"><use href="#i-search"></use></svg><input type="search" placeholder="Hledat dovednost" value="{{d.dov.q}}" onChange="{{d.dov.onQ}}" aria-label="Hledat dovednost"></label>
+            <p class="note" style="flex:1 1 280px">Stupně: vůbec, velmi špatně, špatně, průměrně, dobře, velmi dobře, dokonale. Past je obtížnost hodu na daném stupni. Profibody se čerpají z fondu dané vlastnosti.</p>
+          </div>
+        </section>
+        <sc-for list="{{d.dov.groups}}" as="g" hint-placeholder-count="5">
+          <section class="dk-card">
+            <div class="dk-gh">
+              <h2 class="dk-h3">{{g.nazev}} <span class="dn-pocet">{{g.n}}</span></h2>
+              <div class="dk-pool">
+                <span>Profibody {{g.used}} / {{g.pool}}</span>
+                <div class="dn-bar thin {{g.barCls}}" role="meter" aria-label="Profibody: {{g.nazev}}" aria-valuemin="0" aria-valuemax="{{g.pool}}" aria-valuenow="{{g.used}}"><i style="width: {{g.pct}}%"></i></div>
+                <span class="dn-stitek {{g.zbCls}}">{{g.zbyva}}</span>
+              </div>
+            </div>
+            <div class="dn-seznam">
+              <sc-for list="{{g.rows}}" as="r" hint-placeholder-count="5">
+                <div class="dn-pol {{r.cls}}">
+                  <div class="dn-pol-head">
+                    <button type="button" class="dn-pol-toggle" onClick="{{r.toggle}}" aria-expanded="{{r.open}}">
+                      <svg class="dk-ic chev" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+                      <span class="dn-pol-nazev">{{r.nazev}}</span>
+                      <span class="dn-stitek">{{r.ob}}</span>
+                    </button>
+                    <span class="dk-st {{r.stCls}}">{{r.stLbl}}</span>
+                    <span class="dk-past" title="Past na tomto stupni">past {{r.past}}</span>
+                    <div class="dk-step">
+                      <button type="button" class="dn-pm" onClick="{{r.minus}}" disabled="{{r.minusDis}}" aria-label="{{r.minusAria}}">−</button>
+                      <button type="button" class="dn-pm" onClick="{{r.plus}}" disabled="{{r.plusDis}}" aria-label="{{r.plusAria}}">+</button>
+                    </div>
+                  </div>
+                  <sc-if value="{{r.open}}" hint-placeholder-val="{{ false }}">
+                    <div class="dn-pol-telo">
+                      <div class="dk-prog"><span>Body {{r.body}}</span><div class="dn-bar thin" role="meter" aria-label="Postup k dalšímu stupni" aria-valuemin="0" aria-valuemax="{{r.progMax}}" aria-valuenow="{{r.progNow}}"><i style="width: {{r.progPct}}%"></i></div><span>{{r.progTxt}}</span></div>
+                      <p class="note">{{r.dalsi}}</p>
+                      <div style="margin:8px 0"><button type="button" class="btn btn-secondary sm" onClick="{{r.ucitelKlik}}" aria-pressed="{{r.ucitel}}">{{r.ucitelLbl}}</button></div>
+                      <sc-if value="{{r.hasOv}}" hint-placeholder-val="{{ false }}"><div class="dn-dvojice"><span>Ověřování</span><strong>{{r.ov}}</strong></div></sc-if>
+                      <sc-if value="{{r.hasRes}}" hint-placeholder-val="{{ false }}">
+                        <div class="dk-res4">
+                          <span><b>Totální úspěch:</b> {{r.tot}}</span>
+                          <span><b>Úspěch:</b> {{r.usp}}</span>
+                          <span><b>Neúspěch:</b> {{r.neusp}}</span>
+                          <span><b>Fatální neúspěch:</b> {{r.fat}}</span>
+                        </div>
+                      </sc-if>
+                      <sc-if value="{{r.hasPozn}}" hint-placeholder-val="{{ false }}"><p class="note" style="margin-top:8px">{{r.pozn}}</p></sc-if>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+            <sc-if value="{{g.prazdne}}" hint-placeholder-val="{{ false }}"><p class="note">Žádná dovednost neodpovídá hledání.</p></sc-if>
+          </section>
+        </sc-for>
+      </div>
+      </sc-if>
+
+      <!-- Společníci -->
+      <sc-if value="{{d.tabSpol}}" hint-placeholder-val="{{ false }}">
+      <section class="dk-card">
+        <div class="dk-khead">
+          <div>
+            <h2 class="dk-h3">Společníci <span class="dn-pocet">{{d.sp.pocet}}</span></h2>
+            <p class="note">{{d.sp.limitTxt}}</p>
+          </div>
+          <sc-if value="{{d.sp.canAdd}}" hint-placeholder-val="{{ false }}"><button type="button" class="btn btn-primary" onClick="{{d.sp.pridej}}"><svg class="dk-ic" aria-hidden="true"><use href="#i-plus"></use></svg>Přidat společníka</button></sc-if>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <sc-for list="{{d.sp.items}}" as="p" hint-placeholder-count="1">
+            <article class="dk-comp">
+              <div class="dk-comphead">
+                <svg class="dk-ic l" aria-hidden="true"><use href="#i-paw"></use></svg>
+                <input type="text" value="{{p.jmeno}}" onChange="{{p.onJmeno}}" aria-label="Jméno společníka">
+                <sc-if value="{{p.hasVel}}" hint-placeholder-val="{{ true }}"><span class="tag">velikost {{p.velikost}}</span></sc-if>
+                <sc-if value="{{p.hasUr}}" hint-placeholder-val="{{ true }}"><span class="tag">{{p.uroven}}. úroveň</span></sc-if>
+                <button type="button" class="btn btn-ghost sm" onClick="{{p.propust}}" aria-label="{{p.propustAria}}">Propustit</button>
+              </div>
+              <div class="dk-compgrid">
+                <div class="dn-cell main" style="padding:5px 10px">
+                  <div class="dn-cell-id"><span class="dn-cell-l">Životy</span><span class="dn-cell-v"><strong>{{p.hp}}</strong><span>/ {{p.hpMax}}</span></span></div>
+                  <div class="dn-cell-mid"><div class="dn-bar thin {{p.barCls}}" role="meter" aria-label="Životy společníka" aria-valuemin="0" aria-valuemax="{{p.hpMax}}" aria-valuenow="{{p.hp}}"><i style="width: {{p.pct}}%"></i></div></div>
+                  <div class="dn-pms">
+                    <sc-for list="{{p.pms}}" as="pm" hint-placeholder-count="4">
+                      <button type="button" class="dn-pm" onClick="{{pm.klik}}" disabled="{{pm.dis}}" aria-label="{{pm.aria}}">{{pm.lbl}}</button>
+                    </sc-for>
+                  </div>
+                </div>
+                <label class="note">Max. životů <input class="dk-num" type="number" value="{{p.hpMaxVal}}" onChange="{{p.onHpMax}}" aria-label="Maximální životy společníka"></label>
+                <div><span class="dn-stitek neuplne">útočné a obranné číslo zatím nevyplněno</span></div>
+              </div>
+            </article>
+          </sc-for>
+        </div>
+        <sc-if value="{{d.sp.noItems}}" hint-placeholder-val="{{ false }}"><p class="note">Zatím žádný společník.</p></sc-if>
+      </section>
+      </sc-if>
+
+      </div>
+    </section>
+  </div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{toast}}" hint-placeholder-val="{{ false }}">
+  <div class="dk-toast" role="status">{{toast}}</div>
+</sc-if>
+
+</div>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props='{"mistaSpolecniku":{"editor":"int","default":1,"min":0,"max":5},"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this._t = null;
+    this._n = 0;
+    this.state = {
+      open: true,
+      tab: 'postava',
+      c: this.dataChar(),
+      selItem: null,
+      selSlot: null,
+      invQ: '',
+      invTyp: 'vse',
+      katQ: '',
+      kQ: '',
+      kFiltr: 'vse',
+      dQ: '',
+      exp: {},
+      toast: ''
+    };
+  }
+
+  componentWillUnmount() { clearTimeout(this._t); }
+
+  /* ---------- pomocné ---------- */
+  say(msg) {
+    this.setState({ toast: msg });
+    clearTimeout(this._t);
+    this._t = setTimeout(() => this.setState({ toast: '' }), 4500);
+  }
+  upd(fn, extra) {
+    this.setState(Object.assign({ c: fn(this.state.c) }, extra || {}));
+  }
+  plural(n, f) { return n + ' ' + (n === 1 ? f[0] : (n >= 2 && n <= 4 ? f[1] : f[2])); }
+  norm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+  fmt(n) { return n > 0 ? '+' + n : (n < 0 ? '−' + Math.abs(n) : '0'); }
+  num(n) { return String(Math.round(n * 100) / 100).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' '); }
+  mn(n) { return this.num(n) + ' mn' + (n >= 200 ? ' (' + this.num(n / 20) + ' kg)' : ''); }
+  bon(v) {
+    if (v <= 1) return -5;
+    if (v <= 3) return -4;
+    if (v <= 5) return -3;
+    if (v <= 7) return -2;
+    if (v <= 9) return -1;
+    if (v <= 12) return 0;
+    return Math.min(6, Math.floor((v - 11) / 2));
+  }
+  stupenUnavy(c, odl) {
+    const p = c.unava;
+    return p > 4 * odl ? 4 : (p > 3 * odl ? 3 : (p > 2 * odl ? 2 : (p > odl ? 1 : 0)));
+  }
+  maxSp(c) {
+    const p = this.props ? Number(this.props.mistaSpolecniku) : NaN;
+    return isNaN(p) ? Math.floor(c.uroven / 8) : Math.max(0, Math.min(5, Math.round(p)));
+  }
+
+  /* ---------- číselníky ---------- */
+  DOLL() {
+    return [
+      { id: 'prilba', label: 'Přilba', col: 1, row: 1, types: ['prilba'], icon: '#i-hardhat' },
+      { id: 'kape', label: 'Kápě, plášť', col: 1, row: 2, types: ['plast'], icon: '#i-shirt' },
+      { id: 'saty', label: 'Šaty', col: 1, row: 3, types: ['saty'], icon: '#i-shirt' },
+      { id: 'rukavice', label: 'Rukavice', col: 1, row: 4, types: ['rukavice'], icon: '#i-hand' },
+      { id: 'boty', label: 'Boty', col: 1, row: 5, types: ['boty'], icon: '#i-footprints' },
+      { id: 'nahrdelnik', label: 'Náhrdelník', col: 3, row: 1, types: ['nahrdelnik'], icon: '#i-gem' },
+      { id: 'stit', label: 'Štít', col: 3, row: 2, types: ['stit'], icon: '#i-shield' },
+      { id: 'demonicon', label: 'Daemonicon', col: 3, row: 3, types: ['kniha'], icon: '#i-book', only: 'Warlock' },
+      { id: 'zbroj', label: 'Zbroj', col: 2, row: 5, types: ['zbroj'], icon: '#i-shirt' }
+    ];
+  }
+  ARM() {
+    return [
+      { id: 'zbran1', label: 'Zbraň 1', types: ['zbran'], icon: '#i-sword' },
+      { id: 'zbran2', label: 'Zbraň 2', types: ['zbran'], icon: '#i-sword' },
+      { id: 'zbran3', label: 'Zbraň 3', types: ['zbran'], icon: '#i-sword' },
+      { id: 'zbran4', label: 'Zbraň 4', types: ['zbran'], icon: '#i-sword' },
+      { id: 'strelna1', label: 'Střelná 1', types: ['strelna'], icon: '#i-target' },
+      { id: 'strelna2', label: 'Střelná 2', types: ['strelna'], icon: '#i-target' }
+    ];
+  }
+  RINGS(c) {
+    const out = [];
+    for (let i = 1; i <= c.prstenu; i++) out.push({ id: 'prsten' + i, label: 'Prsten ' + i, types: ['prsten'], icon: '#i-ring' });
+    return out;
+  }
+  allSlots(c) { return this.DOLL().concat(this.ARM(), this.RINGS(c)); }
+  TYP() {
+    return { zbran: 'Zbraň', strelna: 'Střelná zbraň', stit: 'Štít', zbroj: 'Zbroj', plast: 'Kápě, plášť', saty: 'Šaty', prilba: 'Přilba', rukavice: 'Rukavice', boty: 'Boty', nahrdelnik: 'Náhrdelník', prsten: 'Prsten', kniha: 'Kniha', lektvar: 'Lektvar', vybava: 'Vybavení', poklad: 'Poklad' };
+  }
+  IKONA(t) {
+    const m = { zbran: '#i-sword', strelna: '#i-target', stit: '#i-shield', zbroj: '#i-shirt', plast: '#i-shirt', saty: '#i-shirt', prilba: '#i-hardhat', rukavice: '#i-hand', boty: '#i-footprints', nahrdelnik: '#i-gem', prsten: '#i-ring', kniha: '#i-book', lektvar: '#i-flask', vybava: '#i-package', poklad: '#i-coins' };
+    return m[t] || '#i-package';
+  }
+  BAND() { return ['žádné', 'mírné', 'střední', 'velké', 'neunese']; }
+  UNAVA() { return ['v pohodě', 'unavená', 'vyčerpaná', 'úplně vyčerpaná', 'vysílená']; }
+  STUPNE() { return ['vůbec', 'velmi špatně', 'špatně', 'průměrně', 'dobře', 'velmi dobře', 'dokonale']; }
+  PAST() { return [14, 11, 8, 5, 2, -1, -4]; }
+  OBT() { return ['lehká', 'střední', 'těžká', 'velmi těžká']; }
+  ATR() { return [['sil', 'Síla', 'Sil'], ['obr', 'Obratnost', 'Obr'], ['odl', 'Odolnost', 'Odl'], ['int', 'Inteligence', 'Int'], ['cha', 'Charisma', 'Cha']]; }
+  /* [stupeň 1..6][obtížnost 1..4] = [přestup, celkem] */
+  BEZ() {
+    return [[[3, 3], [5, 5], [7, 7], [9, 9]], [[6, 9], [10, 15], [14, 21], [18, 27]], [[9, 18], [15, 30], [21, 42], [27, 54]], [[12, 30], [20, 50], [28, 70], [36, 90]], [[15, 45], [25, 75], [35, 105], [45, 135]], [[18, 63], [30, 105], [42, 147], [54, 189]]];
+  }
+  UCI() {
+    return [[[3, 3], [4, 4], [6, 6], [7, 7]], [[4, 7], [8, 12], [10, 16], [14, 21]], [[7, 14], [11, 23], [16, 32], [20, 41]], [[9, 23], [15, 38], [21, 53], [27, 68]], [[11, 34], [19, 57], [26, 79], [34, 102]], [[14, 48], [22, 79], [32, 111], [40, 142]]];
+  }
+  DOBA() {
+    return [[5, 10, 15, 20], [10, 20, 30, 40], [15, 30, 45, 60], [20, 40, 60, 80], [25, 50, 75, 100], [30, 60, 90, 120]];
+  }
+  prestup(ob, st, uc) { return (uc ? this.UCI() : this.BEZ())[st - 1][ob - 1][0]; }
+  celkem(ob, st, uc) { return st <= 0 ? 0 : (uc ? this.UCI() : this.BEZ())[st - 1][ob - 1][1]; }
+  doba(ob, st) { return this.DOBA()[st - 1][ob - 1]; }
+
+  /* ---------- data: Ronan ---------- */
+  dataChar() {
+    const it = (id, nazev, typ, vaha, kde, slot, x) => Object.assign({ id: id, nazev: nazev, typ: typ, vaha: vaha, ks: 1, kde: kde, slot: slot || null, img: null }, x || {});
+    return {
+      jmeno: 'Ronan', initials: 'Ro', av: 'av-0', rasa: 'Elf', povolani: 'Warlock', uroven: 13, velikost: 'B',
+      zt: 0, ztDalsi: 232500, narozeni: '8. 8. 1', znameni: 'Zmije', presvedceni: '',
+      vl: { sil: 15, obr: 15, odl: 10, int: 19, cha: 15 }, pohybZaklad: 16,
+      hpMax: 42, hp: 42, mpMax: 61, mp: 48, unava: 2,
+      sanceZaklad: 95, postrehObj: 0, postrehMech: 5,
+      maKouzla: true, zamky: {}, zbrojTypy: null, zbrojText: '',
+      prstenu: 2, aktivni: 'zbran1',
+      kontejnery: [{ id: 'telo', nazev: 'Na sobě', kap: null, vlastni: 0 }, { id: 'torna', nazev: 'Torna kožená', kap: 800, vlastni: 30 }],
+      items: [
+        it('r_zbroj', 'Kožená zbroj', 'zbroj', 60, 'telo', 'zbroj', { kz: 3, kzTyp: 'kozena', cena: '20 zl' }),
+        it('r_saty', 'Šaty zimní luxusní B – z pavučin', 'saty', 60, 'telo', 'saty', {}),
+        it('r_plast', 'Plášť letní normální B', 'plast', 60, 'telo', 'kape', { cena: '3 st' }),
+        it('r_boty', 'Elfí boty', 'boty', 10, 'telo', 'boty', {}),
+        it('r_dem', 'Daemonicon', 'kniha', null, 'telo', 'demonicon', { popis: 'Warlockova kniha. Zachycuje vzpomínky zabitých protivníků a dokáže si podržet až dvě jejich kouzla. Kapacita zápisků je neomezená.' }),
+        it('r_mec', 'Široký meč', 'zbran', 30, 'telo', 'zbran1', { sz: 5, ut: 0, oz: 0, delka: '1', cena: '30 st' }),
+        it('r_kopi', 'Krátké kopí', 'zbran', 30, 'telo', 'zbran2', { sz: 4, ut: 1, oz: 0, delka: null }),
+        it('r_pochva', 'Pochva s řemenem 1H', 'vybava', 10, 'telo', null, {}),
+        it('r_elixir', 'Elixír Démonní krve', 'lektvar', 5, 'telo', null, { efekt: 'elixir', cena: '45 zl', popis: 'Jen pro Warlocka. +30 % k max. životům i magům, +2 stupně síly a obratnosti, +5 iniciativa, −12 charisma (nejméně 1), −3 inteligence (nejméně 2). Trvá 2 směny. Lze vypít 1× týdně, počítá se jako 3 lektvary.' }),
+        it('r_jidlo', 'Jídlo cestovní', 'vybava', 20, 'torna', null, { ks: 2 }),
+        it('r_deka1', 'Deka normální', 'vybava', 35, 'torna', null, {}),
+        it('r_deka2', 'Deka luxusní', 'vybava', 50, 'torna', null, {}),
+        it('r_okvet', 'Okvětní lístek – fialový z hrobu', 'vybava', 2, 'torna', null, { ks: 4 }),
+        it('r_pav', 'Pavučina (40 kg)', 'vybava', 800, 'torna', null, {}),
+        it('r_plyn', 'Slzný plyn', 'vybava', null, 'torna', null, {}),
+        it('r_hvezda', 'Lektvar – bílá hvězda', 'lektvar', null, 'torna', null, {})
+      ],
+      penize: { zl: 0, st: 0, md: 0 },
+      efekty: [],
+      pinned: { k_pamet_noci: true, k_cerna_liska: true },
+      kouzla: this.kouzlaWarlock(),
+      schopnosti: this.schopnostiWarlock(),
+      dovednosti: this.dovednostiRonan(),
+      spolecnici: [{ id: 'sp1', jmeno: 'Tvor 1', velikost: 'C', uroven: 7, hp: 33, hpMax: 33 }],
+      poznamky: ''
+    };
+  }
+
+  kouzlaWarlock() {
+    const k = (nazev, chip, cena, cenaText, sesil, dosah, trvani, popis, x) => Object.assign({
+      id: 'k_' + this.norm(nazev).replace(/[^a-z]+/g, '_'), nazev: nazev, chip: chip, cena: cena, cenaText: cenaText,
+      sesil: sesil, dosah: dosah, trvani: trvani, popis: popis, rez: false, efekt: false
+    }, x || {});
+    return [
+      k('Paměť noci', '5 magů', 5, '5 magů za prozkoumání 10 sáhů čtverečních', '3 kola + 1 kolo za každých 10 sáhů', 'podle dodané magenergie, max. 50 sáhů', 'hodina nebo do vzdálenosti 1 míle', 'Musí být vidět do oblasti a v místnosti aspoň šero. Šance na odhalení skrytého cíle je 50 % + 2 % za úroveň Warlocka, nemrtvé ukáže vždy. Warlock určí, jestli hledá objekty, nebo bytosti.'),
+      k('Půlnoční zrak', '6 magů/den', 6, '6 magů na den', '2 kola', '1 tvor, dotyk', '1 den', 'Cíl vidí ve tmě černobíle na 15 sáhů, v magické tmě na 30 sáhů. Za každé 2 magy v předmětu či osobě je 1 % šance spatřit magenergii. Při prudké změně osvětlení −2 ÚČ a −2 OČ na 5 kol.', { rez: true, efekt: true }),
+      k('Stínová zeď', '2 magy/sáh', 2, '2 magy za sáh délky a výšky', '1 kolo za každých 5 sáhů', '1–30 sáhů', '1k4 směn', 'Poloprůsvitná zeď jako pevná překážka. Každý sáh má 30 životů, OČ zdi je 7. Jako cesta unese 3 000 mincí na sáh.'),
+      k('Stínová zbroj', 'od 4 magů', 4, 'dle dodané magenergie (4 magy = +1 OČ, 8 = +2, 12 = +3, 16 = +4, 20 = +5)', '1 kolo', 'dotek, 1 tvor', '1 až x směn', 'Zvýší OČ proti fyzickým útokům. Magické útoky, které cíl zasáhnou, působí o 30 % slaběji, včetně pozitivních (léčení, rychlost).', { efekt: true }),
+      k('Temná ektoplazma', '3 magy', 3, '3 za první cíl, 2 za další', '1 kolo', '15 sáhů, 1–3 tvorové', '1 mag za kolo, max. 5 kol', 'Zraňuje cíl za 1k6+3 životů každé kolo a obchází magické bariéry. Při zranění za 1/3 max. životů nastane dodatečný efekt ektoplazmy.'),
+      k('Lože ostnů', '2 magy/sáh', 2, '2 magy za sáh', '1 kolo', 'dotyk, 1–20 sáhů čtverečních', '4 kola', 'Stínové hroty zraní za 1k6+2 na chodidlech (past Obr −7). Zraněný se příští kolo nemůže hýbat. Ostny nejsou vidět, dokud někdo nešlápne na hex.'),
+      k('Černý provaz', 'podle cíle', null, '2× životaschopnost cíle', '1 kolo', '16 sáhů, 1 cíl', '2k6 kol + ½ úrovně', 'Stínové provazy bleskurychle znehybní cíl (past Roz, Sil −6). Svázaný nemůže útočit, kouzlí s postihem 30 %, brání se s −6.'),
+      k('Rošáda', '12 magů', 12, '12 magů', '1 kolo', '1–40 sáhů, 1 stín + 1 osoba', 'ihned', 'Warlock si vymění pozici s jedním ze svých stínových výtvorů. Musí na něj vidět. Šance, že při přesunu polapí ⅓ magů použitých na stín: 30 % + 1 % za úroveň.'),
+      k('Stínovka', '10 magů', 10, '10 magů', '5 kol', '600 sáhů, 1 stínovka', '4 hodiny', 'Stínový přízrak, který slouží jako špeh. Warlock se musí soustředit a jeho zrak nahradí zrak Stínovky. Je takřka neviditelná, zničí ji zlomení kouzla nebo útočné kouzlo.', { efekt: true }),
+      k('Stínový válečník', '10 magů', 10, '10 magů', '1 kolo', '8 sáhů, 1 válečník', '3 směny', 'Částečně hmotný stín schopný boje zblízka, 3 akce na kolo, dosah útoku 1. Obyčejné fyzické zranění mu ubírá 1/4, denní světlo ho zraňuje za 1k10 za kolo.', { efekt: true }),
+      k('Stínový střelec', '10 magů', 10, '10 magů (rezerva)', '1 kolo za střelce', '8 sáhů, 1–3 střelci', '3 hodiny', 'Nehybná postava s dostřelem 10/20/30 a viděním 360°, 2 akce na kolo. Útok past Obr −8, zranění 1k10+1 stínové.', { rez: true, efekt: true }),
+      k('Zuby noci', '6 magů', 6, '6 za první, 4 za další, max. 4 zuby', '1 kolo + 1 kolo seslání', '40 sáhů, 1–4 cíle', '2 směny, nebo do seslání', 'Přízračné bestie zraňují za 4k6+8 životů. Zbroj snižuje zranění v rozsahu své kvality. Při napadení jednoho cíle 4 zuby je 16 % šance na další 3k6.'),
+      k('Bestie', '8 magů', 8, '8 magů', '2 kola', '45 sáhů, 1 cíl', '1k6 + 4 kola', 'Stínový parazit sužuje cíl iluzí odpudivého tvora (past Roz, Int −8). Každé kolo 25 % šance na ztrátu iniciativy, −2 na útok i obranu, šance na seslání kouzel o 40 % nižší.'),
+      k('Černá liška', '17 magů', 17, '17 magů', '2 kola', '12 sáhů, 1–4 cíle', 'ihned', 'Stínový plamen, který přeskakuje až na 4 cíle (60 %): 3k6+4, 2k6+3, 1k6+2, 1k4+10. Léčí se jen magicky, magickým tvorům způsobuje neregenerovatelné zranění.'),
+      k('Vysátí magie', 'podle cíle', null, 'podle dodané magenergie', '1 kolo', '30 sáhů, 1 cíl', 'ihned, 1× denně', 'Za každé 2 magy použité na seslání získá Warlock 4 magy z cíle (nejvýše své maximum). Šance na seslání 100 %, cíl hází past Roz, Int −6.'),
+      k('Podrobení duše', 'rezerva ⅕', null, 'vzorec, rezerva ⅕ magů potřebných k podrobení', '4 kola + 1 za rozdíl úrovní', '2 sáhy, 1 magický tvor', '3k10 dní', 'Podrobí si magického tvora včetně nemrtvých (past Roz, Cha −7). Naráz lze mít podrobeného 1 společníka za každých 6 úrovní.', { rez: true })
+    ];
+  }
+
+  schopnostiWarlock() {
+    return [
+      { id: 'sch_zarik', nazev: 'Zaříkávač', od: 6, popis: 'Při kouzlení získává Warlock bonus k iniciativě podobně jako kouzelník: 6.–10. úroveň +2, 10.–15. úroveň +3, 16.–21. úroveň +4, 22.–27. úroveň +5, 28.–31. úroveň +6, 32.–36. úroveň +7.' },
+      { id: 'sch_choc', nazev: 'Ochočování magických tvorů', od: 8, popis: 'Magické bytosti s Inteligencí 10 a menší jsou ochočitelné nebo přesvědčitelné podobně jako u hraničáře (nesmí být pod nadvládou někoho jiného). Za každých 8 úrovní může mít Warlock u sebe 1 ochočeného tvora. Jeho úroveň nesmí být vyšší o více než 2 úrovně. Od 20. úrovně +1 k ochočování, od 25. +2 (max. Int cíle 13), od 35. +3 (max. Int cíle 16).' },
+      { id: 'sch_mysl', nazev: 'Nelidská mysl', od: 10, popis: 'V hodu proti pasti na inteligenci si Warlock přičítá bonus podle úrovně: od 10. úrovně +2, od 20. úrovně +3.' },
+      { id: 'sch_pakt', nazev: 'Pakt', od: 12, popis: 'Vztah mezi Warlockem a jeho knihou je tak silný, že všichni zakletí démoni v předmětech, které má při sobě, ho nechtějí opustit. Magické předměty s omezenou trvanlivostí vydrží Warlockovi 2× déle.' },
+      { id: 'sch_zivamagie', nazev: 'Živá magie', od: 13, popis: 'Warlock může obětovat 1 mag za 2 životy případného zranění od kouzel, nemrtvých, démonů, lykantropů, magických tvorů a magicky pokřivených jedinců. Rozhoduje PJ.' },
+      { id: 'sch_absorb', nazev: 'Absorbce dovednosti', od: 6, popis: 'Když Warlock zabije protivníka, může se do 3 směn pokusit zachytit část jeho vzpomínek do Daemoniconu. Kniha si dokáže podržet i dvě kouzla, která protivník uměl (náhodně). Základní šance je 30 % + Int Warlocka.' },
+      { id: 'sch_milacek', nazev: 'Miláček noci', od: 16, popis: 'Za každou hodinu strávenou ve tmě Warlockovi přibude 1 mag, až do 10 % jeho maximálních magů.' },
+      { id: 'sch_nocni', nazev: 'Noční tvor', od: 16, popis: 'Inteligentní tvorové magického založení (démoni, někteří nemrtví, lykantropové), kteří mají o 6 úrovní méně než Warlock, se k němu chovají s úctou až bázní. Běžní lidé a ostatní inteligentní bytosti s ním jednají, jako by měl charisma o 2 vyšší.' }
+    ];
+  }
+
+  SKTXT() {
+    return {
+      'Plavání': { ov: 'jednou za směnu', tot: 'Další ověřování bude zapotřebí až za 6 směn.', usp: 'Postava plave bez obtíží.', neusp: 'Postava se začíná topit a v následujícím kole si hází proti pasti, kde se past zvyšuje o 1. Pokud neuspěje, ztrácí dva životy a past se znovu navyšuje o 1.', fat: 'Stejně jako neúspěch, ale počet ztracených životů vzrůstá po 5 (5, 10, 15…).' },
+      'Šplh': { ov: 'jednou za 5 sáhů', tot: 'Postava vylezla bez nutnosti dalšího ověřování.', usp: 'Postava vylezla 5 sáhů.', neusp: 'Postava nevylezla, nebo sklouzla o 5 sáhů.', fat: 'Postava se neudržela a spadla. Zranění dle pravidel.', pozn: 'Týká se šplhu po laně, tyči, stromu apod. Každých 5 sáhů stojí 1 bod únavy a trvá 2 kola.' },
+      'Práce s provazy a lany': { ov: 'každý pokus o přivázání, uchycení něčeho', tot: 'Provaz drží naprosto perfektně a sám se nerozváže, nebude-li si to postava sama přát.', usp: 'Uzly jsou, jak mají být, ale při velkém namáhání mohou povolit.', neusp: 'Uzly jsou tak leda na okrasu a neplní svoji funkci.', fat: 'Postava záhadným způsobem svázala sama sebe, ztratila provaz apod.', pozn: 'Umožňuje používat lasa a sítě k chytání osob či předmětů.' },
+      'Běh na krátké vzdálenosti': { ov: 'v boji 1 za 3 kola, jinak každých 6 kol', tot: '+1 sáh k rychlosti pohybu pro běh a sprint v boji. Mimo boj tolik bodů pohybu, jako by byla pohyblivost o 2 vyšší.', usp: '+1 sáh k rychlosti pohybu pro běh a sprint v boji. Mimo boj jako by byla pohyblivost o 1 vyšší.', neusp: 'Rychlost postavy zůstává nezměněna.', fat: 'Postava upadne a natáhne si nohu. V boji nemůže příští směnu sprintovat, bodů sprintu má jako při pohyblivosti o 2 menší.' },
+      'Mistr zbraně': { ov: 'při každém pokusu o zastrašení, zaujetí apod.', tot: 'Cíl věnuje postavě 100 % pozornosti a reaguje pozitivně podle účelu a okolností.', usp: 'Cíl uznává, že postava je mistrem své zbraně, a není radno se k ní chovat neuctivě.', neusp: 'Zastrašení vyšlo do prázdna.', fat: 'Postava svůj úmysl zcela nezvládla, hrozí upuštění zbraně nebo zranění.', pozn: 'Past Sil −x− Int, úspěch/nic. Na stupni dokonale: +1k ÚČ s tímto druhem zbraně a odstranění postihu −2 k iniciativě u těžkých zbraní.' },
+      'Znalec zbraně': { pozn: 'Umožňuje ovládat zbraň mimo kategorii daného povolání, platí pro jeden druh zbraně. Postih k ÚČ podle stupně: vůbec −6, velmi špatně −5, špatně −4, průměrně −3, dobře −2, velmi dobře −1, dokonale 0.' },
+      'Scholastik': { pozn: 'Při dalším rozdělování profibodů získá postava další body podle stupně: velmi špatně 3, špatně 4, průměrně 6, dobře 8, velmi dobře 9, dokonale 12. Lze se naučit pro všechny vlastnosti, ale pouze jednou.' },
+      'Jízda na koni': { ov: 'každé 3 hodiny při kroku nebo klusu, každou směnu při cvalu nebo trysku', tot: 'Jízda je perfektní, až do konce boje nemusí manévr ověřovat. Mimo boj další ověřování až za dvojnásobnou dobu a jezdec získává poloviční únavu.', usp: 'Manévr se povedl a únavu získává beze změny.', neusp: 'Postava získává 1 bod únavy za každé 2 body únavy zvířete. V boji se manévr nepovedl a celé další kolo se věnuje ovládání zvířete.', fat: 'Zvíře se splašilo, postava spadla a zranila se apod. (PJ)' },
+      'Švindlování při hazardu': { ov: 'každou hru', tot: 'Brilantní tah. Nikdo nemá šanci si všimnout podvodu.', usp: 'Vše prošlo. 10 % šance, že si někdo všimne podvodu.', neusp: 'Švindl se nevyvedl a vyústil v prohru. 35 % šance na provalení podvodu.', fat: '100 % šance na provalení podvodu.', pozn: 'Aby mohla postava podvádět, musí se několika hrami seznámit s pravidly (2–5 her podle složitosti).' },
+      'Ševcovství': { pozn: 'Viz řezbářství a ostatní běžná řemesla.' },
+      'Kopání štol a podkopů': { ov: 'každých 10 sáhů podkopu', tot: 'Stavba trvá polovinu doby v tabulce.', usp: 'Stavba trvá stejnou dobu.', neusp: 'Daný úsek se musí hloubit znovu.', fat: 'Stavba je prozrazena, nebo se zřítila. Je potřeba začít znovu. (PJ)', pozn: 'Skála 30 dní, písek 7 dní, hlína 7 dní.' },
+      'Asketismus': { ov: 'každý den, kdy se postava snaží vydržet o hladu a žízni', tot: 'Postihy z hladovění a nedostatku pocítí až po 3 dnech.', usp: 'Postihy z hladovění a nedostatku pocítí až po 2 dnech.', neusp: 'Postava je sužována dle pravidel.', fat: 'Dehydratace a hladovění způsobují dvojnásobnou únavu.' },
+      'Kachní žaludek': { ov: 's každým jídlem, které postava považuje za nechutné', tot: 'Porci snědla bez nejmenších problémů, místní specialita sklidí obdiv místních.', usp: 'Postava byla schopná jídlo sníst.', neusp: 'Postava se nedokázala donutit jídlo sníst.', fat: 'Vše musí ven. 3 kola dávení a případné ostudy.' },
+      'Zadržování dechu': { ov: 'od 4. kola včetně, s každým dalším kolem se past zvyšuje o 1', tot: 'Příští kolo si postava nehází proti pasti a past se nezvyšuje.', usp: 'Postava se ještě nedusí.', neusp: 'Postava se začíná dusit a musí se nejdéle příští kolo nadechnout.', fat: 'Postava se musela okamžitě nadechnout, dle okolností se začíná topit nebo je otrávena.' },
+      'Koželužnictví': { ov: 'každá kůže', tot: 'Kůže je vyčiněna skvěle, dostane se za ni o 25 % více peněz.', usp: 'Kůže je vyčiněna.', neusp: 'Kůže je vyčiněna mizerně, −50 % z ceny.', fat: 'Kůže je docela zničená, postava má šanci se přiotrávit. (PJ)', pozn: 'Umí vyčinit kůže i kožešiny. Na vyčinění je potřeba aspoň lovecká chata nebo bytelný přístřešek.' },
+      'Umění usnout': { ov: 'každý pokus o usnutí', tot: 'Postava usne i v nepohodlných polohách a probudí se naprosto svěží.', usp: 'Postava spí prakticky okamžitě, za spánek si může odečíst o 1 bod únavy navíc.', neusp: 'Postavě se nedaří usnout.', fat: 'Postava se vystresovala, může to zkusit znovu až za hodinu a získá 1 bod únavy.', pozn: 'Může si smazat 3 body únavy za spánek navíc. Vyspí se plnohodnotně i ve zbroji.' },
+      'Jazyky': { ov: 'jednou za 10 kol nebo při každé otázce', tot: 'Postava až do konce rozhovoru nemusí ověřovat.', usp: 'Postava rozuměla všemu řečenému.', neusp: 'Postava nepochopila obsah sdělení, nebo zkomolila své sdělení.', fat: 'Sdělení bylo pochopeno zcela opačně.', pozn: 'Každá postava umí na začátku svůj rodný jazyk velmi dobře. Past se upravuje dle složitosti hovoru.' },
+      'Čtení a psaní': { ov: 'při každém čtení nebo psaní', tot: 'Postava bezchybně přečte text a objeví všechny pravopisné chyby, nebo text dokonale zapíše.', usp: 'Postava napíše text tak, že bude pochopen, ale neopraví po sobě hrubky.', neusp: 'Postava text nepřečte, nebo ho napíše nečitelně.', fat: 'Postava text poplete tak, že je pochopen zcela špatně.' },
+      'Počítání': { ov: 'každý odhad, výpočet', tot: 'Postava si příští směnu nemusí házet na ověřování.', usp: 'Postava správně spočítala sumu.', neusp: 'Postava se ve výpočtu zmýlila.', fat: 'Postava se ve výpočtu naprosto zmýlila, ale je si výsledkem jistá.' },
+      'Mantry': { ov: 'bez ověřování', pozn: 'Mantry slouží k memorizování již naučených kouzel. Bonus k šanci na seslání podle stupně: velmi špatně 1 %, špatně 2 %, průměrně 4 %, dobře 5 %, velmi dobře 7 %, dokonale 10 %.' },
+      'Posunková řeč': { ov: 'každá otázka, odpověď', tot: 'Postava si příští směnu nemusí házet na ověřování.', usp: 'Postava rozumí.', neusp: 'Postava není schopná pochopit sdělení, nebo jej předat.', fat: 'Postava pochopí, nebo sdělí přesný opak.', pozn: 'Posunková řeč je takřka univerzální: dvě osoby, které ji umí, se dorozumějí i bez společného jazyka.' },
+      'Čtení ze rtů': { ov: 'každá věta', tot: 'Postava rozumí skvěle, dalších 5 minut nemusí ověřovat.', usp: 'Postava rozumí.', neusp: 'Postava nerozumí.', fat: 'Postava rozumí opak toho, co dotyčný řekl.', pozn: 'Pokud postava nezná jazyk odezíraného, je past o 4 vyšší.' },
+      'Boj poslepu': { ov: 'každé kolo boje', tot: 'Nemusí ověřovat příští směnu při boji s tímto jedním protivníkem, postih za boj poslepu nemá.', usp: 'Postava má poloviční postih (zaokrouhleno nahoru).', neusp: 'Postava má stejný postih dle pravidel.', fat: 'Postava svůj postih zvýšila o polovinu.', pozn: 'Nelze použít proti nehmotným protivníkům. Při boji s více protivníky se hází na každého zvlášť.' },
+      'Prospektor, mineralog': { ov: 'každých 5 sáhů tunelu, každý pokus o rozpoznání minerálu', tot: 'Dalších 10 sáhů tunelu nemusí ověřovat, přesně pozná a nacení všechny minerály.', usp: 'Postava navrhla 5 sáhů tunelu a poznala jeden konkrétní minerál.', neusp: 'Postava neodhadla situaci a 5 sáhů tunelu se zřítilo, minerál nepoznala.', fat: 'Došlo k závalu, který poškodí minimálně dalších 5 sáhů tunelů. Hrozí zavalení osob.' },
+      'Ovládání velkých jezdeckých nestvůr': { ov: 'každé 3 hodiny při kroku či klusu, každých 10 kol při cvalu nebo trysku', tot: 'Zvíře dělá přesně to, co má. Při dalším ověřování +2 k hodu.', usp: 'Zvíře dělá to, co má.', neusp: 'Zvíře neposlouchá a dělá to, co je pro něj výhodné.', fat: 'Zvíře dělá přesný opak, může na jezdce zaútočit, shodit ho apod.' },
+      'Vznešenost elfů': { pozn: 'Postava působí sebevědomě a přesvědčivě. V hodu proti pasti na charisma může uplatnit tuto dovednost a navýšit výsledek hodu o 1.' },
+      'Imitace humanoidních hlasů': { ov: 'jednou za větu/slovo', tot: 'Hlas zní, jako by jím mluvil jeho majitel, je k nerozeznání.', usp: 'Osoby, které dotyčného znají, hází na past Int −11−, jestli poznají, že nejde o něj.', neusp: 'Hlas zní podobně, ale pokus selhal. Každý, kdo dotyčného aspoň jednou slyšel, pozná podvrh.', fat: 'Z postavy vyšel jen chrchlavý zvuk, hlasivky bolí. Příští směnu nemůže napodobovat.', pozn: 'Dá se kombinovat s břichomluvectvím.' },
+      'Břichomluvectví': { ov: 'každá věta, nebo jednou za směnu', tot: 'Postava naprosto obelstí posluchače. Při dalším hodu na past +2.', usp: 'Ostatní si myslí, že mluví někdo jiný.', neusp: 'Posluchači poznali, že zvuky vydává postava.', fat: 'Postava se zakuckala a po dobu 3 směn se nemůže znovu pokusit.', pozn: 'Při zpěvu se past zvyšuje o 2.' }
+    };
+  }
+
+  dovednostiRonan() {
+    const s = (id, a, nazev, k, ob, st, body, uc) => ({ id: id, a: a, nazev: nazev, k: k, ob: ob, st: st, body: body, uc: uc });
+    return [
+      s('d1', 'sil', 'Plavání', 'Plavání', 2, 4, 38, true),
+      s('d2', 'sil', 'Šplh', 'Šplh', 1, 4, 23, true),
+      s('d3', 'sil', 'Práce s provazy a lany', 'Práce s provazy a lany', 2, 4, 38, true),
+      s('d4', 'sil', 'Běh na krátké vzdálenosti', 'Běh na krátké vzdálenosti', 2, 4, 38, true),
+      s('d5', 'sil', 'Mistr zbraně', 'Mistr zbraně', 3, 2, 29, false),
+      s('d6', 'sil', 'Znalec zbraně – střelné', 'Znalec zbraně', 1, 6, 24, true),
+      s('d7', 'sil', 'Scholastik', 'Scholastik', 1, 4, 23, true),
+      s('d8', 'obr', 'Jízda na koni', 'Jízda na koni', 1, 4, 30, false),
+      s('d9', 'obr', 'Švindlování při hazardu', 'Švindlování při hazardu', 3, 3, 43, false),
+      s('d10', 'obr', 'Ševcovství', 'Ševcovství', 2, 5, 57, true),
+      s('d11', 'obr', 'Kopání štol a podkopů', 'Kopání štol a podkopů', 3, 3, 32, true),
+      s('d12', 'obr', 'Znalec zbraně – střední', 'Znalec zbraně', 1, 6, 24, true),
+      s('d13', 'obr', 'Scholastik', 'Scholastik', 1, 4, 23, true),
+      s('d14', 'odl', 'Asketismus', 'Asketismus', 3, 3, 32, true),
+      s('d15', 'odl', 'Kachní žaludek', 'Kachní žaludek', 1, 3, 14, true),
+      s('d16', 'odl', 'Zadržování dechu', 'Zadržování dechu', 3, 2, 21, false),
+      s('d17', 'odl', 'Koželužnictví', 'Koželužnictví', 1, 6, 48, true),
+      s('d18', 'odl', 'Umění usnout', 'Umění usnout', 1, 3, 18, false),
+      s('d19', 'odl', 'Scholastik', 'Scholastik', 1, 4, 23, true),
+      s('d20', 'int', 'Jazyky – Obecná mluva', 'Jazyky', 3, 5, 0, true),
+      s('d21', 'int', 'Jazyky – Quenia (elfština)', 'Jazyky', 3, 5, 0, true),
+      s('d22', 'int', 'Čtení a psaní – Tengwar (elfské)', 'Čtení a psaní', 2, 3, 23, true),
+      s('d23', 'int', 'Čtení a psaní – běžný jazyk', 'Čtení a psaní', 2, 3, 23, true),
+      s('d24', 'int', 'Počítání', 'Počítání', 2, 3, 23, true),
+      s('d25', 'int', 'Mantry', 'Mantry', 3, 3, 32, true),
+      s('d26', 'int', 'Posunková řeč', 'Posunková řeč', 2, 3, 23, true),
+      s('d27', 'int', 'Čtení ze rtů', 'Čtení ze rtů', 3, 3, 32, true),
+      s('d28', 'int', 'Boj poslepu', 'Boj poslepu', 3, 3, 32, true),
+      s('d29', 'int', 'Důlní značky', 'Důlní značky', 1, 3, 14, true),
+      s('d30', 'int', 'Prospektor, mineralog', 'Prospektor, mineralog', 3, 3, 32, true),
+      s('d31', 'int', 'Scholastik', 'Scholastik', 1, 4, 23, true),
+      s('d32', 'cha', 'Ovládání velkých jezdeckých nestvůr', 'Ovládání velkých jezdeckých nestvůr', 2, 3, 30, false),
+      s('d33', 'cha', 'Vznešenost elfů', 'Vznešenost elfů', 3, 4, 53, true),
+      s('d34', 'cha', 'Imitace humanoidních hlasů', 'Imitace humanoidních hlasů', 3, 4, 53, true),
+      s('d35', 'cha', 'Břichomluvectví', 'Břichomluvectví', 3, 4, 53, true),
+      s('d36', 'cha', 'Scholastik', 'Scholastik', 1, 4, 23, true)
+    ];
+  }
+
+  KATALOG() {
+    return [
+      { k: 'k1', nazev: 'Dýka', typ: 'zbran', vaha: 5, sz: 2, ut: 0, oz: -2, delka: '1', cena: '1 st' },
+      { k: 'k2', nazev: 'Krátký meč', typ: 'zbran', vaha: 20, sz: 4, ut: -1, oz: -1, delka: '1', cena: '16 st' },
+      { k: 'k3', nazev: 'Široký meč', typ: 'zbran', vaha: 30, sz: 5, ut: 0, oz: 0, delka: '1', cena: '30 st' },
+      { k: 'k4', nazev: 'Dlouhý meč', typ: 'zbran', vaha: 45, sz: 7, ut: -1, oz: 0, delka: '1–2', cena: '75 st' },
+      { k: 'k5', nazev: 'Kopí', typ: 'zbran', vaha: 45, sz: 5, ut: 0, oz: 1, delka: '1–2', cena: '8 st' },
+      { k: 'k6', nazev: 'Válečná sekera', typ: 'zbran', vaha: 60, sz: 4, ut: 4, oz: -1, delka: '1–2', cena: '30 st' },
+      { k: 'k7', nazev: 'Dlouhý luk', typ: 'strelna', vaha: 25, sz: 5, ut: 1, dostrely: [15, 30, 50], cena: '50 st' },
+      { k: 'k8', nazev: 'Lehká kuše', typ: 'strelna', vaha: 35, sz: 4, ut: 1, dostrely: [15, 27, 40], cena: '45 st' },
+      { k: 'k9', nazev: 'Štít', typ: 'stit', vahaV: { A: 35, B: 50, C: 60 }, kz: 1, cenaV: { A: '4 zl', B: '5 zl', C: '6 zl' } },
+      { k: 'k10', nazev: 'Kožená zbroj', typ: 'zbroj', vahaV: { A: 55, B: 80, C: 100 }, kz: 3, kzTyp: 'kozena', cenaV: { A: '16 zl', B: '20 zl', C: '24 zl' } },
+      { k: 'k11', nazev: 'Kroužková zbroj', typ: 'zbroj', vahaV: { A: 250, B: 350, C: 420 }, kz: 5, kzTyp: 'krouzkova', cenaV: { A: '240 zl', B: '300 zl', C: '340 zl' } },
+      { k: 'k12', nazev: 'Plátová zbroj', typ: 'zbroj', vahaV: { A: 280, B: 400, C: 480 }, kz: 6, kzTyp: 'platova', cenaV: { A: '280 zl', B: '350 zl', C: '400 zl' } },
+      { k: 'k13', nazev: 'Pochodeň', typ: 'vybava', vaha: 10, cena: '7 md' },
+      { k: 'k14', nazev: 'Měch na vodu (prázdný)', typ: 'vybava', vaha: 5, cena: '1,50 st' },
+      { k: 'k15', nazev: 'Flakónek (0,1 l)', typ: 'vybava', vaha: 3, cena: '50 md' },
+      { k: 'k16', nazev: 'Lucerna obyčejná', typ: 'vybava', vaha: 26, cena: '50 md' },
+      { k: 'k17', nazev: 'Plášť zimní normální', typ: 'plast', vaha: 60, cena: '6 st' },
+      { k: 'k18', nazev: 'Elixír Démonní krve', typ: 'lektvar', vaha: 5, efekt: 'elixir', cena: '45 zl' }
+    ];
+  }
+
+  /* ---------- odvozené hodnoty ---------- */
+  derive(c) {
+    const mods = { hpPct: 0, mpPct: 0, sil: 0, obr: 0, odl: 0, int: 0, cha: 0 };
+    let rez = 0;
+    c.efekty.forEach(e => {
+      if (e.mods) Object.keys(e.mods).forEach(k => { mods[k] = (mods[k] || 0) + e.mods[k]; });
+      if (e.rez) rez += e.rez;
+    });
+    const vlNow = {};
+    ['sil', 'obr', 'odl', 'int', 'cha'].forEach(k => { vlNow[k] = Math.max(k === 'int' ? 2 : 1, c.vl[k] + (mods[k] || 0)); });
+    const bBase = {}, b = {};
+    Object.keys(c.vl).forEach(k => { bBase[k] = this.bon(c.vl[k]); b[k] = this.bon(vlNow[k]); });
+    const odl = vlNow.odl;
+    const f = this.stupenUnavy(c, odl);
+    const pu = { sil: [0, 1, 2, 3, 3][f], obr: [0, 1, 2, 3, 3][f], int: [0, 0, 2, 4, 4][f], cha: [0, 0, 0, 2, 2][f] };
+    const e = { sil: b.sil - pu.sil, obr: b.obr - pu.obr, odl: b.odl, int: b.int - pu.int, cha: b.cha - pu.cha };
+    const at = id => c.items.find(i => i.slot === id) || null;
+    const zbroj = at('zbroj'), stit = at('stit');
+    const zbrane = ['zbran1', 'zbran2', 'zbran3', 'zbran4'].map(at).filter(Boolean);
+    const strelne = ['strelna1', 'strelna2'].map(at).filter(Boolean);
+    const kz = (zbroj ? zbroj.kz : 1) + (stit ? stit.kz : 0);
+    let total = 0, missing = 0;
+    c.kontejnery.forEach(k => { total += k.vlastni || 0; });
+    c.items.forEach(i => { if (i.vaha == null) { missing += 1; } else { total += i.vaha * i.ks; } });
+    const coins = c.penize.zl + c.penize.st + c.penize.md;
+    total += coins;
+    const nos = 360 + 30 * b.sil;
+    const ratio = total / nos;
+    const band = ratio <= 1 ? 0 : (ratio <= 2 ? 1 : (ratio <= 3 ? 2 : (ratio <= 4 ? 3 : 4)));
+    const pohyb = Math.round(c.pohybZaklad * [1, 0.75, 0.5, 0.25, 0][band]);
+    const hpMaxNow = Math.round(c.hpMax * (1 + mods.hpPct / 100));
+    const mpMaxNow = Math.round(c.mpMax * (1 + mods.mpPct / 100));
+    const mpCap = Math.max(0, mpMaxNow - rez);
+    const lowHp = hpMaxNow > 0 && c.hp < hpMaxNow / 3;
+    const penHp = lowHp ? (odl <= 5 ? 3 : (odl <= 11 ? 2 : (odl <= 16 ? 1 : 0))) : 0;
+    const penLoad = band >= 3 ? 1 : 0;
+    const pen = penHp + penLoad;
+    const div = odl <= 5 ? 4 : (odl <= 11 ? 6 : (odl <= 16 ? 8 : 0));
+    const mez = odl >= 17 ? 1 : Math.max(1, Math.floor(hpMaxNow / div));
+    const ocBase = Math.max(0, kz + bBase.obr);
+    const oc = Math.max(0, kz + e.obr - pen);
+    const WSL = this.ZBRANE_SLOTY();
+    const aId = (WSL.indexOf(c.aktivni) >= 0 && at(c.aktivni)) ? c.aktivni : (WSL.find(id => at(id)) || null);
+    const wa = aId ? at(aId) : null;
+    const ranged = !!wa && wa.typ === 'strelna';
+    const ak = ranged ? 'obr' : 'sil';
+    const ucBase = wa ? Math.max(0, wa.sz + bBase[ak]) : null;
+    const uc = wa ? Math.max(0, wa.sz + e[ak] - pen) : null;
+    const oz = wa && !ranged ? wa.oz : 0;
+    const ocW = Math.max(0, oc + oz), ocWBase = Math.max(0, ocBase + oz);
+    const mantry = c.dovednosti.find(d => d.k === 'Mantry');
+    const mantryBonus = mantry ? [0, 1, 2, 4, 5, 7, 10][mantry.st] : 0;
+    const sance = Math.min(100, c.sanceZaklad + mantryBonus);
+    return { vlNow: vlNow, bBase: bBase, b: b, e: e, f: f, odl: odl, kz: kz, zbroj: zbroj, stit: stit, zbrane: zbrane, strelne: strelne, wa: wa, aId: aId, ranged: ranged, ocW: ocW, ocWBase: ocWBase, total: total, coins: coins, missing: missing, nos: nos, band: band, pohyb: pohyb, hpMaxNow: hpMaxNow, mpMaxNow: mpMaxNow, rez: rez, mpCap: mpCap, lowHp: lowHp, penHp: penHp, penLoad: penLoad, pen: pen, mez: mez, ocBase: ocBase, oc: oc, ucBase: ucBase, uc: uc, mantryBonus: mantryBonus, sance: sance, mods: mods };
+  }
+
+  ZBRANE_SLOTY() { return ['zbran1', 'zbran2', 'zbran3', 'zbran4', 'strelna1', 'strelna2']; }
+  /* rozpis bonusu vlastnosti: základ, aktivní efekt, únava */
+  bonTxt(dv, k) {
+    const ef = dv.b[k] - dv.bBase[k], un = dv.b[k] - dv.e[k];
+    return this.fmt(dv.bBase[k]) + (ef ? ' ' + this.fmt(ef) + ' (aktivní efekt)' : '') + (un ? ' −' + un + ' (únava)' : '');
+  }
+  penTxt2(dv) {
+    return (dv.penHp ? ' −' + dv.penHp + ' (málo životů)' : '') + (dv.penLoad ? ' −1 (velké naložení)' : '');
+  }
+  ucBreakdown(dv, w, ranged) {
+    const k = ranged ? 'obr' : 'sil';
+    const raw = w.sz + dv.e[k] - dv.pen;
+    return 'ÚČ ' + w.nazev + ' (' + (ranged ? 'na dálku' : 'na blízko') + ') = SZ ' + w.sz + ' + bonus ' + (ranged ? 'Obr ' : 'Sil ') + this.bonTxt(dv, k) + this.penTxt2(dv) + ' = ' + Math.max(0, raw) + (raw < 0 ? ' (nikdy méně než 0)' : '');
+  }
+  ocBreakdown(dv) {
+    const raw = dv.kz + dv.e.obr - dv.pen;
+    const w = dv.wa && !dv.ranged ? dv.wa : null;
+    return 'OČ = KZ ' + dv.kz + (dv.stit ? ' (zbroj ' + (dv.zbroj ? dv.zbroj.kz : 1) + ' + štít ' + dv.stit.kz + ')' : '') + ' + bonus Obr ' + this.bonTxt(dv, 'obr') + this.penTxt2(dv) + ' = ' + Math.max(0, raw) + (raw < 0 ? ' (nikdy méně než 0)' : '') + (w ? '. S aktivní zbraní ' + w.nazev + ': + OZ ' + this.fmt(w.oz) + ' = ' + dv.ocW : '');
+  }
+  vyberZbran(slotId) {
+    const c = this.state.c;
+    const it = c.items.find(i => i.slot === slotId);
+    if (!it || this.ZBRANE_SLOTY().indexOf(slotId) < 0) return;
+    const dv = this.derive(Object.assign({}, c, { aktivni: slotId }));
+    this.upd(cc => Object.assign({}, cc, { aktivni: slotId }));
+    this.say('Aktivní zbraň: ' + it.nazev + ' (' + (it.typ === 'strelna' ? 'na dálku' : 'na blízko') + '), ÚČ ' + dv.uc + ', OČ ' + dv.ocW + '.');
+  }
+  dalsiZbran() {
+    const c = this.state.c, dv = this.derive(c);
+    const ids = this.ZBRANE_SLOTY().filter(id => c.items.some(i => i.slot === id));
+    if (ids.length < 2) return;
+    this.vyberZbran(ids[(ids.indexOf(dv.aId) + 1) % ids.length]);
+  }
+
+  /* ---------- sloty a předměty ---------- */
+  vahaPol(i) { return (i.vaha || 0) * i.ks; }
+  volno(c, kid, ignoreId) {
+    const k = c.kontejnery.find(x => x.id === kid);
+    if (!k || k.kap == null) return 1e9;
+    const used = c.items.filter(i => i.kde === kid && i.id !== ignoreId).reduce((a, i) => a + this.vahaPol(i), 0);
+    return k.kap - used;
+  }
+  equipProblem(c, item, slotId) {
+    const sd = this.allSlots(c).find(s => s.id === slotId);
+    if (!sd || sd.types.indexOf(item.typ) < 0) return 'Tenhle předmět se do slotu „' + (sd ? sd.label : '') + '“ nehodí.';
+    if (c.zamky[slotId]) return c.zamky[slotId];
+    if (item.typ === 'zbroj' && c.zbrojTypy && c.zbrojTypy.indexOf(item.kzTyp) < 0) return c.zbrojText;
+    return '';
+  }
+  slotsVisible(c) { return this.DOLL().filter(s => !s.only || s.only === c.povolani); }
+
+  equip(itemId, slotId) {
+    const c = this.state.c;
+    const item = c.items.find(i => i.id === itemId);
+    if (!item) return;
+    const cands = this.allSlots(c).filter(x => x.types.indexOf(item.typ) >= 0 && (!x.only || x.only === c.povolani)).map(x => x.id);
+    if (!cands.length) { this.say('„' + item.nazev + '“ se obléct nedá, patří do vaku.'); return; }
+    let target = slotId;
+    if (!target) {
+      const free = cands.filter(id => !c.zamky[id]);
+      target = free.find(id => !c.items.some(i => i.slot === id)) || free[0] || cands[0];
+    }
+    const prob = this.equipProblem(c, item, target);
+    if (prob) { this.say(prob); return; }
+    const old = c.items.find(i => i.slot === target && i.id !== item.id) || null;
+    let dest = null;
+    if (old) {
+      const tryIds = [item.kde].concat(c.kontejnery.map(k => k.id)).filter(id => id !== 'telo');
+      dest = tryIds.find(id => this.volno(c, id, item.id) >= this.vahaPol(old)) || null;
+      if (!dest) { this.say('Dosavadní „' + old.nazev + '“ se nikam nevejde. Nejdřív uvolni místo ve vaku.'); return; }
+    }
+    const sd = this.allSlots(c).find(x => x.id === target);
+    this.upd(cc => Object.assign({}, cc, {
+      items: cc.items.map(i => i.id === item.id ? Object.assign({}, i, { slot: target, kde: 'telo' }) : (old && i.id === old.id ? Object.assign({}, i, { slot: null, kde: dest }) : i))
+    }), { selItem: item.id, selSlot: null });
+    this.say(c.jmeno + ': ' + item.nazev + ' → ' + sd.label.toLowerCase() + (old ? ' (místo „' + old.nazev + '“)' : '') + '.');
+  }
+  unequip(itemId) {
+    const c = this.state.c;
+    const item = c.items.find(i => i.id === itemId);
+    if (!item) return;
+    const dest = c.kontejnery.map(k => k.id).filter(id => id !== 'telo').find(id => this.volno(c, id, item.id) >= this.vahaPol(item));
+    if (!dest) { this.say('„' + item.nazev + '“ se nikam nevejde. Uvolni místo ve vaku.'); return; }
+    const k = c.kontejnery.find(x => x.id === dest);
+    this.upd(cc => Object.assign({}, cc, { items: cc.items.map(i => i.id === item.id ? Object.assign({}, i, { slot: null, kde: dest }) : i) }), { selSlot: null });
+    this.say(c.jmeno + ': ' + item.nazev + ' → ' + k.nazev.toLowerCase() + '.');
+  }
+  presun(itemId, kid) {
+    const c = this.state.c;
+    const item = c.items.find(i => i.id === itemId);
+    const k = c.kontejnery.find(x => x.id === kid);
+    if (!item || !k) return;
+    const w = this.vahaPol(item), free = this.volno(c, kid, item.id);
+    if (free < w) { this.say('Do „' + k.nazev + '“ se nevejde: zbývá ' + this.num(Math.max(0, free)) + ' mn, potřebuješ ' + this.num(w) + ' mn.'); return; }
+    this.upd(cc => Object.assign({}, cc, { items: cc.items.map(i => i.id === item.id ? Object.assign({}, i, { slot: null, kde: kid }) : i) }));
+    this.say(item.nazev + ' → ' + k.nazev.toLowerCase() + '.');
+  }
+  vypit(itemId) {
+    const c = this.state.c;
+    const item = c.items.find(i => i.id === itemId);
+    if (!item || item.typ !== 'lektvar') return;
+    const patch = {};
+    let msg = '';
+    if (item.efekt === 'elixir') {
+      if (c.efekty.some(e => e.nazev === 'Elixír Démonní krve')) { this.say('Elixír už působí. Další dávka dřív než za 7 dní způsobí prudkou otravu.'); return; }
+      patch.efekty = c.efekty.concat([{ id: 'e' + (++this._n), nazev: 'Elixír Démonní krve', typ: 'buff', zbyva: 'zbývají 2 směny', mods: { hpPct: 30, mpPct: 30, sil: 2, obr: 2, int: -3, cha: -12 } }]);
+      msg = c.jmeno + ' vypíjí Elixír Démonní krve: +30 % životy a magy, +2 Sil a Obr, −3 Int, −12 Cha na 2 směny.';
+    } else {
+      msg = 'Účinek lektvaru „' + item.nazev + '“ zatím není v datech.';
+    }
+    this.upd(cc => Object.assign({}, cc, patch, {
+      items: item.ks > 1 ? cc.items.map(i => i.id === item.id ? Object.assign({}, i, { ks: i.ks - 1 }) : i) : cc.items.filter(i => i.id !== item.id)
+    }), { selItem: item.ks > 1 ? item.id : null });
+    this.say(msg);
+  }
+  pridej(kid) {
+    const c = this.state.c;
+    const k = this.KATALOG().find(x => x.k === kid);
+    if (!k) return;
+    const vaha = k.vahaV ? k.vahaV[c.velikost] : k.vaha;
+    let dest = c.kontejnery.map(x => x.id).filter(id => id !== 'telo').find(id => this.volno(c, id, null) >= (vaha || 0));
+    const naTele = !dest;
+    if (naTele) dest = 'telo';
+    const kont = c.kontejnery.find(x => x.id === dest);
+    const stack = (k.typ === 'vybava' || k.typ === 'lektvar') ? c.items.find(i => i.nazev === k.nazev && i.kde === dest && !i.slot) : null;
+    if (stack) {
+      this.upd(cc => Object.assign({}, cc, { items: cc.items.map(i => i.id === stack.id ? Object.assign({}, i, { ks: i.ks + 1 }) : i) }));
+    } else {
+      const nov = Object.assign({ id: 'n' + (++this._n), nazev: k.nazev, typ: k.typ, vaha: vaha == null ? null : vaha, ks: 1, kde: dest, slot: null, img: null, cena: k.cenaV ? k.cenaV[c.velikost] : k.cena }, {
+        sz: k.sz, ut: k.ut, oz: k.oz, delka: k.delka, dostrely: k.dostrely, kz: k.kz, kzTyp: k.kzTyp, efekt: k.efekt
+      });
+      this.upd(cc => Object.assign({}, cc, { items: cc.items.concat([nov]) }), { selItem: nov.id });
+    }
+    this.say(naTele ? '„' + k.nazev + '“: nevešlo se do žádného vaku, nosíš to u sebe.' : k.nazev + ' → ' + kont.nazev.toLowerCase() + '.');
+  }
+  zmen(pole, d) {
+    const c = this.state.c, dv = this.derive(c);
+    const max = pole === 'hp' ? dv.hpMaxNow : (pole === 'mp' ? dv.mpCap : dv.odl * 5);
+    const v = Math.max(0, Math.min(max, c[pole] + d));
+    if (v === c[pole]) return;
+    this.upd(cc => Object.assign({}, cc, { [pole]: v }));
+  }
+  zmenPenize(m, d) {
+    this.upd(cc => Object.assign({}, cc, { penize: Object.assign({}, cc.penize, { [m]: Math.max(0, cc.penize[m] + d) }) }));
+  }
+  odeberEfekt(id) {
+    const c = this.state.c;
+    const rest = c.efekty.filter(e => e.id !== id);
+    const dv = this.derive(Object.assign({}, c, { efekty: rest }));
+    this.upd(cc => Object.assign({}, cc, { efekty: rest, hp: Math.min(cc.hp, dv.hpMaxNow), mp: Math.min(cc.mp, dv.mpCap) }));
+  }
+  seslat(sp) {
+    const c = this.state.c, dv = this.derive(c);
+    if (dv.f >= 2) { this.say(c.jmeno + ' je ' + this.UNAVA()[dv.f] + ' a nesmí sesílat kouzla.'); return; }
+    if (sp.cena == null) { this.say('Cena kouzla „' + sp.nazev + '“ závisí na cíli. Odečti magy ručně u měřidla.'); return; }
+    if (c.mp < sp.cena) { this.say('Chybí magy: ' + sp.nazev + ' stojí ' + this.plural(sp.cena, ['mag', 'magy', 'magů']) + ', máš ' + c.mp + '.'); return; }
+    const novy = sp.efekt ? { id: 'e' + (++this._n), nazev: sp.nazev, typ: 'buff', zbyva: 'trvání: ' + sp.trvani, rez: sp.rez ? sp.cena : 0 } : null;
+    this.upd(cc => Object.assign({}, cc, {
+      mp: cc.mp - sp.cena,
+      efekty: novy ? cc.efekty.filter(e => e.nazev !== sp.nazev).concat([novy]) : cc.efekty
+    }));
+    this.say(c.jmeno + ' sesílá ' + sp.nazev + ': −' + this.plural(sp.cena, ['mag', 'magy', 'magů']) + (sp.rez ? ', magy jsou v rezervě, dokud kouzlo trvá' : '') + '.');
+  }
+  klikSlot(slotId) {
+    const s = this.state, c = s.c;
+    const zam = c.zamky[slotId];
+    if (zam) { this.say(zam); return; }
+    const it = c.items.find(i => i.slot === slotId);
+    if (it) { this.setState({ selItem: s.selItem === it.id ? null : it.id, selSlot: null }); return; }
+    const sel = s.selItem ? c.items.find(i => i.id === s.selItem) : null;
+    if (sel && !this.equipProblem(c, sel, slotId)) { this.equip(sel.id, slotId); return; }
+    if (s.selSlot === slotId) { this.setState({ selSlot: null }); return; }
+    const sd = this.allSlots(c).find(x => x.id === slotId);
+    const hasAny = c.items.some(i => !i.slot && sd.types.indexOf(i.typ) >= 0);
+    this.setState({ selSlot: slotId, selItem: null, tab: 'inventar', invTyp: 'vse', invQ: '' });
+    if (!hasAny) this.say('V inventáři nemáš nic, co se do slotu „' + sd.label + '“ hodí. Přidej předmět z katalogu.');
+  }
+  klikPolozka(itemId) {
+    const s = this.state, c = s.c;
+    const item = c.items.find(i => i.id === itemId);
+    if (!item) return;
+    if (s.selSlot && !this.equipProblem(c, item, s.selSlot)) { this.equip(itemId, s.selSlot); return; }
+    this.setState({ selItem: s.selItem === itemId ? null : itemId });
+  }
+  addRing() {
+    const c = this.state.c;
+    if (c.prstenu >= 20) { this.say('Víc než 20 slotů na prsteny nejde přidat.'); return; }
+    this.upd(cc => Object.assign({}, cc, { prstenu: cc.prstenu + 1 }));
+  }
+
+  /* dovednosti */
+  dovStep(id, d) {
+    const c = this.state.c;
+    const sk = c.dovednosti.find(x => x.id === id);
+    if (!sk) return;
+    const dv = this.derive(c);
+    if (d > 0) {
+      if (sk.st >= 6) return;
+      const cost = this.prestup(sk.ob, sk.st + 1, sk.uc);
+      const g = this.skGroup(c, sk.a);
+      if (g.zbyva < cost) { this.say('Chybí ' + (cost - g.zbyva) + ' profibodů ve vlastnosti ' + g.nazev + '.'); return; }
+      this.upd(cc => Object.assign({}, cc, { dovednosti: cc.dovednosti.map(x => x.id === id ? Object.assign({}, x, { st: x.st + 1, body: x.body + cost }) : x) }));
+      this.say(sk.nazev + ': ' + this.STUPNE()[sk.st + 1] + ' (−' + cost + ' profibodů).');
+    } else {
+      if (sk.st <= 0) return;
+      const back = Math.min(sk.body, this.prestup(sk.ob, sk.st, sk.uc));
+      this.upd(cc => Object.assign({}, cc, { dovednosti: cc.dovednosti.map(x => x.id === id ? Object.assign({}, x, { st: x.st - 1, body: x.body - back }) : x) }));
+      this.say(sk.nazev + ': ' + this.STUPNE()[sk.st - 1] + ' (+' + back + ' profibodů zpět).');
+    }
+  }
+  dovUcitel(id) {
+    this.upd(cc => Object.assign({}, cc, { dovednosti: cc.dovednosti.map(x => x.id === id ? Object.assign({}, x, { uc: !x.uc }) : x) }));
+  }
+  skGroup(c, a) {
+    const half = Math.floor(c.uroven / 2);
+    const schol = c.dovednosti.find(x => x.a === a && x.k === 'Scholastik');
+    const sb = schol ? [0, 3, 4, 6, 8, 9, 12][schol.st] : 0;
+    const pool = c.vl[a] * (5 + half) + sb * half;
+    const used = c.dovednosti.filter(x => x.a === a).reduce((s, x) => s + x.body, 0);
+    const nazev = this.ATR().find(x => x[0] === a)[1];
+    return { pool: pool, used: used, zbyva: pool - used, nazev: nazev };
+  }
+
+  /* společníci */
+  pridejSp() {
+    const c = this.state.c;
+    if (c.spolecnici.length >= this.maxSp(c)) { this.say('Všechna místa pro společníky jsou obsazená.'); return; }
+    this.upd(cc => Object.assign({}, cc, { spolecnici: cc.spolecnici.concat([{ id: 'sp' + (++this._n), jmeno: 'Společník ' + (cc.spolecnici.length + 1), velikost: '', uroven: null, hp: 0, hpMax: 0 }]) }));
+  }
+  spPatch(id, patch) {
+    this.upd(cc => Object.assign({}, cc, { spolecnici: cc.spolecnici.map(p => p.id === id ? Object.assign({}, p, patch) : p) }));
+  }
+  spHp(id, d) {
+    const p = this.state.c.spolecnici.find(x => x.id === id);
+    if (!p) return;
+    this.spPatch(id, { hp: Math.max(0, Math.min(p.hpMax, p.hp + d)) });
+  }
+  spHpMax(id, v) {
+    const n = Math.max(0, Math.round(Number(v) || 0));
+    const p = this.state.c.spolecnici.find(x => x.id === id);
+    if (!p) return;
+    this.spPatch(id, { hpMax: n, hp: Math.min(p.hp === 0 && p.hpMax === 0 ? n : p.hp, n) });
+  }
+  propust(id) {
+    const p = this.state.c.spolecnici.find(x => x.id === id);
+    this.upd(cc => Object.assign({}, cc, { spolecnici: cc.spolecnici.filter(x => x.id !== id) }));
+    if (p) this.say(p.jmeno + ' už není tvůj společník.');
+  }
+
+  /* ---------- zobrazení ---------- */
+  tabList(c) {
+    const used = c.spolecnici.length, max = this.maxSp(c);
+    const t = [{ id: 'postava', label: 'Postava', n: null }, { id: 'inventar', label: 'Inventář', n: c.items.length }];
+    if (c.maKouzla) t.push({ id: 'kouzla', label: 'Kouzla', n: c.kouzla.length });
+    t.push({ id: 'schopnosti', label: 'Schopnosti', n: c.schopnosti.filter(x => x.od <= c.uroven).length });
+    t.push({ id: 'dovednosti', label: 'Dovednosti', n: c.dovednosti.filter(x => x.st > 0).length });
+    if (max > 0 || used > 0) t.push({ id: 'spolecnici', label: 'Společníci', n: used + '/' + max });
+    return t;
+  }
+
+  unavaTxt(f, odl) {
+    return ['Bez postihu. Unavená je postava nad ' + odl + ' bodů.', 'Bonus za Sil a Obr −1, nesmí sprintovat.', 'Sil a Obr −2, Int −2, bez běhu a sprintu, bez kouzel.', 'Sil a Obr −3, Int −4, Cha −2, jen plazení.', 'Postava omdlévá.'][f];
+  }
+
+  metry(c, dv) {
+    const sl = { hp: ['život', 'životy', 'životů'], mp: ['mag', 'magy', 'magů'], unava: ['bod únavy', 'body únavy', 'bodů únavy'] };
+    const pms = pole => [-5, -1, 1, 5].map(d => ({
+      lbl: (d > 0 ? '+' : '−') + Math.abs(d),
+      aria: (d > 0 ? 'Přidat ' : 'Ubrat ') + this.plural(Math.abs(d), sl[pole]),
+      klik: () => this.zmen(pole, d)
+    }));
+    const out = [];
+    const hpOut = c.hp < dv.mez;
+    const hpSt = [];
+    if (hpOut) hpSt.push({ txt: 'vyřazen z boje', cls: 'nebezpeci' });
+    else if (dv.penHp > 0) hpSt.push({ txt: 'postih −' + dv.penHp + ' k ÚČ a OČ', cls: 'varovani' });
+    out.push({
+      label: 'Životy', cislo: c.hp, max: '/ ' + dv.hpMaxNow, pct: dv.hpMaxNow ? Math.round(100 * c.hp / dv.hpMaxNow) : 0,
+      barCls: hpOut ? 'out' : (dv.lowHp ? 'low' : ''), markers: [], stitky: hpSt, hasRez: false, rezPct: 0,
+      pozn: 'Mez vyřazení ≈ ' + dv.mez + ' životů, pod ní je postava mimo boj. Pod 1/3 max. životů (' + Math.ceil(dv.hpMaxNow / 3) + '): ' + (dv.penHp > 0 ? 'postih −' + dv.penHp + ' k ÚČ a OČ (platí teď).' : 'postih k ÚČ a OČ by byl −' + (dv.odl <= 5 ? 3 : (dv.odl <= 11 ? 2 : (dv.odl <= 16 ? 1 : 0))) + ' (zatím se neuplatňuje).') + ' Po 8 h spánku +2 životy.' + (dv.mods.hpPct ? ' Max. životy upraveny o ' + this.fmt(dv.mods.hpPct) + ' %.' : ''),
+      hasPms: true, pms: pms('hp'), wide: 'main', ariaMax: dv.hpMaxNow, ariaNow: c.hp
+    });
+    if (c.mpMax > 0) {
+      const mSt = [{ txt: 'seslání ' + dv.sance + ' %', cls: '' }];
+      if (dv.rez > 0) mSt.push({ txt: 'rezerva ' + dv.rez, cls: 'varovani' });
+      out.push({
+        label: 'Magy', cislo: c.mp, max: '/ ' + dv.mpMaxNow, pct: dv.mpMaxNow ? Math.round(100 * c.mp / dv.mpMaxNow) : 0,
+        barCls: 'mag', markers: [], stitky: mSt, hasRez: dv.rez > 0, rezPct: dv.mpMaxNow ? Math.round(100 * dv.rez / dv.mpMaxNow) : 0,
+        pozn: 'Šance na seslání ' + dv.sance + ' % (základ ' + c.sanceZaklad + ' % + Mantry ' + dv.mantryBonus + ' %). Magy v rezervě (šrafovaně) nelze doplnit, dokud kouzlo trvá.',
+        hasPms: true, pms: pms('mp'), wide: 'main', ariaMax: dv.mpMaxNow, ariaNow: c.mp
+      });
+    }
+    const uSt = dv.f > 0 ? [{ txt: this.UNAVA()[dv.f], cls: dv.f >= 2 ? 'nebezpeci' : 'varovani' }] : [];
+    out.push({
+      label: 'Únava', cislo: c.unava, max: '/ ' + dv.odl + ' vytrvalost', pct: Math.min(100, Math.round(100 * c.unava / (4 * dv.odl))),
+      barCls: dv.f >= 2 ? 'out' : (dv.f === 1 ? 'low' : ''),
+      markers: [{ pct: 25 }, { pct: 50 }, { pct: 75 }], stitky: uSt, hasRez: false, rezPct: 0,
+      pozn: 'Únava ' + c.unava + ', Odolnost ' + dv.odl + '. ' + this.unavaTxt(dv.f, dv.odl) + ' Prahy: unavená nad ' + dv.odl + ', vyčerpaná nad ' + 2 * dv.odl + ', úplně vyčerpaná nad ' + 3 * dv.odl + ', vysílená nad ' + 4 * dv.odl + '.', hasPms: true, pms: pms('unava').filter(p => p.lbl.indexOf('5') < 0), wide: 'aux', ariaMax: dv.odl * 4, ariaNow: c.unava
+    });
+    const lSt = [];
+    if (dv.band > 0) lSt.push({ txt: this.BAND()[dv.band], cls: dv.band >= 3 ? 'nebezpeci' : 'varovani' });
+    if (dv.missing > 0) lSt.push({ txt: 'neúplný součet', cls: 'neuplne' });
+    out.push({
+      label: 'Naložení', cislo: this.num(dv.total), max: '/ ' + dv.nos + ' mn', pct: Math.min(100, Math.round(100 * dv.total / (4 * dv.nos))),
+      barCls: dv.band >= 3 ? 'out' : (dv.band >= 1 ? 'low' : ''),
+      markers: [{ pct: 25 }, { pct: 50 }, { pct: 75 }], stitky: lSt, hasRez: false, rezPct: 0,
+      pozn: 'Nosnost ' + dv.nos + ' mn. Pohyblivost ' + c.pohybZaklad + ' → ' + dv.pohyb + '. Velké naložení (nad 3× nosnost) dává −1 k ÚČ a OČ' + (dv.penLoad ? ' (platí teď)' : ' (zatím se neuplatňuje)') + '.' + (dv.missing ? ' ' + dv.missing + ' předmětů bez váhy se nepočítá.' : ''),
+      hasPms: false, pms: [], wide: 'aux', ariaMax: dv.nos * 4, ariaNow: Math.round(dv.total)
+    });
+    return out;
+  }
+
+  badge(it) {
+    if (!it) return '';
+    if (it.typ === 'zbran' || it.typ === 'strelna') return 'SZ ' + it.sz;
+    if (it.typ === 'zbroj') return 'KZ ' + it.kz;
+    if (it.typ === 'stit') return 'KZ +' + it.kz;
+    if (it.ks > 1) return '×' + it.ks;
+    return '';
+  }
+  slotVals(c, defs) {
+    const S = this.state;
+    const sel = S.selItem ? c.items.find(i => i.id === S.selItem) : null;
+    const aId = this.derive(c).aId;
+    return defs.map(sd => {
+      const it = c.items.find(i => i.slot === sd.id) || null;
+      const zam = c.zamky[sd.id] || '';
+      const ok = !!sel && !zam && (!it || it.id !== sel.id) && !this.equipProblem(c, sel, sd.id);
+      const cls = [it ? 'full' : 'empty', zam ? 'locked' : '', ok ? 'ok' : '', S.selSlot === sd.id ? 'pick' : '', (it && S.selItem === it.id) ? 'cur' : '', (it && aId === sd.id) ? 'akt' : ''].filter(Boolean).join(' ');
+      const badge = this.badge(it);
+      return {
+        id: sd.id, label: sd.label, col: sd.col, row: sd.row, icon: it ? this.IKONA(it.typ) : sd.icon, cls: cls,
+        hasImg: !!(it && it.img), noImg: !(it && it.img), img: it && it.img ? it.img : '',
+        nazev: it ? it.nazev : (zam ? 'Nelze použít' : 'Prázdné'),
+        hasBadge: !!badge, badge: badge, locked: !!zam,
+        aria: sd.label + ': ' + (it ? it.nazev + (aId === sd.id ? ' (aktivní zbraň)' : '') : (zam ? 'zamčeno. ' + zam : 'prázdné')),
+        klik: () => this.klikSlot(sd.id)
+      };
+    });
+  }
+
+  selNone() {
+    return { none: true, has: false, nazev: '', typ: '', kde: '', noW: false, hasImg: false, noImg: true, img: '', icon: '#i-package', zavri: () => {}, hasVz: false, vz: [], rows: [], hasPopis: false, popis: '', act: [], hasMoves: false, moves: [] };
+  }
+  selVals(c, dv) {
+    const S = this.state;
+    const it = S.selItem ? c.items.find(i => i.id === S.selItem) : null;
+    if (!it) return this.selNone();
+    const TYP = this.TYP();
+    const sd = it.slot ? this.allSlots(c).find(x => x.id === it.slot) : null;
+    const kont = c.kontejnery.find(k => k.id === it.kde);
+    const vz = [];
+    const add = (k, v, op, res) => vz.push({ k: k, v: String(v), op: op || '', hasOp: !!op, cls: res ? 'dn-vysledek' : '' });
+    const rows = [];
+    const row = (k, v) => rows.push({ k: k, v: String(v) });
+    const ocS = (zk, sk) => Math.max(0, zk + sk + dv.e.obr - dv.pen);
+    if (it.typ === 'zbran') {
+      add('SZ', it.sz); add('Sil', this.fmt(dv.e.sil), '+');
+      if (dv.pen) add('postih', dv.pen, '−');
+      add('ÚČ', Math.max(0, it.sz + dv.e.sil - dv.pen), '=', true);
+      row('Útočnost', this.fmt(it.ut)); row('Obrana zbraně (OZ)', this.fmt(it.oz)); row('Délka', it.delka || '—');
+    } else if (it.typ === 'strelna') {
+      add('SZ', it.sz); add('Obr', this.fmt(dv.e.obr), '+');
+      if (dv.pen) add('postih', dv.pen, '−');
+      add('ÚČ', Math.max(0, it.sz + dv.e.obr - dv.pen), '=', true);
+      row('Útočnost', this.fmt(it.ut)); row('Dostřely', it.dostrely.join(' / ') + ' sáhů');
+      row('Přesnost podle pásma', '+1 / 0 / −1');
+    } else if (it.typ === 'zbroj') {
+      const sk = dv.stit ? dv.stit.kz : 0;
+      add('KZ', it.kz); add('Obr', this.fmt(dv.e.obr), '+');
+      if (sk) add('štít', '+' + sk, '+');
+      if (dv.pen) add('postih', dv.pen, '−');
+      add('OČ', ocS(it.kz, sk), '=', true);
+      row('Kvalita zbroje (KZ)', it.kz);
+      if (it.slot !== 'zbroj') row('OČ nyní', dv.oc);
+    } else if (it.typ === 'stit') {
+      const zk = dv.zbroj ? dv.zbroj.kz : 1;
+      add('KZ', zk); add('štít', '+' + it.kz, '+'); add('Obr', this.fmt(dv.e.obr), '+');
+      if (dv.pen) add('postih', dv.pen, '−');
+      add('OČ', ocS(zk, it.kz), '=', true);
+      row('Bonus ke KZ', '+' + it.kz);
+      if (it.slot !== 'stit') row('OČ nyní', dv.oc);
+    } else if (it.typ === 'lektvar') {
+      row('Účinek', it.efekt === 'elixir' ? '+30 % životy a magy, +2 Sil a Obr, −3 Int, −12 Cha, 2 směny' : 'zatím není v datech');
+    }
+    row('Váha', it.vaha == null ? '—' : this.mn(it.vaha) + (it.ks > 1 ? ' × ' + it.ks : ''));
+    row('Cena', it.cena || '—');
+    const act = [];
+    const slottable = this.allSlots(c).some(x => x.types.indexOf(it.typ) >= 0);
+    if (it.typ === 'lektvar') act.push({ lbl: 'Vypít', cls: 'btn-primary', klik: () => this.vypit(it.id) });
+    if (it.slot && (it.typ === 'zbran' || it.typ === 'strelna') && dv.aId !== it.slot) act.push({ lbl: 'Použít jako aktivní', cls: 'btn-primary', klik: () => this.vyberZbran(it.slot) });
+    if (it.slot) act.push({ lbl: 'Sundat', cls: it.typ === 'zbran' || it.typ === 'strelna' ? 'btn-secondary' : 'btn-primary', klik: () => this.unequip(it.id) });
+    else if (slottable) act.push({ lbl: it.typ === 'zbran' || it.typ === 'strelna' ? 'Vzít do ruky' : 'Obléct', cls: 'btn-primary', klik: () => this.equip(it.id) });
+    const moves = c.kontejnery.filter(k => k.id !== 'telo' && k.id !== it.kde).map(k => ({ lbl: k.nazev, klik: () => this.presun(it.id, k.id) }));
+    return {
+      none: false, has: true, nazev: it.nazev, typ: TYP[it.typ],
+      kde: it.slot ? 'nasazeno: ' + sd.label.toLowerCase() : (it.kde === 'telo' ? 'nošeno u sebe' : 'v: ' + kont.nazev.toLowerCase()),
+      noW: it.vaha == null, hasImg: !!it.img, noImg: !it.img, img: it.img || '', icon: this.IKONA(it.typ),
+      hasVz: vz.length > 0, vz: vz, rows: rows,
+      hasPopis: !!it.popis, popis: it.popis || '', act: act, hasMoves: moves.length > 0, moves: moves,
+      zavri: () => this.setState({ selItem: null })
+    };
+  }
+
+  denikVals(S, dv) {
+    const c = S.c;
+    const tabs = this.tabList(c);
+    let tab = S.tab;
+    if (!tabs.some(t => t.id === tab)) tab = 'postava';
+    const TYP = this.TYP();
+    const d = {};
+
+    d.avCls = c.av; d.initials = c.initials; d.jmeno = c.jmeno; d.dialogLabel = 'Deník postavy: ' + c.jmeno;
+    d.sub = c.rasa + ' · ' + c.povolani + ' · ' + c.uroven + '. úroveň';
+    d.presvedceni = c.presvedceni || 'přesvědčení nezvoleno';
+    d.presvCls = c.presvedceni ? '' : 'neuplne';
+    d.attrs = this.ATR().map(a => {
+      const k = a[0], ch = dv.e[k] !== dv.b[k], zm = dv.vlNow[k] !== c.vl[k];
+      return {
+        k: a[2], h: dv.vlNow[k], hasBase: zm, base: c.vl[k], zm: zm ? 'zm' : '',
+        b: this.fmt(dv.e[k]), bCls: dv.e[k] < 0 ? 'minus' : '', hasStruck: ch, struck: this.fmt(dv.b[k]),
+        aria: a[1] + ' ' + dv.vlNow[k] + (zm ? ' (základ ' + c.vl[k] + ', upraveno aktivním efektem)' : '') + ', bonus ' + this.fmt(dv.e[k]) + (ch ? ' (bonus bez únavy ' + this.fmt(dv.b[k]) + ', únava −' + (dv.b[k] - dv.e[k]) + ')' : '')
+      };
+    });
+    const penTxt = dv.pen ? ' − postihy ' + dv.pen + ' (' + [dv.penHp ? 'málo životů −' + dv.penHp : '', dv.penLoad ? 'velké naložení −1' : ''].filter(Boolean).join(', ') + ')' : '';
+    d.oc = {
+      h: dv.ocW, hasBase: dv.ocW !== dv.ocWBase, base: dv.ocWBase,
+      title: this.ocBreakdown(dv)
+    };
+    const nZb = dv.zbrane.length + dv.strelne.length;
+    d.uc = dv.wa ? {
+      h: dv.uc, hasBase: dv.uc !== dv.ucBase, base: dv.ucBase,
+      popis: dv.wa.nazev + ' · ' + (dv.ranged ? 'na dálku' : 'na blízko'),
+      title: this.ucBreakdown(dv, dv.wa, dv.ranged) + '.' + (nZb > 1 ? ' Klepnutím přepneš na další zbraň (' + nZb + ' ve slotech).' : ' Máš jen jednu zbraň ve slotu.'),
+      aria: 'Aktivní zbraň: ' + dv.wa.nazev + ', ' + (dv.ranged ? 'na dálku' : 'na blízko') + ', ÚČ ' + dv.uc + (nZb > 1 ? '. Klepnutím přepneš na další zbraň.' : ''),
+      cls: nZb > 1 ? '' : 'jedna', dalsi: () => this.dalsiZbran()
+    } : { h: '—', hasBase: false, base: '', popis: 'bez zbraně', title: 'Nemáš zbraň ve slotu Zbraň 1–4 ani Střelná 1–2.', aria: 'ÚČ: nemáš zbraň ve slotu', cls: 'jedna', dalsi: () => {} };
+
+    d.meters = this.metry(c, dv);
+    const psObj = dv.vlNow.int + c.postrehObj, psMech = Math.floor(dv.vlNow.int / 2) + c.postrehMech;
+    d.postreh = {
+      obj: psObj + ' %', mech: psMech + ' %',
+      title: 'Postřeh na objekty = Inteligence ' + dv.vlNow.int + (c.postrehObj ? ' ' + this.fmt(c.postrehObj) : '') + ' %. Na mechanismy = ½ Inteligence (' + Math.floor(dv.vlNow.int / 2) + ')' + (c.postrehMech ? ' ' + this.fmt(c.postrehMech) + ' (bonus rasy)' : '') + ' %. Mění se s Inteligencí.'
+    };
+    d.tabs = tabs.map(t => ({ label: t.label, hasN: t.n != null, n: t.n, cls: t.id === tab ? 'on' : '', on: t.id === tab, klik: () => this.setState({ tab: t.id, selSlot: null }) }));
+    d.tabLabel = (tabs.find(t => t.id === tab) || tabs[0]).label;
+
+    d.slots = this.slotVals(c, this.slotsVisible(c));
+    d.arm = this.slotVals(c, this.ARM());
+    d.rings = this.slotVals(c, this.RINGS(c));
+    d.ringsN = c.prstenu;
+    d.addRing = () => this.addRing();
+    d.dollNote = 'Vlastní obrázek předmětu se ukáže přímo ve slotu; zatím ho ukazují jen ikony podle typu.';
+    d.sel = this.selVals(c, dv);
+
+    d.tabPostava = tab === 'postava';
+    d.tabInv = tab === 'inventar';
+    d.tabKouzla = tab === 'kouzla';
+    d.tabSchop = tab === 'schopnosti';
+    d.tabDov = tab === 'dovednosti';
+    d.tabSpol = tab === 'spolecnici';
+
+    /* --- Postava --- */
+    const bojRows = [];
+    dv.zbrane.concat(dv.strelne).forEach(w => {
+      const rg = w.typ === 'strelna', on = dv.aId === w.slot;
+      bojRows.push({
+        nazev: w.nazev, sz: w.sz, uc: Math.max(0, w.sz + dv.e[rg ? 'obr' : 'sil'] - dv.pen), ut: this.fmt(w.ut),
+        oz: rg ? '—' : this.fmt(w.oz), ob: rg ? '—' : Math.max(0, dv.oc + w.oz),
+        hasDostrel: rg, dostrel: rg ? w.dostrely.join('/') : '', druh: rg ? 'na dálku' : 'na blízko',
+        cls: on ? 'akt' : '', aktCls: on ? 'on' : '', aktTxt: on ? 'Aktivní' : 'Vybrat', akt: on,
+        aria: (on ? 'Aktivní zbraň: ' : 'Nastavit jako aktivní zbraň: ') + w.nazev,
+        ucTitle: this.ucBreakdown(dv, w, rg),
+        obTitle: rg ? 'Střelná zbraň obranu nedává.' : 'Obrana s ní = OČ ' + dv.oc + ' + OZ zbraně ' + this.fmt(w.oz) + ' = ' + Math.max(0, dv.oc + w.oz),
+        vyber: () => this.vyberZbran(w.slot)
+      });
+    });
+    const ladder = [1, 2, 3, 4].map(k => {
+      const poh = Math.round(c.pohybZaklad * [1, 0.75, 0.5, 0.25][k - 1]);
+      return { nazev: this.BAND()[k - 1], mez: this.num(k * dv.nos), poh: poh, bonus: this.fmt(this.bon(poh)), cls: dv.band === k - 1 ? 'cur' : '' };
+    });
+    const pctXp = c.ztDalsi ? Math.min(100, Math.round(100 * c.zt / c.ztDalsi)) : 0;
+    d.p = {
+      xp: { txt: this.num(c.zt) + ' / ' + this.num(c.ztDalsi) + ' zt', max: c.ztDalsi, now: c.zt, pct: pctXp },
+      ident: [
+        { k: 'Velikost', v: c.velikost },
+        { k: 'Narození', v: c.narozeni + ' · znamení ' + c.znameni },
+        { k: 'Základní pohyblivost', v: c.pohybZaklad }
+      ],
+      boj: bojRows, bojPrazdny: bojRows.length === 0,
+      ocText: 'OČ ' + dv.oc + ' = KZ ' + dv.kz + ' + Obr ' + this.fmt(dv.e.obr) + (dv.pen ? ' − postihy ' + dv.pen : '') + '. „Obrana s ní“ je OČ plus OZ dané zbraně.',
+      ladder: ladder, neunese: dv.band >= 4,
+      efektyN: c.efekty.length, hasEfekty: c.efekty.length > 0, noEfekty: c.efekty.length === 0,
+      efekty: c.efekty.map(e => {
+        const m = [];
+        if (e.mods) {
+          if (e.mods.hpPct) m.push(this.fmt(e.mods.hpPct) + ' % životy');
+          if (e.mods.mpPct) m.push(this.fmt(e.mods.mpPct) + ' % magy');
+          ['sil', 'obr', 'odl', 'int', 'cha'].forEach(k => { if (e.mods[k]) m.push(this.fmt(e.mods[k]) + ' ' + k.charAt(0).toUpperCase() + k.slice(1)); });
+        }
+        if (e.rez) m.push('rezerva ' + e.rez + ' magů');
+        return {
+          nazev: e.nazev, typ: e.typ, tag: e.typ === 'buff' ? 'posílení' : 'oslabení', zbyva: e.zbyva,
+          hasMods: m.length > 0, mods: m.join(' · '),
+          aria: 'Odebrat efekt ' + e.nazev,
+          odeber: () => this.odeberEfekt(e.id)
+        };
+      }),
+      poznamky: c.poznamky,
+      onPozn: ev => { const v = ev.target.value; this.upd(cc => Object.assign({}, cc, { poznamky: v })); }
+    };
+
+    /* --- Inventář --- */
+    const grp = t => (['zbran', 'strelna', 'stit', 'zbroj', 'plast', 'saty', 'prilba', 'rukavice', 'boty', 'nahrdelnik', 'prsten', 'kniha'].indexOf(t) >= 0 ? 'vyzbroj' : (t === 'lektvar' ? 'lektvar' : (t === 'poklad' ? 'poklad' : 'vybava')));
+    const q = this.norm(S.invQ);
+    const pickDef = S.selSlot ? this.allSlots(c).find(x => x.id === S.selSlot) : null;
+    const pass = i => (S.invTyp === 'vse' || grp(i.typ) === S.invTyp) && (!q || this.norm(i.nazev).indexOf(q) >= 0) && (!pickDef || pickDef.types.indexOf(i.typ) >= 0);
+    const filtering = S.invTyp !== 'vse' || !!q || !!pickDef;
+    const kont = c.kontejnery.map(k => {
+      const all = c.items.filter(i => i.kde === k.id);
+      const shown = all.filter(pass);
+      const used = all.reduce((a, i) => a + this.vahaPol(i), 0);
+      const hasKap = k.kap != null;
+      const over = hasKap && used > k.kap;
+      return {
+        nazev: k.nazev, hasKap: hasKap, kap: k.kap || 0, used: used,
+        kapTxt: hasKap ? (over ? 'přeplněno o ' + this.num(used - k.kap) + ' mn' : this.num(used) + ' / ' + k.kap + ' mn') : this.num(used) + ' mn',
+        kapStitek: over ? 'nebezpeci' : '',
+        kapPct: hasKap ? Math.min(100, Math.round(100 * used / k.kap)) : 0,
+        kapCls: over ? 'out' : (hasKap && used > k.kap * 0.9 ? 'low' : ''),
+        rows: shown.map(i => ({
+          nazev: i.nazev, icon: this.IKONA(i.typ), hasKs: i.ks > 1, ks: '×' + i.ks,
+          hasSlot: !!i.slot, slot: i.slot ? this.allSlots(c).find(x => x.id === i.slot).label.toLowerCase() : '',
+          vaha: i.vaha == null ? '' : this.mn(i.vaha * i.ks), noW: i.vaha == null,
+          cls: S.selItem === i.id ? 'on' : '', aria: i.nazev + ', ' + TYP[i.typ].toLowerCase(),
+          klik: () => this.klikPolozka(i.id)
+        })),
+        pata: (k.vlastni ? 'Vlastní váha ' + k.vlastni + ' mn · ' : '') + (hasKap ? (over ? 'nad kapacitu' : 'zbývá ' + this.num(k.kap - used) + ' mn') : 'nošeno na těle'),
+        prazdne: shown.length === 0, prazdneTxt: filtering ? 'Nic tu neodpovídá filtru.' : 'Prázdné.'
+      };
+    });
+    const kat = this.norm(S.katQ);
+    const res = kat ? this.KATALOG().filter(x => this.norm(x.nazev).indexOf(kat) >= 0).slice(0, 6) : [];
+    d.inv = {
+      q: S.invQ, onQ: ev => this.setState({ invQ: ev.target.value }),
+      chips: [['vse', 'Vše'], ['vyzbroj', 'Výzbroj a oděv'], ['lektvar', 'Lektvary'], ['vybava', 'Vybavení'], ['poklad', 'Poklad']].map(a => ({ lbl: a[1], cls: S.invTyp === a[0] ? 'on' : '', on: S.invTyp === a[0], klik: () => this.setState({ invTyp: a[0] }) })),
+      hasBanner: !!pickDef, banner: pickDef ? 'Vybíráš předmět do slotu „' + pickDef.label + '“. Klepni na vhodný předmět.' : '',
+      zrus: () => this.setState({ selSlot: null }),
+      kont: kont,
+      money: [['zl', 'zlaté'], ['st', 'stříbrné'], ['md', 'měděné']].map(a => ({
+        lbl: a[1], val: c.penize[a[0]], ariaM: 'Ubrat jednu minci: ' + a[1], ariaP: 'Přidat jednu minci: ' + a[1],
+        minus: () => this.zmenPenize(a[0], -1), plus: () => this.zmenPenize(a[0], 1)
+      })),
+      mincTxt: 'Mince váží: ' + dv.coins + ' ks = ' + dv.coins + ' mn. Celkem ' + (c.penize.zl + c.penize.st / 10 + c.penize.md / 100).toFixed(2).replace('.', ',') + ' zl (1 zl = 10 st = 100 md).',
+      katQ: S.katQ, onKat: ev => this.setState({ katQ: ev.target.value }),
+      hasRes: res.length > 0, noRes: !!kat && res.length === 0, hintKat: !kat,
+      res: res.map(x => {
+        const w = x.vahaV ? x.vahaV[c.velikost] : x.vaha;
+        return { nazev: x.nazev, meta: TYP[x.typ].toLowerCase() + ' · ' + (w == null ? 'bez váhy' : this.mn(w)), klik: () => this.pridej(x.k) };
+      })
+    };
+
+    /* --- Kouzla --- */
+    const kq = this.norm(S.kQ);
+    const blok = dv.f >= 2 ? this.UNAVA()[dv.f] + ': kouzla nelze sesílat' : '';
+    let ks = c.kouzla.filter(sp => (!kq || this.norm(sp.nazev).indexOf(kq) >= 0));
+    if (S.kFiltr === 'pin') ks = ks.filter(sp => !!c.pinned[sp.id]);
+    if (S.kFiltr === 'lze') ks = ks.filter(sp => sp.cena != null && sp.cena <= c.mp);
+    if (S.kFiltr === 'rez') ks = ks.filter(sp => sp.rez);
+    ks = ks.slice().sort((a, b) => ((c.pinned[b.id] ? 1 : 0) - (c.pinned[a.id] ? 1 : 0)) || a.nazev.localeCompare(b.nazev, 'cs'));
+    d.k = {
+      count: c.kouzla.length,
+      magyTxt: 'Magy ' + c.mp + ' / ' + dv.mpMaxNow + (dv.rez ? ', z toho v rezervě ' + dv.rez : '') + '. Cena u každého kouzla je základ, víc magů přidáš ručně u měřidla.',
+      sanceTxt: 'Šance na seslání ' + dv.sance + ' % (základ ' + c.sanceZaklad + ' % + Mantry ' + dv.mantryBonus + ' %). Rezerva: magy, které nelze doplnit, dokud je kouzlo aktivní.',
+      hasBlok: !!blok, blok: blok,
+      q: S.kQ, onQ: ev => this.setState({ kQ: ev.target.value }),
+      chips: [['vse', 'Vše'], ['pin', 'Připnutá'], ['lze', 'Lze seslat teď'], ['rez', 'S rezervou']].map(a => ({ lbl: a[1], cls: S.kFiltr === a[0] ? 'on' : '', on: S.kFiltr === a[0], klik: () => this.setState({ kFiltr: a[0] }) })),
+      empty: ks.length === 0,
+      rows: ks.map(sp => {
+        const open = !!S.exp[sp.id], pinned = !!c.pinned[sp.id];
+        let why = '';
+        if (sp.cena == null) why = 'Cena závisí na cíli. Magy odečti ručně u měřidla.';
+        else if (dv.f >= 2) why = 'Vyčerpaná postava nesmí sesílat kouzla.';
+        else if (c.mp < sp.cena) why = 'Chybí ' + this.plural(sp.cena - c.mp, ['mag', 'magy', 'magů']) + '.';
+        return {
+          nazev: sp.nazev, chip: sp.chip, rez: sp.rez, cls: open ? 'open' : '', open: open,
+          pinned: pinned, pinCls: pinned ? 'on' : '', pinAria: (pinned ? 'Odepnout kouzlo ' : 'Připnout kouzlo ') + sp.nazev,
+          pinKlik: () => this.upd(cc => Object.assign({}, cc, { pinned: Object.assign({}, cc.pinned, { [sp.id]: !cc.pinned[sp.id] }) })),
+          toggle: () => this.setState({ exp: Object.assign({}, S.exp, { [sp.id]: !S.exp[sp.id] }) }),
+          cenaText: sp.cenaText, sesil: sp.sesil, dosah: sp.dosah, trvani: sp.trvani, popis: sp.popis,
+          dis: !!why, hasWhy: !!why, why: why, btnCls: why ? 'btn-secondary' : 'btn-primary',
+          sesli: () => this.seslat(sp)
+        };
+      })
+    };
+
+    /* --- Schopnosti --- */
+    d.sch = {
+      count: c.schopnosti.filter(x => x.od <= c.uroven).length + ' z ' + c.schopnosti.length,
+      rows: c.schopnosti.slice().sort((a, b) => a.od - b.od).map(x => {
+        const open = !!S.exp[x.id], zam = x.od > c.uroven;
+        return {
+          nazev: x.nazev, od: zam ? 'od ' + x.od + '. úrovně' : 'aktivní od ' + x.od + '. úrovně', odCls: zam ? 'neuplne' : 'dobre',
+          cls: (open ? 'open ' : '') + (zam ? 'zam' : ''), open: open, popis: x.popis,
+          toggle: () => this.setState({ exp: Object.assign({}, S.exp, { [x.id]: !S.exp[x.id] }) })
+        };
+      })
+    };
+
+    /* --- Dovednosti --- */
+    const SK = this.SKTXT();
+    const dq = this.norm(S.dQ);
+    d.dov = {
+      q: S.dQ, onQ: ev => this.setState({ dQ: ev.target.value }),
+      groups: this.ATR().map(a => {
+        const g = this.skGroup(c, a[0]);
+        const all = c.dovednosti.filter(x => x.a === a[0]);
+        const shown = all.filter(x => !dq || this.norm(x.nazev).indexOf(dq) >= 0);
+        return {
+          nazev: a[1] + ' ' + c.vl[a[0]], n: all.filter(x => x.st > 0).length, used: g.used, pool: g.pool, pct: g.pool ? Math.min(100, Math.round(100 * g.used / g.pool)) : 0,
+          barCls: g.zbyva < 0 ? 'out' : '', zbyva: g.zbyva < 0 ? 'přečerpáno o ' + (-g.zbyva) : 'zbývá ' + g.zbyva, zbCls: g.zbyva < 0 ? 'nebezpeci' : (g.zbyva === 0 ? '' : 'dobre'),
+          prazdne: shown.length === 0,
+          rows: shown.map(x => {
+            const txt = SK[x.k] || {};
+            const open = !!S.exp[x.id];
+            const next = x.st < 6 ? { sam: this.prestup(x.ob, x.st + 1, false), uc: this.prestup(x.ob, x.st + 1, true), dni: this.doba(x.ob, x.st + 1) } : null;
+            const celk = this.celkem(x.ob, x.st, x.uc);
+            const nextCelk = x.st < 6 ? this.celkem(x.ob, x.st + 1, x.uc) : celk;
+            const prog = Math.max(0, x.body - celk);
+            const progMax = Math.max(1, nextCelk - celk);
+            return {
+              id: x.id, nazev: x.nazev, ob: this.OBT()[x.ob - 1], cls: open ? 'open' : '', open: open,
+              stCls: 'st' + x.st, stLbl: this.STUPNE()[x.st], past: this.PAST()[x.st],
+              body: x.body, progNow: Math.min(prog, progMax), progMax: progMax, progPct: x.st >= 6 ? 100 : Math.min(100, Math.round(100 * prog / progMax)),
+              progTxt: x.st >= 6 ? 'nejvyšší stupeň' : prog + ' / ' + progMax + ' k dalšímu stupni',
+              dalsi: next ? 'Další stupeň (' + this.STUPNE()[x.st + 1] + ', past ' + this.PAST()[x.st + 1] + '): ' + next.sam + ' profibodů sám, ' + next.uc + ' s učitelem, ' + next.dni + ' dní učení.' : 'Další stupeň už není.',
+              ucitel: x.uc, ucitelLbl: x.uc ? 'Učí se s učitelem (−25 % bodů)' : 'Učí se sám', ucitelKlik: () => this.dovUcitel(x.id),
+              minus: () => this.dovStep(x.id, -1), minusDis: x.st <= 0, minusAria: 'Snížit stupeň: ' + x.nazev,
+              plus: () => this.dovStep(x.id, 1), plusDis: x.st >= 6, plusAria: 'Zvýšit stupeň: ' + x.nazev,
+              hasOv: !!txt.ov, ov: txt.ov || '', hasRes: !!txt.tot, tot: txt.tot || '', usp: txt.usp || '', neusp: txt.neusp || '', fat: txt.fat || '',
+              hasPozn: !!txt.pozn || !txt.tot, pozn: txt.pozn || 'Popis a výsledky ověření této dovednosti doplníme z pravidel.',
+              toggle: () => this.setState({ exp: Object.assign({}, S.exp, { [x.id]: !S.exp[x.id] }) })
+            };
+          })
+        };
+      })
+    };
+
+    /* --- Společníci --- */
+    const max = this.maxSp(c), used = c.spolecnici.length;
+    const nextLvl = (used + 1) * 8;
+    d.sp = {
+      pocet: used + ' / ' + max,
+      limitTxt: max > used ? 'Volná místa: ' + (max - used) + '. Warlock má u sebe 1 ochočeného tvora za každých 8 úrovní.' : (max === 0 ? 'Tato postava zatím nemá místo pro společníka.' : 'Všechna místa jsou obsazená. Další místo od ' + nextLvl + '. úrovně (1 tvor za každých 8 úrovní).'),
+      canAdd: used < max, pridej: () => this.pridejSp(), noItems: used === 0,
+      items: c.spolecnici.map(p => {
+        const pct = p.hpMax ? Math.round(100 * p.hp / p.hpMax) : 0;
+        return {
+          jmeno: p.jmeno, onJmeno: ev => this.spPatch(p.id, { jmeno: ev.target.value }),
+          hasVel: !!p.velikost, velikost: p.velikost, hasUr: !!p.uroven, uroven: p.uroven,
+          hp: p.hp, hpMax: p.hpMax, hpMaxVal: p.hpMax, pct: pct, barCls: p.hpMax && p.hp < p.hpMax / 3 ? 'low' : '',
+          onHpMax: ev => this.spHpMax(p.id, ev.target.value),
+          pms: [-5, -1, 1, 5].map(dd => ({ lbl: (dd > 0 ? '+' : '−') + Math.abs(dd), dis: p.hpMax === 0, aria: (dd > 0 ? 'Přidat ' : 'Ubrat ') + this.plural(Math.abs(dd), ['život', 'životy', 'životů']) + ': ' + p.jmeno, klik: () => this.spHp(p.id, dd) })),
+          propust: () => this.propust(p.id), propustAria: 'Propustit společníka ' + p.jmeno
+        };
+      })
+    };
+    return d;
+  }
+
+  renderVals() {
+    const S = this.state;
+    const dv = this.derive(S.c);
+    return {
+      toast: S.toast, open: S.open,
+      otevri: () => this.setState({ open: true }),
+      zavri: () => this.setState({ open: false, selItem: null, selSlot: null }),
+      d: this.denikVals(S, dv)
+    };
+  }
+}
+</script>
+</body>
+</html>
