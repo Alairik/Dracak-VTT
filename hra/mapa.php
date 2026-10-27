@@ -722,17 +722,24 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
   </div>
 
   <?php if ($denikPostavy): ?>
-  <div id="denikDock" class="denik-dock" style="display:none;" role="complementary" aria-label="Deník postavy">
-    <div class="denik-dock-uchyt" id="denikUchyt" title="Tažením změníš šířku" aria-hidden="true"></div>
-    <div class="denik-dock-hlava">
+  <div id="denikDock" class="denik-dock" style="display:none;" role="dialog" aria-label="Deník postavy">
+    <?php foreach (['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'] as $hrana): ?>
+      <div class="denik-hrana" data-hrana="<?= $hrana ?>" aria-hidden="true"></div>
+    <?php endforeach; ?>
+    <div class="denik-dock-hlava" id="denikHlava" title="Tažením přesuneš okno">
+      <span class="denik-dock-titul"><span class="denik-dock-grip" aria-hidden="true">⠿</span> Deník — <strong id="denikTitul"></strong></span>
+      <a id="denikOtevrit" class="denik-dock-btn" target="_blank" rel="noopener" title="Otevřít na samostatné stránce (nová záložka)">↗</a>
+      <button id="denikSbalit" class="denik-dock-btn" type="button" title="Sbalit na hlavičku" aria-label="Sbalit deník na hlavičku"><?php dracak_icon('minus', 16); ?></button>
+      <button id="denikCela" class="denik-dock-btn" type="button" title="Na celou obrazovku" aria-label="Deník na celou obrazovku"><span class="ik-max"><?php dracak_icon('maximize', 16); ?></span><span class="ik-min"><?php dracak_icon('minimize', 16); ?></span></button>
+      <button id="denikZavrit" class="denik-dock-btn" type="button" title="Zavřít deník" aria-label="Zavřít deník"><?php dracak_icon('x', 16); ?></button>
+    </div>
+    <div class="denik-dock-volby">
       <select id="denikPostava" class="input" aria-label="Postava"></select>
       <select id="denikSledovat" class="input" aria-label="Kterou postavu deník ukazuje" title="Kterou postavu deník ukazuje">
         <option value="vyber">podle vybraného tokenu</option>
         <option value="tah">podle toho, kdo je na tahu</option>
         <option value="nic">pevně tuhle postavu</option>
       </select>
-      <a id="denikOtevrit" class="denik-dock-btn" target="_blank" rel="noopener" title="Otevřít na celé stránce (nová záložka)">↗</a>
-      <button id="denikZavrit" class="denik-dock-btn" type="button" title="Zavřít deník" aria-label="Zavřít deník">✕</button>
     </div>
     <iframe id="denikFrame" class="denik-dock-frame" title="Deník postavy"></iframe>
   </div>

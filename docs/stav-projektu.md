@@ -157,24 +157,28 @@ MariaDB.** Postup, který v session fungoval:
   měřítko px→sáh (`dracak_vtt_px_na_sah`).
 
 ### Boj
-- **Deník postavy v panelu na mapě (2026-10-19, bez ručního SQL):** v boji se výbava, zbraň v ruce, životy, kouzla… upravují ve stejném deníku jako
-  na stránce postavy (`hra/denik.php`), ale **přímo vedle mapy, bez proklikávání**. **Vstup je v detailu tokenu** (panel Spravovat, tlačítko „Otevřít deník“ `#spravovatDenik` nahoře pod jménem; rozhodnutí uživatele 2026-10-20 —
-  v levé liště nástrojů tlačítko není; zobrazí se u tokenu postavy, kterou smí uživatel otevřít, a přebije i režim „pevně“, na telefonu detail po otevření
-  schová) a otevře panel (`#denikDock`, `assets/js/denik_dock.js`). Pod ním jsou **skoky rovnou na sekci deníku** (Boj / Kouzla / Výbava →
-  `#boj`, `#schopnosti`, `#vybaveni`) a v Inventáři detailu u postavy tlačítko „Upravit v deníku“ (Výbava; Inventář se u postavy ukazuje vždy, i prázdný);
-  skok srovná sekci pod hlavičku deníku, jen když se ta v panelu drží nahoře. **Kontrakt pro přepracování deníku (Claude Design):** ponechat `id`
-  sekcí `prehled`, `boj`, `schopnosti`, `vybaveni`, `postava` a třídu `.dn-pas` u hlavičky — mapa na nich stojí; když zmizí, skok se prostě neprovede
-  a deník zůstane nahoře. V horní liště mapy je odkaz **Pravidla ↗** (`../pravidla.php`, nová záložka; co kdo uvidí, hlídá `pravidla.php` podle role) s deníkem v rámečku (`denik.php?id=…&embed=1` — bez odkazů, které by z mapy odvedly pryč; celé
-  funkce deníku včetně hledání v katalogu, kontejnerů, hodů a sesílání zůstávají). Panel ukazuje postavu **podle vybraného tokenu** (výchozí),
-  **podle toho, kdo je na tahu**, nebo **pevně** jednu (ruční výběr v seznamu přepne na „pevně“); nestvůra deník postavy nemá, takže výběr nestvůry
-  postavu nemění. PJ otevře deník kterékoli postavy světa, hráč jen svých (server to hlídá znovu, cizí deník dá 403). Mapa se po otevření zúží
-  zleva (panel nezakrývá tokeny, střed pohledu zůstane uprostřed), šířka se táhne za okraj (340–900 px, aspoň 240 px mapy zůstane), na telefonu
-  (pod 760 px) je panel spodní list. Otevřenost, šířku, režim a postavu si pamatuje prohlížeč. Deník a mapa si dávají vědět přes `postMessage`
-  (`denik_zmena` → mapa hned obnoví stav, `denik_obnov` → deník se obnoví po zásahu na mapě; obnova se nepřeskočí, jen když zrovna píšeš).
-  Zavřený panel nic nenačítá ani neobnovuje. Test: `denik_dock.js`. **Nepokryto:** nestvůry (výbava nestvůry se dál spravuje v panelu tokenu a
-  v malém deníku nestvůry), deník nemá nové boční zkratky. **Plán — zjednodušený postavový deník nestvůry (zadání uživatele 2026-10-20):** nestvůry mají
-  mít podobný deník, ale ne pro úpravy za boje, nýbrž **před bojem** (příprava výbavy a čísel); stejný vstup — tlačítko v detailu tokenu nestvůry
-  (`#spravovatDenik` se u nestvůry teď záměrně skrývá). Uživatel navrhuje design sám, implementace čeká na něj.
+- **Deník postavy v plovoucím okně na mapě (2026-10-19, okno přestavěno 2026-10-27; bez ručního SQL):** v boji se výbava, zbraň v ruce, životy, kouzla…
+  upravují ve stejném deníku jako na stránce postavy (`hra/denik.php`), ale **přímo na mapě, bez proklikávání**. **Vstup je v detailu tokenu** (panel Spravovat,
+  tlačítko „Otevřít deník“ `#spravovatDenik` nahoře pod jménem; rozhodnutí uživatele 2026-10-20 — v levé liště nástrojů tlačítko není; zobrazí se u tokenu
+  postavy, kterou smí uživatel otevřít, přebije i režim „pevně“, na telefonu detail po otevření schová). Pod ním jsou **skoky rovnou na sekci deníku**
+  (Boj / Kouzla / Výbava → `#boj`, `#schopnosti`, `#vybaveni`) a v Inventáři detailu u postavy tlačítko „Upravit v deníku“ (Výbava; Inventář se u postavy
+  ukazuje vždy, i prázdný); skok srovná sekci pod hlavičku deníku, jen když se ta v okně drží nahoře. V horní liště mapy je odkaz **Pravidla ↗**
+  (`../pravidla.php`, nová záložka; co kdo uvidí, hlídá `pravidla.php` podle role).
+  **Okno (`#denikDock`, `assets/js/denik_dock.js`, rozhodnutí uživatele 2026-10-27: „floating, není nutné to mít fix, ale oboje“):** deník v rámečku
+  (`denik.php?id=…&embed=1` — bez odkazů, které by z mapy odvedly pryč; celé funkce deníku včetně hledání v katalogu, kontejnerů, hodů a sesílání zůstávají)
+  **plave přes mapu** — mapu nezužuje. Přesouvá se tažením za hlavičku, velikost se mění za okraje a rohy (min. 340 × 240 px), jde **sbalit na hlavičku**
+  a **roztáhnout na celou obrazovku** (overlay přes mapu, lištu i panel tokenu; „Zpět do okna“ vrátí poslední polohu, ✕ zavře). Okno zůstane vždy svisle
+  na obrazovce a aspoň 200 px z něj vodorovně, ať jde chytit; leží nad lištami (z-index 201), pod postranními panely (202) — panel tokenu okno překrývá,
+  ne naopak. Na telefonu (pod 760 px) je spodní list, který jde taky na celou obrazovku. Poloha, velikost, sbalení, celá obrazovka, otevřenost, režim sledování
+  a postava se pamatují v prohlížeči (`dracak_denik_dock`). Okno ukazuje postavu **podle vybraného tokenu** (výchozí), **podle toho, kdo je na tahu**, nebo
+  **pevně** jednu (ruční výběr v seznamu přepne na „pevně“); nestvůra deník postavy nemá, takže výběr nestvůry postavu nemění. PJ otevře deník kterékoli
+  postavy světa, hráč jen svých (server to hlídá znovu, cizí deník dá 403). Deník a mapa si dávají vědět přes `postMessage` (`denik_zmena` → mapa hned
+  obnoví stav, `denik_obnov` → deník se obnoví po zásahu na mapě; obnova se nepřeskočí, jen když zrovna píšeš). Zavřené okno nic nenačítá ani neobnovuje.
+  Test: `denik_dock.js`. **Kontrakt pro přepracování deníku (viz `docs/prototypy/denik-v2-predani.md`):** ponechat `id` sekcí `prehled`, `boj`,
+  `schopnosti`, `vybaveni`, `postava` a třídu `.dn-pas` u hlavičky — mapa na nich stojí; když zmizí, skok se prostě neprovede a deník zůstane nahoře.
+  **Nepokryto:** nestvůry (výbava nestvůry se dál spravuje v panelu tokenu a v malém deníku nestvůry). **Plán — zjednodušený postavový deník nestvůry
+  (zadání uživatele 2026-10-20):** nestvůry mají mít podobný deník, ale ne pro úpravy za boje, nýbrž **před bojem** (příprava výbavy a čísel); stejný vstup —
+  tlačítko v detailu tokenu nestvůry (`#spravovatDenik` se u nestvůry teď záměrně skrývá). Uživatel navrhuje design sám, implementace čeká na něj.
 - **Souboj s fázemi (blok B, krok 1; hotový a zapnutý na produkci, ruční SQL 0085 proběhlo):**
   PJ klikne na „Zahájit souboj“ (meče v liště) a vybere účastníky, jejich strany
   (družina / nepřátelé) a překvapení (−6 k iniciativě v 1. kole, řádek

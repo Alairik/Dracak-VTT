@@ -154,7 +154,7 @@ body { -webkit-tap-highlight-color:transparent; }
   .popover .note { font-size:11px; color:#bbb; margin-top:8px; }
   .popover .close-x { position:absolute; top:8px; right:10px; cursor:pointer; color:#999; background:none; border:none; }
 
-  .panel { position:fixed; right:0; top:0; bottom:0; width:300px; z-index:200; background:rgba(20,18,16,.95);
+  .panel { position:fixed; right:0; top:0; bottom:0; width:300px; z-index:202; background:rgba(20,18,16,.95);
            color:#eee; padding:16px; box-sizing:border-box; transform:translateX(100%); transition:transform .15s;
            overflow-y:auto; }
   .panel.open { transform:translateX(0); }
@@ -362,43 +362,59 @@ body { -webkit-tap-highlight-color:transparent; }
 .ini-slib { font-size: 11px; opacity: .85; margin-left: 6px; white-space: nowrap; }
 .ini-zavazek { color: #e8c9a8; }
 
-/* ---------- Panel „Deník“ vedle mapy (assets/js/denik_dock.js; deník v rámečku hra/denik.php?embed=1) ---------- */
-.denik-dock { position:fixed; left:88px; /* přesnou hodnotu dosadí denik_dock.js podle šířky lišty */ top:12px; bottom:12px; width:var(--denik-w, 480px); max-width:calc(100vw - 100px); z-index:195;
+/* ---------- Okno „Deník“ přes mapu (assets/js/denik_dock.js; deník v rámečku hra/denik.php?embed=1) ---------- */
+/* Polohu a velikost dosazuje denik_dock.js (inline style); tady jsou jen výchozí hodnoty a režimy. */
+.denik-dock { position:fixed; left:88px; top:12px; width:480px; height:calc(100vh - 24px); min-width:340px; min-height:240px; z-index:201; /* nad lištami (200), pod postranními panely (202) */
               display:flex; flex-direction:column; background:#1d1a17; color:#eee; border:1px solid rgba(255,255,255,.16);
               border-radius:12px; box-shadow:0 8px 28px rgba(0,0,0,.45); }
+.denik-dock.tahne { user-select:none; box-shadow:0 14px 40px rgba(0,0,0,.6); }
+.denik-dock.sbaleno { height:auto !important; min-height:0; }
+.denik-dock.sbaleno .denik-dock-frame, .denik-dock.sbaleno .denik-hrana, .denik-dock.sbaleno .denik-dock-volby { display:none; }
+.denik-dock.sbaleno .denik-dock-hlava { border-radius:12px; padding-bottom:5px; }
+/* Celá obrazovka: deník je overlay přes mapu, lištu i detail tokenu; „Zpět do okna“ ho vrátí, ✕ ho zavře. */
+.denik-dock.cela { left:0 !important; top:0 !important; width:100vw !important; height:100vh !important; max-width:none; border-radius:0; border:0; z-index:300; box-shadow:none; }
+.denik-dock.cela .denik-hrana { display:none; }
+.denik-dock.cela .denik-dock-frame { border-radius:0; }
+.denik-dock.cela .denik-dock-hlava { cursor:default; }
+body.denik-dock-cela { overflow:hidden; }
 .denik-blok { margin:0 0 10px; }
 .denik-otevrit { width:100%; margin:0; display:flex; align-items:center; justify-content:center; gap:6px; }
 .denik-skoky { display:flex; gap:6px; margin-top:6px; }
 .denik-skoky .btn { flex:1; padding:4px 6px; font-size:12px; }
 .topbar .topbar-pravidla { flex:none; font-size:12px; opacity:.85; padding-left:10px; border-left:1px solid rgba(255,255,255,.2); }
 .topbar .topbar-pravidla:hover { opacity:1; }
-.denik-dock-hlava { display:flex; align-items:center; gap:6px; padding:6px 8px; flex:none; }
-.denik-dock-hlava select.input { background:#2b251f; color:#f1e6d8; border:1px solid rgba(255,255,255,.28); border-radius:6px;
-                                 padding:4px 6px; margin:0; width:auto; min-width:0; font-size:12.5px; box-sizing:border-box; }
-.denik-dock-hlava #denikPostava { flex:1 1 40%; font-weight:600; }
-.denik-dock-hlava #denikSledovat { flex:1 1 40%; }
+.denik-dock-hlava { display:flex; align-items:center; gap:4px; padding:5px 8px 3px; flex:none; cursor:grab; touch-action:none; border-radius:12px 12px 0 0; }
+.denik-dock.tahne .denik-dock-hlava { cursor:grabbing; }
+.denik-dock-titul { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; color:#cdbfae; }
+.denik-dock-titul strong { color:#f1e6d8; }
+.denik-dock-grip { opacity:.55; margin-right:4px; }
+.denik-dock-volby { display:flex; gap:6px; padding:3px 8px 7px; flex:none; }
+.denik-dock-volby select.input { background:#2b251f; color:#f1e6d8; border:1px solid rgba(255,255,255,.28); border-radius:6px;
+                                 padding:4px 6px; margin:0; width:auto; min-width:0; font-size:12.5px; box-sizing:border-box; cursor:pointer; }
+.denik-dock-volby #denikPostava { flex:1 1 40%; font-weight:600; }
+.denik-dock-volby #denikSledovat { flex:1 1 40%; }
 .denik-dock-btn { flex:none; width:30px; height:30px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px;
                   border:none; background:transparent; color:#ddd; font-size:16px; text-decoration:none; cursor:pointer; }
 .denik-dock-btn:hover { background:rgba(255,255,255,.14); }
+.denik-dock-btn svg { display:block; }
+#denikCela .ik-min, .denik-dock.cela #denikCela .ik-max { display:none; }
+.denik-dock.cela #denikCela .ik-min { display:inline-flex; }
 .denik-dock-frame { flex:1; min-height:0; width:100%; border:0; border-radius:0 0 12px 12px; background:#f6f1e9; }
-.denik-dock-uchyt { position:absolute; right:-6px; top:0; bottom:0; width:12px; cursor:ew-resize; z-index:2; touch-action:none; }
-.denik-dock-uchyt::after { content:""; position:absolute; left:4px; top:50%; width:4px; height:44px; margin-top:-22px; border-radius:2px; background:rgba(255,255,255,.35); }
-.denik-dock-uchyt:hover::after { background:rgba(255,255,255,.7); }
+/* Okraje a rohy pro změnu velikosti: tenké pásy přes okraj okna, rohy o něco větší. */
+.denik-hrana { position:absolute; z-index:3; touch-action:none; }
+.denik-hrana[data-hrana="n"], .denik-hrana[data-hrana="s"] { left:12px; right:12px; height:10px; cursor:ns-resize; }
+.denik-hrana[data-hrana="e"], .denik-hrana[data-hrana="w"] { top:12px; bottom:12px; width:10px; cursor:ew-resize; }
+.denik-hrana[data-hrana="n"] { top:-5px; } .denik-hrana[data-hrana="s"] { bottom:-5px; }
+.denik-hrana[data-hrana="e"] { right:-5px; } .denik-hrana[data-hrana="w"] { left:-5px; }
+.denik-hrana[data-hrana="ne"], .denik-hrana[data-hrana="nw"], .denik-hrana[data-hrana="se"], .denik-hrana[data-hrana="sw"] { width:18px; height:18px; }
+.denik-hrana[data-hrana="ne"] { top:-6px; right:-6px; cursor:nesw-resize; } .denik-hrana[data-hrana="sw"] { bottom:-6px; left:-6px; cursor:nesw-resize; }
+.denik-hrana[data-hrana="nw"] { top:-6px; left:-6px; cursor:nwse-resize; } .denik-hrana[data-hrana="se"] { bottom:-6px; right:-6px; cursor:nwse-resize; }
+.denik-hrana[data-hrana="se"]::after { content:""; position:absolute; right:7px; bottom:7px; width:9px; height:9px; border-right:2px solid rgba(255,255,255,.4); border-bottom:2px solid rgba(255,255,255,.4); }
 @media (max-width: 760px) {
-  /* Telefon / malý tablet: deník jako spodní list přes spodek mapy. */
-  .denik-dock { left:0; right:0; top:auto; bottom:0; width:auto; max-width:none; height:62vh; border-radius:12px 12px 0 0; }
+  /* Telefon / malý tablet: deník jako spodní list přes spodek mapy (okno se nepřesouvá ani nemění), jde ale na celou obrazovku. */
+  .denik-dock { left:0; right:0; top:auto; bottom:0; width:auto; max-width:none; min-width:0; height:62vh; border-radius:12px 12px 0 0; }
+  .denik-dock.sbaleno { height:auto !important; }
   .denik-dock-frame { border-radius:0; }
-  .denik-dock-uchyt { display:none; }
-}
-
-/* Mapa se při otevřeném deníku zúží zleva (panel nezakrývá tokeny); proměnnou --denik-posun nastavuje denik_dock.js. */
-body.denik-dock-otevreny #viewport { left: var(--denik-posun, 0px); }
-@media (max-width: 760px) { body.denik-dock-otevreny #viewport { left: 0; } }
-/* Prvky vystředěné na obrazovce se vystředí nad zúženou mapou, ne pod panelem. */
-body.denik-dock-otevreny .topbar,
-body.denik-dock-otevreny .vyzva-panel { left: calc((100% + var(--denik-posun, 0px)) / 2); }
-body.denik-dock-otevreny .vyzva-panel { max-width: calc(100vw - var(--denik-posun, 0px) - 24px); }
-@media (max-width: 760px) {
-  body.denik-dock-otevreny .topbar, body.denik-dock-otevreny .vyzva-panel { left: 50%; }
-  body.denik-dock-otevreny .vyzva-panel { max-width: none; }
+  .denik-dock-hlava { cursor:default; }
+  .denik-hrana { display:none; }
 }

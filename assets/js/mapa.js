@@ -1420,11 +1420,10 @@ const souboj = initSouboj ? initSouboj({
   getZdi: () => zdiList,
   soubojSvg: document.getElementById('soubojSvg'),
 }) : null;
-// Deník postavy v panelu vedle mapy (assets/js/denik_dock.js) — upravuje se přímo při hře.
+// Deník postavy v plovoucím okně přes mapu (assets/js/denik_dock.js) — upravuje se přímo při hře.
 const denikDock = initDenikDock ? initDenikDock({
   postavy: window.MAPA.denikPostavy,
   spravovaneId: () => (spravovanyToken && spravovanyToken.typEntity === 'postava' ? spravovanyToken.entitaId : null),
-  posunMapy: (dx) => kamera.posun(dx, 0),
   poZmene: (postavaId) => {
     obnovitStav();
     if (spravovanyToken && spravovanyToken.typEntity === 'postava' && spravovanyToken.entitaId === postavaId) nactiInventar();
