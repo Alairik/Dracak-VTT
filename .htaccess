@@ -11,11 +11,12 @@
     Header always unset X-Powered-By
 </IfModule>
 
-# Skryté soubory (.ftp-deploy-sync-state.json, .git*...) a config.php s
+# Skryté soubory (.ftp-deploy-sync-state.json, .git*...), deploy-manifest.json
+# (seznam souborů s kontrolními součty, čte ho jen admin_nasazeni.php) a config.php s
 # přístupy k databázi nesmí jít stáhnout přes HTTP. config.php je jinak
 # v bezpečí jen proto, že ho PHP spouští místo vydání — kdyby handler
 # někdy selhal (např. při přepnutí verze PHP), vydal by se jako text.
-<FilesMatch "^(\..*|config(\.example)?\.php)$">
+<FilesMatch "^(\..*|config(\.example)?\.php|deploy-manifest\.json)$">
     <IfModule mod_authz_core.c>
         Require all denied
     </IfModule>

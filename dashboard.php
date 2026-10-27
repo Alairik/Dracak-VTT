@@ -68,6 +68,11 @@ $isAdmin = $user['role'] === 'admin';
       <div class="tile-title">Změny databáze</div>
       <div class="tile-desc">Spuštění nových změn po nasazení.</div>
     </a>
+    <a class="tile" href="admin_nasazeni.php">
+      <div class="tile-icon">🛡️</div>
+      <div class="tile-title">Kontrola nasazení</div>
+      <div class="tile-desc">Sedí soubory na serveru, jsou zavřené cesty.</div>
+    </a>
     <?php endif; ?>
   </div>
 </div>

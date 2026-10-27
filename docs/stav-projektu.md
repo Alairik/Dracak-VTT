@@ -143,8 +143,16 @@ MariaDB.** Postup, který v session fungoval:
   které už ručně proběhly (sloupec / index / cizí klíč / tabulka existuje), přeskočí a zapíše; jiné DDL spadne na 1142 a stránka řekne, že potřebuje ruční SQL.
   Spuštění je POST s tokenem v relaci (navíc k obraně proti cizímu webu v `auth.php`) a přesměrování (obnovení stránky nespustí nic znovu), souběžné spuštění
   hlídá `GET_LOCK`. Bez tabulky `migrace_log` ukáže hotový příkaz k ručnímu založení. **Po pushi s novou migrací klikni v administraci na „Spustit čekající
-  změny“.** **Ztraceno s HTTP kroky:** smoke test (hlídal, že FTP nahrálo všechny soubory — to se na tomhle hostingu už stalo) a kontrola zavřených cest, hlaviček a CSRF;
-  teď ručně. Možné řešení (nepostavené): manifest souborů s kontrolními součty z deploye a jeho porovnání na stránce Změny databáze.
+  změny“.** **Nahrazení HTTP kontrol — „Kontrola nasazení“ (2026-10-28):** `deploy.yml` před FTP spustí `.github/scripts/manifest.php` (seznam
+  nahrávaných souborů z gitu minus `exclude` z `deploy.yml`, SHA-256, commit, čas → `deploy-manifest.json`, zavřený v `.htaccess`); `admin_nasazeni.php`
+  (jen admin, menu / dlaždice / editor) ho na serveru porovná s diskem: **chybí** (FTP nenahrálo — na tomhle hostingu se to už stalo), **jiný obsah**
+  (nahráno částečně / změněno na serveru), **navíc** (zbytek po starém nasazení, `setup-admin.php`, cizí kód), **spustitelné soubory v `uploads/`**
+  (tam smí být jen obrázky). Tlačítko „Zkontrolovat“ si zevnitř serveru vyžádá vlastní adresy, které musí být zavřené (config.php, manifest, sync state,
+  includes, content, uploads, migrace) a bezpečnostní hlavičky z `index.php` (X-Frame-Options, nosniff, HSTS, bez X-Powered-By); když se server na vlastní
+  doménu nedovolá, napíše „nelze ověřit“. **Zbývá ručně:** CSRF (POST z cizího Originu → 403, dřív kontrolovalo deploy). Pozor: FTP-Deploy nahrává jen
+  změněné soubory, chybějící soubor tedy další deploy sám nedoplní — drobná změna v tom souboru, nebo ruční FTP. Otestováno lokálně (manifest ze skutečného repa,
+  čistý stav, chybějící / změněný / cizí soubor, uploads, bez / poškozený manifest, zavřené cesty proti routeru napodobujícímu `.htaccess`); na ostrém hostingu
+  poběží až po prvním nasazení s touto změnou (do té doby „na serveru není manifest“).
 - **Hlídá to deploy:** poslední krok `deploy.yml` („Post-deploy security
   checks“) ověří na ostré doméně zavřené cesty, hlavičky a CSRF
   (POST se stejným Origin = 200, s cizím = 403). Červený krok = hosting

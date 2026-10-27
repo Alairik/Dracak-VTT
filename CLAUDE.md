@@ -106,8 +106,18 @@
   přihlášení — `deploy.yml` ji nevylučuje, nahrálo by se to na veřejný web.
 - **Deploy (`deploy.yml`) jen nahraje soubory přes FTP.** Kroky, které
   volaly web z GitHubu (migrace, smoke test, kontrola zabezpečení), jsou
-  pryč — hosting je z GitHubu odmítá. Kontrolu zabezpečení (zavřené cesty,
-  hlavičky, CSRF) i to, že se FTP nahrálo celé, je třeba dělat ručně.
+  pryč — hosting je z GitHubu odmítá. Místo nich: deploy před nahráním
+  vyrobí `deploy-manifest.json` (`.github/scripts/manifest.php`, seznam
+  nahrávaných souborů se SHA-256; vzory vyloučení čte z `exclude` v
+  `deploy.yml`, takže nové vyloučení stačí přidat tam) a stránka
+  „Kontrola nasazení“ (`admin_nasazeni.php`, `includes/nasazeni.php`) na
+  serveru porovná manifest s diskem — chybějící / jiné / navíc ležící
+  soubory, spustitelné soubory v `uploads/` — a po kliknutí si zkusí
+  vyžádat vlastní zavřené cesty a bezpečnostní hlavičky. Po nasazení se
+  proto vyplatí zkontrolovat tuhle stránku; CSRF a ostatní se dál kontrolují
+  jen ručně. `deploy-manifest.json` je v `.htaccess` zavřený zvenčí.
+  FTP-Deploy nahrává jen změněné soubory, takže chybějící soubor další
+  deploy sám nedoplní — oprava = drobná změna v tom souboru, nebo ruční FTP.
 - **`setup-admin.php` se nikdy nedeployuje** (viz `exclude` v `deploy.yml`)
   — má přístup k DB a zakládá admin účty, nepatří na veřejný web.
 - **`content/` drží fragmenty rulebooku pro `pravidla.php`** (`pravidla-hrac.html`,

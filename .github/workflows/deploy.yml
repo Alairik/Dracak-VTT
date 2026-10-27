@@ -35,6 +35,12 @@ jobs:
           file_put_contents("config.php", $php);
           '
 
+      - name: Generate deploy manifest
+        # Seznam nahrávaných souborů s kontrolními součty (deploy-manifest.json). Porovnává ho stránka
+        # admin_nasazeni.php na serveru — pozná, že FTP nějaký soubor nenahrálo, nebo že na serveru leží něco navíc.
+        # Vzory vyloučení čte skript z bloku `exclude` níž, takže se nerozejdou.
+        run: php .github/scripts/manifest.php
+
       - name: FTP Deploy
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
