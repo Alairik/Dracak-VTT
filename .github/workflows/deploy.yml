@@ -57,56 +57,10 @@ jobs:
             database/RUCNE-*.sql
             docs/**
             setup-admin.php
-            scripts/migrate.php
-
-      # migrate.php na serveru trvale NEZŮSTÁVÁ (vstup do DB nemá viset na webu — upozornění NÚKIB
-      # na PHP RCE). Deploy ho nahraje pod náhodným jménem scripts/migrate-<32 hex>.php, zavolá s
-      # tokenem a hned smaže; úklid proběhne i po chybě. Na serveru existuje pár sekund. Nahrání i
-      # smazání dělá stejná FTP akce jako hlavní deploy (tedy stejné nastavení FTPS), do vlastní
-      # podsložky stavu (scripts/.ftp-deploy-sync-state.json, dotfile je zavřený v .htaccess).
-      - name: Prepare one-time migration file
-        run: |
-          set -eu
-          name="migrate-$(openssl rand -hex 16).php"
-          mkdir -p .migrate-stage .migrate-stage-empty
-          cp scripts/migrate.php ".migrate-stage/$name"
-          echo "MIGRATE_FILE=$name" >> "$GITHUB_ENV"
-      - name: Upload one-time migration file
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftps
-          local-dir: ./.migrate-stage/
-          server-dir: ./scripts/
-
-      # TEMP DIAG
-      - name: Diagnostics
-        continue-on-error: true
-        run: |
-          echo "runner: $(curl -sS -m 10 https://ipinfo.io/json | tr -d '\n' | head -c 300)"
-          for u in "" index.php dashboard.php hra/svety.php assets/js/denik.js assets/css/denik.css robots.txt scripts/ "scripts/$MIGRATE_FILE"; do
-            code=$(curl -sS -o /tmp/o -w "%{http_code} %{size_download}b %{redirect_url}" "https://vtt.zvelebil.online/$u")
-            echo "/$u -> $code | $(head -c 90 /tmp/o | tr '\n' ' ')"
-          done
-          echo "--- hlavičky /index.php:"
-          curl -sSI "https://vtt.zvelebil.online/index.php" | head -20
-          echo "--- s prohlížečovým UA:"
-          curl -sS -o /dev/null -w "index.php %{http_code}\n" -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36" "https://vtt.zvelebil.online/index.php"
-          curl -sS -o /dev/null -w "scripts/migrate %{http_code}\n" -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36" "https://vtt.zvelebil.online/scripts/$MIGRATE_FILE"
-          echo "--- co je na webu na /:"
-          curl -sS "https://vtt.zvelebil.online/" | grep -io '<title>[^<]*</title>' | head -2
-          echo "--- hlavní doména robots.txt vs. vtt:"
-          curl -sS "https://zvelebil.online/robots.txt" | head -5
-          echo "--- FTP: výpis kořene (striktní TLS, bez --insecure):"
-          curl -sS -m 30 --ssl-reqd --list-only --user "${{ secrets.FTP_USERNAME }}:${{ secrets.FTP_PASSWORD }}" "ftp://${{ secrets.FTP_SERVER }}/" 2>&1 | head -40
-          echo "--- FTP: scripts/:"
-          curl -sS -m 30 --ssl-reqd --list-only --user "${{ secrets.FTP_USERNAME }}:${{ secrets.FTP_PASSWORD }}" "ftp://${{ secrets.FTP_SERVER }}/scripts/" 2>&1 | head -20
 
       - name: Run pending DB migrations
         run: |
-          response=$(curl -sS -w "\n%{http_code}" -X POST "https://vtt.zvelebil.online/scripts/$MIGRATE_FILE" \
+          response=$(curl -sS -w "\n%{http_code}" -X POST "https://vtt.zvelebil.online/scripts/migrate.php" \
             -H "X-Migrate-Token: ${{ secrets.MIGRATE_TOKEN }}")
           http_code=$(echo "$response" | tail -1)
           body=$(echo "$response" | sed '$d')
@@ -115,33 +69,6 @@ jobs:
             echo "::error::migrate.php vrátil HTTP $http_code"
             exit 1
           fi
-
-      # Smazat nahraný soubor — vždy, i když migrace selhaly. Prázdná složka = FTP akce smaže, co
-      # sama nahrála (soubor ze zaznamenaného stavu), a nic dalšího.
-      - name: Remove one-time migration file
-        if: always() && env.MIGRATE_FILE != ''
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftps
-          local-dir: ./.migrate-stage-empty/
-          server-dir: ./scripts/
-
-      - name: Check one-time migration file is gone
-        if: always() && env.MIGRATE_FILE != ''
-        run: |
-          fail=0
-          for path in "scripts/$MIGRATE_FILE" scripts/migrate.php; do
-            code=$(curl -sS -o /dev/null -w "%{http_code}" "https://vtt.zvelebil.online/$path")
-            echo "$path -> HTTP $code (čekáno 403 nebo 404)"
-            if [ "$code" != "403" ] && [ "$code" != "404" ]; then
-              echo "::error::$path je zvenku pořád dostupné (HTTP $code) — smaž ho na serveru ručně"
-              fail=1
-            fi
-          done
-          exit $fail
 
       - name: Post-deploy smoke test
         run: |
@@ -173,7 +100,7 @@ jobs:
           fail=0
 
           # 1) Soubory a složky, které musí být zvenku zavřené.
-          for path in config.php .ftp-deploy-sync-state.json scripts/.ftp-deploy-sync-state.json includes/auth.php content/pravidla-pj.html database/migrations/0100_zbrane_kombinace_chvat.sql uploads/ scripts/migrate.php; do
+          for path in config.php .ftp-deploy-sync-state.json includes/auth.php content/pravidla-pj.html database/migrations/0100_zbrane_kombinace_chvat.sql uploads/; do
             code=$(curl -sS -o /dev/null -w "%{http_code}" "$base/$path")
             echo "$path -> HTTP $code (čekáno 403 nebo 404)"
             if [ "$code" != "403" ] && [ "$code" != "404" ]; then
