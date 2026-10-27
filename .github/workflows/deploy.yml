@@ -95,6 +95,14 @@ jobs:
           echo "--- s prohlížečovým UA:"
           curl -sS -o /dev/null -w "index.php %{http_code}\n" -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36" "https://vtt.zvelebil.online/index.php"
           curl -sS -o /dev/null -w "scripts/migrate %{http_code}\n" -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36" "https://vtt.zvelebil.online/scripts/$MIGRATE_FILE"
+          echo "--- co je na webu na /:"
+          curl -sS "https://vtt.zvelebil.online/" | grep -io '<title>[^<]*</title>' | head -2
+          echo "--- hlavní doména robots.txt vs. vtt:"
+          curl -sS "https://zvelebil.online/robots.txt" | head -5
+          echo "--- FTP: výpis kořene (striktní TLS, bez --insecure):"
+          curl -sS -m 30 --ssl-reqd --list-only --user "${{ secrets.FTP_USERNAME }}:${{ secrets.FTP_PASSWORD }}" "ftp://${{ secrets.FTP_SERVER }}/" 2>&1 | head -40
+          echo "--- FTP: scripts/:"
+          curl -sS -m 30 --ssl-reqd --list-only --user "${{ secrets.FTP_USERNAME }}:${{ secrets.FTP_PASSWORD }}" "ftp://${{ secrets.FTP_SERVER }}/scripts/" 2>&1 | head -20
 
       - name: Run pending DB migrations
         run: |
