@@ -95,10 +95,12 @@ function dracak_vtt_iniciativa_poradi(PDO $pdo, int $mapaId): array
 {
     // Sloupce iniciativy v2 (slíbený úkon) jen když je ruční SQL provedené.
     $v2 = function_exists('dracak_vtt_tokeny_funkce') && dracak_vtt_tokeny_funkce()['iniciativa_v2'];
+    // Ruční název tokenu (PJ ho přejmenoval třeba na „Vlk 2“) má přednost, stejně jako ve výzvách a událostech.
+    $maNazevTokenu = function_exists('dracak_vtt_tokeny_ma_sloupec') && dracak_vtt_tokeny_ma_sloupec('nazev');
     $stmt = $pdo->prepare(
         'SELECT ki.token_id, ki.hod, ki.modifikator, ki.vysledek, ki.akce_celkem, ki.akce_zbyvajici,
                 ' . ($v2 ? 'ki.zavazek, ki.zavazek_akci, ki.zavazek_hotovo, ki.akce_hotovo,' : '') . '
-                t.typ_entity, t.entita_id,
+                t.typ_entity, t.entita_id, ' . ($maNazevTokenu ? 't.nazev AS nazev_tokenu,' : 'NULL AS nazev_tokenu,') . '
                 p.nazev AS postava_nazev, p.obratnost,
                 ni.nazev_instance, n.oc AS nestvura_oc
          FROM kolo_iniciativa ki
@@ -117,7 +119,9 @@ function dracak_vtt_iniciativa_poradi(PDO $pdo, int $mapaId): array
         $r['vysledek'] = (int)$r['vysledek'];
         $r['akce_celkem'] = (int)$r['akce_celkem'];
         $r['akce_zbyvajici'] = (int)$r['akce_zbyvajici'];
-        $r['label'] = $r['typ_entity'] === 'postava' ? $r['postava_nazev'] : $r['nazev_instance'];
+        $r['label'] = ($r['nazev_tokenu'] !== null && $r['nazev_tokenu'] !== '')
+            ? (string)$r['nazev_tokenu']
+            : ($r['typ_entity'] === 'postava' ? $r['postava_nazev'] : $r['nazev_instance']);
         if ($r['typ_entity'] === 'postava') {
             $bonus = dracak_vtt_obratnost_bonus($pdo, $r['obratnost'] !== null ? (int)$r['obratnost'] : null);
         } else {

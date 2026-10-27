@@ -20,6 +20,10 @@ $rucne = !empty($data['rucne']);
 $pdo->beginTransaction();
 try {
     $stav = dracak_vtt_souboj_nacti($pdo, $mapaId, true);
+    if ($stav === null) {
+        $pdo->rollBack();
+        dracak_vtt_souboj_chyba(422, 'Na téhle mapě žádný souboj neběží.');
+    }
     $v = dracak_vtt_vyzva_nacti($pdo, (int)($data['vyzva_id'] ?? 0), true);
     if (!$v || $v['mapa_id'] !== $mapaId) {
         $pdo->rollBack();
@@ -34,6 +38,16 @@ try {
         dracak_vtt_souboj_chyba(403, 'Za tohohle tvora házet nesmíš.');
     }
     $d = $v['data'];
+    // Tik efektu, který mezitím zmizel (PJ ho sundal, vypršel), se neprovede — nesmí strhnout ani přidat životy za efekt, který tvor už nemá.
+    if ($v['druh'] === 'tik') {
+        $q = $pdo->prepare('SELECT 1 FROM aktivni_efekty WHERE id = ?');
+        $q->execute([(int)($d['aktivni_efekt_id'] ?? 0)]);
+        if (!$q->fetchColumn()) {
+            $pdo->prepare('UPDATE souboj_vyzva SET stav = "zruseno" WHERE id = ?')->execute([$v['id']]);
+            $pdo->commit();
+            dracak_vtt_souboj_chyba(422, 'Efekt už na tvorovi není (PJ ho sundal, nebo vypršel) — tik se neprovede.');
+        }
+    }
     $cislo = dracak_vtt_vyzva_cislo($v['druh'], $d);
     if ($cislo === null) {
         $pdo->rollBack();

@@ -364,7 +364,12 @@ function dracak_vtt_efekt_aplikuj(PDO $pdo, ?int $mapaId, string $typ, int $enti
         } else {
             $nove = $e['opakovani'] === 'secti' ? $staryZbyva + $zbyva : max($staryZbyva, $zbyva);
         }
-        $pdo->prepare('UPDATE aktivni_efekty SET zbyva_kol = ? WHERE id = ?')->execute([$nove, $stary['id']]);
+        // Kolo seslání se do trvání nepočítá (kolo_se_nepocita) — a po obnovení platí kolo té poslední aplikace, ne původní.
+        if ($mech) {
+            $pdo->prepare('UPDATE aktivni_efekty SET zbyva_kol = ?, nasazeno_kolo = ? WHERE id = ?')->execute([$nove, $kolo, $stary['id']]);
+        } else {
+            $pdo->prepare('UPDATE aktivni_efekty SET zbyva_kol = ? WHERE id = ?')->execute([$nove, $stary['id']]);
+        }
         $aktivniId = (int)$stary['id'];
         $zbyvaPred = $staryZbyva;
         $zbyva = $nove;
@@ -565,15 +570,20 @@ function dracak_vtt_efekty_tiky_zaloz(PDO $pdo, int $svetId, int $mapaId, int $u
     }
     $info = dracak_vtt_souboj_tokeny_info($pdo, $svetId, $mapaId);
     $pocet = 0;
+    // Tik z minulého kola, který nikdo nedohrál, se s novým kolem ruší — jinak by šel dohrát vedle nového a krvácení by se
+    // započítalo dvakrát.
+    $pdo->prepare('UPDATE souboj_vyzva SET stav = "zruseno" WHERE mapa_id = ? AND druh = "tik" AND stav = "ceka"')->execute([$mapaId]);
+    $zalozene = [];   // aktivni_efekt_id — tvor se dvěma tokeny na mapě má jeden tik, ne dva
     foreach ($info as $tokenId => $t) {
         if (!in_array($t['typ_entity'], ['postava', 'nestvura_instance'], true)) {
             continue;
         }
         foreach (dracak_vtt_efekty_souhrn($pdo, $t['typ_entity'], (int)$t['entita_id'])['tiky'] as $tik) {
             $k = dracak_vtt_parsuj_kostky($tik['kostky']);
-            if ($k === null) {
+            if ($k === null || isset($zalozene[$tik['aktivni_id']])) {
                 continue;
             }
+            $zalozene[$tik['aktivni_id']] = true;
             $d = [
                 'popis' => ($tik['znamenko'] < 0 ? 'Zranění od efektu ' : 'Léčení od efektu ') . $tik['nazev'],
                 'efekt_nazev' => $tik['nazev'],
@@ -609,6 +619,9 @@ function dracak_vtt_tik_vyhodnot(PDO $pdo, array $mapa, array $info, array $vyzv
         $hp = dracak_vtt_souboj_zranit($pdo, $svetId, $mapaId, $t, $castka, $ucetId);
     } else {
         $entita = dracak_vtt_entity_row($t['typ_entity'], (int)$t['entita_id']);
+        if (!$entita) {
+            throw new RuntimeException('Tvor, kterému měl tik léčit, už neexistuje.');
+        }
         $pred = (int)($entita['aktualni_hp'] ?? 0);
         [$nove, $max] = dracak_vtt_aplikuj_hp_deltu($t['typ_entity'], $entita, $castka);
         dracak_vtt_log_event($svetId, $mapaId, 'hp_zmena', [

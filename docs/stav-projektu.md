@@ -160,10 +160,12 @@ MariaDB.** Postup, který v session fungoval:
   jinak by hosting odpovídající 404 na všechno vyrobil falešné „zavřeno“; hostitel jen z `Host` a IP / localhost jen při vývoji z loopbacku (SSRF); (5) sken serveru
   přeskočí nečitelné složky a logy hostingu; (6) počet využití „jednou za kolo“ se čte po stránkách od startu souboje, ne z pevného okna; (7) `manifest.php` ukončí blok
   `exclude` podle odsazení a na nepodporovanou syntaxi vzoru (`!`, `{}`, `[]`) deploy zastaví; (8) `zbran_vytasit.php` nemá předčasnou kontrolu akcí (bezplatné vytasení akci nepotřebuje).
-- **Hlídá to deploy:** poslední krok `deploy.yml` („Post-deploy security
-  checks“) ověří na ostré doméně zavřené cesty, hlavičky a CSRF
-  (POST se stejným Origin = 200, s cizím = 403). Červený krok = hosting
-  direktivu neuplatnil, ne chyba aplikace.
+- **Kdo to hlídá:** zavřené cesty a hlavičky ověří stránka „Kontrola nasazení“
+  (`admin_nasazeni.php`, tlačítko „Zkontrolovat“); dřívější krok `deploy.yml`
+  „Post-deploy security checks“ je od 2026-10-27 pryč (hosting odmítá HTTP z
+  GitHubu). CSRF (POST s cizím Origin = 403) se kontroluje jen ručně.
+  „Zavřeno“ = hosting direktivy z `.htaccess` uplatnil, červená položka =
+  direktiva se neuplatnila, ne chyba aplikace.
 - **Prošlo auditem bez nálezu:** SQL (prepared statements, jediná
   konkatenace je `(int)`), nahrávání obrázků (whitelist přes
   `getimagesize`, náhodné jméno, přípona z MIME, složka zavřená, výdej
@@ -391,6 +393,12 @@ MariaDB.** Postup, který v session fungoval:
   na začátku kola vznikne tvoru výzva „tik“ — tlačítko → 3D kostka, nebo hod z vlastní kostky; tik tah nezdržuje a PJ ho
   smí zrušit. UI: panel tokenu ukazuje aktivní efekty (zbývá kol, co boj dělá, ✕ sundat), nabídka efektů má značky ⚙ ◐ ✋ ❓
   a výchozí trvání, odznak na tokenu má tooltip, deník postavy ukazuje, co efekt dělá.
+  **Po code review (3. kolo, 2026-10-28) opraveno:** (1) tvor má nejvýš jednu čekající výzvu „tik“ na efekt — nové kolo zruší nevyřízené tiky z minulého
+  (`stav = zruseno`) a duplicity podle `aktivni_id` vynechá; (2) tik efektu, který mezitím zmizel (PJ ho sundal, vypršel), se nehodí — `vyzva_hod.php` ho zruší
+  s hláškou místo toho, aby strhl životy za efekt, který tvor nemá, a `dracak_vtt_tik_vyhodnot` při chybějícím tvoru spadne s výjimkou; (3) znovunasazený
+  efekt (Rychlost, která už běží) obnoví i `nasazeno_kolo`, takže „poslední aplikace“ platí od nového kola; (4) veřejná událost `kolo_nove` už neprozradí skrytou
+  nestvůru v seznamu `ztrata_iniciativy` (trest jí vidí PJ v efektech); (5) pořadí iniciativy bere popisek přejmenovaného tokenu; (6) `vyzva_hod.php` bez běžícího
+  souboje vrátí srozumitelné 422. Regresní test `review2_api.js`.
   **Co je zpracované (17 efektů):** Rychlost (lektvar, kouzlo), Protoplazma, Spánek, Ochromení, Ochromení Černou zhoubou,
   Krvácení a Ochromení trollobijce, Sražen na zem, Zastrašen (útěk, i totální úspěch), Berserk (+6 iniciativa),
   Regenerace (lektvar, Prasiolit), Běh na krátké vzdálenosti. Ostatních ~100 zůstává `pj` / `past` / `ceka` — kniha u nich

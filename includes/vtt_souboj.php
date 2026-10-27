@@ -222,9 +222,15 @@ function dracak_vtt_souboj_nove_kolo(PDO $pdo, int $svetId, int $mapaId, int $uc
     // Slib úkonu: kdo nevěnoval aspoň polovinu akcí tomu, za co dostal bonus, ztratí v příští iniciativě. Zjistit a potrestat
     // dřív, než se smaže kolo_iniciativa a než se změní číslo kola (efekt se nasazuje s číslem kola, které právě končí).
     $ztrata = [];
+    $infoTokenu = null;
     foreach (dracak_vtt_iniciativa_nesplneny_slib($pdo, $svetId, $mapaId) as $n) {
         $duvod = 'nesplněný slib: ' . (DRACAK_VTT_ZAVAZEK_NAZVY[$n['zavazek']] ?? $n['zavazek']) . ' ' . $n['zavazek_hotovo'] . '/' . $n['zavazek_akci'] . ' akcí';
         if (dracak_vtt_iniciativa_ztrata_zaloz($pdo, $svetId, $mapaId, $ucetId, $n, $duvod)) {
+            // Událost čtou i hráči: skrytá nestvůra (jméno, úmysl, důvod) se do ní nesmí dostat. Trest jí PJ vidí v panelu efektů.
+            $infoTokenu ??= dracak_vtt_souboj_tokeny_info($pdo, $svetId, $mapaId);
+            if (isset($infoTokenu[(int)$n['token_id']]) && !dracak_vtt_souboj_vidi_hrac($infoTokenu[(int)$n['token_id']])) {
+                continue;
+            }
             $ztrata[] = ['token_id' => $n['token_id'], 'label' => $n['label'], 'duvod' => $duvod];
         }
     }
