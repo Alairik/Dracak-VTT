@@ -1,5 +1,6 @@
 -- Testovací data pro tests/ (lokální MariaDB; nikdy ne na ostrou databázi!).
--- Stav: svět 1 (PJ = účet 1), hráč = účet 3, postavy Hrun / Sindor / Prázdná / Nulová odolnost, mapa 1 (čtverec) a 2 (hex), jedna zeď.
+-- Stav: svět 1 (PJ = účet 1), hráč = účet 3, postavy Hrun / Sindor / Prázdná / Nulová odolnost, mapa 1 (čtverec) a 2 (hex), jedna zeď,
+-- na mapě 1 tokeny 1 (Hrun), 2 (Sindor) a 24 (obecný Sud rumu) — sady na ně odkazují číslem.
 -- Ruční ucty se zakládají v tests/build-fixture.sh (hesla se generují, v repu nejsou). Soubor je zároveň „reset“: před vložením
 -- smaže všechna dynamická data hry (souboj, efekty, tokeny, události) i testovací data, takže ho lze pouštět před každou sadou.
 SET NAMES utf8mb4;
@@ -7,7 +8,6 @@ SET FOREIGN_KEY_CHECKS = 0;
 
 DELETE FROM aktivni_efekty;
 DELETE FROM souboj_vyzva;
-DELETE FROM souboj_pohyb;
 DELETE FROM kolo_ucastnik;
 DELETE FROM kolo_iniciativa;
 DELETE FROM kolo_stav;
@@ -52,5 +52,8 @@ INSERT INTO `postava_lektvary` (`id`, `postava_id`, `lektvar_id`, `mnozstvi`) VA
 INSERT INTO `mapy` (`id`, `svet_id`, `nazev`, `typ_mapy`, `obrazek_cesta`, `sirka_px`, `vyska_px`, `grid_velikost_px`, `grid_typ`, `mlha_aktivni`, `grid_posun_x`, `grid_posun_y`, `vytvoreno`) VALUES (1,1,'Testovací mapa','svet','testmapa_ctverec.png',2400,1800,70,'ctverec',1,0,0,'2026-10-14 05:48:54');
 INSERT INTO `mapy` (`id`, `svet_id`, `nazev`, `typ_mapy`, `obrazek_cesta`, `sirka_px`, `vyska_px`, `grid_velikost_px`, `grid_typ`, `mlha_aktivni`, `grid_posun_x`, `grid_posun_y`, `vytvoreno`) VALUES (2,1,'Hex bojiště','zona','testmapa_hex.png',3200,2200,45,'hex',1,0,0,'2026-10-14 06:40:12');
 INSERT INTO `zdi` (`id`, `mapa_id`, `x1`, `y1`, `x2`, `y2`, `sirka_px`, `blokuje_pohyb`, `blokuje_vystrel`, `viditelna_hracum`, `vytvoreno`) VALUES (6,1,560,280,595,385,14,1,1,1,'2026-10-14 07:07:25');
+INSERT INTO `tokeny` (`id`, `mapa_id`, `typ_entity`, `entita_id`, `x`, `y`, `z_poradi`, `smer`, `velikost_sahu`, `hexu`, `barva`, `zamceno`, `nazev`, `obrazek_id`, `viditelny_hracum`) VALUES (1,1,'postava',1,245,175,0,0,1.00,1,NULL,0,NULL,NULL,1);
+INSERT INTO `tokeny` (`id`, `mapa_id`, `typ_entity`, `entita_id`, `x`, `y`, `z_poradi`, `smer`, `velikost_sahu`, `hexu`, `barva`, `zamceno`, `nazev`, `obrazek_id`, `viditelny_hracum`) VALUES (2,1,'postava',2,665,315,0,45,1.00,1,NULL,0,NULL,NULL,1);
+INSERT INTO `tokeny` (`id`, `mapa_id`, `typ_entity`, `entita_id`, `x`, `y`, `z_poradi`, `smer`, `velikost_sahu`, `hexu`, `barva`, `zamceno`, `nazev`, `obrazek_id`, `viditelny_hracum`) VALUES (24,1,'obecny',0,805,455,0,0,2.00,1,'#d9822b',1,'Sud rumu',NULL,1);
 
 SET FOREIGN_KEY_CHECKS = 1;

@@ -99,7 +99,7 @@ MariaDB.** Postup, který v session fungoval:
 
 **Regresní testy jsou v repu: `tests/`** (od 2026-10-28; dřív žily jen v pracovní složce session a po jejím zániku by se ztratily). `tests/build-fixture.sh`
 postaví z repa celou testovací databázi (pravidla + migrace + účty + testovací data), `tests/run.sh` pustí všechny sady a před každou vrátí data do výchozího
-stavu (pořadí nehraje roli); podrobnosti a seznam sad: `tests/README.md`. Nasazení je ignoruje (`tests/**` v `exclude`). **Před pushem změny v souboji, iniciativě,
+stavu (pořadí nehraje roli); podrobnosti a seznam sad: `tests/README.md`. Nasazení je ignoruje (`tests/**` v `exclude`). Náhodná procházka soubojem (`tests/e2e/fuzz_souboj.js`) 2026-10-28 našla a nechala opravit pád „Další tah“ u tvora s 0 akcemi (`GREATEST(0, x - 1)` na sloupci bez znaménka). **Před pushem změny v souboji, iniciativě,
 efektech, zbraních nebo deníku pusť aspoň příslušné sady** (`tests/run.sh souboj_api ini_v2_api …`), u změn základu (`includes/db.php`, `vtt.php`, auth) všechno.
 
 ---

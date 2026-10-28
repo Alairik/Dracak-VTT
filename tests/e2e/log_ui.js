@@ -2,7 +2,7 @@
 const { otevri } = require('./lib');
 const DB = process.env.DB || 'dracak';
 const fs = require('fs');
-const LOG = '/home/user/Dracak-VTT/logs/aplikace.log';
+const LOG = (process.env.DOCROOT || require('path').resolve(__dirname, '../..')) + '/logs/aplikace.log';
 const BASE = process.env.BASE || 'http://127.0.0.1:8099';
 let chyb = 0;
 const ok = (n, c, v = '') => { console.log((c ? 'OK    ' : 'CHYBA ') + n + (v ? ': ' + v : '')); if (!c) chyb++; };

@@ -39,6 +39,7 @@ Proměnné: `DB` (výchozí `dracak`), `BASE`, `OUT` (screenshoty, výchozí `/t
 |---|---|
 | `tests/unit/` | `log_unit.php` (chybový log), `migrace_unit.php` (rozdělení SQL a zakázané příkazy; část proti DB zatím jen ručně), `zaloha_test.php` (záloha → obnova do prázdné DB, kontrolní součty) |
 | `tests/e2e/` | Playwright a API sady: souboj a iniciativa (`souboj_api`, `ini_v2_api`, `vyzva_api`, `hex_*`), efekty (`efekty_*`), zbraně a vytasení (`zbrane_*`, `tasit_zdarma_api`), deník (`denik_v2`, `denik_dock`, `inv_ui`), tok pozvání a oprávnění (`e2e_hra`, `druzina_*`), chybový log a záloha (`log_ui`, `zaloha_ui`), review regrese (`review2_api`) |
+| `tests/e2e/fuzz_souboj.js` | Náhodná procházka soubojem (PJ i hráč posílají přes API náhodné i nesmyslné akce); hledá chyby serveru (5xx) a záznamy v chybovém logu. Není v `run.sh` (náhodná, pomalá): `cd tests/e2e && SEED=3 KROKU=200 node fuzz_souboj.js`, vždy po resetu dat (`mysql dracak < ../fixture/seed.sql`). Nalezla pád Dalšího tahu u tvora s 0 akcemi |
 | `tests/e2e/qa_zarizeni2.js`, `poll_load.js` | Měření, ne kontrola: screenshoty na telefonu a tabletu; požadavky a dotazy do DB na hráče za minutu (zapíná general log MariaDB). Spouštějí se ručně: `cd tests/e2e && node qa_zarizeni2.js` |
 | `tests/fixture/` | `seed.sql` (reset a testovací data), `make-images.py` (podklady map) |
 

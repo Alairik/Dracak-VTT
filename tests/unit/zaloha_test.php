@@ -19,7 +19,7 @@ $cmd = "mysql --default-character-set=utf8mb4 $cil < " . escapeshellarg($soubor)
 $out = shell_exec($cmd);
 echo ($out === null || trim($out) === '' ? 'OK   ' : 'CHYBA') . " import do prázdné DB" . ($out ? ': ' . trim($out) : '') . "\n";
 $ok = true;
-$orig = getenv('DB') ?: 'dracak';
+$orig = (string)$pdo->query('SELECT DATABASE()')->fetchColumn();   // databáze, na kterou míří config.php
 foreach ($v['radku_podle_tabulek'] as $t => $n) {
     $a = (int)shell_exec("mysql -N $orig -e 'SELECT COUNT(*) FROM `$t`'");
     $b = (int)shell_exec("mysql -N $cil -e 'SELECT COUNT(*) FROM `$t`'");

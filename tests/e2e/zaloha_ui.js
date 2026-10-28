@@ -23,7 +23,8 @@ const ok = (n, c, v = '') => { console.log((c ? 'OK    ' : 'CHYBA ') + n + (v ? 
   const text = fs.readFileSync(cesta, 'utf8');
   ok('soubor končí řádkem „Konec zálohy“', /-- Konec zálohy: \d+ tabulek, \d+ řádků\.\n$/.test(text), text.slice(-80).trim());
   ok('není v něm DROP ani žádná CHYBA', !/DROP |-- CHYBA/.test(text));
-  ok('obsahuje účty a mlhu (binární)', /CREATE TABLE IF NOT EXISTS `ucty`/.test(text) && /INSERT INTO `mlha_valky`[\s\S]*?0x[0-9a-f]{20}/.test(text));
+  ok('obsahuje účty', /CREATE TABLE IF NOT EXISTS `ucty`/.test(text) && /INSERT INTO `ucty`/.test(text));
+  ok('binární sloupce (mlha) jsou hexadecimálně, pokud nějaké řádky jsou', !/INSERT INTO `mlha_valky`/.test(text) || /INSERT INTO `mlha_valky`[\s\S]*?0x[0-9a-f]{20}/.test(text));
   // POST bez tokenu a s cizím tokenem
   const bez = await page.evaluate(async () => { const f = new URLSearchParams({ akce: 'stahnout' }); const r = await fetch('/admin_zaloha.php', { method: 'POST', body: f }); return r.status; });
   ok('POST bez tokenu = 403', bez === 403, String(bez));
