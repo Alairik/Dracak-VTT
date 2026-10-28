@@ -656,7 +656,7 @@ function dracak_vtt_utok_vyhodnot(PDO $pdo, array $mapa, array $info, array $uto
     $akceObrance = null;
     if (($obranaVyzva['data']['volba'] ?? null) === 'branit') {
         // Obrana je bojová akce: splňuje slíbený útok (iniciativa v2), do „první akce kola“ se ale nepočítá.
-        $pdo->prepare('UPDATE kolo_iniciativa SET akce_zbyvajici = GREATEST(0, akce_zbyvajici - 1)'
+        $pdo->prepare('UPDATE kolo_iniciativa SET akce_zbyvajici = IF(akce_zbyvajici > 0, akce_zbyvajici - 1, 0)'
             . (dracak_vtt_iniciativa_v2() ? ", zavazek_hotovo = zavazek_hotovo + IF(zavazek IN ('utok', 'strelba'), 1, 0)" : '')
             . ' WHERE mapa_id = ? AND token_id = ?')
             ->execute([$mapaId, $obrId]);

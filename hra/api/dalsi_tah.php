@@ -60,7 +60,7 @@ try {
         $novyAktivniTokenId = $maUAkce[0]['token_id'];
     } else {
         // "Spotřebuje" jednu akci aktuálně aktivního.
-        $pdo->prepare('UPDATE kolo_iniciativa SET akce_zbyvajici = GREATEST(0, akce_zbyvajici - 1) WHERE mapa_id = ? AND token_id = ?')
+        $pdo->prepare('UPDATE kolo_iniciativa SET akce_zbyvajici = IF(akce_zbyvajici > 0, akce_zbyvajici - 1, 0) WHERE mapa_id = ? AND token_id = ?')
             ->execute([$mapaId, $puvodniAktivniTokenId]);
 
         $poradi = dracak_vtt_iniciativa_poradi($pdo, $mapaId);
