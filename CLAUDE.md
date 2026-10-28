@@ -118,6 +118,12 @@
   jen ručně. `deploy-manifest.json` je v `.htaccess` zavřený zvenčí.
   FTP-Deploy nahrává jen změněné soubory, takže chybějící soubor další
   deploy sám nedoplní — oprava = drobná změna v tom souboru, nebo ruční FTP.
+- **Regresní testy jsou v `tests/`** (postavení DB: `tests/build-fixture.sh`,
+  spuštění: `tests/run.sh`, popis: `tests/README.md`). Před pushem změny v
+  souboji, iniciativě, efektech, zbraních nebo deníku pusť příslušné sady,
+  u změn základu (`includes/db.php`, `vtt.php`, auth) všechny. `tests/**` se
+  nenasazuje (je v `exclude` v `deploy.yml`) a testy nikdy nepatří proti
+  ostré databázi — `tests/fixture/seed.sql` v ní maže data her.
 - **Chybový log (`logs/aplikace.log`, `includes/log.php`, stránka `admin_log.php`)
   je data za provozu, ne obsah repa** — `logs/*` je v `.gitignore` kromě
   `logs/.htaccess` (zavírá složku zvenčí, musí v repu zůstat). Nezapisuj do něj

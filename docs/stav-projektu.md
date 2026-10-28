@@ -97,6 +97,11 @@ MariaDB.** Postup, který v session fungoval:
    Chromium `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`,
    `--no-sandbox`) — přihlásit přes `index.php`, screenshot stránky.
 
+**Regresní testy jsou v repu: `tests/`** (od 2026-10-28; dřív žily jen v pracovní složce session a po jejím zániku by se ztratily). `tests/build-fixture.sh`
+postaví z repa celou testovací databázi (pravidla + migrace + účty + testovací data), `tests/run.sh` pustí všechny sady a před každou vrátí data do výchozího
+stavu (pořadí nehraje roli); podrobnosti a seznam sad: `tests/README.md`. Nasazení je ignoruje (`tests/**` v `exclude`). **Před pushem změny v souboji, iniciativě,
+efektech, zbraních nebo deníku pusť aspoň příslušné sady** (`tests/run.sh souboj_api ini_v2_api …`), u změn základu (`includes/db.php`, `vtt.php`, auth) všechno.
+
 ---
 
 ## Hotovo — podle oblastí

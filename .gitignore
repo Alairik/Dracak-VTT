@@ -7,3 +7,6 @@ config.php
 # Log aplikace (vzniká za provozu, viz includes/log.php); .htaccess ve složce zůstává v repu.
 logs/*
 !logs/.htaccess
+
+# Podklady testovacích map (tests/fixture/make-images.py) — nesmí do commitu ani na hosting.
+uploads/mapy/testmapa_*

@@ -60,4 +60,5 @@ jobs:
             database/0002_ucty_a_role.sql
             database/RUCNE-*.sql
             docs/**
+            tests/**
             setup-admin.php

@@ -31,6 +31,11 @@ hosting je klasický sdílený PHP+MySQL, viz historie commitů.)
   vynuceno i na POST requestu, ne jen skrytím tlačítka (`dracak_can_edit_row()`).
 - ✅ Správa účtů (`admin.php`) — zakládání účtů, role, per-typ editační
   práva pro roli hráč
+- ✅ Administrace pro provoz (jen admin): Změny databáze (`admin_migrace.php`),
+  Kontrola nasazení (`admin_nasazeni.php`), Chybový log (`admin_log.php`),
+  Záloha databáze (`admin_zaloha.php`, postup obnovy v `docs/zalohy.md`)
+- ✅ Regresní testy v `tests/` (spuštění: `tests/README.md`), jen lokálně,
+  nenasazují se
 - ✅ Otestováno end-to-end na lokální MariaDB (import schématu + reálných
   dat, login, viditelnost podle role, uložení/smazání záznamu, M:N vazby,
   vynucení práv i na úrovni POST requestu, ne jen skrytí tlačítka v UI)
