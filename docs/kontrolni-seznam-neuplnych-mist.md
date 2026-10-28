@@ -439,7 +439,10 @@ knihou a opraví najednou. Pravidlo je v `CLAUDE.md`.
 **Vytasení bez akce (2026-10-27)**
 - [ ] Kniha píše **Erithen** (h1094, b7751–b7755, i h1094 nadpis „Rychlé tasení“), povolání v DB a v ostatních textech je **Erythen**. Pravopis nechán, jak je; jednotný tvar určí korektura.
 - [ ] Past u Rychlého tasení cizí zbraně: „Obr ~ 7 ~ Obr tasení/nic“ (b7752) — zdvojené „Obr“ a smysl čísla 7 jsou v knize nejasné (poznámka b7753), vyhodnocuje PJ.
-- [ ] **U 19 zbraní katalogu chybí `kategorie_zbrane`** (např. Fuuma shuriken, Hvězdice-bumerang, Atlatl, Rachejtle, Řetězový meč, Kouzelný luk); boj je proto nepovažuje za „tváří v tvář“ ani „vrhací“ a Rychlé tasení / Dikobraz se na ně neuplatní (vytasení stojí akci). Doplnit druh, až se projdou.
+- [ ] **U 13 zbraní katalogu zůstává prázdné `kategorie_zbrane`** (6 z původních 19 doplnila migrace `0103` podle tabulky a názvu v knize). Boj je nepovažuje za „tváří v tvář“ ani „vrhací“,
+  Rychlé tasení / Dikobraz se na ně neuplatní (vytasení stojí akci) a výběr číslované ÚČ (Síla / Obratnost) u nich odhaduje z dostřelu. Kniha druh jasně neříká u: **Fuuma shuriken** (je v tabulce
+  TVÁŘÍ V TVÁŘ, ale má dostřel 3/6/9 a bonus lupiče / Erithena k iniciativě mluví o „vrhání“), **Atlatl** (příslušenství v tabulce střeleckých zbraní, násobí dostřel vrhacích), **Řetězový meč**, **Khakkhara**,
+  **Hůl „Minami no mori“** (tváří v tvář, ale kniha neříká, jestli sečná / bodná / tupá) a **Rachejtle 1.–8. úrovně** (výbušná zbraň vypouštěná do vzduchu). Doplnit druh při proofreadingu.
 
 **Zbraně a iniciativa (2026-10-17, tabulky zbraní uživatele b14664–b14827)**
 - [ ] Základní tabulka zbraní označuje ‡ („vždy ztrácí iniciativu“) i **Válečnou sekeru** (b10672), nová tabulka ji ve „střední

@@ -228,7 +228,7 @@ efektech, zbraních nebo deníku pusť aspoň příslušné sady** (`tests/run.s
   nebo vrhací zbraň (jeden limit pro oboje); využití se počítá z logu (`akce_provedena.zdarma_efekt` ve stejném kole). **Dikobraz** (Zlaté tetování Velkého lovce, h1411,
   b9098): efekt „Dikobraz (Zlaté tetování)“ (1 kolo, rychlá volba) nasadí PJ jako každý efekt; vrhací zbraň se pak vytasí bez akce bez omezení počtu. Bezplatné vytasení
   neubere akci, není „akce kola“ (neposune tah, nespustí trest za slib úkonu, nepřeruší řadu sprintů) a zbraň musí být „u sebe“ (volně dostupná: pochva, holster —
-  b7754). Druh zbraně dává `dracak_vtt_zbran_druh()` z `kategorie_zbrane` (střelné a zbraně bez kategorie se nepočítají). V deníku (Boj) pruh „Bez akce: …, zbývá 1×“ a
+  b7754). Druh zbraně dává `dracak_vtt_zbran_druh()` z `kategorie_zbrane` (střelné a zbraně bez kategorie se nepočítají; migrace `0103` doplnila druh u 6 zbraní, 13 jich zůstává prázdných — viz `docs/kontrolni-seznam-neuplnych-mist.md`). V deníku (Boj) pruh „Bez akce: …, zbývá 1×“ a
   tlačítko „Vytasit (bez akce)“. **Zůstává na PJ** (efekty jsou ve stavu „cast“): Erythenova vržená zbraň +2 ÚČ, cizí zbraň v dosahu 1 (past Obr–7–Obr), dvojnásobné dostřely
   Dikobraza; ostatní značky Zlatého tetování (Slon, Kobra…) nejsou v DB. **Chybí (potřebuje pravidlo):** kolik zbraní se vejde na opasek / do pochev, cena pochev v nosnosti,
   toulec a šípy jako omezení střelby.
