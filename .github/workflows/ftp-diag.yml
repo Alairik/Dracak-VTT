@@ -1,0 +1,40 @@
+# Jednorázová diagnostika: co leží na FTP a co vrací doména. Spouští se ručně (workflow_dispatch), nic nenahrává ani nemaže.
+# Vypisuje jen názvy souborů a složek a hlavičku deploy-manifest.json (commit a čas); hesla jsou v GitHub Secrets a v logu se maskují.
+name: FTP Diag
+on: workflow_dispatch
+jobs:
+  diag:
+    name: Diagnostika FTP
+    runs-on: ubuntu-latest
+    steps:
+      - name: Výpis FTP
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          set +e
+          vypis() {
+            echo "=== /$1"
+            curl -sS --max-time 40 --ssl-reqd -u "$FTP_USERNAME:$FTP_PASSWORD" "ftp://$FTP_SERVER/$1" 2>&1 | head -80
+            if [ "${PIPESTATUS[0]}" != 0 ]; then
+              echo "(ověřený TLS selhal, zkouším bez ověření certifikátu — jen výpis názvů)"
+              curl -sS -k --max-time 40 --ssl-reqd -u "$FTP_USERNAME:$FTP_PASSWORD" "ftp://$FTP_SERVER/$1" 2>&1 | head -80
+            fi
+          }
+          vypis ""
+          vypis "hra/"
+          vypis "logs/"
+          vypis "uploads/"
+          echo "=== deploy-manifest.json (hlavička)"
+          curl -sS -k --max-time 40 --ssl-reqd -u "$FTP_USERNAME:$FTP_PASSWORD" "ftp://$FTP_SERVER/deploy-manifest.json" 2>&1 | head -c 400
+          echo
+          echo "=== kořen o úroveň výš (kdyby bylo víc webů)"
+          curl -sS -k --max-time 40 --ssl-reqd -u "$FTP_USERNAME:$FTP_PASSWORD" "ftp://$FTP_SERVER/../" 2>&1 | head -40
+      - name: Co vrací doména z GitHubu
+        run: |
+          set +e
+          for u in https://vtt.zvelebil.online/ https://vtt.zvelebil.online/index.php https://vtt.zvelebil.online/robots.txt https://zvelebil.online/; do
+            echo "=== $u"
+            curl -sS -o /dev/null -D - --max-time 25 "$u" 2>&1 | head -12
+          done
