@@ -18,7 +18,7 @@ if (!$user) {
     exit;
 }
 
-$typEntity = (string)($_GET['typ_entity'] ?? '');
+$typEntity = dracak_text($_GET['typ_entity'] ?? '');
 $entitaId = (int)($_GET['entita_id'] ?? 0);
 if (!in_array($typEntity, ['postava', 'nestvura_instance'], true) || $entitaId <= 0) {
     http_response_code(422);

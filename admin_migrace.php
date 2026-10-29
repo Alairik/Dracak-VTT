@@ -18,7 +18,7 @@ if (empty($_SESSION['migrace_token'])) {
 $token = (string)$_SESSION['migrace_token'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $dodany = (string)($_POST['token'] ?? '');
+    $dodany = dracak_text($_POST['token'] ?? '');
     if (($_POST['akce'] ?? '') === 'spustit' && hash_equals($token, $dodany)) {
         $v = dracak_migrace_spust($pdo);
         error_log('[dracak-vtt] migrace z administrace (' . $user['email'] . '): spuštěno ' . $v['spusteno']

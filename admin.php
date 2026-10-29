@@ -15,7 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($akce === 'vytvorit') {
         $email = trim($_POST['email'] ?? '');
         $jmeno = trim($_POST['jmeno'] ?? '');
-        $heslo = (string)($_POST['heslo'] ?? '');
+        $heslo = dracak_text($_POST['heslo'] ?? '');
         $role = in_array($_POST['role'] ?? '', ['admin', 'pj', 'hrac'], true) ? $_POST['role'] : 'hrac';
         if ($email === '' || $jmeno === '' || strlen($heslo) < 12) {
             $error = 'Vyplň e-mail, jméno a heslo (min. 12 znaků).';
@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($akce === 'ulozit') {
         $id = (int)$_POST['id'];
         $role = in_array($_POST['role'] ?? '', ['admin', 'pj', 'hrac'], true) ? $_POST['role'] : 'hrac';
-        $noveHeslo = (string)($_POST['nove_heslo'] ?? '');
+        $noveHeslo = dracak_text($_POST['nove_heslo'] ?? '');
         if ($noveHeslo !== '' && strlen($noveHeslo) < 12) {
             $error = 'Nové heslo musí mít aspoň 12 znaků.';
         } else {

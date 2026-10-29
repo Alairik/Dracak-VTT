@@ -10,8 +10,8 @@ require_once __DIR__ . '/../../includes/vtt_kontejnery.php';
 header('Content-Type: application/json; charset=utf-8');
 dracak_require_login();
 
-$typ = (string)($_GET['typ'] ?? '');
-$q = trim((string)($_GET['q'] ?? ''));
+$typ = dracak_text($_GET['typ'] ?? '');
+$q = trim(dracak_text($_GET['q'] ?? ''));
 if (mb_strlen($q) < 2) {
     echo json_encode(['vysledky' => []]);
     exit;

@@ -15,7 +15,7 @@ if (empty($_SESSION['log_token'])) {
 $token = (string)$_SESSION['log_token'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (($_POST['akce'] ?? '') === 'smazat' && hash_equals($token, (string)($_POST['token'] ?? ''))) {
+    if (($_POST['akce'] ?? '') === 'smazat' && hash_equals($token, dracak_text($_POST['token'] ?? ''))) {
         $_SESSION['log_vysledek'] = dracak_log_smaz() ? 'Log je prázdný.' : 'Log se nepodařilo smazat (nejde psát do složky logs/).';
     } else {
         $_SESSION['log_vysledek'] = 'Požadavek nemá platný token — načti stránku znovu a zkus to ještě jednou.';
@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $vysledek = $_SESSION['log_vysledek'] ?? null;
 unset($_SESSION['log_vysledek']);
 
-$druh = (string)($_GET['druh'] ?? '');
+$druh = dracak_text($_GET['druh'] ?? '');
 $druh = isset(DRACAK_LOG_DRUHY[$druh]) ? $druh : null;
 $vse = dracak_log_nacti();
 $log = $druh === null ? $vse : dracak_log_nacti($druh);

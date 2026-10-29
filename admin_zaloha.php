@@ -16,7 +16,7 @@ if (empty($_SESSION['zaloha_token'])) {
 $token = (string)$_SESSION['zaloha_token'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (($_POST['akce'] ?? '') !== 'stahnout' || !hash_equals($token, (string)($_POST['token'] ?? ''))) {
+    if (($_POST['akce'] ?? '') !== 'stahnout' || !hash_equals($token, dracak_text($_POST['token'] ?? ''))) {
         http_response_code(403);
         die('Požadavek nemá platný token — načti stránku znovu a zkus to ještě jednou.');
     }

@@ -107,7 +107,7 @@ if ($nastroj === null) {
     }
 
     // ---------- Filtry a hledání (jen na seznamu, jen server-side SQL) ----------
-    $search = trim((string)($_GET['q'] ?? ''));
+    $search = trim(dracak_text($_GET['q'] ?? ''));
     $filterValues = [];
     $where = [];
     $params = [];
@@ -134,7 +134,7 @@ if ($nastroj === null) {
         // Kouzla — speciální filtry: mana/dosah (volný text, parsuje se v PHP
         // po SQL dotazu) a Povolání (přes seznam_kouzel_id -> seznamy_kouzel.povolani_id).
         if (in_array('kouzla_mana_dosah_povolani', $config['special_filters'] ?? [], true)) {
-            $povolaniFilter = trim((string)($_GET['povolani'] ?? ''));
+            $povolaniFilter = trim(dracak_text($_GET['povolani'] ?? ''));
             if ($povolaniFilter !== '' && ctype_digit($povolaniFilter)) {
                 $where[] = 'seznam_kouzel_id IN (SELECT id FROM seznamy_kouzel WHERE povolani_id = ?)';
                 $params[] = (int)$povolaniFilter;
@@ -142,10 +142,10 @@ if ($nastroj === null) {
         }
         $rows = dracak_entity_list($table, $config, ['where' => $where, 'params' => $params]);
         if (in_array('kouzla_mana_dosah_povolani', $config['special_filters'] ?? [], true)) {
-            $manaMin = trim((string)($_GET['cena_magenergie_min'] ?? ''));
-            $manaMax = trim((string)($_GET['cena_magenergie_max'] ?? ''));
-            $dosahMin = trim((string)($_GET['dosah_min'] ?? ''));
-            $dosahMax = trim((string)($_GET['dosah_max'] ?? ''));
+            $manaMin = trim(dracak_text($_GET['cena_magenergie_min'] ?? ''));
+            $manaMax = trim(dracak_text($_GET['cena_magenergie_max'] ?? ''));
+            $dosahMin = trim(dracak_text($_GET['dosah_min'] ?? ''));
+            $dosahMax = trim(dracak_text($_GET['dosah_max'] ?? ''));
             $leadNum = function (?string $s): int {
                 if ($s === null) return 0;
                 if (preg_match('/(\d+)/', $s, $m)) return (int)$m[1];
@@ -509,7 +509,7 @@ if ($nastroj === null) {
           <select class="input filter-select" name="povolani" onchange="this.form.submit()">
             <option value="">vše</option>
             <?php foreach ($filterSelectOptions['__povolani'] ?? [] as $p): ?>
-              <option value="<?= (int)$p['id'] ?>" <?= (string)($_GET['povolani'] ?? '') === (string)$p['id'] ? 'selected' : '' ?>><?= htmlspecialchars($p['nazev']) ?></option>
+              <option value="<?= (int)$p['id'] ?>" <?= dracak_text($_GET['povolani'] ?? '') === (string)$p['id'] ? 'selected' : '' ?>><?= htmlspecialchars($p['nazev']) ?></option>
             <?php endforeach; ?>
           </select>
         </div>

@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($akce === 'upravit_datum') {
-        $novyDatum = (string)($_POST['pocatecni_datum'] ?? '');
+        $novyDatum = dracak_text($_POST['pocatecni_datum'] ?? '');
         if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $novyDatum)) {
             $stmt = dracak_db()->prepare('UPDATE svet SET pocatecni_datum = ? WHERE id = ?');
             $stmt->execute([$novyDatum, $svetId]);

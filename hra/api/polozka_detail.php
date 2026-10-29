@@ -14,7 +14,7 @@ require_once __DIR__ . '/../../includes/vtt_efekty.php';
 header('Content-Type: application/json; charset=utf-8');
 dracak_require_login();
 
-$typ = (string)($_GET['typ'] ?? '');
+$typ = dracak_text($_GET['typ'] ?? '');
 $id = (int)($_GET['id'] ?? 0);
 $pdo = dracak_db();
 

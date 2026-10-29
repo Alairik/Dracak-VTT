@@ -20,7 +20,7 @@ if (!dracak_vtt_tokeny_funkce()['obrazek']) {
     echo json_encode(['error' => 'Obrázky tokenů se zapnou po jednorázovém kroku správce (ruční SQL).']);
     exit;
 }
-$vysledek = dracak_vtt_obrazek_ulozit(dracak_db(), $svetId, (int)$user['id'], $_FILES['soubor'] ?? [], (string)($_POST['nazev'] ?? ''));
+$vysledek = dracak_vtt_obrazek_ulozit(dracak_db(), $svetId, (int)$user['id'], $_FILES['soubor'] ?? [], dracak_text($_POST['nazev'] ?? ''));
 if (isset($vysledek['chyba'])) {
     http_response_code(422);
     echo json_encode(['error' => $vysledek['chyba']]);

@@ -40,7 +40,7 @@ if (!dracak_can_edit($user, $table)) {
     dracak_text_save_fail(403, 'Nemáš právo upravovat text pravidel.');
 }
 
-$knihaId = trim((string)($_POST['kniha_id'] ?? ''));
+$knihaId = trim(dracak_text($_POST['kniha_id'] ?? ''));
 // Přesně formát id="hNNNN"/"bNNNN" z content/pravidla-*.html (viz
 // pravidla.php) — nic jiného se sem ukládat nemá, jinak by šlo přes
 // tenhle endpoint zapsat libovolný řetězec jako "kotvu".
@@ -48,7 +48,7 @@ if (!preg_match('/^[hb][1-9][0-9]{0,9}$/', $knihaId)) {
     dracak_text_save_fail(400, 'Neplatné ID v knize.');
 }
 
-$obsahRaw = (string)($_POST['obsah'] ?? '');
+$obsahRaw = dracak_text($_POST['obsah'] ?? '');
 if (strlen($obsahRaw) > 200000) {
     dracak_text_save_fail(413, 'Text je příliš dlouhý.');
 }

@@ -219,7 +219,7 @@ function wizard_krok5(
 // --- Dispatch ---------------------------------------------------------
 
 $krok = (int)($_POST['krok'] ?? 0);
-$akce = (string)($_POST['akce'] ?? '');
+$akce = dracak_text($_POST['akce'] ?? '');
 
 $atributyZPostu = [];
 foreach (POLE_PODLE_KODU as $kod => $pole) {
@@ -330,7 +330,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             echo '<div class="card elev-sm"><p>Neplatná rasa nebo povolání — zkus to prosím znovu od kroku 1.</p></div>';
             wizard_krok1($svet, $svetId);
         } elseif ($akce === 'ulozit' && $krok === 5) {
-            $nazev = trim((string)($_POST['nazev'] ?? ''));
+            $nazev = trim(dracak_text($_POST['nazev'] ?? ''));
             if ($nazev === '') {
                 http_response_code(422);
                 echo '<div class="card elev-sm"><p>Postava musí mít jméno.</p></div>';
@@ -363,7 +363,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
                 exit;
             }
         } else {
-            wizard_krok5($svetId, $rasaId, $povolaniId, $atributyZPostu, $maxHp, $isPjOrAdmin, $hraciVeSvete, (string)($_POST['nazev'] ?? ''));
+            wizard_krok5($svetId, $rasaId, $povolaniId, $atributyZPostu, $maxHp, $isPjOrAdmin, $hraciVeSvete, dracak_text($_POST['nazev'] ?? ''));
         }
     }
 }

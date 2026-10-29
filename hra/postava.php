@@ -33,12 +33,23 @@ if ($svetId > 0) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $nazev = trim((string)($_POST['nazev'] ?? ''));
+    $nazev = trim(dracak_text($_POST['nazev'] ?? ''));
     if ($nazev === '') { http_response_code(422); die('Postava musí mít jméno.'); }
-    $rasaId = !empty($_POST['rasa_id']) ? (int)$_POST['rasa_id'] : null;
-    $povolaniId = !empty($_POST['povolani_id']) ? (int)$_POST['povolani_id'] : null;
-    $uroven = max(1, (int)($_POST['uroven'] ?? 1));
-    $maxHp = max(0, (int)($_POST['max_hp'] ?? 0));
+    $nazev = mb_substr($nazev, 0, 150);   // sloupec nazev je VARCHAR(150)
+    // Meze podle sloupců (rasa a povolání SMALLINT, úroveň a vlastnosti TINYINT, životy SMALLINT) a existence záznamu v číselníku:
+    // jinak by hodnota mimo rozsah nebo neexistující rasa spadla na chybě databáze.
+    $existuje = static function (string $tabulka, ?int $id): ?int {
+        if ($id === null || $id < 1 || $id > 65535) {
+            return null;
+        }
+        $q = dracak_db()->prepare('SELECT 1 FROM ' . $tabulka . ' WHERE id = ?');
+        $q->execute([$id]);
+        return $q->fetchColumn() !== false ? $id : null;
+    };
+    $rasaId = $existuje('rasy', !empty($_POST['rasa_id']) ? (int)$_POST['rasa_id'] : null);
+    $povolaniId = $existuje('povolani', !empty($_POST['povolani_id']) ? (int)$_POST['povolani_id'] : null);
+    $uroven = max(1, min(255, (int)($_POST['uroven'] ?? 1)));
+    $maxHp = max(0, min(30000, (int)($_POST['max_hp'] ?? 0)));
     // Aktuální život se nesmí přehoupnout přes nové maximum (typicky se
     // upravuje max. život při postupu na vyšší úroveň) — mimo tenhle
     // strop se nekontroluje nic (léčení/zranění v boji řeší mapa.php).
@@ -47,14 +58,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // je na rozdíl od HP nepovinná — prázdné pole = NULL = tohle
     // povolání magenergii nepoužívá (nebo se zatím nevyplnilo), stejná
     // konvence jako nullable atributy níž.
-    $maxMagenergie = !empty($_POST['max_magenergie']) ? max(0, (int)$_POST['max_magenergie']) : null;
+    $maxMagenergie = !empty($_POST['max_magenergie']) ? max(0, min(30000, (int)$_POST['max_magenergie'])) : null;
     $aktualniMagenergie = $maxMagenergie !== null
         ? min($maxMagenergie, max(0, (int)($_POST['aktualni_magenergie'] ?? 0)))
         : null;
-    $poznamky = trim((string)($_POST['poznamky'] ?? '')) ?: null;
+    $poznamky = trim(dracak_text($_POST['poznamky'] ?? '')) ?: null;
     $atributy = [];
     foreach (['sila', 'obratnost', 'odolnost', 'inteligence', 'charisma'] as $atr) {
-        $atributy[$atr] = !empty($_POST[$atr]) ? max(1, (int)$_POST[$atr]) : null;
+        $atributy[$atr] = !empty($_POST[$atr]) ? max(1, min(255, (int)$_POST[$atr])) : null;
     }
 
     $stmt = dracak_db()->prepare(

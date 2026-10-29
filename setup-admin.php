@@ -16,7 +16,7 @@ if ($count > 0) {
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email'] ?? '');
     $jmeno = trim($_POST['jmeno'] ?? '');
-    $heslo = (string)($_POST['heslo'] ?? '');
+    $heslo = dracak_text($_POST['heslo'] ?? '');
     if ($email === '' || $jmeno === '' || strlen($heslo) < 12) {
         $error = 'Vyplň e-mail, jméno a heslo (min. 12 znaků).';
     } else {

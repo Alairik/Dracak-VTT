@@ -11,7 +11,7 @@ if (dracak_current_user()) {
 $error = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email'] ?? '');
-    $password = (string)($_POST['password'] ?? '');
+    $password = dracak_text($_POST['password'] ?? '');
     if (dracak_login($email, $password)) {
         header('Location: dashboard.php');
         exit;

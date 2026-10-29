@@ -10,8 +10,8 @@ $isAdmin = $user['role'] === 'admin';
 // includes/vtt.php, dracak_vtt_je_pj_sveta). ucty.role dnes slouží jen
 // jako admin override a jako výchozí nálepka účtu, nic víc.
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $nazev = trim((string)($_POST['nazev'] ?? ''));
-    $popis = trim((string)($_POST['popis'] ?? ''));
+    $nazev = mb_substr(trim(dracak_text($_POST['nazev'] ?? '')), 0, 150);   // sloupec nazev je VARCHAR(150)
+    $popis = trim(dracak_text($_POST['popis'] ?? ''));
     if ($nazev === '') {
         http_response_code(422);
         die('Svět musí mít název.');
@@ -19,8 +19,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Počáteční herní datum — od něj se svět "posouvá" (viz
     // hra/svet_administrace.php); prázdné pole = dnešní reálné datum,
     // ale je to čistě PJova fikce, žádný vztah ke skutečnému kalendáři.
-    $pocatecniDatum = trim((string)($_POST['pocatecni_datum'] ?? ''));
-    if ($pocatecniDatum === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $pocatecniDatum)) {
+    $pocatecniDatum = trim(dracak_text($_POST['pocatecni_datum'] ?? ''));
+    if ($pocatecniDatum === '' || !preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $pocatecniDatum, $d) || !checkdate((int)$d[2], (int)$d[3], (int)$d[1]) || (int)$d[1] < 1000) {
         $pocatecniDatum = date('Y-m-d');
     }
     $stmt = dracak_db()->prepare('INSERT INTO svet (nazev, popis, pocatecni_datum, pj_ucet_id) VALUES (?, ?, ?, ?)');

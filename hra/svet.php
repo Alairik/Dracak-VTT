@@ -16,8 +16,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$isPjOrAdmin) { http_response_code(403); die('Jen PJ/admin může upravit shrnutí.'); }
         $stmt = dracak_db()->prepare('UPDATE svet SET posledni_shrnuti = ?, pripraveno_priste = ? WHERE id = ?');
         $stmt->execute([
-            trim((string)($_POST['posledni_shrnuti'] ?? '')) ?: null,
-            trim((string)($_POST['pripraveno_priste'] ?? '')) ?: null,
+            trim(dracak_text($_POST['posledni_shrnuti'] ?? '')) ?: null,
+            trim(dracak_text($_POST['pripraveno_priste'] ?? '')) ?: null,
             $svetId,
         ]);
         header("Location: svet.php?id=$svetId");
@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($akce === 'nova_mapa') {
         if (!$isPjOrAdmin) { http_response_code(403); die('Jen PJ/admin přidává mapy.'); }
-        $nazev = trim((string)($_POST['nazev'] ?? ''));
+        $nazev = trim(dracak_text($_POST['nazev'] ?? ''));
         $typMapy = ($_POST['typ_mapy'] ?? 'zona') === 'svet' ? 'svet' : 'zona';
         if ($nazev === '') { http_response_code(422); die('Mapa musí mít název.'); }
 
@@ -45,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // NULL a mapa.php ho nevykresluje (chování shodné se stavem před
         // touhle funkcí). Typ/offset dávají smysl jen spolu s velikostí,
         // ale ukládají se vždy (typ má DB DEFAULT 'ctverec', offsety 0).
-        $gridPx = trim((string)($_POST['grid_velikost_px'] ?? ''));
+        $gridPx = trim(dracak_text($_POST['grid_velikost_px'] ?? ''));
         $gridVelikostPx = $gridPx !== '' ? max(1, (int)$gridPx) : null;
         $gridTyp = ($_POST['grid_typ'] ?? 'ctverec') === 'hex' ? 'hex' : 'ctverec';
         $gridPosunX = (int)($_POST['grid_posun_x'] ?? 0);
@@ -123,7 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($akce === 'nova_postava') {
-        $nazev = trim((string)($_POST['nazev'] ?? ''));
+        $nazev = trim(dracak_text($_POST['nazev'] ?? ''));
         if ($nazev === '') { http_response_code(422); die('Postava musí mít jméno.'); }
         $rasaId = !empty($_POST['rasa_id']) ? (int)$_POST['rasa_id'] : null;
         $povolaniId = !empty($_POST['povolani_id']) ? (int)$_POST['povolani_id'] : null;
@@ -198,7 +198,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // ne přes plný výběrový katalog, ať je formulář malý (viz konverzace).
         if (!$isPjOrAdmin) { http_response_code(403); die('Jen PJ/admin přidává položky postavě.'); }
         $cilovaPostavaId = (int)($_POST['postava_id'] ?? 0);
-        $typPolozky = (string)($_POST['typ_polozky'] ?? '');
+        $typPolozky = dracak_text($_POST['typ_polozky'] ?? '');
         $polozkaId = (int)($_POST['polozka_id'] ?? 0);
         $mnozstvi = max(1, (int)($_POST['mnozstvi'] ?? 1));
 
@@ -231,7 +231,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($akce === 'pridat_poznamku') {
         // Kdokoli s přístupem do světa (PJ i hráč) — žádná role-based
         // výjimka, viz includes/vtt_poznamky.php.
-        $text = trim((string)($_POST['text'] ?? ''));
+        $text = trim(dracak_text($_POST['text'] ?? ''));
         if ($text === '') { http_response_code(422); die('Poznámka nemůže být prázdná.'); }
         $sdileno = array_map('intval', (array)($_POST['sdileno'] ?? []));
         // Místo nepovinné, musí ale patřit do TOHOTO světa — jinak by
