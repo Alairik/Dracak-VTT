@@ -13,8 +13,8 @@ if (!$user) {
 
 $data = json_decode((string)file_get_contents('php://input'), true) ?: [];
 $tokenId = (int)($data['token_id'] ?? 0);
-$noveX = (int)($data['x'] ?? 0);
-$noveY = (int)($data['y'] ?? 0);
+$noveX = dracak_vtt_souradnice($data['x'] ?? 0);
+$noveY = dracak_vtt_souradnice($data['y'] ?? 0);
 
 $pdo = dracak_db();
 $stmt = $pdo->prepare(

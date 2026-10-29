@@ -31,7 +31,7 @@ function odpoved_hod(int $kod, array $data): void
 
 $data = json_decode((string)file_get_contents('php://input'), true) ?: [];
 $postavaId = (int)($data['postava_id'] ?? 0);
-$druh = (string)($data['druh'] ?? '');
+$druh = dracak_text($data['druh'] ?? '');
 $modifikator = max(-30, min(30, (int)($data['modifikator'] ?? 0)));
 
 $pdo = dracak_db();

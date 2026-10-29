@@ -49,6 +49,13 @@ function dracak_vtt_je_pj_sveta(array $user, int $svetId): bool
     return $pjSveta[$svetId] === (int)$user['id'];
 }
 
+// Souřadnice z požadavku jako celé číslo v rozumných mezích: sloupce x, y jsou INT, takže obří nebo nečíselná hodnota z klienta
+// (chyba nebo úmysl) by jinak spadla na chybě databáze (500) místo srozumitelné odpovědi.
+function dracak_vtt_souradnice(mixed $v): int
+{
+    return (int)max(-1000000, min(1000000, is_numeric($v) ? (float)$v : 0));
+}
+
 function dracak_vtt_require_svet(array $user, int $svetId): array
 {
     $stmt = dracak_db()->prepare('SELECT * FROM svet WHERE id = ?');

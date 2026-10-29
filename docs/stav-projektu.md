@@ -99,7 +99,7 @@ MariaDB.** Postup, který v session fungoval:
 
 **Regresní testy jsou v repu: `tests/`** (od 2026-10-28; dřív žily jen v pracovní složce session a po jejím zániku by se ztratily). `tests/build-fixture.sh`
 postaví z repa celou testovací databázi (pravidla + migrace + účty + testovací data), `tests/run.sh` pustí všechny sady a před každou vrátí data do výchozího
-stavu (pořadí nehraje roli); podrobnosti a seznam sad: `tests/README.md`. Nasazení je ignoruje (`tests/**` v `exclude`). Náhodná procházka soubojem (`tests/e2e/fuzz_souboj.js`) 2026-10-28 našla a nechala opravit pád „Další tah“ u tvora s 0 akcemi (`GREATEST(0, x - 1)` na sloupci bez znaménka). **Před pushem změny v souboji, iniciativě,
+stavu (pořadí nehraje roli); podrobnosti a seznam sad: `tests/README.md`. Nasazení je ignoruje (`tests/**` v `exclude`). Náhodná procházka soubojem (`tests/e2e/fuzz_souboj.js`) 2026-10-28 našla a nechala opravit pád „Další tah“ u tvora s 0 akcemi (`GREATEST(0, x - 1)` na sloupci bez znaménka). Náhodné vstupy do všech endpointů (`tests/e2e/fuzz_api.js`, 2026-10-29, ~2 600 požadavků na seed, 11 seedů) našly a nechaly opravit: obří souřadnice tokenu / pinu (`dracak_vtt_souradnice()` je ořízne, sloupce jsou INT), obří velikost a posun mřížky (SMALLINT), dlouhý název pinu (VARCHAR 150), **nekonečnou smyčku v mlze** při obdélníkovém výběru přes „celý svět“ (smyčka je teď omezená na rozsah mapy; hrozilo zablokování PHP procesu na 30 s) a varování „Array to string conversion“ u pole místo textu (`dracak_text()` v `includes/db.php` na 25 místech). **Před pushem změny v souboji, iniciativě,
 efektech, zbraních nebo deníku pusť aspoň příslušné sady** (`tests/run.sh souboj_api ini_v2_api …`), u změn základu (`includes/db.php`, `vtt.php`, auth) všechno.
 
 ---

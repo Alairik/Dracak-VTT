@@ -8,7 +8,7 @@ $user = dracak_require_login();
 $data = json_decode((string)file_get_contents('php://input'), true) ?: [];
 $svetId = (int)($data['svet_id'] ?? 0);
 $mapaId = !empty($data['mapa_id']) ? (int)$data['mapa_id'] : null;
-$notace = trim((string)($data['notace'] ?? ''));
+$notace = trim(dracak_text($data['notace'] ?? ''));
 
 if (!dracak_vtt_svet_access($user, $svetId)) {
     http_response_code(403);

@@ -40,8 +40,8 @@ $mapaId = null;
 $svetId = null;
 foreach ($pozadavky as $p) {
     $tokenId = (int)($p['token_id'] ?? 0);
-    $x = (int)($p['x'] ?? 0);
-    $y = (int)($p['y'] ?? 0);
+    $x = dracak_vtt_souradnice($p['x'] ?? 0);
+    $y = dracak_vtt_souradnice($p['y'] ?? 0);
     $stmt->execute([$tokenId]);
     $token = $stmt->fetch();
     if (!$token || !dracak_vtt_svet_access($user, (int)$token['svet_id'])) {

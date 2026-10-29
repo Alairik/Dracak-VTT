@@ -29,7 +29,7 @@ function dracak_vtt_souboj_proved_akci(PDO $pdo, array $mapa, bool $jePj, array 
     $mapaId = (int)$mapa['id'];
     $svetId = (int)$mapa['svet_id'];
     $tokenId = (int)($data['token_id'] ?? 0);
-    $druh = (string)($data['druh'] ?? 'jina');
+    $druh = dracak_text($data['druh'] ?? 'jina');
     if (!isset(DRACAK_VTT_AKCE_DRUHY[$druh])) {
         $druh = 'jina';
     }

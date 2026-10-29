@@ -11,7 +11,7 @@ $mapaId = (int)($data['mapa_id'] ?? 0);
 [$mapa, $svetId, $jePj, $user] = dracak_vtt_souboj_zacatek($mapaId, true);
 $pdo = dracak_db();
 
-$prekvapeni = (string)($data['prekvapeni'] ?? 'zadne');
+$prekvapeni = dracak_text($data['prekvapeni'] ?? 'zadne');
 if (!in_array($prekvapeni, DRACAK_VTT_PREKVAPENI, true)) {
     dracak_vtt_souboj_chyba(422, 'Neplatné překvapení.');
 }

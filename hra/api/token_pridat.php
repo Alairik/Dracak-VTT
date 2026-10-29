@@ -11,8 +11,8 @@ $user = dracak_require_login();
 $data = json_decode((string)file_get_contents('php://input'), true) ?: [];
 $mapaId = (int)($data['mapa_id'] ?? 0);
 $typEntity = in_array($data['typ_entity'] ?? 'postava', ['nestvura', 'obecny'], true) ? $data['typ_entity'] : 'postava';
-$x = (int)($data['x'] ?? 0);
-$y = (int)($data['y'] ?? 0);
+$x = dracak_vtt_souradnice($data['x'] ?? 0);
+$y = dracak_vtt_souradnice($data['y'] ?? 0);
 
 $pdo = dracak_db();
 $stmt = $pdo->prepare('SELECT * FROM mapy WHERE id = ?');
@@ -41,7 +41,7 @@ if ($typEntity === 'obecny') {
         echo json_encode(['error' => 'Vlastní tokeny se zapnou po jednorázovém kroku správce (ruční SQL).']);
         exit;
     }
-    $obecnyNazev = trim((string)($data['nazev'] ?? ''));
+    $obecnyNazev = trim(dracak_text($data['nazev'] ?? ''));
     if ($obecnyNazev === '' || mb_strlen($obecnyNazev) > 100) {
         http_response_code(422);
         echo json_encode(['error' => 'Vlastní token potřebuje název (nejvíc 100 znaků).']);

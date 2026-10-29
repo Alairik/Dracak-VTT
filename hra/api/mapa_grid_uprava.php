@@ -9,10 +9,11 @@ $data = json_decode((string)file_get_contents('php://input'), true) ?: [];
 $mapaId = (int)($data['mapa_id'] ?? 0);
 // Prázdné/0 = grid vypnutý — žádný zvláštní "zapnuto" sloupec, stejný
 // princip jako dřív v svet.php (NULL = bez gridu).
-$gridVelikostPx = !empty($data['grid_velikost_px']) ? max(4, (int)$data['grid_velikost_px']) : null;
+// Sloupce jsou SMALLINT (velikost buňky 0–65535, posun ±32767): obří hodnota z klienta by spadla na chybě databáze.
+$gridVelikostPx = !empty($data['grid_velikost_px']) ? max(4, min(2000, (int)$data['grid_velikost_px'])) : null;
 $gridTyp = ($data['grid_typ'] ?? '') === 'hex' ? 'hex' : 'ctverec';
-$gridPosunX = (int)($data['grid_posun_x'] ?? 0);
-$gridPosunY = (int)($data['grid_posun_y'] ?? 0);
+$gridPosunX = max(-10000, min(10000, (int)($data['grid_posun_x'] ?? 0)));
+$gridPosunY = max(-10000, min(10000, (int)($data['grid_posun_y'] ?? 0)));
 
 $pdo = dracak_db();
 $stmt = $pdo->prepare('SELECT * FROM mapy WHERE id = ?');

@@ -11,7 +11,7 @@ $mapaId = (int)($data['mapa_id'] ?? 0);
 [$mapa, $svetId, $jePj, $user] = dracak_vtt_souboj_zacatek($mapaId, true);
 $pdo = dracak_db();
 $tokenId = (int)($data['token_id'] ?? 0);
-$op = (string)($data['op'] ?? 'delta');
+$op = dracak_text($data['op'] ?? 'delta');
 $info = dracak_vtt_souboj_tokeny_info($pdo, $svetId, $mapaId);
 if (!isset($info[$tokenId])) {
     dracak_vtt_souboj_chyba(404, 'Token nenalezen.');

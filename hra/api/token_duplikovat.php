@@ -11,8 +11,8 @@ $user = dracak_require_login();
 
 $data = json_decode((string)file_get_contents('php://input'), true) ?: [];
 $tokenId = (int)($data['token_id'] ?? 0);
-$x = (int)($data['x'] ?? 0);
-$y = (int)($data['y'] ?? 0);
+$x = dracak_vtt_souradnice($data['x'] ?? 0);
+$y = dracak_vtt_souradnice($data['y'] ?? 0);
 
 $pdo = dracak_db();
 $stmt = $pdo->prepare('SELECT t.*, m.svet_id FROM tokeny t JOIN mapy m ON m.id = t.mapa_id WHERE t.id = ?');

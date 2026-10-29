@@ -14,7 +14,7 @@ $mapaId = (int)($data['mapa_id'] ?? 0);
 [$mapa, $svetId, $jePj, $user] = dracak_vtt_souboj_zacatek($mapaId);
 $pdo = dracak_db();
 $tokenIds = array_values(array_unique(array_map('intval', is_array($data['token_ids'] ?? null) ? $data['token_ids'] : [$data['token_id'] ?? 0])));
-$umysl = isset($data['umysl']) && $data['umysl'] !== '' ? (string)$data['umysl'] : null;
+$umysl = isset($data['umysl']) && $data['umysl'] !== '' ? dracak_text($data['umysl']) : null;
 if ($umysl !== null && !isset(DRACAK_VTT_UMYSLY[$umysl])) {
     dracak_vtt_souboj_chyba(422, 'Neplatný úmysl.');
 }

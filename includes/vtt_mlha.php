@@ -151,13 +151,23 @@ function dracak_vtt_mlha_bunky_v_obdelniku(array $rozmery, float $x1, float $y1,
     $minY = min($y1, $y2);
     $maxY = max($y1, $y2);
     $vysledek = [];
+    if ($rozmery['sloupcu'] <= 0 || $rozmery['radku'] <= 0) {
+        return $vysledek;
+    }
+    // Buňky mimo mapu neexistují (dracak_vtt_mlha_bunka_idx je zahodí), takže se smyčka omezí na rozsah mapy — výběr „přes celý svět“
+    // z podvrženého požadavku by jinak počítal miliardy buněk a spadl na časovém limitu.
+    $radOd = (int)$rozmery['min_row'];
+    $radDo = $radOd + (int)$rozmery['radku'] - 1;
+    $sloOd = (int)$rozmery['min_col'];
+    $sloDo = $sloOd + (int)$rozmery['sloupcu'] - 1;
+    [$minX, $maxX, $minY, $maxY] = array_map(static fn(float $v): float => max(-1.0e7, min(1.0e7, $v)), [$minX, $maxX, $minY, $maxY]);
     if ($rozmery['typ'] === 'hex') {
-        $rowOd = (int)floor(($minY - $rozmery['off_y']) / $rozmery['row_step']) - 1;
-        $rowDo = (int)floor(($maxY - $rozmery['off_y']) / $rozmery['row_step']) + 1;
+        $rowOd = max($radOd, (int)floor(($minY - $rozmery['off_y']) / $rozmery['row_step']) - 1);
+        $rowDo = min($radDo, (int)floor(($maxY - $rozmery['off_y']) / $rozmery['row_step']) + 1);
         for ($row = $rowOd; $row <= $rowDo; $row++) {
             $rowShift = (abs($row % 2) === 1) ? $rozmery['col_step'] / 2 : 0;
-            $colOd = (int)floor(($minX - $rozmery['off_x'] - $rowShift) / $rozmery['col_step']) - 1;
-            $colDo = (int)floor(($maxX - $rozmery['off_x'] - $rowShift) / $rozmery['col_step']) + 1;
+            $colOd = max($sloOd, (int)floor(($minX - $rozmery['off_x'] - $rowShift) / $rozmery['col_step']) - 1);
+            $colDo = min($sloDo, (int)floor(($maxX - $rozmery['off_x'] - $rowShift) / $rozmery['col_step']) + 1);
             for ($col = $colOd; $col <= $colDo; $col++) {
                 $stred = dracak_vtt_mlha_bunka_stred($rozmery, $row, $col);
                 if ($stred['x'] >= $minX && $stred['x'] <= $maxX && $stred['y'] >= $minY && $stred['y'] <= $maxY) {
@@ -167,10 +177,10 @@ function dracak_vtt_mlha_bunky_v_obdelniku(array $rozmery, float $x1, float $y1,
         }
         return $vysledek;
     }
-    $colOd = (int)floor(($minX - $rozmery['off_x']) / $rozmery['bunka_px']) - 1;
-    $colDo = (int)floor(($maxX - $rozmery['off_x']) / $rozmery['bunka_px']) + 1;
-    $rowOd = (int)floor(($minY - $rozmery['off_y']) / $rozmery['bunka_px']) - 1;
-    $rowDo = (int)floor(($maxY - $rozmery['off_y']) / $rozmery['bunka_px']) + 1;
+    $colOd = max($sloOd, (int)floor(($minX - $rozmery['off_x']) / $rozmery['bunka_px']) - 1);
+    $colDo = min($sloDo, (int)floor(($maxX - $rozmery['off_x']) / $rozmery['bunka_px']) + 1);
+    $rowOd = max($radOd, (int)floor(($minY - $rozmery['off_y']) / $rozmery['bunka_px']) - 1);
+    $rowDo = min($radDo, (int)floor(($maxY - $rozmery['off_y']) / $rozmery['bunka_px']) + 1);
     for ($row = $rowOd; $row <= $rowDo; $row++) {
         for ($col = $colOd; $col <= $colDo; $col++) {
             $stred = dracak_vtt_mlha_bunka_stred($rozmery, $row, $col);

@@ -5,6 +5,10 @@ require dirname(__DIR__, 2) . '/includes/db.php';
 require dirname(__DIR__, 2) . '/includes/zaloha.php';
 $pdo = dracak_db();
 $cil = 'dracak_obnova_test';
+// Binární sloupec (bitmapa mlhy) s bajty 00 / FF / uvozovkami, aby se ověřilo hexadecimální zapsání; řádek se po testu smaže.
+$pdo->exec("DELETE FROM mlha_valky WHERE mapa_id = 1 AND ucet_id = 1");
+$pdo->exec("INSERT INTO mlha_valky (mapa_id, ucet_id, bitmapa, sirka_bunky, sloupcu, radku) VALUES (1, 1, UNHEX('0001FF2722005C0A0DFE'), 70, 5, 2)");
+register_shutdown_function(static function () use ($pdo): void { $pdo->exec("DELETE FROM mlha_valky WHERE mapa_id = 1 AND ucet_id = 1"); });
 $soubor = sys_get_temp_dir() . '/dracak_zaloha_test.sql';
 $f = fopen($soubor, 'wb');
 $t0 = microtime(true);

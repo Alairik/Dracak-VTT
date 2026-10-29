@@ -26,7 +26,7 @@ function odpoved_kont(int $kod, array $data): void
 
 $data = json_decode((string)file_get_contents('php://input'), true) ?: [];
 $postavaId = (int)($data['postava_id'] ?? 0);
-$akce = (string)($data['akce'] ?? '');
+$akce = dracak_text($data['akce'] ?? '');
 
 $pdo = dracak_db();
 $postava = dracak_vtt_entity_row('postava', $postavaId);
@@ -56,10 +56,10 @@ switch ($akce) {
         $v = dracak_vtt_kontejner_rozbalit($pdo, $postavaId, (int)($data['predmet_id'] ?? 0));
         break;
     case 'nosic':
-        $v = dracak_vtt_kontejner_nosic($pdo, $postava, $kontejnerId, (string)($data['nosic'] ?? ''));
+        $v = dracak_vtt_kontejner_nosic($pdo, $postava, $kontejnerId, dracak_text($data['nosic'] ?? ''));
         break;
     case 'prejmenovat':
-        $v = dracak_vtt_kontejner_prejmenovat($pdo, $postavaId, $kontejnerId, (string)($data['nazev'] ?? ''));
+        $v = dracak_vtt_kontejner_prejmenovat($pdo, $postavaId, $kontejnerId, dracak_text($data['nazev'] ?? ''));
         break;
     default:
         odpoved_kont(422, ['error' => 'Neznámá akce.']);

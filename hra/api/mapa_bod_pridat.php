@@ -8,11 +8,11 @@ $user = dracak_require_login();
 
 $data = json_decode((string)file_get_contents('php://input'), true) ?: [];
 $mapaId = (int)($data['mapa_id'] ?? 0);
-$nazev = trim((string)($data['nazev'] ?? ''));
+$nazev = mb_substr(trim(dracak_text($data['nazev'] ?? '')), 0, 150);   // sloupec nazev je VARCHAR(150)
 $typ = in_array($data['typ'] ?? '', ['mesto', 'vesnice', 'tajne_misto', 'budova', 'mistnost', 'sklep', 'prechod', 'jine'], true) ? $data['typ'] : 'jine';
-$x = (int)($data['x'] ?? 0);
-$y = (int)($data['y'] ?? 0);
-$popis = trim((string)($data['popis'] ?? '')) ?: null;
+$x = dracak_vtt_souradnice($data['x'] ?? 0);
+$y = dracak_vtt_souradnice($data['y'] ?? 0);
+$popis = trim(dracak_text($data['popis'] ?? '')) ?: null;
 $viditelnyHracum = !empty($data['viditelny_hracum']);
 $cilovaMapaId = !empty($data['cilova_mapa_id']) ? (int)$data['cilova_mapa_id'] : null;
 

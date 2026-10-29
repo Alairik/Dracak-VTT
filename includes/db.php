@@ -13,6 +13,13 @@ header_remove('X-Powered-By');
 require_once __DIR__ . '/log.php';
 dracak_log_registruj();
 
+// Text z požadavku: skalár jako řetězec, cokoli jiného (pole, objekt z podvrženého JSON) jako prázdný řetězec. Holé (string) na poli
+// zapíše varování „Array to string conversion“ a vrátí „Array“.
+function dracak_text(mixed $v): string
+{
+    return is_scalar($v) ? (string)$v : '';
+}
+
 function dracak_fail_safely(string $logMessage): void
 {
     error_log('[dracak-vtt] ' . $logMessage);

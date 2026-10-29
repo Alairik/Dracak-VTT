@@ -10,7 +10,7 @@ $data = dracak_vtt_souboj_vstup();
 $mapaId = (int)($data['mapa_id'] ?? 0);
 [$mapa, $svetId, $jePj, $user] = dracak_vtt_souboj_zacatek($mapaId, true);
 $pdo = dracak_db();
-$kam = (string)($data['kam'] ?? '');
+$kam = dracak_text($data['kam'] ?? '');
 
 $pdo->beginTransaction();
 try {

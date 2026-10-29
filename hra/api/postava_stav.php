@@ -29,7 +29,7 @@ function odpoved(int $kod, array $data): void
 
 $data = json_decode((string)file_get_contents('php://input'), true) ?: [];
 $postavaId = (int)($data['postava_id'] ?? 0);
-$akce = (string)($data['akce'] ?? '');
+$akce = dracak_text($data['akce'] ?? '');
 
 $pdo = dracak_db();
 $postava = dracak_vtt_entity_row('postava', $postavaId);
@@ -123,7 +123,7 @@ switch ($akce) {
         odpoved(200, ['ok' => true]);
     }
     case 'penize': {
-        $mena = (string)($data['mena'] ?? '');
+        $mena = dracak_text($data['mena'] ?? '');
         if (!in_array($mena, ['zl', 'st', 'md'], true) || !pole_existuje($postava, 'penize_' . $mena)) {
             odpoved(422, ['error' => 'Peníze se zatím nedají ukládat (chybí migrace 0070).']);
         }
@@ -132,7 +132,7 @@ switch ($akce) {
         odpoved(200, ['ok' => true]);
     }
     case 'vyber': {
-        $pole = (string)($data['pole'] ?? '');
+        $pole = dracak_text($data['pole'] ?? '');
         if (!in_array($pole, ['zbroj_id', 'stit_id', 'drzena_zbran_id'], true) || !pole_existuje($postava, $pole)) {
             odpoved(422, ['error' => 'Tohle pole se zatím nedá ukládat (chybí migrace 0070).']);
         }
@@ -190,11 +190,11 @@ switch ($akce) {
         odpoved(200, ['ok' => true]);
     }
     case 'text': {
-        $pole = (string)($data['pole'] ?? '');
+        $pole = dracak_text($data['pole'] ?? '');
         if (!in_array($pole, ['puvod', 'osobnost', 'poznamky'], true) || !pole_existuje($postava, $pole)) {
             odpoved(422, ['error' => 'Tohle pole se zatím nedá ukládat (chybí migrace 0070).']);
         }
-        $text = trim((string)($data['hodnota'] ?? ''));
+        $text = trim(dracak_text($data['hodnota'] ?? ''));
         $pdo->prepare("UPDATE postavy SET $pole = ? WHERE id = ?")->execute([$text !== '' ? mb_substr($text, 0, 20000) : null, $postavaId]);
         odpoved(200, ['ok' => true]);
     }
@@ -202,7 +202,7 @@ switch ($akce) {
         if (!pole_existuje($postava, 'velikost')) {
             odpoved(422, ['error' => 'Velikost se zatím nedá ukládat (chybí migrace 0070).']);
         }
-        $v = (string)($data['hodnota'] ?? '');
+        $v = dracak_text($data['hodnota'] ?? '');
         if ($v !== '' && !in_array($v, ['A0', 'A', 'B', 'C', 'D', 'E'], true)) {
             odpoved(422, ['error' => 'Neplatná velikost.']);
         }
@@ -229,7 +229,7 @@ switch ($akce) {
         // Správa inventáře postavy: předměty a lektvary po kusech, kouzla
         // (znalost) jen přidat/odebrat. Vlastník i PJ/admin (stejné právo
         // jako u životů); PJ-only přidávání z katalogu ve svet.php zůstává.
-        $typ = (string)($data['typ_polozky'] ?? '');
+        $typ = dracak_text($data['typ_polozky'] ?? '');
         $cfg = dracak_vtt_polozka_config($typ);
         if (!$cfg) {
             odpoved(422, ['error' => 'Neplatný typ položky.']);

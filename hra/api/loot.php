@@ -7,7 +7,7 @@ $user = dracak_require_login();
 
 $data = json_decode((string)file_get_contents('php://input'), true) ?: [];
 $nestvuraInstanceId = (int)($data['nestvura_instance_id'] ?? 0);
-$typPolozky = (string)($data['typ_polozky'] ?? '');
+$typPolozky = dracak_text($data['typ_polozky'] ?? '');
 $polozkaId = (int)($data['polozka_id'] ?? 0);
 $cilovaPostavaId = (int)($data['cilova_postava_id'] ?? 0);
 // Nepovinné — když chybí, předá se celý aktuální kus/hromádka (typické

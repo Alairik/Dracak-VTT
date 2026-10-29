@@ -9,7 +9,7 @@ $user = dracak_require_login();
 $data = json_decode((string)file_get_contents('php://input'), true) ?: [];
 $typEntity = ($data['typ_entity'] ?? '') === 'nestvura_instance' ? 'nestvura_instance' : 'postava';
 $entitaId = (int)($data['entita_id'] ?? 0);
-$typPolozky = (string)($data['typ_polozky'] ?? '');
+$typPolozky = dracak_text($data['typ_polozky'] ?? '');
 $polozkaId = (int)($data['polozka_id'] ?? 0);
 // Cíl je nepovinný — bez zadání efekt/kostka dopadá na entitu, co položku
 // použila (typický "vypij lektvar na sebe"). PJ/hráč ho zadá, když je cíl

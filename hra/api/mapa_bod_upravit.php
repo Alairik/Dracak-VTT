@@ -8,9 +8,9 @@ $user = dracak_require_login();
 
 $data = json_decode((string)file_get_contents('php://input'), true) ?: [];
 $bodId = (int)($data['id'] ?? 0);
-$nazev = trim((string)($data['nazev'] ?? ''));
+$nazev = mb_substr(trim(dracak_text($data['nazev'] ?? '')), 0, 150);   // sloupec nazev je VARCHAR(150)
 $typ = in_array($data['typ'] ?? '', ['mesto', 'vesnice', 'tajne_misto', 'budova', 'mistnost', 'sklep', 'prechod', 'jine'], true) ? $data['typ'] : 'jine';
-$popis = trim((string)($data['popis'] ?? '')) ?: null;
+$popis = trim(dracak_text($data['popis'] ?? '')) ?: null;
 $viditelnyHracum = !empty($data['viditelny_hracum']);
 $cilovaMapaId = !empty($data['cilova_mapa_id']) ? (int)$data['cilova_mapa_id'] : null;
 
@@ -24,8 +24,8 @@ $stmt->execute([$bodId]);
 $bod = $stmt->fetch();
 // x/y nepovinné v requestu — needitovaná pozice (jen přejmenování apod.)
 // zůstává na svém místě, nespadne na 0,0.
-$x = isset($data['x']) ? (int)$data['x'] : (int)($bod['x'] ?? 0);
-$y = isset($data['y']) ? (int)$data['y'] : (int)($bod['y'] ?? 0);
+$x = isset($data['x']) ? dracak_vtt_souradnice($data['x']) : (int)($bod['x'] ?? 0);
+$y = isset($data['y']) ? dracak_vtt_souradnice($data['y']) : (int)($bod['y'] ?? 0);
 if (!$bod || !dracak_vtt_svet_access($user, (int)$bod['svet_id'])) {
     http_response_code(404);
     echo json_encode(['error' => 'Pin nenalezen.']);

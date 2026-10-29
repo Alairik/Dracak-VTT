@@ -47,7 +47,7 @@ if (!empty($data['id'])) {
     }
     $svetId = (int)$mapa['svet_id'];
     $jePj = dracak_vtt_je_pj_sveta($user, $svetId);
-    $rezim = (string)($data['rezim'] ?? '');
+    $rezim = dracak_text($data['rezim'] ?? '');
     if ($rezim === 'vsechny') {
         if (!$jePj) kresba_smazat_chyba(403, 'Všechny kresby smí smazat jen PJ.');
         $q = $pdo->prepare('SELECT id FROM mapa_kresby WHERE mapa_id = ?');
