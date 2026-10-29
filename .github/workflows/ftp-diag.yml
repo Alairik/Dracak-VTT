@@ -7,6 +7,7 @@ jobs:
     name: Diagnostika FTP
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Výpis FTP
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
@@ -38,3 +39,25 @@ jobs:
             echo "=== $u"
             curl -sS -o /dev/null -D - --max-time 25 "$u" 2>&1 | head -12
           done
+      - name: Ověření .htaccess
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          set +e
+          echo "=== .htaccess na FTP vs v repu (SHA-256)"
+          for f in .htaccess logs/.htaccess uploads/.htaccess; do
+            curl -sS -k --max-time 40 --ssl-reqd -u "$FTP_USERNAME:$FTP_PASSWORD" "ftp://$FTP_SERVER/$f" -o /tmp/vzdaleny.htaccess 2>&1
+            echo "$f  FTP: $(sha256sum < /tmp/vzdaleny.htaccess | cut -c1-16)  repo: $(sha256sum < $f | cut -c1-16)  $(cmp -s /tmp/vzdaleny.htaccess $f && echo STEJNÝ || echo ODLIŠNÝ)"
+          done
+          echo "=== Uplatňuje web .htaccess z FTP? Naše hlavičky: X-Robots-Tag noindex, HSTS, CSP frame-ancestors; config.php a .htaccess mají být zavřené (403)"
+          for u in / /index.php /config.php /.htaccess /includes/auth.php /logs/ /deploy-manifest.json; do
+            h=$(curl -sS -o /dev/null -D - --max-time 25 "https://vtt.zvelebil.online$u" 2>&1)
+            echo "$u -> $(echo "$h" | head -1 | tr -d '\r')  x-robots-tag:$(echo "$h" | grep -ci '^x-robots-tag')  hsts:$(echo "$h" | grep -ci '^strict-transport-security')  csp:$(echo "$h" | grep -ci '^content-security-policy')"
+          done
+          echo "=== HTTP/2 vs HTTP/1.1 a jiný Host"
+          curl -sS -o /dev/null -D - --max-time 25 --http1.1 "https://vtt.zvelebil.online/robots.txt" 2>&1 | head -3
+          echo "=== co říká robots.txt, který web vydává (69 B) a náš (26 B)"
+          curl -sS --max-time 25 "https://vtt.zvelebil.online/robots.txt" 2>&1 | head -5
+          echo "--- náš:"; cat robots.txt
