@@ -65,6 +65,7 @@ $velikost = $log['velikost'] >= 1048576 ? number_format($log['velikost'] / 10485
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/organic.css?v=<?= filemtime(__DIR__ . '/assets/css/organic.css') ?>">
+<script src="assets/js/obecne.js?v=<?= filemtime(__DIR__ . '/assets/js/obecne.js') ?>" defer></script>
 <style>
   .log-filtr { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 12px; }
   .log-filtr a { text-decoration:none; }
@@ -133,7 +134,7 @@ $velikost = $log['velikost'] >= 1048576 ? number_format($log['velikost'] / 10485
         <?php if (count($log['zaznamy']) > count($zaznamy)): ?>
           <p class="note">Zobrazeno nejnovějších <?= count($zaznamy) ?> z <?= count($log['zaznamy']) ?>.</p>
         <?php endif; ?>
-        <form method="post" style="margin-top:14px;" onsubmit="return confirm('Smazat celý chybový log?');">
+        <form method="post" style="margin-top:14px;" data-potvrdit="Smazat celý chybový log?">
           <input type="hidden" name="akce" value="smazat">
           <input type="hidden" name="token" value="<?= $e($token) ?>">
           <button class="btn btn-secondary" type="submit">Vymazat log</button>
@@ -144,7 +145,7 @@ $velikost = $log['velikost'] >= 1048576 ? number_format($log['velikost'] / 10485
       Očekávané hlášky pro hráče („Na tahu je jiný tvor“ apod.) sem nepatří. Hesla ani tokeny v adresách se nezapisují.</p>
   </main>
 </div>
-<script>
+<script nonce="<?= dracak_csp_nonce() ?>">
 (function () {
   var b = document.getElementById('menuBtn'), s = document.getElementById('sidebar'), k = document.getElementById('backdrop');
   if (!b || !s || !k) return;

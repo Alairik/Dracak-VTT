@@ -21,6 +21,12 @@ const scenare = [
   ['svět PJ', 'test@local', 'test1234', '/hra/svet.php?id=1'],
   ['správa světa PJ', 'test@local', 'test1234', '/hra/svet_administrace.php?id=1'],
   ['administrace', 'test@local', 'test1234', '/admin.php'],
+  ['editor číselníků (rasy)', 'test@local', 'test1234', '/editor.php?tabulka=rasy&akce=edit&id=1'],
+  ['editor číselníků (kouzla)', 'test@local', 'test1234', '/editor.php?tabulka=kouzla'],
+  ['chybový log', 'test@local', 'test1234', '/admin_log.php'],
+  ['změny databáze', 'test@local', 'test1234', '/admin_migrace.php'],
+  ['tisk deníku', 'hrac@local', 'hrac1234', '/hra/denik_tisk.php?id=2'],
+  ['pravidla PJ', 'test@local', 'test1234', '/pravidla.php'],
 ];
 const NEBEZPECNE = /odhl[aá]sit|logout|smazat sv[eě]t|smazat ú[cč]et|vymazat log|st[aá]hnout z[aá]lohu|spustit [cč]ekaj[ií]c[ií]/i;
 (async () => {

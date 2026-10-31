@@ -252,7 +252,7 @@ if ($canSeePjBestiar) {
 
 <button class="top-btn" id="topBtn" type="button" aria-label="Nahoru">↑</button>
 
-<script>
+<script nonce="<?= dracak_csp_nonce() ?>">
 window.__HEADINGS__ = <?= $headingsJson ?>;
 window.__EDIT_LINKS__ = <?= $editLinksJson ?>;
 window.__LIVE_CARDS__ = <?= $liveCardsJson ?>;
@@ -263,7 +263,7 @@ window.__TEXT_EDIT_UNRESTRICTED__ = <?= $textEditUnrestricted ? 'true' : 'false'
 window.__CURRENT_USER_ID__ = <?= $user !== null ? (int)$user['id'] : 'null' ?>;
 </script>
 <script src="assets/pravidla/pravidla.js?v=<?= filemtime(__DIR__ . '/assets/pravidla/pravidla.js') ?>"></script>
-<script>
+<script nonce="<?= dracak_csp_nonce() ?>">
 (function(){
   // Živé karty: nahradí zmrzlý statický text u napojeného nadpisu aktuálním
   // obsahem z DB (viz dracak_render_pravidla_card v entity_crud.php) — než

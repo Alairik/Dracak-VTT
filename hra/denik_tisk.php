@@ -127,9 +127,10 @@ $maMag = $postava && dracak_vtt_ma_magenergii($postava);
     .tl { display: none; }
   }
 </style>
+<script src="../assets/js/obecne.js?v=<?= filemtime(__DIR__ . '/../assets/js/obecne.js') ?>" defer></script>
 </head>
 <body>
-<button class="tl" type="button" onclick="window.print()">Vytisknout</button>
+<button class="tl" type="button" data-tisk">Vytisknout</button>
 
 <!-- ===================== STRANA 1 ===================== -->
 <section class="strana">

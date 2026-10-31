@@ -49,6 +49,7 @@ $e = static fn($v): string => htmlspecialchars((string)$v, ENT_QUOTES);
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/organic.css?v=<?= filemtime(__DIR__ . '/assets/css/organic.css') ?>">
+<script src="assets/js/obecne.js?v=<?= filemtime(__DIR__ . '/assets/js/obecne.js') ?>" defer></script>
 </head>
 <body>
 <button class="menu-btn" id="menuBtn" type="button" aria-label="Otevřít navigaci">☰</button>
@@ -90,7 +91,7 @@ $e = static fn($v): string => htmlspecialchars((string)$v, ENT_QUOTES);
                 <?php else: ?>jen data<?php endif; ?></li>
             <?php endforeach; ?>
           </ul>
-          <form method="post" onsubmit="return confirm('Spustit čekající změny databáze (<?= count($cekajici) ?>)? Provedou se popořadě a při první chybě se zastaví.');">
+          <form method="post" data-potvrdit="Spustit čekající změny databáze (<?= count($cekajici) ?>)? Provedou se popořadě a při první chybě se zastaví.">
             <input type="hidden" name="akce" value="spustit">
             <input type="hidden" name="token" value="<?= $e($token) ?>">
             <button class="btn btn-primary" type="submit">Spustit čekající změny</button>
@@ -114,7 +115,7 @@ $e = static fn($v): string => htmlspecialchars((string)$v, ENT_QUOTES);
     <?php endif; ?>
   </main>
 </div>
-<script>
+<script nonce="<?= dracak_csp_nonce() ?>">
 (function () {
   var b = document.getElementById('menuBtn'), s = document.getElementById('sidebar'), k = document.getElementById('backdrop');
   if (!b || !s || !k) return;

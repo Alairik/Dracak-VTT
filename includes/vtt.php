@@ -355,6 +355,7 @@ function dracak_vtt_page_start(string $title, array $user, bool $wide = false, a
 <link rel="stylesheet" href="<?= htmlspecialchars($css) ?>?v=<?= $cssFile ? filemtime($cssFile) : 0 ?>">
 <?php endforeach; ?>
 <script src="../assets/js/chyby.js?v=<?= filemtime(__DIR__ . '/../assets/js/chyby.js') ?>"></script>
+<script src="../assets/js/obecne.js?v=<?= filemtime(__DIR__ . '/../assets/js/obecne.js') ?>" defer></script>
 </head>
 <body>
 <?php if ($wide): ?>

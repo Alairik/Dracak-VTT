@@ -617,7 +617,7 @@ dracak_vtt_page_start($svet['nazev'], $user, true);
                     <?php endif; ?>
                   </span>
                   <?php if ($jeAutor || $user['role'] === 'admin'): ?>
-                    <form method="post" onsubmit="return confirm('Smazat tuhle poznámku?');">
+                    <form method="post" data-potvrdit="Smazat tuhle poznámku?">
                       <input type="hidden" name="akce" value="smazat_poznamku">
                       <input type="hidden" name="poznamka_id" value="<?= (int)$p['id'] ?>">
                       <button class="btn btn-ghost" type="submit">Smazat</button>
@@ -868,7 +868,7 @@ dracak_vtt_page_start($svet['nazev'], $user, true);
   </dialog>
   <?php endif; ?>
 
-  <script>
+  <script nonce="<?= dracak_csp_nonce() ?>">
   (function () {
     var fab = document.getElementById('svet-fab');
     var fabBtn = fab.querySelector('.svet-fab-btn');

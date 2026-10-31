@@ -98,7 +98,7 @@ $tabulek = count(dracak_zaloha_tabulky(dracak_db()));
     </div>
   </main>
 </div>
-<script>
+<script nonce="<?= dracak_csp_nonce() ?>">
 (function () {
   var b = document.getElementById('menuBtn'), s = document.getElementById('sidebar'), k = document.getElementById('backdrop');
   if (!b || !s || !k) return;

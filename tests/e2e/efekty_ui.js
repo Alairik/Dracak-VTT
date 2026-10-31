@@ -2,6 +2,8 @@ const { chromium } = require(process.env.PLAYWRIGHT || '/opt/node22/lib/node_mod
 const BASE = process.env.BASE || 'http://127.0.0.1:8099';
 const DB = process.env.DB || 'dracak';
 const MAPA = 2;
+const SHOTS = (process.env.OUT || '/tmp/dracak-tests') + '/shots';
+require('fs').mkdirSync(SHOTS, { recursive: true });
 let chyb = 0;
 const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK   ' : 'CHYBA') + ' ' + m); };
 const sql = (q) => require('child_process').execSync(`mysql --default-character-set=utf8mb4 ${DB} -e "${q}"`);
@@ -91,7 +93,7 @@ const stav = (page) => page.evaluate(async (m) => (await fetch('api/mapa_stav.ph
   ok(parseInt(sqlVal(`select aktualni_hp from nestvura_instance where id=${gobInst}`), 10) === 17, 'ručně zapsané 3 → goblin má 17 životů');
   const log = await pj.evaluate(() => document.getElementById('logList').textContent);
   ok(/Krvácení.*−3 životů/.test(log), 'log: řádek o tiku krvácení');
-  await pj.screenshot({ path: process.env.SHOTS + '/efekty_tik.png' });
+  await pj.screenshot({ path: SHOTS + '/efekty_tik.png' });
 
   // Hráč vidí efekt na své postavě v deníku
   await uklid();

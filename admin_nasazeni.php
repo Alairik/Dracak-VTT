@@ -130,7 +130,7 @@ $seznam = static function (array $polozky) use ($e): string {
     </div>
   </main>
 </div>
-<script>
+<script nonce="<?= dracak_csp_nonce() ?>">
 (function(){
   var menuBtn = document.getElementById('menuBtn'), sidebar = document.getElementById('sidebar'), backdrop = document.getElementById('backdrop');
   function closeNav(){ sidebar.classList.remove('open'); backdrop.classList.remove('show'); }

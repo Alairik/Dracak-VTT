@@ -131,6 +131,13 @@
   maskují samy. Server o chybě v JS ví díky `assets/js/chyby.js` (načítá
   ho `dracak_vtt_page_start` a `hra/mapa.php`) — nová samostatná stránka
   bez `dracak_vtt_page_start` ho musí přidat sama.
+- **Content-Security-Policy (`includes/csp.php`): nový inline `<script>` musí mít
+  `nonce="<?= dracak_csp_nonce() ?>"` a žádný ovládací prvek nesmí mít inline
+  `onclick`/`onsubmit`/`onchange`** — použij `data-potvrdit`, `data-odeslat-pri-zmene`,
+  `data-tisk` (`assets/js/obecne.js`) nebo vlastní `data-akce` s delegovanou obsluhou.
+  Režim `DRACAK_CSP_REZIM` je zatím `'report'` (jen hlásí do logu, druh „Porušení CSP“);
+  na `'vynutit'` se přepíná až po pár dnech bez hlášení z ostrého provozu. Text z DB
+  nebo `<option>` se do `innerHTML` vkládá jen přes `esc()`.
 - **`setup-admin.php` se nikdy nedeployuje** (viz `exclude` v `deploy.yml`)
   — má přístup k DB a zakládá admin účty, nepatří na veřejný web.
 - **`content/` drží fragmenty rulebooku pro `pravidla.php`** (`pravidla-hrac.html`,

@@ -197,6 +197,7 @@ if ($nastroj === null) {
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/organic.css?v=<?= filemtime(__DIR__ . '/assets/css/organic.css') ?>">
+<script src="assets/js/obecne.js?v=<?= filemtime(__DIR__ . '/assets/js/obecne.js') ?>" defer></script>
 </head>
 <body>
 <button class="menu-btn" id="menuBtn" type="button" aria-label="Otevřít navigaci">☰</button>
@@ -359,13 +360,13 @@ if ($nastroj === null) {
               <?= htmlspecialchars($item['label']) ?>
               <?php if ($extraType === 'stepper'): $mod = (int)($item['extra'] ?? 0); ?>
                 <span class="chip-stepper">
-                  <button type="button" onclick="dracakBump(this,-1)">−</button><b class="chip-val"><?= $mod >= 0 ? '+' . $mod : $mod ?></b><button type="button" onclick="dracakBump(this,1)">+</button>
+                  <button type="button" data-akce="bump" data-delta="-1">−</button><b class="chip-val"><?= $mod >= 0 ? '+' . $mod : $mod ?></b><button type="button" data-akce="bump" data-delta="1">+</button>
                 </span>
                 <input type="hidden" class="chip-extra" name="rel_<?= htmlspecialchars($join) ?>_extra[<?= (int)$item['id'] ?>]" value="<?= $mod ?>">
               <?php elseif ($extraType === 'text'): ?>
                 <input type="text" class="chip-extra-input" name="rel_<?= htmlspecialchars($join) ?>_extra[<?= (int)$item['id'] ?>]" value="<?= htmlspecialchars((string)($item['extra'] ?? '')) ?>" placeholder="<?= htmlspecialchars($rel['extra_placeholder'] ?? '') ?>">
               <?php endif; ?>
-              <button type="button" class="x-btn" onclick="dracakRemoveTag(this)">×</button>
+              <button type="button" class="x-btn" data-akce="odebrat-tag">×</button>
               <input type="hidden" name="rel_<?= htmlspecialchars($join) ?>[]" value="<?= (int)$item['id'] ?>">
             </span>
           <?php endforeach; ?>
@@ -377,7 +378,7 @@ if ($nastroj === null) {
               <option value="<?= (int)$opt['id'] ?>"><?= htmlspecialchars((string)$opt['label']) ?></option>
             <?php endforeach; ?>
           </select>
-          <button type="button" class="btn btn-secondary" onclick="dracakAddTag(this)">+ Přidat</button>
+          <button type="button" class="btn btn-secondary" data-akce="pridat-tag">+ Přidat</button>
         </div>
       <?php endforeach; ?>
 
@@ -392,7 +393,7 @@ if ($nastroj === null) {
           <div class="card" style="padding:12px 14px;margin-bottom:10px;background:var(--color-neutral-100);border:none;">
             <div style="font-weight:600;font-size:13px;margin-bottom:6px;"><?= htmlspecialchars($t['nazev']) ?></div>
             <label style="font-weight:400;font-size:11.5px;display:flex;align-items:center;gap:5px;margin-bottom:6px;">
-              <input type="checkbox" class="vt-split-toggle" data-tier="<?= $t['id'] ?>" <?= $hasSplit ? 'checked' : '' ?> onchange="dracakToggleVtSplit(this)">
+              <input type="checkbox" class="vt-split-toggle" data-tier="<?= $t['id'] ?>" <?= $hasSplit ? 'checked' : '' ?> data-akce-zmena="split">
               Liší se v boji / mimo boj
             </label>
             <div class="field vt-obecny" data-tier="<?= $t['id'] ?>" style="<?= $hasSplit ? 'display:none;' : '' ?>margin-bottom:0;">
@@ -473,7 +474,7 @@ if ($nastroj === null) {
         </div>
       <?php elseif ($f['filter'] === 'select'): ?>
         <div><div class="filter-lbl"><?= htmlspecialchars($f['label']) ?></div>
-          <select class="input filter-select" name="<?= $name ?>" onchange="this.form.submit()">
+          <select class="input filter-select" name="<?= $name ?>" data-odeslat-pri-zmene>
             <option value="">vše</option>
             <?php foreach ($filterSelectOptions[$name] ?? [] as $opt): ?>
               <option value="<?= htmlspecialchars($opt) ?>" <?= ($filterValues[$name] ?? '') === $opt ? 'selected' : '' ?>><?= htmlspecialchars($opt) ?></option>
@@ -482,7 +483,7 @@ if ($nastroj === null) {
         </div>
       <?php elseif ($f['filter'] === 'select_fk'): ?>
         <div><div class="filter-lbl"><?= htmlspecialchars($f['label']) ?></div>
-          <select class="input filter-select" name="<?= $name ?>" onchange="this.form.submit()">
+          <select class="input filter-select" name="<?= $name ?>" data-odeslat-pri-zmene>
             <option value="">vše</option>
             <?php foreach ($filterSelectOptions[$name] ?? [] as $opt): ?>
               <option value="<?= (int)$opt['id'] ?>" <?= (string)($filterValues[$name] ?? '') === (string)$opt['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string)$opt['label']) ?></option>
@@ -506,7 +507,7 @@ if ($nastroj === null) {
           </div>
         </div>
         <div><div class="filter-lbl">Povolání</div>
-          <select class="input filter-select" name="povolani" onchange="this.form.submit()">
+          <select class="input filter-select" name="povolani" data-odeslat-pri-zmene>
             <option value="">vše</option>
             <?php foreach ($filterSelectOptions['__povolani'] ?? [] as $p): ?>
               <option value="<?= (int)$p['id'] ?>" <?= dracak_text($_GET['povolani'] ?? '') === (string)$p['id'] ? 'selected' : '' ?>><?= htmlspecialchars($p['nazev']) ?></option>
@@ -581,7 +582,7 @@ if ($nastroj === null) {
             <?php if (dracak_can_edit_row($user, $table, $config, $row)): ?>
               <div class="rec-actions">
                 <a class="btn btn-secondary" href="editor.php?tabulka=<?= urlencode($table) ?>&akce=edit&id=<?= (int)$row['id'] ?>">Upravit</a>
-                <form method="post" onsubmit="return confirm('Opravdu smazat?');">
+                <form method="post" data-potvrdit="Opravdu smazat?">
                   <input type="hidden" name="akce" value="smazat">
                   <input type="hidden" name="id" value="<?= (int)$row['id'] ?>">
                   <button class="btn btn-ghost" type="submit">Smazat</button>
@@ -596,7 +597,7 @@ if ($nastroj === null) {
 <?php endif; ?>
   </main>
 </div>
-<script>
+<script nonce="<?= dracak_csp_nonce() ?>">
 (function(){
   var menuBtn = document.getElementById('menuBtn'), sidebar = document.getElementById('sidebar'), backdrop = document.getElementById('backdrop');
   function closeNav(){ sidebar.classList.remove('open'); backdrop.classList.remove('show'); }
@@ -612,6 +613,19 @@ if ($nastroj === null) {
   });
 })();
 
+document.addEventListener('click', function(e){
+  var b = e.target.closest ? e.target.closest('[data-akce]') : null;
+  if (!b) return;
+  var a = b.getAttribute('data-akce');
+  if (a === 'bump') dracakBump(b, parseInt(b.getAttribute('data-delta'), 10));
+  else if (a === 'odebrat-tag') dracakRemoveTag(b);
+  else if (a === 'pridat-tag') dracakAddTag(b);
+});
+document.addEventListener('change', function(e){
+  var c = e.target.closest ? e.target.closest('[data-akce-zmena="split"]') : null;
+  if (c) dracakToggleVtSplit(c);
+});
+
 function dracakAddTag(btn){
   var wrap = btn.parentElement, select = wrap.querySelector('select');
   var opt = select.options[select.selectedIndex];
@@ -620,14 +634,16 @@ function dracakAddTag(btn){
   var tagbox = document.querySelector('.tagbox[data-rel="' + join + '"]');
   var span = document.createElement('span');
   span.className = 'pill-x'; span.setAttribute('data-id', opt.value); span.setAttribute('data-label', opt.text);
-  var html = opt.text;
+  // Text volby z <select> se do innerHTML vkládá escapovaný — název záznamu z katalogu nesmí být brán jako HTML.
+  var esc = function(t){ return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); };
+  var html = esc(opt.text);
   if (extraType === 'stepper') {
-    html += ' <span class="chip-stepper"><button type="button" onclick="dracakBump(this,-1)">−</button><b class="chip-val">+0</b><button type="button" onclick="dracakBump(this,1)">+</button></span>'
-      + '<input type="hidden" class="chip-extra" name="rel_' + join + '_extra[' + opt.value + ']" value="0">';
+    html += ' <span class="chip-stepper"><button type="button" data-akce="bump" data-delta="-1">−</button><b class="chip-val">+0</b><button type="button" data-akce="bump" data-delta="1">+</button></span>'
+      + '<input type="hidden" class="chip-extra" name="rel_' + esc(join) + '_extra[' + esc(opt.value) + ']" value="0">';
   } else if (extraType === 'text') {
-    html += '<input type="text" class="chip-extra-input" name="rel_' + join + '_extra[' + opt.value + ']" value="" placeholder="' + placeholder + '">';
+    html += '<input type="text" class="chip-extra-input" name="rel_' + esc(join) + '_extra[' + esc(opt.value) + ']" value="" placeholder="' + esc(placeholder) + '">';
   }
-  html += ' <button type="button" class="x-btn" onclick="dracakRemoveTag(this)">×</button><input type="hidden" name="rel_' + join + '[]" value="' + opt.value + '">';
+  html += ' <button type="button" class="x-btn" data-akce="odebrat-tag">×</button><input type="hidden" name="rel_' + esc(join) + '[]" value="' + esc(opt.value) + '">';
   span.innerHTML = html;
   tagbox.appendChild(span);
   opt.remove();

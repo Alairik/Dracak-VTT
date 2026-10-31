@@ -12,6 +12,9 @@ header_remove('X-Powered-By');
 // Čitelný log pro admina (admin_log.php) vedle PHP error logu hostingu: výjimky, chyby DB, varování a fatální chyby.
 require_once __DIR__ . '/log.php';
 dracak_log_registruj();
+// Content-Security-Policy (zatím v režimu hlášení, viz includes/csp.php).
+require_once __DIR__ . '/csp.php';
+dracak_csp_hlavicka();
 
 // Text z požadavku: skalár jako řetězec, cokoli jiného (pole, objekt z podvrženého JSON) jako prázdný řetězec. Holé (string) na poli
 // zapíše varování „Array to string conversion“ a vrátí „Array“.

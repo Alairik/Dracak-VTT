@@ -75,6 +75,7 @@ foreach ($pdo->query('SELECT ucet_id, tabulka FROM ucet_opravneni')->fetchAll() 
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/organic.css?v=<?= filemtime(__DIR__ . '/assets/css/organic.css') ?>">
+<script src="assets/js/obecne.js?v=<?= filemtime(__DIR__ . '/assets/js/obecne.js') ?>" defer></script>
 </head>
 <body>
 <button class="menu-btn" id="menuBtn" type="button" aria-label="Otevřít navigaci">☰</button>
@@ -137,7 +138,7 @@ foreach ($pdo->query('SELECT ucet_id, tabulka FROM ucet_opravneni')->fetchAll() 
             <button class="btn btn-secondary" type="submit" style="margin-top:12px;font-size:12px;padding:6px 12px;">Uložit</button>
           </form>
           <?php if ((int)$u['id'] !== (int)$user['id']): ?>
-            <form method="post" onsubmit="return confirm('Smazat účet <?= htmlspecialchars($u['email']) ?>?');">
+            <form method="post" data-potvrdit="Smazat účet <?= htmlspecialchars($u['email'], ENT_QUOTES) ?>?">
               <input type="hidden" name="akce" value="smazat">
               <input type="hidden" name="id" value="<?= (int)$u['id'] ?>">
               <button class="btn btn-ghost" type="submit">Smazat</button>
@@ -148,7 +149,7 @@ foreach ($pdo->query('SELECT ucet_id, tabulka FROM ucet_opravneni')->fetchAll() 
     </div>
   </main>
 </div>
-<script>
+<script nonce="<?= dracak_csp_nonce() ?>">
 (function(){
   var menuBtn = document.getElementById('menuBtn'), sidebar = document.getElementById('sidebar'), backdrop = document.getElementById('backdrop');
   function closeNav(){ sidebar.classList.remove('open'); backdrop.classList.remove('show'); }

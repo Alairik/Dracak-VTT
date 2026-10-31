@@ -150,7 +150,7 @@ if (!$fragment) {
 </div>
 <?php if (!$fragment): ?>
 </div>
-<script>
+<script nonce="<?= dracak_csp_nonce() ?>">
 // Překreslení každých 5 s (životy, únava… se mění za hry).
 (function () {
   const ID = document.querySelector('.dz-wrap').dataset.svetId;

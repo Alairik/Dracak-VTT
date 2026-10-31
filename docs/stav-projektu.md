@@ -33,7 +33,7 @@ Stav k 2026-10-31: vše z dosavadního plánu (bod A–D, deník v2 kroky 1–3a
 na DB postavené od nuly. Co lze dělat **bez** ptaní (vždy s testy, `tests/run.sh`):
 - **Další oblasti fuzzingu:** (nahrávání obrázků je od 2026-10-31 pokryté testem `upload_api.js`; limit rozměrů je teď `dracak_vtt_obrazek_max_bodu()` podle `memory_limit`, strop 16 Mbodů — dřív 40 Mbodů, což by na hostingu spadlo na paměti), souběžné požadavky na souboj (dva hráči v jednom
   okamžiku: transakce a `FOR UPDATE` jsou, ale nikdy se netestovaly paralelně), JSON s hlubokým zanořením a obřím tělem (limit velikosti požadavku).
-- **Bezpečnost** (uložený XSS do všech uživatelských textů je od 2026-10-31 pokrytý testem `tests/e2e/xss_ui.js`, bez nálezu): Content-Security-Policy omezující `script-src` (stránky mají inline skripty → nonce; větší práce, ale jediná zbývající plošná obrana proti XSS), kontrola, že každý
+- **Bezpečnost** (uložený XSS do všech uživatelských textů je od 2026-10-31 pokrytý testem `tests/e2e/xss_ui.js`, bez nálezu): přepnutí Content-Security-Policy z hlášení na vynucování (etapa 1 hotová 2026-10-31, viz Bezpečnost; čeká na pár dní bez hlášení v logu), kontrola, že každý
   výpis uživatelského textu je escapovaný (grep + test s `<script>` v názvech světa, postavy, tokenu, pinu, poznámky), `Secure`/`SameSite` cookie za proxy.
 - **Kvalita:** projít poslední větší změny revizí (`/code-review`): omezení přihlášení, chybový log, záloha, kontrola nasazení, fuzzery.
 - **Provoz:** `docs/zalohy.md` ověřit obnovu do prázdné databáze na hostingu (uživatel), měřit polling na skutečných zařízeních (uživatel), případně 304 / ETag u `udalosti.php`.
@@ -217,6 +217,17 @@ efektech, zbraních nebo deníku pusť aspoň příslušné sady** (`tests/run.s
   nesměl založit); chybějící nebo nezapisovatelná složka omezení tiše vypne, přihlášení kvůli tomu nepřestane fungovat. IP se bere z `REMOTE_ADDR` (ne z hlaviček, které posílá klient).
   Neexistující e-mail se ověřuje proti fiktivnímu hashi, ať doba odpovědi neprozradí, jestli účet existuje. Testy: `tests/unit/login_unit.php`, `tests/e2e/login_ui.js`.
   Při zkoušení přes `tests/run.sh` se `logs/login/` před každou sadou maže (fuzzery formulářů z jedné adresy nasbírají limit hned).
+- **Content-Security-Policy, etapa 1 — jen hlásí (2026-10-31, bez DDL):** `includes/csp.php` posílá hlavičku `Content-Security-Policy-Report-Only` na všech stránkách (načítá ji
+  `includes/db.php`, ne v CLI): skripty jen z vlastní domény nebo s jednorázovým `nonce`, žádné inline `on*` atributy, `object-src 'none'`, `base-uri`/`form-action` jen vlastní
+  doména; styly zůstávají s `'unsafe-inline'` (stovky `style=""` v šablonách, riziko je proti skriptům malé) a písma z Google Fonts. Prohlížeč porušení nepřeruší, jen pošle hlášení
+  na `csp-report.php` (jen POST, tělo ≤ 4 kB, max. 60 hlášení za minutu), které je zapíše do chybového logu jako druh „Porušení CSP“ (`admin_log.php`). Každý inline `<script>` má
+  `nonce="<?= dracak_csp_nonce() ?>"`; inline `onclick`/`onsubmit`/`onchange` jsou nahrazené atributy `data-potvrdit`, `data-odeslat-pri-zmene`, `data-tisk`, `data-akce`
+  a delegovanou obsluhou v `assets/js/obecne.js` (načítá ho `dracak_vtt_page_start`) a ve skriptu `editor.php`. **Při té příležitosti opraveno:** `dracakAddTag` v editoru
+  vkládal text z `<option>` do `innerHTML` bez escapování (DOM-XSS přes název záznamu číselníku) — teď `esc()`. **Přepnutí na vynucování** = jediná konstanta
+  `DRACAK_CSP_REZIM` v `includes/csp.php` (`'report'` → `'vynutit'`), ale až poté, co po nasazení pár dní v administraci „Chybový log“ nebude žádné „Porušení CSP“ od skutečných
+  hráčů (rozšíření prohlížeče a přeložené stránky hlášení generují také; ignorovat to, co má `blocked-uri` mimo naši doménu). **Pravidlo do budoucna:** nový inline skript musí mít
+  nonce, nový ovládací prvek nesmí mít `on*` atribut. Testy: `tests/unit/login_unit.php` se tím nemění; `tests/e2e/editor_ui.js` a opice (`monkey_ui.js`) končí chybou, když se
+  v logu objeví druh `csp`.
 - **Kdo to hlídá:** zavřené cesty a hlavičky ověří stránka „Kontrola nasazení“
   (`admin_nasazeni.php`, tlačítko „Zkontrolovat“); dřívější krok `deploy.yml`
   „Post-deploy security checks“ je od 2026-10-27 pryč (hosting odmítá HTTP z

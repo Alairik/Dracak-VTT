@@ -748,7 +748,7 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
 
   <div id="diceBoxContainer" style="position:fixed;inset:0;pointer-events:none;z-index:9999;"></div>
 
-<script>
+<script nonce="<?= dracak_csp_nonce() ?>">
 // Konfigurace a počáteční data pro assets/js/mapa.js (samotný skript je
 // statický soubor, aby se dal cachovat).
 window.MAPA = <?= json_encode([

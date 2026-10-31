@@ -16,6 +16,7 @@ const DRACAK_LOG_DRUHY = [
     'varovani' => 'Varování PHP',
     'fatalni' => 'Fatální chyba PHP',
     'prohlizec' => 'Chyba v prohlížeči',
+    'csp' => 'Porušení CSP',
 ];
 
 function dracak_log_cesta(): string
