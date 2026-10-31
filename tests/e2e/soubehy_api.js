@@ -101,6 +101,22 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK   ' : 'CHYBA') + ' '
   ok(r.every(x => x.s === 200) && ks === '130', '30 současných +1 kus lektvaru: ' + ks + ' (čekáno 130)');
   sql('delete from postava_lektvary where postava_id=2');
 
+  // --- vak: poslední kus nejde vložit dvakrát (dvě zařízení) ---
+  sql('delete from postava_kontejnery where postava_id=2; delete from postava_predmety where postava_id=2');
+  sql('insert into postava_kontejnery (postava_id, predmet_id) values (2, 481)');
+  const vakId = parseInt(sqlVal('select id from postava_kontejnery where postava_id=2 order by id desc limit 1'), 10);
+  const predmetId = parseInt(sqlVal("select id from predmety where kapacita_mn is null and typ='vybaveni' order by id limit 1"), 10);
+  sql(`insert into postava_predmety (postava_id, predmet_id, mnozstvi) values (2, ${predmetId}, 1)`);
+  r = await naraz(8, () => api('postava_kontejner', { postava_id: 2, akce: 'vloz', kontejner_id: vakId, predmet_id: predmetId, mnozstvi: 1, potvrdit: true }));
+  const vlozeno = r.filter(x => x.ok).length;
+  const vVaku = sqlVal(`select ifnull(sum(mnozstvi),0) from kontejner_obsah where kontejner_id=${vakId}`);
+  ok(vlozeno === 1 && vVaku === '1', 'poslední kus jde při 8 současných pokusech vložit do vaku jen jednou: vloženo ' + vlozeno + ', ve vaku ' + vVaku + ' (' + r.map(x => x.s).join(',') + ')');
+  r = await naraz(8, () => api('postava_kontejner', { postava_id: 2, akce: 'vyndej', kontejner_id: vakId, predmet_id: predmetId, mnozstvi: null }));
+  const vyndano = r.filter(x => x.ok).length;
+  const volne = sqlVal(`select ifnull(sum(mnozstvi),0) from postava_predmety where postava_id=2 and predmet_id=${predmetId}`);
+  ok(vyndano === 1 && volne === '1', 'kus jde při 8 současných pokusech vyndat z vaku jen jednou: vyndáno ' + vyndano + ', volně ' + volne);
+  sql('delete from postava_kontejnery where postava_id=2; delete from postava_predmety where postava_id=2');
+
   // --- souboj: víc současných akcí téhož tvora ---
   await api('souboj_konec', { mapa_id: MAPA });
   const stav = async () => (await page.request.get(BASE + '/hra/api/mapa_stav.php?mapa_id=' + MAPA)).json();

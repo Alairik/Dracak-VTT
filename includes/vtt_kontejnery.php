@@ -217,6 +217,15 @@ function dracak_vtt_kontejner_vloz(PDO $pdo, int $postavaId, int $kontejnerId, i
 
     $pdo->beginTransaction();
     try {
+        // Počet kusů se znovu přečte se zámkem: dvě současná vložení téhož posledního kusu (dvě zařízení) by jinak vložila kus dvakrát.
+        $zam = $pdo->prepare('SELECT mnozstvi FROM postava_predmety WHERE postava_id = ? AND predmet_id = ? FOR UPDATE');
+        $zam->execute([$postavaId, $predmetId]);
+        $ted = $zam->fetchColumn();
+        if ($ted === false || (int)$ted < $mnozstvi) {
+            $pdo->rollBack();
+            return ['ok' => false, 'chyba' => 'Tolik kusů ve volném inventáři postava nemá.'];
+        }
+        $volny['mnozstvi'] = (int)$ted;
         if ((int)$volny['mnozstvi'] === $mnozstvi) {
             $pdo->prepare('DELETE FROM postava_predmety WHERE postava_id = ? AND predmet_id = ?')->execute([$postavaId, $predmetId]);
             // Věc, co už není ve volném inventáři, se nemůže nosit ani držet.
@@ -253,10 +262,18 @@ function dracak_vtt_kontejner_vyndej(PDO $pdo, int $postavaId, int $kontejnerId,
     if ($kusu === false) {
         return ['ok' => false, 'chyba' => 'Tuhle věc v kontejneru nemáš.'];
     }
-    $kusu = (int)$kusu;
-    $vyndat = $mnozstvi === null ? $kusu : max(1, min($kusu, $mnozstvi));
     $pdo->beginTransaction();
     try {
+        // Počet kusů se znovu přečte se zámkem: dvě současná vyndání téhož kusu (dvě zařízení) by jinak vrátila kus do inventáře dvakrát.
+        $stmt = $pdo->prepare('SELECT mnozstvi FROM kontejner_obsah WHERE kontejner_id = ? AND predmet_id = ? FOR UPDATE');
+        $stmt->execute([$kontejnerId, $predmetId]);
+        $kusu = $stmt->fetchColumn();
+        if ($kusu === false) {
+            $pdo->rollBack();
+            return ['ok' => false, 'chyba' => 'Tuhle věc v kontejneru nemáš.'];
+        }
+        $kusu = (int)$kusu;
+        $vyndat = $mnozstvi === null ? $kusu : max(1, min($kusu, $mnozstvi));
         if ($vyndat >= $kusu) {
             $pdo->prepare('DELETE FROM kontejner_obsah WHERE kontejner_id = ? AND predmet_id = ?')->execute([$kontejnerId, $predmetId]);
         } else {
