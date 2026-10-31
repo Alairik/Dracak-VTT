@@ -61,3 +61,28 @@ jobs:
           echo "=== co říká robots.txt, který web vydává (69 B) a náš (26 B)"
           curl -sS --max-time 25 "https://vtt.zvelebil.online/robots.txt" 2>&1 | head -5
           echo "--- náš:"; cat robots.txt
+      - name: Je složka FTP vidět na nějaké adrese? (značkový soubor)
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          set +e
+          ZNACKA="dracak-znacka-$(date +%s).txt"
+          echo "dracak-vtt $ZNACKA" > "$ZNACKA"
+          echo "=== nahrání značky do kořene FTP"
+          curl -sS -k --max-time 40 --ssl-reqd -u "$FTP_USERNAME:$FTP_PASSWORD" -T "$ZNACKA" "ftp://$FTP_SERVER/$ZNACKA" 2>&1 | tail -2
+          sleep 2
+          echo "=== kde se značka ukáže (200 = tady se servíruje kořen FTP)"
+          for h in vtt.zvelebil.online zvelebil.online www.zvelebil.online; do
+            for p in https http; do
+              echo "$p://$h/$ZNACKA -> $(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$p://$h/$ZNACKA" 2>&1)"
+            done
+          done
+          for c in vtt/ vtt.zvelebil.online/ domains/vtt.zvelebil.online/ www/; do
+            echo "https://zvelebil.online/$c$ZNACKA -> $(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "https://zvelebil.online/$c$ZNACKA" 2>&1)"
+          done
+          echo "=== smazání značky z FTP"
+          curl -sS -k --max-time 40 --ssl-reqd -u "$FTP_USERNAME:$FTP_PASSWORD" "ftp://$FTP_SERVER/" -Q "-DELE $ZNACKA" 2>&1 | tail -2
+          echo "=== po smazání v kořeni FTP:"
+          curl -sS -k --max-time 40 --ssl-reqd -u "$FTP_USERNAME:$FTP_PASSWORD" "ftp://$FTP_SERVER/" 2>&1 | grep -c "$ZNACKA"
