@@ -48,7 +48,7 @@ if ($typEntity === 'obecny') {
         exit;
     }
     if (isset($data['barva']) && is_string($data['barva']) && preg_match('/^#[0-9a-fA-F]{6}$/', $data['barva'])) {
-        $obecnyBarva = strtolower($data['barva']);
+        $obecnyBarva = strtolower(dracak_text($data['barva']));
     }
     $obecnaVelikost = max(0.25, min(8.0, round((float)($data['velikost'] ?? 1) * 4) / 4));
     $entitaId = 0;

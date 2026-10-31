@@ -86,14 +86,97 @@ function dracak_current_user(): ?array
     return $user;
 }
 
+// Omezení pokusů o přihlášení (hádání hesel). Bez databázové tabulky (web účet nesmí vytvářet tabulky): počítadla jsou malé soubory
+// ve složce logs/login/ (zavřená .htaccess). Dva klíče: IP adresa (hodně pokusů z jedné adresy) a IP + e-mail (hádání jednoho účtu).
+// Blokuje se jen ta adresa, která chybuje, takže cizí člověk nemůže zamknout cizí účet. Po úspěšném přihlášení se počítadla smažou.
+const DRACAK_LOGIN_OKNO_S = 900;          // pamatují se selhání za posledních 15 minut
+const DRACAK_LOGIN_LIMIT_EMAIL = 6;       // selhání na jeden e-mail z jedné adresy
+const DRACAK_LOGIN_LIMIT_IP = 30;         // selhání z jedné adresy celkem
+
+function dracak_login_soubor(string $klic): string
+{
+    return dirname(__DIR__) . '/logs/login/' . substr(hash('sha256', $klic), 0, 24) . '.json';
+}
+
+// Časy selhání v okně, nebo [] (bez souboru, bez zápisu do složky, poškozený soubor).
+function dracak_login_cteni(string $soubor, int $ted): array
+{
+    $json = @file_get_contents($soubor);
+    $casy = $json !== false ? json_decode($json, true) : null;
+    return is_array($casy) ? array_values(array_filter($casy, static fn($t): bool => is_int($t) && $t > $ted - DRACAK_LOGIN_OKNO_S)) : [];
+}
+
+// Kolik vteřin ještě musí čekat; 0 = smí zkusit.
+function dracak_login_cekani(string $email, ?int $ted = null): int
+{
+    $ted ??= time();
+    $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+    $cekani = 0;
+    foreach ([[$ip, DRACAK_LOGIN_LIMIT_IP], [$ip . '|' . strtolower($email), DRACAK_LOGIN_LIMIT_EMAIL]] as [$klic, $limit]) {
+        $casy = dracak_login_cteni(dracak_login_soubor($klic), $ted);
+        if (count($casy) >= $limit) {
+            // uvolní se, až vyprší nejstarší selhání, které drží počet nad limitem
+            sort($casy);
+            $cekani = max($cekani, $casy[count($casy) - $limit] + DRACAK_LOGIN_OKNO_S - $ted);
+        }
+    }
+    return max(0, $cekani);
+}
+
+function dracak_login_selhani(string $email, ?int $ted = null): void
+{
+    $ted ??= time();
+    $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+    if (!dracak_log_priprav_slozku() || (!is_dir(dirname(__DIR__) . '/logs/login') && !@mkdir(dirname(__DIR__) . '/logs/login', 0750))) {
+        return;   // bez možnosti zapisovat se omezení tiše vypne, přihlášení kvůli tomu nesmí přestat fungovat
+    }
+    foreach ([$ip, $ip . '|' . strtolower($email)] as $klic) {
+        $soubor = dracak_login_soubor($klic);
+        $f = @fopen($soubor, 'c+');
+        if (!$f) {
+            continue;
+        }
+        if (flock($f, LOCK_EX)) {
+            $casy = dracak_login_cteni($soubor, $ted);
+            $casy[] = $ted;
+            ftruncate($f, 0);
+            rewind($f);
+            fwrite($f, (string)json_encode(array_slice($casy, -100)));
+            flock($f, LOCK_UN);
+        }
+        fclose($f);
+    }
+    // Úklid starých počítadel (občas, ať složka neroste).
+    if (random_int(1, 50) === 1) {
+        foreach (glob(dirname(__DIR__) . '/logs/login/*.json') ?: [] as $stary) {
+            if (@filemtime($stary) < time() - DRACAK_LOGIN_OKNO_S) {   // skutečný čas souboru, ne $ted (ten se v testech vymýšlí)
+                @unlink($stary);
+            }
+        }
+    }
+}
+
+function dracak_login_vymaz(string $email): void
+{
+    @unlink(dracak_login_soubor((string)($_SERVER['REMOTE_ADDR'] ?? '') . '|' . strtolower($email)));
+}
+
 function dracak_login(string $email, string $password): bool
 {
+    // Zablokovaná adresa se k ověřování hesla vůbec nedostane (stejná odpověď jako při špatném hesle by schovala důvod; hláška říká, že se má počkat).
+    if (dracak_login_cekani($email) > 0) {
+        return false;
+    }
     $stmt = dracak_db()->prepare('SELECT id, heslo_hash FROM ucty WHERE email = ?');
     $stmt->execute([$email]);
     $row = $stmt->fetch();
-    if (!$row || !password_verify($password, $row['heslo_hash'])) {
+    // password_verify i pro neexistující e-mail, ať doba odpovědi neprozradí, jestli účet existuje.
+    $hash = $row ? (string)$row['heslo_hash'] : '$2y$10$.vGA1O9wmRjrwAVXD98HNOgsNpDczlqm3Jq7KnEd1rVAGv3Fykk1a';
+    if (!password_verify($password, $hash) || !$row) {
+        dracak_login_selhani($email);
         return false;
     }
+    dracak_login_vymaz($email);
     dracak_session_start();
     session_regenerate_id(true);
     $_SESSION['ucet_id'] = $row['id'];

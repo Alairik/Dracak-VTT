@@ -13,8 +13,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $akce = $_POST['akce'] ?? '';
 
     if ($akce === 'vytvorit') {
-        $email = trim($_POST['email'] ?? '');
-        $jmeno = trim($_POST['jmeno'] ?? '');
+        $email = trim(dracak_text($_POST['email'] ?? ''));
+        $jmeno = trim(dracak_text($_POST['jmeno'] ?? ''));
         $heslo = dracak_text($_POST['heslo'] ?? '');
         $role = in_array($_POST['role'] ?? '', ['admin', 'pj', 'hrac'], true) ? $_POST['role'] : 'hrac';
         if ($email === '' || $jmeno === '' || strlen($heslo) < 12) {

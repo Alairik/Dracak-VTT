@@ -14,8 +14,8 @@ $done = false;
 if ($count > 0) {
     $error = 'Účty už existují — tenhle formulář dál nefunguje. Nové účty zakládej v admin.php.';
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = trim($_POST['email'] ?? '');
-    $jmeno = trim($_POST['jmeno'] ?? '');
+    $email = trim(dracak_text($_POST['email'] ?? ''));
+    $jmeno = trim(dracak_text($_POST['jmeno'] ?? ''));
     $heslo = dracak_text($_POST['heslo'] ?? '');
     if ($email === '' || $jmeno === '' || strlen($heslo) < 12) {
         $error = 'Vyplň e-mail, jméno a heslo (min. 12 znaků).';

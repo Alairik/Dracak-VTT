@@ -27,6 +27,22 @@ už byly rozhodnuté (viz "Architektonická rozhodnutí" a celá sekce
 "Rozpracováno" níže — všechno v ní je buď přímo citovaný text pravidel,
 nebo odsouhlasené uživatelem, ne můj odhad).
 
+### Další kroky bez rozhodnutí uživatele (kandidáty pro další sezení)
+
+Stav k 2026-10-31: vše z dosavadního plánu (bod A–D, deník v2 kroky 1–3a, deploy, migrace z administrace, log, záloha, testy, fuzzery) je hotové a nasazené; 31 sad v `tests/` prochází
+na DB postavené od nuly. Co lze dělat **bez** ptaní (vždy s testy, `tests/run.sh`):
+- **Další oblasti fuzzingu:** nahrávání obrázků (`hra/api/obrazek_nahrat.php`: podvržený typ, obří soubor, polyglot, SVG se skriptem), souběžné požadavky na souboj (dva hráči v jednom
+  okamžiku: transakce a `FOR UPDATE` jsou, ale nikdy se netestovaly paralelně), JSON s hlubokým zanořením a obřím tělem (limit velikosti požadavku).
+- **Bezpečnost:** Content-Security-Policy omezující `script-src` (stránky mají inline skripty → nonce; větší práce, ale jediná zbývající plošná obrana proti XSS), kontrola, že každý
+  výpis uživatelského textu je escapovaný (grep + test s `<script>` v názvech světa, postavy, tokenu, pinu, poznámky), `Secure`/`SameSite` cookie za proxy.
+- **Kvalita:** projít poslední větší změny revizí (`/code-review`): omezení přihlášení, chybový log, záloha, kontrola nasazení, fuzzery.
+- **Provoz:** `docs/zalohy.md` ověřit obnovu do prázdné databáze na hostingu (uživatel), měřit polling na skutečných zařízeních (uživatel), případně 304 / ETag u `udalosti.php`.
+- **Deník v2:** zbývá figurína a sloty, Dovednosti, Společníci, připnutá kouzla — všechno potřebuje rozhodnutí o pravidlech nebo hromadná data (viz `docs/prototypy/denik-v2-predani.md`).
+
+**Čeká na rozhodnutí uživatele (neřešit samo):** (1) výsledek iniciativy ≤ 0 (b10805, kniha je nejednoznačná); (2) ostatní značky Zlatého tetování mimo Dikobraza (mechanika?); (3) druh zbraně u 13 položek
+(`docs/kontrolni-seznam-neuplnych-mist.md`: Fuuma shuriken, Atlatl, Řetězový meč, Khakkhara, Hůl „Minami no mori“, Rachejtle); (4) které kroky deníku v2 (figurína, Dovednosti, Společníci) a s jakými pravidly;
+(5) jestli má pravidlo „obrana zbraní“ (OZ, nepovinné h1611) vstoupit do OČ; (6) nastavení subdomény `vtt` u WEDOSu na složku `vtt` (hezká adresa bez `/vtt/`).
+
 ### Čeká na ruční spuštění přes phpMyAdmin (admin účet)
 
 Migrace běží pod DML-only účtem (od 2026-10-27 ze stránky Změny databáze v administraci, dřív `scripts/migrate.php`), takže DDL nikdy neprovede a **na
@@ -195,6 +211,12 @@ efektech, zbraních nebo deníku pusť aspoň příslušné sady** (`tests/run.s
   domény, v podsložce funguje beze změny. **Kontrola nasazení** si základní cestu bere ze složky, ve které leží (`dirname(SCRIPT_NAME)`), a navíc porovná `robots.txt` z domény s nahraným:
   když doména vydává jiný obsah, napíše to místo falešného „zavřeno“ (`tests/unit/nasazeni_unit.php`).
   Po opravě: `/index.php` má ukázat přihlášení, pak v administraci „Kontrola nasazení“ → „Zkontrolovat“.
+- **Omezení pokusů o přihlášení (2026-10-31, bez DDL):** `includes/auth.php` — šest nepovedených přihlášení na jeden e-mail z jedné IP adresy (nebo 30 z jedné adresy celkem) za 15 minut
+  zablokuje další pokusy z té adresy (i se správným heslem) až do vypršení nejstaršího selhání; `index.php` a `pravidla.php` ukážou „Příliš mnoho nepovedených pokusů, zkus to za N min“
+  (HTTP 429). Blokuje se jen chybující adresa, takže cizí člověk nezamkne cizí účet. Počítadla jsou malé soubory v `logs/login/` (zavřená `.htaccess`, bez tabulky, kterou by web účet
+  nesměl založit); chybějící nebo nezapisovatelná složka omezení tiše vypne, přihlášení kvůli tomu nepřestane fungovat. IP se bere z `REMOTE_ADDR` (ne z hlaviček, které posílá klient).
+  Neexistující e-mail se ověřuje proti fiktivnímu hashi, ať doba odpovědi neprozradí, jestli účet existuje. Testy: `tests/unit/login_unit.php`, `tests/e2e/login_ui.js`.
+  Při zkoušení přes `tests/run.sh` se `logs/login/` před každou sadou maže (fuzzery formulářů z jedné adresy nasbírají limit hned).
 - **Kdo to hlídá:** zavřené cesty a hlavičky ověří stránka „Kontrola nasazení“
   (`admin_nasazeni.php`, tlačítko „Zkontrolovat“); dřívější krok `deploy.yml`
   „Post-deploy security checks“ je od 2026-10-27 pryč (hosting odmítá HTTP z

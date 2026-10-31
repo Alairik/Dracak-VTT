@@ -10,13 +10,19 @@ if (dracak_current_user()) {
 
 $error = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = trim($_POST['email'] ?? '');
+    $email = trim(dracak_text($_POST['email'] ?? ''));
     $password = dracak_text($_POST['password'] ?? '');
     if (dracak_login($email, $password)) {
         header('Location: dashboard.php');
         exit;
     }
-    $error = 'Nesprávný e-mail nebo heslo.';
+    $cekani = dracak_login_cekani($email);
+    if ($cekani > 0) {
+        http_response_code(429);
+        $error = 'Příliš mnoho nepovedených pokusů. Zkus to znovu za ' . max(1, (int)ceil($cekani / 60)) . ' min.';
+    } else {
+        $error = 'Nesprávný e-mail nebo heslo.';
+    }
 }
 ?>
 <!doctype html>
