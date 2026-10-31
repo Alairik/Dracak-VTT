@@ -190,7 +190,10 @@ efektech, zbraních nebo deníku pusť aspoň příslušné sady** (`tests/run.s
   míří do jiné složky než ta, kam nasazuje FTP (od 22. 10., kdy se přepínalo PHP a hosting zasahoval kvůli NÚKIB — vysvětluje i dřívější 404 z GitHubu). FTP účet je zamčený
   ve své složce (`../` vrací totéž). **Značkový soubor** nahraný do kořene FTP je dostupný na `https://zvelebil.online/vtt/…` (200), na `vtt.zvelebil.online` ani v kořeni
   `zvelebil.online` ne (404): kořen FTP je tedy složka `vtt` uvnitř hlavního webu a subdoména `vtt` ukazuje do kořene hlavního webu místo do ní. Oprava je v administraci
-  hostingu: u subdomény `vtt.zvelebil.online` nastavit cílovou složku na `vtt`.
+  hostingu: u subdomény `vtt.zvelebil.online` nastavit cílovou složku na `vtt`. **Dokud se to nespraví, aplikace běží na `https://vtt.zvelebil.online/vtt/` i `https://zvelebil.online/vtt/`**
+  (ověřeno z GitHubu: přihlášení 200, `config.php` / `includes/` / `logs/` / manifest 403, API 401, naše hlavičky a session cookie na místě). Aplikace nemá nikde absolutní cesty od kořene
+  domény, v podsložce funguje beze změny. **Kontrola nasazení** si základní cestu bere ze složky, ve které leží (`dirname(SCRIPT_NAME)`), a navíc porovná `robots.txt` z domény s nahraným:
+  když doména vydává jiný obsah, napíše to místo falešného „zavřeno“ (`tests/unit/nasazeni_unit.php`).
   Po opravě: `/index.php` má ukázat přihlášení, pak v administraci „Kontrola nasazení“ → „Zkontrolovat“.
 - **Kdo to hlídá:** zavřené cesty a hlavičky ověří stránka „Kontrola nasazení“
   (`admin_nasazeni.php`, tlačítko „Zkontrolovat“); dřívější krok `deploy.yml`
