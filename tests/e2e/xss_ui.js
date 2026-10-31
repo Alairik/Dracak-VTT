@@ -36,7 +36,7 @@ const SMES = P1 + P2 + P3;
   await json('/hra/api/mapa_bod_pridat.php', { mapa_id: 2, nazev: SMES, typ: 'mesto', x: 400, y: 400, popis: SMES, viditelny_hracum: true });
   await json('/hra/api/kresba_pridat.php', { mapa_id: 2, typ: 'text', body: [{ x: 500, y: 500 }], text: SMES, barva: '#000000', tloustka: 3 });
   await json('/hra/api/token_pridat.php', { mapa_id: 2, typ_entity: 'postava', postava_id: 2, x: 600, y: 600 });
-  const svetyId = sqlVal("select id from svet where nazev like 'Svět <%' order by id desc limit 1");
+  const svetyId = sqlVal("select id from svet where nazev like 'Svět %onerror%' order by id desc limit 1");
 
   // --- čtení: stránky, které texty vypisují ---
   const stranky = [
@@ -58,7 +58,7 @@ const SMES = P1 + P2 + P3;
   }
   // úklid
   sql("delete from ucty where email like 'xss-%'");
-  sql("delete from svet where nazev like 'Svět <%'");
+  sql("delete from svet where nazev like 'Svět %onerror%'");
   await browser.close();
   console.log(chyb ? '\nSELHALO ' + chyb : '\nVŠE OK');
   process.exit(chyb ? 1 : 0);

@@ -33,7 +33,7 @@ Stav k 2026-10-31: vše z dosavadního plánu (bod A–D, deník v2 kroky 1–3a
 na DB postavené od nuly. Co lze dělat **bez** ptaní (vždy s testy, `tests/run.sh`):
 - **Další oblasti fuzzingu:** nahrávání obrázků (`hra/api/obrazek_nahrat.php`: podvržený typ, obří soubor, polyglot, SVG se skriptem), souběžné požadavky na souboj (dva hráči v jednom
   okamžiku: transakce a `FOR UPDATE` jsou, ale nikdy se netestovaly paralelně), JSON s hlubokým zanořením a obřím tělem (limit velikosti požadavku).
-- **Bezpečnost:** Content-Security-Policy omezující `script-src` (stránky mají inline skripty → nonce; větší práce, ale jediná zbývající plošná obrana proti XSS), kontrola, že každý
+- **Bezpečnost** (uložený XSS do všech uživatelských textů je od 2026-10-31 pokrytý testem `tests/e2e/xss_ui.js`, bez nálezu): Content-Security-Policy omezující `script-src` (stránky mají inline skripty → nonce; větší práce, ale jediná zbývající plošná obrana proti XSS), kontrola, že každý
   výpis uživatelského textu je escapovaný (grep + test s `<script>` v názvech světa, postavy, tokenu, pinu, poznámky), `Secure`/`SameSite` cookie za proxy.
 - **Kvalita:** projít poslední větší změny revizí (`/code-review`): omezení přihlášení, chybový log, záloha, kontrola nasazení, fuzzery.
 - **Provoz:** `docs/zalohy.md` ověřit obnovu do prázdné databáze na hostingu (uživatel), měřit polling na skutečných zařízeních (uživatel), případně 304 / ETag u `udalosti.php`.
