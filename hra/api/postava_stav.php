@@ -59,12 +59,7 @@ if ($svetId > 0) {
 
 switch ($akce) {
     case 'hp': {
-        $max = (int)$postava['max_hp'];
-        $nove = max(0, (int)$postava['aktualni_hp'] + $delta);
-        if ($max > 0) {
-            $nove = min($max, $nove);
-        }
-        $pdo->prepare('UPDATE postavy SET aktualni_hp = ? WHERE id = ?')->execute([$nove, $postavaId]);
+        [$nove, $max] = dracak_vtt_hp_zmen($pdo, 'postava', $postavaId, $delta) ?? [0, (int)$postava['max_hp']];
         if ($svetId > 0) {
             dracak_vtt_log_event($svetId, $aktivniMapaId, 'hp_zmena', [
                 'typ_entity' => 'postava', 'entita_id' => $postavaId, 'nove_hp' => $nove, 'max_hp' => $max,
@@ -76,9 +71,7 @@ switch ($akce) {
         if (!dracak_vtt_ma_magenergii($postava)) {
             odpoved(422, ['error' => 'Tahle postava magenergii nepoužívá.']);
         }
-        $max = (int)$postava['max_magenergie'];
-        $nova = max(0, min($max, (int)$postava['aktualni_magenergie'] + $delta));
-        $pdo->prepare('UPDATE postavy SET aktualni_magenergie = ? WHERE id = ?')->execute([$nova, $postavaId]);
+        [$nova, $max] = dracak_vtt_magenergie_zmen($pdo, $postavaId, $delta) ?? [0, (int)$postava['max_magenergie']];
         if ($svetId > 0) {
             dracak_vtt_log_event($svetId, $aktivniMapaId, 'magenergie_zmena', [
                 'typ_entity' => 'postava', 'entita_id' => $postavaId, 'nova_magenergie' => $nova, 'max_magenergie' => $max,
@@ -90,8 +83,7 @@ switch ($akce) {
         if (!pole_existuje($postava, 'unava')) {
             odpoved(422, ['error' => 'Únava se zatím nedá ukládat (chybí migrace 0065).']);
         }
-        $nova = max(0, min(65535, (int)$postava['unava'] + $delta));
-        $pdo->prepare('UPDATE postavy SET unava = ? WHERE id = ?')->execute([$nova, $postavaId]);
+        dracak_vtt_cital_zmen($pdo, 'postavy', 'unava', 'GREATEST(0, LEAST(65535, CAST(unava AS SIGNED) + :delta))', $postavaId, $delta);
         odpoved(200, ['ok' => true]);
     }
     case 'spanek': {
@@ -118,8 +110,7 @@ switch ($akce) {
         if (!$jePj && $svetId > 0) {
             odpoved(403, ['error' => 'Zkušenost přiděluje PJ.']);
         }
-        $nova = max(0, min(4294967295, (int)$postava['zkusenost'] + $delta));
-        $pdo->prepare('UPDATE postavy SET zkusenost = ? WHERE id = ?')->execute([$nova, $postavaId]);
+        dracak_vtt_cital_zmen($pdo, 'postavy', 'zkusenost', 'GREATEST(0, LEAST(4294967295, CAST(zkusenost AS SIGNED) + :delta))', $postavaId, $delta);
         odpoved(200, ['ok' => true]);
     }
     case 'penize': {
@@ -268,17 +259,21 @@ switch ($akce) {
             if ($typ === 'kouzlo') {
                 odpoved(422, ['error' => 'Kouzlo nemá množství.']);
             }
-            $stmt = $pdo->prepare("SELECT mnozstvi FROM $tabulka WHERE postava_id = ? AND $fk = ?");
+            // Čtení se zámkem v transakci: dvě současné změny počtu kusů (+1 a −1 ze dvou zařízení) se nesmí přepsat navzájem.
+            $pdo->beginTransaction();
+            $stmt = $pdo->prepare("SELECT mnozstvi FROM $tabulka WHERE postava_id = ? AND $fk = ? FOR UPDATE");
             $stmt->execute([$postavaId, $polozkaId]);
             $kusu = $stmt->fetchColumn();
             if ($kusu === false) {
+                $pdo->rollBack();
                 odpoved(404, ['error' => 'Tuhle položku postava nemá.']);
             }
-            $nove = (int)$kusu + $delta;
+            $nove = (int)$kusu + max(-1000000, min(1000000, $delta));
             if ($nove < 1) {
-                $odebrat = true;
+                $odebrat = true;   // transakce zůstává otevřená až po smazání níž
             } else {
                 $pdo->prepare("UPDATE $tabulka SET mnozstvi = ? WHERE postava_id = ? AND $fk = ?")->execute([min(65000, $nove), $postavaId, $polozkaId]);
+                $pdo->commit();
                 odpoved(200, ['ok' => true]);
             }
         }
@@ -290,6 +285,9 @@ switch ($akce) {
                     $pdo->prepare("UPDATE postavy SET $sloupec = NULL WHERE id = ? AND $sloupec = ?")->execute([$postavaId, $polozkaId]);
                 }
             }
+        }
+        if ($pdo->inTransaction()) {
+            $pdo->commit();
         }
         odpoved(200, ['ok' => true]);
     }

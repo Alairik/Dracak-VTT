@@ -31,8 +31,7 @@ nebo odsouhlasené uživatelem, ne můj odhad).
 
 Stav k 2026-10-31: vše z dosavadního plánu (bod A–D, deník v2 kroky 1–3a, deploy, migrace z administrace, log, záloha, testy, fuzzery) je hotové a nasazené; 31 sad v `tests/` prochází
 na DB postavené od nuly. Co lze dělat **bez** ptaní (vždy s testy, `tests/run.sh`):
-- **Další oblasti fuzzingu:** (nahrávání obrázků je od 2026-10-31 pokryté testem `upload_api.js`; limit rozměrů je teď `dracak_vtt_obrazek_max_bodu()` podle `memory_limit`, strop 16 Mbodů — dřív 40 Mbodů, což by na hostingu spadlo na paměti), souběžné požadavky na souboj (dva hráči v jednom
-  okamžiku: transakce a `FOR UPDATE` jsou, ale nikdy se netestovaly paralelně), JSON s hlubokým zanořením a obřím tělem (limit velikosti požadavku).
+- **Další oblasti fuzzingu:** (nahrávání obrázků je od 2026-10-31 pokryté testem `upload_api.js`; limit rozměrů je teď `dracak_vtt_obrazek_max_bodu()` podle `memory_limit`, strop 16 Mbodů — dřív 40 Mbodů, což by na hostingu spadlo na paměti; souběžné požadavky na životy, magenergii, lektvary a souboj pokrývá `soubehy_api.js`, JSON s hloubkou 100 000 a tělem 200 MB server odmítne čistě bez záznamu v logu). Zbývá: souběh zbylých míst, kde se čte a zapisuje stav (`vtt_kontejnery.php` — vložení do vaku, `efekt_pridat`, mlha), a zátěžový test pollingu při 6 hráčích.
 - **Bezpečnost** (uložený XSS do všech uživatelských textů je od 2026-10-31 pokrytý testem `tests/e2e/xss_ui.js`, bez nálezu): přepnutí Content-Security-Policy z hlášení na vynucování (etapa 1 hotová 2026-10-31, viz Bezpečnost; čeká na pár dní bez hlášení v logu), kontrola, že každý
   výpis uživatelského textu je escapovaný (grep + test s `<script>` v názvech světa, postavy, tokenu, pinu, poznámky), `Secure`/`SameSite` cookie za proxy.
 - **Kvalita:** projít poslední větší změny revizí (`/code-review`): omezení přihlášení, chybový log, záloha, kontrola nasazení, fuzzery.
@@ -228,6 +227,11 @@ efektech, zbraních nebo deníku pusť aspoň příslušné sady** (`tests/run.s
   hráčů (rozšíření prohlížeče a přeložené stránky hlášení generují také; ignorovat to, co má `blocked-uri` mimo naši doménu). **Pravidlo do budoucna:** nový inline skript musí mít
   nonce, nový ovládací prvek nesmí mít `on*` atribut. Testy: `tests/unit/login_unit.php` se tím nemění; `tests/e2e/editor_ui.js` a opice (`monkey_ui.js`) končí chybou, když se
   v logu objeví druh `csp`.
+- **Souběžné úpravy (2026-10-31, bez DDL):** test `tests/e2e/soubehy_api.js` (osm samostatných přihlášení naráz) ukázal, že úprava životů, magenergie, únavy a zkušenosti četla hodnotu, přepočítala ji v PHP
+  a zapsala zpět — dva současné zásahy (PJ strhne život a hráč se zrovna léčí, deník a mapa na dvou zařízeních) daly jen jeden (60 zásahů −1 ⇒ zbylo o 11 životů víc). Teď je změna jeden `UPDATE` s ořezem
+  v DB (`dracak_vtt_hp_zmen`, `dracak_vtt_magenergie_zmen`, `dracak_vtt_cital_zmen` v `includes/vtt.php`; používá je `hp_uprava`, `magenergie_uprava`, `postava_stav`, použití předmětu a tiky efektů).
+  Dále: poslední kus lektvaru se při použití čte se zámkem řádku (`pouzij_predmet.php`; dva současné doušky dřív prošly oba), předání kořisti PJ (`loot.php`) taky, změna počtu kusů v deníku
+  (`postava_stav.php`, `inventar_zmena`) běží v transakci se zámkem. Souboj (tahy, akce) měl transakce a zámky už dřív a test to potvrdil. Obří změna (`delta` ±10⁹) se ořízne na rozsah sloupce místo chyby DB.
 - **Kdo to hlídá:** zavřené cesty a hlavičky ověří stránka „Kontrola nasazení“
   (`admin_nasazeni.php`, tlačítko „Zkontrolovat“); dřívější krok `deploy.yml`
   „Post-deploy security checks“ je od 2026-10-27 pryč (hosting odmítá HTTP z

@@ -198,6 +198,17 @@ try {
     // Spotřeba: jen lektvar (vypitý kus mizí). Předmět (zbraň/zbroj/
     // artefakt) a kouzlo (znalost) se použitím nespotřebovávají.
     if ($typPolozky === 'lektvar') {
+        // Řádek se znovu přečte se zámkem: dva současné doušky z téhož posledního kusu by jinak oba prošly (kus zmizí jednou, účinek se použije dvakrát).
+        $zam = $pdo->prepare(($typEntity === 'postava' ? "SELECT mnozstvi FROM {$cfg['inventar']}" : 'SELECT mnozstvi FROM nestvura_instance_vybava') . ' WHERE id = ? FOR UPDATE');
+        $zam->execute([(int)$invRow['id']]);
+        $zbyva = $zam->fetchColumn();
+        if ($zbyva === false || (int)$zbyva < 1) {
+            $pdo->rollBack();
+            http_response_code(409);
+            echo json_encode(['error' => 'Tenhle kus už mezitím někdo spotřeboval.']);
+            exit;
+        }
+        $invRow['mnozstvi'] = (int)$zbyva;
         if ((int)$invRow['mnozstvi'] <= 1) {
             $del = $pdo->prepare(($typEntity === 'postava' ? "DELETE FROM {$cfg['inventar']}" : 'DELETE FROM nestvura_instance_vybava') . ' WHERE id = ?');
             $del->execute([(int)$invRow['id']]);

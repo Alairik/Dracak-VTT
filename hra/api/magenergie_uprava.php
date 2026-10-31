@@ -44,11 +44,8 @@ if (!dracak_vtt_ma_magenergii($entity)) {
     exit;
 }
 
-$maxMagenergie = (int)$entity['max_magenergie'];
-$novaMagenergie = max(0, min($maxMagenergie, (int)$entity['aktualni_magenergie'] + $delta));
-
-$upd = $pdo->prepare('UPDATE postavy SET aktualni_magenergie = ? WHERE id = ?');
-$upd->execute([$novaMagenergie, $entitaId]);
+// Jeden UPDATE v DB (dracak_vtt_magenergie_zmen), ne čtení a zápis v PHP: dvě současné změny se nesmí ztratit.
+[$novaMagenergie, $maxMagenergie] = dracak_vtt_magenergie_zmen($pdo, $entitaId, $delta) ?? [0, (int)$entity['max_magenergie']];
 
 $eventId = dracak_vtt_log_event((int)$mapa['svet_id'], $mapaId, 'magenergie_zmena', [
     'typ_entity' => 'postava',

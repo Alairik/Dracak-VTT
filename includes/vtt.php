@@ -257,6 +257,56 @@ function dracak_vtt_can_edit_hp(array $user, string $typEntity, array $entity): 
     return $typEntity === 'postava' && (int)($entity['vlastnik_ucet_id'] ?? 0) === (int)$user['id'];
 }
 
+// Změna čítače v postavě/nestvůře (životy, magenergie, únava, zkušenost) JEDNÍM příkazem UPDATE se ořezem v DB, ne „přečti, přepočítej v PHP, zapiš“:
+// dva současné požadavky (PJ strhne život a hráč se zrovna léčí, dva hráči na jedné postavě) by jinak oba vyšly ze stejné původní hodnoty
+// a jedna změna by se ztratila. Řádek je během UPDATE zamčený, takže druhý požadavek počká a vyjde z výsledku prvního.
+// $sloupec a $tabulka jsou jen pevné názvy z volajících funkcí, ne vstup od uživatele. Vrací nové hodnoty z DB (nebo null, když řádek neexistuje).
+function dracak_vtt_cital_zmen(PDO $pdo, string $tabulka, string $sloupec, string $vyraz, int $id, int $delta, string $dalsiSloupec = 'id'): ?array
+{
+    $delta = max(-1000000, min(1000000, $delta));
+    $vlastni = !$pdo->inTransaction();
+    if ($vlastni) {
+        $pdo->beginTransaction();
+    }
+    try {
+        $upd = $pdo->prepare("UPDATE $tabulka SET $sloupec = $vyraz WHERE id = :id");
+        $upd->bindValue(':delta', $delta, PDO::PARAM_INT);
+        $upd->bindValue(':id', $id, PDO::PARAM_INT);
+        $upd->execute();
+        $q = $pdo->prepare("SELECT $sloupec AS hodnota, $dalsiSloupec AS dalsi FROM $tabulka WHERE id = ?");
+        $q->execute([$id]);
+        $r = $q->fetch();
+        if ($vlastni) {
+            $pdo->commit();
+        }
+    } catch (Throwable $e) {
+        if ($vlastni && $pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $e;
+    }
+    return $r ? ['hodnota' => (int)$r['hodnota'], 'dalsi' => (int)$r['dalsi']] : null;
+}
+
+// Životy o $delta: nejníž 0, nejvýš max_hp (max_hp = 0 znamená „neznámé“, nahoru se neořezává, jen na rozsah sloupce). Vrací [nove_hp, max_hp] nebo null.
+function dracak_vtt_hp_zmen(PDO $pdo, string $typEntity, int $entitaId, int $delta): ?array
+{
+    $tabulka = $typEntity === 'nestvura_instance' ? 'nestvura_instance' : 'postavy';
+    $r = dracak_vtt_cital_zmen($pdo, $tabulka, 'aktualni_hp',
+        'GREATEST(0, LEAST(IF(max_hp > 0, CAST(max_hp AS SIGNED), 32767), CAST(aktualni_hp AS SIGNED) + :delta))',
+        $entitaId, $delta, 'max_hp');
+    return $r === null ? null : [$r['hodnota'], $r['dalsi']];
+}
+
+// Magenergie postavy o $delta: nejníž 0, nejvýš max_magenergie. Vrací [nova_magenergie, max_magenergie] nebo null.
+function dracak_vtt_magenergie_zmen(PDO $pdo, int $postavaId, int $delta): ?array
+{
+    $r = dracak_vtt_cital_zmen($pdo, 'postavy', 'aktualni_magenergie',
+        'GREATEST(0, LEAST(IFNULL(max_magenergie, 0), IFNULL(aktualni_magenergie, 0) + :delta))',
+        $postavaId, $delta, 'IFNULL(max_magenergie, 0)');
+    return $r === null ? null : [$r['hodnota'], $r['dalsi']];
+}
+
 // Vytáhne první číslo z volného textu jako "20", "20-25", "viz text" —
 // zdrojová data bestiáře jsou často nečistá (viz
 // docs/kontrolni-seznam-neuplnych-mist.md), radši 0 než pád na chybě.

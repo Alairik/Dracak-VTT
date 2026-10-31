@@ -276,15 +276,8 @@ function dracak_vtt_los_blokovana(PDO $pdo, int $mapaId, string $typA, int $enti
 // nahoru). Vrací [nove_hp, max_hp].
 function dracak_vtt_aplikuj_hp_deltu(string $typEntity, array $entity, int $delta): array
 {
-    $maxHp = (int)$entity['max_hp'];
-    $noveHp = max(0, (int)$entity['aktualni_hp'] + $delta);
-    if ($maxHp > 0) {
-        $noveHp = min($maxHp, $noveHp);
-    }
-    $table = $typEntity === 'nestvura_instance' ? 'nestvura_instance' : 'postavy';
-    $upd = dracak_db()->prepare("UPDATE $table SET aktualni_hp = ? WHERE id = ?");
-    $upd->execute([$noveHp, (int)$entity['id']]);
-    return [$noveHp, $maxHp];
+    // Jeden UPDATE v DB (dracak_vtt_hp_zmen): souběžné změny životů se neztratí.
+    return dracak_vtt_hp_zmen(dracak_db(), $typEntity, (int)$entity['id'], $delta) ?? [0, (int)$entity['max_hp']];
 }
 
 // Magenergie (viz database/migrations/0050_vtt_postava_magenergie.sql)
@@ -327,9 +320,5 @@ function dracak_vtt_kouzlo_cena_magenergie(?string $cenaMagenergie): ?int
 // Vrací [nova_magenergie, max_magenergie].
 function dracak_vtt_odecti_magenergii(array $postava, int $cena): array
 {
-    $max = (int)$postava['max_magenergie'];
-    $nova = max(0, min($max, (int)$postava['aktualni_magenergie'] - $cena));
-    $upd = dracak_db()->prepare('UPDATE postavy SET aktualni_magenergie = ? WHERE id = ?');
-    $upd->execute([$nova, (int)$postava['id']]);
-    return [$nova, $max];
+    return dracak_vtt_magenergie_zmen(dracak_db(), (int)$postava['id'], -$cena) ?? [0, (int)$postava['max_magenergie']];
 }

@@ -35,15 +35,8 @@ if (!dracak_vtt_can_edit_hp($user, $typEntity, $entity)) {
 
 // max_hp = 0 znamená "nezadáno/neznámé" (viz nečistá data bestiáře), ne
 // "postava/nestvůra nemůže mít žádný život" — v tom případě nahoru neklem.
-$maxHp = (int)$entity['max_hp'];
-$noveHp = max(0, (int)$entity['aktualni_hp'] + $delta);
-if ($maxHp > 0) {
-    $noveHp = min($maxHp, $noveHp);
-}
-
-$table = $typEntity === 'nestvura_instance' ? 'nestvura_instance' : 'postavy';
-$upd = $pdo->prepare("UPDATE $table SET aktualni_hp = ? WHERE id = ?");
-$upd->execute([$noveHp, $entitaId]);
+// Změna je jeden UPDATE v DB (dracak_vtt_hp_zmen), ne čtení a zápis v PHP: dva současné zásahy se nesmí ztratit.
+[$noveHp, $maxHp] = dracak_vtt_hp_zmen($pdo, $typEntity, $entitaId, $delta) ?? [0, (int)$entity['max_hp']];
 
 $eventId = dracak_vtt_log_event((int)$mapa['svet_id'], $mapaId, 'hp_zmena', [
     'typ_entity' => $typEntity,

@@ -84,6 +84,18 @@ $prevod = $typPolozky === 'kouzlo' ? 1 : min($pozadovaneMnozstvi ?? (int)$vybava
 
 $pdo->beginTransaction();
 try {
+    // Řádek se znovu přečte se zámkem: dva hráči, kteří sáhli po téže položce naráz, ji jinak oba dostanou (smazání zabere jen jednou, vložení do inventáře dvakrát).
+    $zam = $pdo->prepare('SELECT mnozstvi FROM nestvura_instance_vybava WHERE id = ? FOR UPDATE');
+    $zam->execute([(int)$vybavaRow['id']]);
+    $aktualni = $zam->fetchColumn();
+    if ($aktualni === false || (int)$aktualni < 1) {
+        $pdo->rollBack();
+        http_response_code(409);
+        echo json_encode(['error' => 'Tuhle položku už mezitím někdo sebral.']);
+        exit;
+    }
+    $vybavaRow['mnozstvi'] = (int)$aktualni;
+    $prevod = $typPolozky === 'kouzlo' ? 1 : min($pozadovaneMnozstvi ?? (int)$aktualni, (int)$aktualni);
     if ($typPolozky === 'kouzlo') {
         $del = $pdo->prepare('DELETE FROM nestvura_instance_vybava WHERE id = ?');
         $del->execute([(int)$vybavaRow['id']]);
