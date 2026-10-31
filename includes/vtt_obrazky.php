@@ -19,6 +19,20 @@ function dracak_vtt_obrazky_adresar(): string
     return $dir;
 }
 
+// Nejvíc bodů, které se smí zmenšovat: GD drží celý zdroj i cíl v paměti (~4 B na bod, počítá se s rezervou), takže obří obrázek by spadl na
+// vyčerpané paměti (chyba serveru) místo srozumitelné hlášky. Strop 16 Mbodů, jinak polovina memory_limit.
+function dracak_vtt_obrazek_max_bodu(): int
+{
+    $limit = trim((string)ini_get('memory_limit'));
+    $bajtu = (int)$limit;
+    $koncovka = strtolower(substr($limit, -1));
+    $bajtu *= match ($koncovka) { 'g' => 1073741824, 'm' => 1048576, 'k' => 1024, default => 1 };
+    if ($bajtu <= 0) {
+        return 16_000_000;   // -1 = bez omezení
+    }
+    return (int)min(16_000_000, max(1_000_000, ($bajtu * 0.5) / 6));
+}
+
 // Vrací ['id' => int, 'nazev' => string] nebo ['chyba' => string].
 function dracak_vtt_obrazek_ulozit(PDO $pdo, int $svetId, int $ucetId, array $soubor, string $nazev): array
 {
@@ -40,8 +54,11 @@ function dracak_vtt_obrazek_ulozit(PDO $pdo, int $svetId, int $ucetId, array $so
     }
     $w = (int)$info[0];
     $h = (int)$info[1];
-    if ($w < 1 || $h < 1 || $w * $h > 40_000_000) {
+    if ($w < 1 || $h < 1) {
         return ['chyba' => 'Obrázek má neplatné rozměry.'];
+    }
+    if ($w * $h > dracak_vtt_obrazek_max_bodu()) {
+        return ['chyba' => 'Obrázek má moc bodů (' . $w . ' × ' . $h . ') — zmenši ho, k portrétu stačí pár set bodů na šířku.'];
     }
 
     $dir = dracak_vtt_obrazky_adresar();

@@ -31,7 +31,7 @@ nebo odsouhlasené uživatelem, ne můj odhad).
 
 Stav k 2026-10-31: vše z dosavadního plánu (bod A–D, deník v2 kroky 1–3a, deploy, migrace z administrace, log, záloha, testy, fuzzery) je hotové a nasazené; 31 sad v `tests/` prochází
 na DB postavené od nuly. Co lze dělat **bez** ptaní (vždy s testy, `tests/run.sh`):
-- **Další oblasti fuzzingu:** nahrávání obrázků (`hra/api/obrazek_nahrat.php`: podvržený typ, obří soubor, polyglot, SVG se skriptem), souběžné požadavky na souboj (dva hráči v jednom
+- **Další oblasti fuzzingu:** (nahrávání obrázků je od 2026-10-31 pokryté testem `upload_api.js`; limit rozměrů je teď `dracak_vtt_obrazek_max_bodu()` podle `memory_limit`, strop 16 Mbodů — dřív 40 Mbodů, což by na hostingu spadlo na paměti), souběžné požadavky na souboj (dva hráči v jednom
   okamžiku: transakce a `FOR UPDATE` jsou, ale nikdy se netestovaly paralelně), JSON s hlubokým zanořením a obřím tělem (limit velikosti požadavku).
 - **Bezpečnost** (uložený XSS do všech uživatelských textů je od 2026-10-31 pokrytý testem `tests/e2e/xss_ui.js`, bez nálezu): Content-Security-Policy omezující `script-src` (stránky mají inline skripty → nonce; větší práce, ale jediná zbývající plošná obrana proti XSS), kontrola, že každý
   výpis uživatelského textu je escapovaný (grep + test s `<script>` v názvech světa, postavy, tokenu, pinu, poznámky), `Secure`/`SameSite` cookie za proxy.
