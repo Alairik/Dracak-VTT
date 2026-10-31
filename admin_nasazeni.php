@@ -15,7 +15,7 @@ $cesty = null;
 if (($_GET['cesty'] ?? '') === '1') {
     $https = !empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off';
     // Jen Host požadavku — X-Forwarded-Host posílá klient a server by se nechal poslat na cizí adresu.
-    $cesty = dracak_nasazeni_zavrene_cesty((string)($_SERVER['HTTP_HOST'] ?? ''), $https, (string)($_SERVER['REMOTE_ADDR'] ?? ''));
+    $cesty = dracak_nasazeni_zavrene_cesty((string)($_SERVER['HTTP_HOST'] ?? ''), $https, (string)($_SERVER['REMOTE_ADDR'] ?? ''), dirname((string)($_SERVER['SCRIPT_NAME'] ?? '/')));
 }
 
 $problemy = count($kontrola['chybi']) + count($kontrola['jine']) + count($kontrola['navic']) + count($kontrola['uploads_spustitelne']);

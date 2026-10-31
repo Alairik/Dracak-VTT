@@ -17,7 +17,7 @@ mkdir -p "$OUT"
 PORT=${BASE##*:}
 
 E2E_VYCHOZI="ini_v2_api souboj_api efekty_api efekty_kolo efekty_kouzla efekty_ui tasit_zdarma_api zbrane_api zbrane_ini_api zbrane_ui zbrane_mapa hex_api hex_multi_api review2_api dalsi_tah_api vyzva_api denik_v2 denik_dock inv_ui e2e_hra druzina_hrac druzina_pj log_ui zaloha_ui souboj_ui hex_tah_ui"
-UNIT_VYCHOZI="log_unit migrace_unit zaloha_test"
+UNIT_VYCHOZI="log_unit migrace_unit zaloha_test nasazeni_unit"
 
 # Stav před jednotlivými sadami navíc k resetu (co sada očekává od postavy, ale seed to nemá).
 predem() {

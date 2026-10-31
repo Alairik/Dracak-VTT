@@ -98,10 +98,10 @@ function dracak_nasazeni_kontrola(): array
     return $vysledek;
 }
 
-// Jeden požadavek na vlastní adresu: ['kod' => ?int, 'hlavicky' => string, 'chyba' => ?string]. Bez přesměrování a s krátkým limitem.
+// Jeden požadavek na vlastní adresu: ['kod' => ?int, 'hlavicky' => string, 'telo' => string (prvních 4 kB), 'chyba' => ?string]. Bez přesměrování a s krátkým limitem.
 function dracak_nasazeni_pozadavek(string $url): array
 {
-    $vystup = ['kod' => null, 'hlavicky' => '', 'chyba' => null];
+    $vystup = ['kod' => null, 'hlavicky' => '', 'telo' => '', 'chyba' => null];
     if (!function_exists('curl_init')) {
         $vystup['chyba'] = 'na serveru chybí rozšíření curl';
         return $vystup;
@@ -122,7 +122,9 @@ function dracak_nasazeni_pozadavek(string $url): array
         $vystup['chyba'] = curl_error($ch) ?: 'požadavek se nepovedl';
     } else {
         $vystup['kod'] = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-        $vystup['hlavicky'] = substr((string)$odpoved, 0, (int)curl_getinfo($ch, CURLINFO_HEADER_SIZE));
+        $velikostHlavicek = (int)curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+        $vystup['hlavicky'] = substr((string)$odpoved, 0, $velikostHlavicek);
+        $vystup['telo'] = substr((string)$odpoved, $velikostHlavicek, 4096);
     }
     curl_close($ch);
     return $vystup;
@@ -130,8 +132,11 @@ function dracak_nasazeni_pozadavek(string $url): array
 
 // Zavřené cesty a bezpečnostní hlavičky, ověřené požadavky ze serveru na vlastní doménu.
 // Vrací ['zakladna' => string, 'cesty' => [[cesta, kod, ok, poznamka]], 'hlavicky' => [[nazev, ok, poznamka]], 'chyba' => ?string].
-function dracak_nasazeni_zavrene_cesty(string $hostHlavicka, bool $https, string $vzdalenaAdresa = ''): array
+function dracak_nasazeni_zavrene_cesty(string $hostHlavicka, bool $https, string $vzdalenaAdresa = '', string $zakladniCesta = ''): array
 {
+    // Aplikace nemusí být v kořeni domény (na Wedosu běží jako zvelebil.online/vtt/): adresy se skládají od složky, ve které leží tahle stránka.
+    $zakladniCesta = '/' . trim($zakladniCesta, '/');
+    $zakladniCesta = $zakladniCesta === '/' || !preg_match('#^/[A-Za-z0-9._~/-]*$#', $zakladniCesta) || str_contains($zakladniCesta, '..') || str_contains($zakladniCesta, '//') ? '' : $zakladniCesta;
     $host = strtolower(trim(explode(',', $hostHlavicka)[0]));
     $vysledek = ['zakladna' => '', 'cesty' => [], 'hlavicky' => [], 'chyba' => null];
     // Jen běžné jméno hostitele (písmena, číslice, tečky, pomlčky, případně port) — nic, co by požadavek odvedlo jinam.
@@ -146,7 +151,7 @@ function dracak_nasazeni_zavrene_cesty(string $hostHlavicka, bool $https, string
         $vysledek['chyba'] = 'Web je otevřený přes IP adresu nebo localhost — kontrola zevnitř serveru se tu nedělá. Otevři ho přes jeho doménu.';
         return $vysledek;
     }
-    $zakladna = ($https ? 'https://' : 'http://') . $host;
+    $zakladna = ($https ? 'https://' : 'http://') . $host . $zakladniCesta;
     $vysledek['zakladna'] = $zakladna;
 
     // Kontrola, že server vlastní doménu vůbec vidí: stránka, která musí odpovědět (robots.txt je součást nasazení). Hosting, který
@@ -155,6 +160,15 @@ function dracak_nasazeni_zavrene_cesty(string $hostHlavicka, bool $https, string
     if ($kontrola['kod'] !== 200) {
         $vysledek['chyba'] = 'Server se na vlastní doménu nedovolá (' . ($kontrola['kod'] !== null ? 'robots.txt vrátil HTTP ' . $kontrola['kod'] : (string)$kontrola['chyba'])
             . ') — zavřené cesty se zevnitř ověřit nedají, protože by „zavřeno“ vyšlo i u otevřených.';
+        return $vysledek;
+    }
+
+    // Odpovídá obsah stejně jako soubor, který deploy nahrál? Doména může být „živá“, a přesto vydávat jiný web (subdoména namířená do cizí
+    // složky — stalo se 2026-10-29: robots.txt hlavního webu místo našeho). Pak by všechny cesty výš vyšly „zavřeno“ jen proto, že tam nic není.
+    $nase = @file_get_contents(dracak_nasazeni_koren() . '/robots.txt');
+    if ($nase !== false && trim($kontrola['telo']) !== trim($nase)) {
+        $vysledek['chyba'] = 'Adresa ' . $zakladna . ' vydává jiný obsah, než nahrál deploy (jiný robots.txt) — doména nejspíš míří do jiné složky než ta, kam nasazuje FTP. '
+            . 'Zavřené cesty se tak ověřit nedají. Zkontroluj v administraci hostingu, na jakou složku subdoména ukazuje.';
         return $vysledek;
     }
 
