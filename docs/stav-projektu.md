@@ -187,8 +187,10 @@ efektech, zbraních nebo deníku pusť aspoň příslušné sady** (`tests/run.s
   dával „Not Found“. Diagnostika z GitHubu (ruční workflow `.github/workflows/ftp-diag.yml`, jen výpis názvů, nic nenahrává; spouští se z Actions → „FTP Diag“ → Run):
   na FTP leží celá aplikace a dnešní nasazení (09:44) proběhlo v pořádku, ale doména vydává **jiné soubory**: úvodní stránka má stejný otisk a velikost (33 765 B,
   `last-modified` 22. 10. 2026 12:47) jako `zvelebil.online`, `robots.txt` má 69 B (náš 26 B) a v odpovědi chybí naše hlavičky z `.htaccess` (HSTS, CSP). Subdoména tedy
-  míří do jiné složky než ta, kam nasazuje FTP (od 22. 10., kdy se přepínalo PHP a hosting zasahoval kvůli NÚKIB — vysvětluje i dřívější 404 z GitHubu). Oprava je
-  v administraci hostingu: u subdomény `vtt` nastavit cílovou složku na složku FTP účtu. FTP účet je zamčený ve své složce (`../` vrací totéž), jinam nahrát nejde.
+  míří do jiné složky než ta, kam nasazuje FTP (od 22. 10., kdy se přepínalo PHP a hosting zasahoval kvůli NÚKIB — vysvětluje i dřívější 404 z GitHubu). FTP účet je zamčený
+  ve své složce (`../` vrací totéž). **Značkový soubor** nahraný do kořene FTP je dostupný na `https://zvelebil.online/vtt/…` (200), na `vtt.zvelebil.online` ani v kořeni
+  `zvelebil.online` ne (404): kořen FTP je tedy složka `vtt` uvnitř hlavního webu a subdoména `vtt` ukazuje do kořene hlavního webu místo do ní. Oprava je v administraci
+  hostingu: u subdomény `vtt.zvelebil.online` nastavit cílovou složku na `vtt`.
   Po opravě: `/index.php` má ukázat přihlášení, pak v administraci „Kontrola nasazení“ → „Zkontrolovat“.
 - **Kdo to hlídá:** zavřené cesty a hlavičky ověří stránka „Kontrola nasazení“
   (`admin_nasazeni.php`, tlačítko „Zkontrolovat“); dřívější krok `deploy.yml`
