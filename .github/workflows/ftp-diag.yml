@@ -86,3 +86,14 @@ jobs:
           curl -sS -k --max-time 40 --ssl-reqd -u "$FTP_USERNAME:$FTP_PASSWORD" "ftp://$FTP_SERVER/" -Q "-DELE $ZNACKA" 2>&1 | tail -2
           echo "=== po smazání v kořeni FTP:"
           curl -sS -k --max-time 40 --ssl-reqd -u "$FTP_USERNAME:$FTP_PASSWORD" "ftp://$FTP_SERVER/" 2>&1 | grep -c "$ZNACKA"
+      - name: Běží aplikace na https://zvelebil.online/vtt/ ?
+        run: |
+          set +e
+          for u in /vtt/index.php /vtt/ /vtt/config.php /vtt/includes/auth.php /vtt/.htaccess /vtt/deploy-manifest.json /vtt/logs/ /vtt/hra/api/udalosti.php?svet_id=1 /vtt/robots.txt /vtt/assets/css/organic.css; do
+            h=$(curl -sS -o /tmp/telo.txt -D - --max-time 25 "https://zvelebil.online$u" 2>&1)
+            echo "$u -> $(echo "$h" | head -1 | tr -d '\r')  x-robots-tag:$(echo "$h" | grep -ci '^x-robots-tag')  hsts:$(echo "$h" | grep -ci '^strict-transport-security')  csp:$(echo "$h" | grep -ci '^content-security-policy')  set-cookie:$(echo "$h" | grep -ci '^set-cookie')  <title>: $(grep -o '<title>[^<]*' /tmp/telo.txt | head -1)"
+          done
+          echo "=== přesměrování po GET /vtt (bez lomítka)"
+          curl -sS -o /dev/null -D - --max-time 25 "https://zvelebil.online/vtt" 2>&1 | head -4
+          echo "=== vtt.zvelebil.online/vtt/ (kdyby subdoména vedla do kořene hlavního webu)"
+          curl -sS -o /dev/null -D - --max-time 25 "https://vtt.zvelebil.online/vtt/index.php" 2>&1 | head -2
