@@ -34,13 +34,24 @@ na DB postavené od nuly. Co lze dělat **bez** ptaní (vždy s testy, `tests/ru
 - **Další oblasti fuzzingu:** (nahrávání obrázků je od 2026-10-31 pokryté testem `upload_api.js`; limit rozměrů je teď `dracak_vtt_obrazek_max_bodu()` podle `memory_limit`, strop 16 Mbodů — dřív 40 Mbodů, což by na hostingu spadlo na paměti; souběžné požadavky na životy, magenergii, lektvary a souboj pokrývá `soubehy_api.js`, JSON s hloubkou 100 000 a tělem 200 MB server odmítne čistě bez záznamu v logu). Zbývá: souběh zbylých míst, kde se čte a zapisuje stav (`efekt_pridat`, mlha, `rozbalit` kontejner), a zátěžový test pollingu při 6 hráčích.
 - **Bezpečnost** (uložený XSS do všech uživatelských textů je od 2026-10-31 pokrytý testem `tests/e2e/xss_ui.js`, bez nálezu): přepnutí Content-Security-Policy z hlášení na vynucování (etapa 1 hotová 2026-10-31, viz Bezpečnost; čeká na pár dní bez hlášení v logu), kontrola, že každý
   výpis uživatelského textu je escapovaný (grep + test s `<script>` v názvech světa, postavy, tokenu, pinu, poznámky), `Secure`/`SameSite` cookie za proxy.
+- **Funkce ze starších plánů, které NEJSOU hotové** (úplný soupis 2026-11-01 — dřív tu byla jen údržba a bezpečnost; funkční kroky z plánů A–E a fází cestování/deníku zůstávaly rozeseté v textu níž):
+  - *Plán náhrady Owlbear — blok B:* (9) dosah pohybu z pohyblivosti postavy po naložení a únavě (v boji se pohybuje po hexech podle akcí, takže jde hlavně o mapu mimo boj); (12) čitelné stavy na tokenu (pruh životů, ikony efektů, únava/přetížení).
+  - *Blok C — svět a cesta:* (14) pochod po mapě světa s měřítkem a trasou → kalkulačka cesty → čas a únava postavám [L]; (15) přechod mezi lokacemi: pin „Vstoupit“ přenese družinu na cílovou mapu [M]; (16) knihovna map (duplikace, pořadí scén); (17) hodiny světa propojené s cestou, odpočinkem a spánkem.
+  - *Blok D:* (22) tablet a telefon na skutečném zařízení a (23) zkušební hra podle `docs/zkusebni-scenar-prvni-hra.md` — čeká na uživatele.
+  - *Blok E — vidění a světlo (nic nestaví):* (24) stíny za zdmi (plný viditelnostní polygon), (25) dveře otevřeno/zavřeno, (26) zdroje světla podle Tabulky světel h286, (27) vidění ve tmě, které jde s postavou (infravidění, noční vidění; dosahy nejdřív dohledat v knize).
+  - *Boj:* „obrana a krok“ (kniha neříká, kdy se krok udělá — potřebuje rozhodnutí), útok na neviditelného nebo kouzlícího tvora, čtyřstupňová škála hodu na dovednost (fatální neúspěch / totální úspěch — v přepisu knihy chybí, potřeba foto), přenos výsledku iniciativy ≤ 0 do dalšího kola (viz otázka 1 níž).
+  - *Nestvůry:* deník nestvůry **před bojem** (zadání uživatele 2026-10-20; design navrhne uživatel), kořist, výbava z katalogu s dopočtem ÚČ/OČ ze zbraně a zbroje, inteligence/charisma/pohyblivost/vytrvalost jako hratelná data, kouzla nestvůr, automatický bonus k iniciativě podle „N× za kolo“.
+  - *Cestování:* jezdecká zvířata jen 7 z asi 40 řádků tabulky h2057 (potřebuje rozhodnutí, jak značit letecké a pozemní varianty a co znamená sloupec „Ujede“); povozy bez nehod (hod kočího), dovednosti Kočí, otevřených kočárů a více povozů v jedné cestě; vnořené kontejnery; povoz není trvalá entita.
+  - *Deník:* figurína a sloty, Dovednosti, Společníci, připnutá kouzla, historie změn postavy, deník cizí postavy pro ostatní hráče, přehled únavy a naložení také v panelu tokenu na mapě, ověření zbytku kapitoly Dovednosti na další propojení.
+  - *Poznámky světa* (jen domluvený plán, v kódu nic): editace, vazba na NPC/postavu, štítky (quest/npc/loot/lore/místo), zrušení sdílení při odebrání hráče, odznak nepřečtených, admin audit.
+  - *Data z knihy:* v `docs/kontrolni-seznam-neuplnych-mist.md` je 288 nezaškrtnutých položek (chybějící tabulky boje beze zbraně, vícenásobných útoků, bonusů k iniciativě ze str. 78, poškozené pasáže) — potřebují foto nebo korekturu.
 - **Kvalita:** projít poslední větší změny revizí (`/code-review`): omezení přihlášení, chybový log, záloha, kontrola nasazení, fuzzery.
 - **Provoz:** `docs/zalohy.md` ověřit obnovu do prázdné databáze na hostingu (uživatel), měřit polling na skutečných zařízeních (uživatel), případně 304 / ETag u `udalosti.php`.
 - **Deník v2:** zbývá figurína a sloty, Dovednosti, Společníci, připnutá kouzla — všechno potřebuje rozhodnutí o pravidlech nebo hromadná data (viz `docs/prototypy/denik-v2-predani.md`).
 
-**Čeká na rozhodnutí uživatele (neřešit samo):** (1) výsledek iniciativy ≤ 0 (b10805, kniha je nejednoznačná); (2) ostatní značky Zlatého tetování mimo Dikobraza (mechanika?); (3) druh zbraně u 13 položek
+**Čeká na rozhodnutí uživatele (neřešit samo):** (1) výsledek iniciativy ≤ 0 (b10805 — uživatel 2026-11-01: „nehází se znovu, použije se výsledek z minulého kola“; text knihy ale říká „v něm si bude znovu házet na iniciativu, ale místo obvyklých postihů použije výsledek z minulého kola“, takže čtení „nehází se“ by nechalo postavu s 0 akcemi navždy — čeká na potvrzení varianty A: nový hod 1k6 + loňský výsledek místo obvyklých postihů); (2) ostatní značky Zlatého tetování mimo Dikobraza (mechanika?); (3) druh zbraně u 13 položek
 (`docs/kontrolni-seznam-neuplnych-mist.md`: Fuuma shuriken, Atlatl, Řetězový meč, Khakkhara, Hůl „Minami no mori“, Rachejtle); (4) které kroky deníku v2 (figurína, Dovednosti, Společníci) a s jakými pravidly;
-(5) jestli má pravidlo „obrana zbraní“ (OZ, nepovinné h1611) vstoupit do OČ; (6) nastavení subdomény `vtt` u WEDOSu na složku `vtt` (hezká adresa bez `/vtt/`).
+(5) nastavení subdomény `vtt` u WEDOSu na složku `vtt` (hezká adresa bez `/vtt/`).
 
 ### Čeká na ruční spuštění přes phpMyAdmin (admin účet)
 
@@ -1221,7 +1232,7 @@ PJ přepíná aktivní mapu. **Chybí / drhne:**
 3. ✔ Token: otočení (směr), velikost, portrét, barva týmu, popisek [M]
    (velikost se volí ručně; podle `velikosti` z pravidel se nenastavuje — kolik
    hexů tvor zabírá, kniha neuvádí tabulkou)
-4. Obecné tokeny (NPC bez statů, předmět, překážka, značka) [M]
+4. ✔ Obecné tokeny (NPC bez statů, předmět, překážka, značka) [M] — v kódu hotové (`typ_entity = 'obecny'`), seznam jen zaostal
 5. ✔ Výběr více tokenů, hromadný pohyb, zamknout, vrstvy, duplikovat, Delete,
    kontextové menu, klávesové zkratky [M]
 6. ✔ Kreslení na mapu (čára, šipka, tvar, text; sdílené/jen PJ) [M]
