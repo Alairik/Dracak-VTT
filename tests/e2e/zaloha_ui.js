@@ -6,12 +6,12 @@ const ok = (n, c, v = '') => { console.log((c ? 'OK    ' : 'CHYBA ') + n + (v ? 
 (async () => {
   const { browser, page } = await otevri({ viewport: { width: 1280, height: 800 } });
   // menu: všechny admin stránky mají stejné položky a správnou aktivní
-  const klice = { 'admin.php': 'Správa účtů', 'admin_migrace.php': 'Změny databáze', 'admin_nasazeni.php': 'Kontrola nasazení', 'admin_log.php': 'Chybový log', 'admin_zaloha.php': 'Záloha databáze' };
+  const klice = { 'admin.php': 'Správa účtů', 'admin_migrace.php': 'Změny databáze', 'admin_nasazeni.php': 'Kontrola nasazení', 'admin_log.php': 'Chybový log', 'admin_poznamky.php': 'Poznámky světů', 'admin_zaloha.php': 'Záloha databáze' };
   for (const [url, nazev] of Object.entries(klice)) {
     await page.goto(BASE + '/' + url);
     const polozky = await page.locator('.sidebar .mock-item').allInnerTexts();
     const aktivni = await page.locator('.sidebar .mock-item.active').allInnerTexts();
-    ok('menu na ' + url, polozky.length === 7 && aktivni.length === 1 && aktivni[0] === nazev, polozky.join(' | ') + ' → aktivní: ' + aktivni.join());
+    ok('menu na ' + url, polozky.length === 8 && aktivni.length === 1 && aktivni[0] === nazev, polozky.join(' | ') + ' → aktivní: ' + aktivni.join());
   }
   await page.goto(BASE + '/admin_zaloha.php');
   await page.screenshot({ path: (process.env.OUT || '/tmp/dracak-tests') + '/zaloha_page.png', fullPage: true });
