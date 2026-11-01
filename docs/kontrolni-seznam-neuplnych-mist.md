@@ -422,9 +422,8 @@ začne hrát často, přidá se mu složka (nový řádek v `efekt_slozky`, bez 
   první akce kola není slíbený úkon (hned), jednak když na konci kola není splněná aspoň polovina akcí (polovina akcí zjištěných při
   hodu, nahoru; obrana se počítá jako bojová akce). Dvojí porušení v jednom kole se nesčítá. Netrestá se vyřazený, spící ani ochromený
   tvor (u konce kola) a ten, komu PJ slib zrušil.
-- [ ] Výsledek hodu na iniciativu 0 a méně (h1623 b10805, b10810): kniha říká, že „postih v dalším kole“ se přenáší — VTT zatím dává
-  0 akcí a nic nepřenáší. Navržená varianta A (čeká na potvrzení uživatele): v dalším kole nový hod 1k6 + loňský celkový výsledek (≤ 0)
-  místo obvyklých postihů za zbraň a činnost; výsledek minulého kola se musí uložit u tvora.
+- [x] Výsledek hodu na iniciativu 0 a méně (h1623 b10805, b10810): rozhodnuto uživatelem 2026-11-01 — v dalším kole nový hod 1k6 a místo obvyklých
+  postihů se použije výsledek z minulého kola (≤ 0); hotovo v kódu (migrace 0104, čeká na ruční SQL), viz `docs/stav-projektu.md`.
 
 ## Na kontrolu při proofreadingu (stav 2026-10-14)
 

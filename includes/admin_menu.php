@@ -8,6 +8,7 @@ const DRACAK_ADMIN_POLOZKY = [
     'migrace' => ['admin_migrace.php', 'Změny databáze'],
     'nasazeni' => ['admin_nasazeni.php', 'Kontrola nasazení'],
     'log' => ['admin_log.php', 'Chybový log'],
+    'poznamky' => ['admin_poznamky.php', 'Poznámky světů'],
     'zaloha' => ['admin_zaloha.php', 'Záloha databáze'],
 ];
 

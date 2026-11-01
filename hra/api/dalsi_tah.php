@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/../../includes/vtt_iniciativa.php';
+require_once __DIR__ . '/../../includes/vtt_souboj.php';
 
 // Posune aktivního na tahu na téhle mapě o jednu akci dál (viz
 // includes/vtt_iniciativa.php a report — zjednodušený v1 model
@@ -76,6 +77,7 @@ try {
             $noveCisloKola = (int)$koloStav['cislo_kola'] + 1;
             $pdo->prepare('UPDATE kolo_stav SET cislo_kola = ?, aktivni_token_id = NULL WHERE mapa_id = ?')
                 ->execute([$noveCisloKola, $mapaId]);
+            dracak_vtt_iniciativa_prenos_uloz($pdo, $mapaId);
             $pdo->prepare('DELETE FROM kolo_iniciativa WHERE mapa_id = ?')->execute([$mapaId]);
 
             $eventId = dracak_vtt_log_event($svetId, $mapaId, 'kolo_nove', [

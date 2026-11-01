@@ -39,19 +39,18 @@ na DB postavené od nuly. Co lze dělat **bez** ptaní (vždy s testy, `tests/ru
   - *Blok C — svět a cesta:* (14) pochod po mapě světa s měřítkem a trasou → kalkulačka cesty → čas a únava postavám [L]; (15) přechod mezi lokacemi: pin „Vstoupit“ přenese družinu na cílovou mapu [M]; (16) knihovna map (duplikace, pořadí scén); (17) hodiny světa propojené s cestou, odpočinkem a spánkem.
   - *Blok D:* (22) tablet a telefon na skutečném zařízení a (23) zkušební hra podle `docs/zkusebni-scenar-prvni-hra.md` — čeká na uživatele.
   - *Blok E — vidění a světlo (nic nestaví):* (24) stíny za zdmi (plný viditelnostní polygon), (25) dveře otevřeno/zavřeno, (26) zdroje světla podle Tabulky světel h286, (27) vidění ve tmě, které jde s postavou (infravidění, noční vidění; dosahy nejdřív dohledat v knize).
-  - *Boj:* „obrana a krok“ (kniha neříká, kdy se krok udělá — potřebuje rozhodnutí), útok na neviditelného nebo kouzlícího tvora, čtyřstupňová škála hodu na dovednost (fatální neúspěch / totální úspěch — v přepisu knihy chybí, potřeba foto), přenos výsledku iniciativy ≤ 0 do dalšího kola (viz otázka 1 níž).
+  - *Boj:* „obrana a krok“ (kniha neříká, kdy se krok udělá — potřebuje rozhodnutí), útok na neviditelného nebo kouzlícího tvora, čtyřstupňová škála hodu na dovednost (fatální neúspěch / totální úspěch — v přepisu knihy chybí, potřeba foto).
   - *Nestvůry:* deník nestvůry **před bojem** (zadání uživatele 2026-10-20; design navrhne uživatel), kořist, výbava z katalogu s dopočtem ÚČ/OČ ze zbraně a zbroje, inteligence/charisma/pohyblivost/vytrvalost jako hratelná data, kouzla nestvůr, automatický bonus k iniciativě podle „N× za kolo“.
   - *Cestování:* jezdecká zvířata jen 7 z asi 40 řádků tabulky h2057 (potřebuje rozhodnutí, jak značit letecké a pozemní varianty a co znamená sloupec „Ujede“); povozy bez nehod (hod kočího), dovednosti Kočí, otevřených kočárů a více povozů v jedné cestě; vnořené kontejnery; povoz není trvalá entita.
   - *Deník:* figurína a sloty, Dovednosti, Společníci, připnutá kouzla, historie změn postavy, deník cizí postavy pro ostatní hráče, přehled únavy a naložení také v panelu tokenu na mapě, ověření zbytku kapitoly Dovednosti na další propojení.
-  - *Poznámky světa* (jen domluvený plán, v kódu nic): editace, vazba na NPC/postavu, štítky (quest/npc/loot/lore/místo), zrušení sdílení při odebrání hráče, odznak nepřečtených, admin audit.
   - *Data z knihy:* v `docs/kontrolni-seznam-neuplnych-mist.md` je 288 nezaškrtnutých položek (chybějící tabulky boje beze zbraně, vícenásobných útoků, bonusů k iniciativě ze str. 78, poškozené pasáže) — potřebují foto nebo korekturu.
 - **Kvalita:** projít poslední větší změny revizí (`/code-review`): omezení přihlášení, chybový log, záloha, kontrola nasazení, fuzzery.
 - **Provoz:** `docs/zalohy.md` ověřit obnovu do prázdné databáze na hostingu (uživatel), měřit polling na skutečných zařízeních (uživatel), případně 304 / ETag u `udalosti.php`.
 - **Deník v2:** zbývá figurína a sloty, Dovednosti, Společníci, připnutá kouzla — všechno potřebuje rozhodnutí o pravidlech nebo hromadná data (viz `docs/prototypy/denik-v2-predani.md`).
 
-**Čeká na rozhodnutí uživatele (neřešit samo):** (1) výsledek iniciativy ≤ 0 (b10805 — uživatel 2026-11-01: „nehází se znovu, použije se výsledek z minulého kola“; text knihy ale říká „v něm si bude znovu házet na iniciativu, ale místo obvyklých postihů použije výsledek z minulého kola“, takže čtení „nehází se“ by nechalo postavu s 0 akcemi navždy — čeká na potvrzení varianty A: nový hod 1k6 + loňský výsledek místo obvyklých postihů); (2) ostatní značky Zlatého tetování mimo Dikobraza (mechanika?); (3) druh zbraně u 13 položek
-(`docs/kontrolni-seznam-neuplnych-mist.md`: Fuuma shuriken, Atlatl, Řetězový meč, Khakkhara, Hůl „Minami no mori“, Rachejtle); (4) které kroky deníku v2 (figurína, Dovednosti, Společníci) a s jakými pravidly;
-(5) nastavení subdomény `vtt` u WEDOSu na složku `vtt` (hezká adresa bez `/vtt/`).
+**Čeká na rozhodnutí uživatele (neřešit samo):** (1) ostatní značky Zlatého tetování mimo Dikobraza (mechanika?); (2) druh zbraně u 13 položek
+(`docs/kontrolni-seznam-neuplnych-mist.md`: Fuuma shuriken, Atlatl, Řetězový meč, Khakkhara, Hůl „Minami no mori“, Rachejtle); (3) které kroky deníku v2 (figurína, Dovednosti, Společníci) a s jakými pravidly;
+(4) nastavení subdomény `vtt` u WEDOSu na složku `vtt` (hezká adresa bez `/vtt/`).
 
 ### Čeká na ruční spuštění přes phpMyAdmin (admin účet)
 
@@ -61,7 +60,7 @@ ním čeká, dokud se to neprovede ručně.
 
 **Ruční DDL blok je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný soubor, ve
 kterém jsou všechny dosud neprovedené DDL příkazy; uživatel ho dostává jako
-text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-10-27): nic nečeká.** Blok „Zbraně u sebe“ (`0101`, ALTER) i „Vytasení bez akce“ (`0102`, vkládání řádků; do ručního SQL šel, protože migrace z GitHubu nejely — viz „Deploy po 22. 10. a migrace z administrace“ níž) uživatel provedl, kontroly vyšly 1 a 2, 3, 1. Další migrace s daty se pouští tlačítkem v administraci. Blok „Iniciativa v2“ + „Zbraně a iniciativa“
+text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-11-01): čeká blok A+B v tomhle souboru — migrace `0104` (přenos výsledku iniciativy ≤ 0) a `0105` (poznámky světa); ověřeno na kopii produkčního stavu čistě, opakovaně i po částečném provedení a stránka Změny databáze po něm pod DML-only účtem doběhne; kód funguje i bez něj.** Dřívější stav (2026-10-27): nic nečekalo. Blok „Zbraně u sebe“ (`0101`, ALTER) i „Vytasení bez akce“ (`0102`, vkládání řádků; do ručního SQL šel, protože migrace z GitHubu nejely — viz „Deploy po 22. 10. a migrace z administrace“ níž) uživatel provedl, kontroly vyšly 1 a 2, 3, 1. Další migrace s daty se pouští tlačítkem v administraci. Blok „Iniciativa v2“ + „Zbraně a iniciativa“
 uživatel provedl (kontrolní SELECT vyšel 1, 4, 3) po tom, co první „sql proběhlo“ nesedělo — deploy po předčasném přesunu `0093`
 skončil na `1142 ALTER denied`, takže sloupce na serveru nebyly. **Poučení: migraci přesouvat do `database/migrations/` až podle
 čísel z kontrolního SELECTu, ne podle slov.** Migrace `0091`–`0096` jsou v `database/migrations/`: sloupce efektů (`0091`) a data (`0092`),
@@ -410,6 +409,12 @@ efektech, zbraních nebo deníku pusť aspoň příslušné sady** (`tests/run.s
   Jen PJ (bestiář je tajný), endpoint `hra/api/nestvura_denik.php`. Bez tabulky je panel jen přehled s vypnutým uložením.
   **Zbývá:** kořist, vybavení nestvůry z katalogu (ÚČ/OČ dopočtem ze zbraně a zbroje), inteligence / charisma /
   pohyblivost / vytrvalost jako hratelná data, kouzla nestvůr, automatický bonus k iniciativě podle „N× za kolo“.
+- **Přenos výsledku iniciativy ≤ 0 do dalšího kola (2026-11-01, migrace `0104`, čeká na ruční SQL; rozhodnutí uživatele: „hází si znovu, ale postih je podle předchozí iniciativy“, h1622 b10805):**
+  výsledek ≤ 0 na konci kola se uloží účastníkovi (`kolo_ucastnik.ini_prenos`, `dracak_vtt_iniciativa_prenos_uloz` před smazáním `kolo_iniciativa`, jak v `dracak_vtt_souboj_nove_kolo`, tak ve starší
+  cestě `dalsi_tah.php`); v dalším kole tvor hází znovu 1k6 a **místo celého obvyklého modifikátoru** (tabulka bonusů, držená zbraň, únava a naložení, efekty, bonus povolání) se přičte
+  tohle číslo (např. Arpag s obouruční zbraní −2 hodí 1 → −1 a 0 akcí; příště hodí 5 a přičte −1 místo −2 → 4 → 2 akce). Ruční úprava PJ se přičte dál, „nemůže jednat“ (efekt) platí dál, slib
+  úkonu se při přenosu nevyhlašuje. Kdo skončí na 1 a víc nebo nehodil, nic nepřenáší. Popis v logu hodu: „Výsledek z minulého kola (−1) místo obvyklých postihů“. Test: `tests/e2e/ini_prenos_api.js`.
+  Bez sloupce se nepřenáší (dosavadní chování).
 - **Iniciativa v2 a útok na vyřazeného (blok B, krok 6; v kódu hotové a otestované, zapne se ručním SQL, viz „Čeká na ruční spuštění“):**
   uživatel při zkoušce zjistil, že jde zaškrtnout víc řádků Tabulky vícenásobných útoků najednou („3 za 2 kola“ i „2 za kolo“ = +9)
   a bonus za úkon se dá uplatnit bez ohlášení. Teď (h1622): **hráč nejdřív ohlásí úmysl** (kouzlení / útok na blízko / střelba…)
@@ -621,12 +626,19 @@ efektech, zbraních nebo deníku pusť aspoň příslušné sady** (`tests/run.s
   `role='admin'` vidí vše vždy (bezpečnostní dohled, potvrzeno podruhé v
   konverzaci, že tohle pravidlo platí beze změny).
 - Nese `den_pri_vytvoreni` (snapshot herního data) + volitelně `mapa_id`.
-- **Rozpracováno / naplánováno, ještě nepostaveno:** editace (bez
-  historie — přepis na místě), vazba na konkrétní NPC/postavu
-  (`postava_id`), tagy (quest/npc/loot/lore/misto, pevná sada s
-  auto-návrhem), cascade zrušení sdílení při odebrání hráče ze světa,
-  odznak nepřečtených, admin audit stránka. Nic z tohohle zatím není v
-  kódu — jen domluvený plán (viz konverzace o Fázi 3/4).
+- **Rozšíření hotové v kódu 2026-11-01 (migrace `0105`, čeká na ruční SQL — bez něj fungují poznámky po staru):**
+  - **Štítky** `quest / npc / loot / lore / misto` (Úkol, NPC, Kořist, Příběh, Místo; pevná sada v `DRACAK_VTT_POZNAMKY_STITKY` v `includes/vtt_poznamky.php`, nový štítek DDL nepotřebuje).
+    Výchozí volba „Automaticky podle textu“: klíčová slova v textu (bez ohledu na diakritiku; pořadí Úkol, Kořist, NPC, Příběh, Místo), jinak vazba na postavu = NPC, vazba na místo = Místo,
+    jinak bez štítku. Ve výpisu je filtr podle štítku (`?stitek=`) s počty.
+  - **Vazba na postavu / NPC** (`postava_id`, jen z téhož světa; smaže-li se postava, vazba se zruší, poznámka zůstane).
+  - **Úprava** na místě bez historie (`upravit_poznamku`): text, místo, štítek, postava a sdílení; smí **jen autor** (ani admin nepřepisuje cizí slova; smazat cizí poznámku admin smí dál).
+    Zapisuje čas úpravy („upraveno“). Příjemci sdílení se teď ověřují proti členům světa (dřív šlo poslat id libovolného účtu).
+  - **Odznak nepřečtených:** tabulka `svet_poznamka_precteno`; „nové“ = nasdílené poznámky, které účet ještě neotevřel (vlastní a admin-dohled se nepočítají). Počet je v seznamu světů
+    (`hra/svety.php`) a u nadpisu Poznámky ve světě, nová poznámka má štítek „Nové“. Po úpravě textu a po novém přidání do sdílení se poznámka zase ukáže jako nová.
+  - **Odebrání hráče ze světa** (tlačítko „Odebrat“ v dialogu Hráči ve světě; PJ/admin): hráč ztratí přístup, poznámky světa, které mu někdo nasdílel, se mu přestanou ukazovat
+    (`dracak_vtt_poznamky_zrus_sdileni_hrace`). Jeho postavy ve světě a jeho vlastní poznámky zůstávají; PJ světa odebrat nejde. (Odebírání hráčů dřív v aplikaci vůbec nebylo.)
+  - **Dohled admina:** `admin_poznamky.php` (menu administrace „Poznámky světů“) — všechny poznámky všech světů i nenasdílené, filtr podle světa, autora a štítku; jen ke čtení.
+  Test: `tests/e2e/poznamky_ui.js`.
 
 ### Piny (`mapa_body`)
 - Místo na mapě, volitelně 1:1 vede na vlastní zónovou mapu

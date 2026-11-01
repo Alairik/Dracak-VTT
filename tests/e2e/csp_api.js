@@ -24,7 +24,7 @@ const uklid = () => {
   const get = async (url) => { const r = await page.request.get(BASE + url); return { s: r.status(), h: r.headers(), t: await r.text() }; };
 
   // --- hlavička a nonce na stránkách ---
-  const stranky = ['/dashboard.php', '/admin.php', '/admin_log.php', '/admin_migrace.php', '/admin_nasazeni.php', '/admin_zaloha.php', '/editor.php', '/editor.php?tabulka=rasy&akce=edit&id=1',
+  const stranky = ['/dashboard.php', '/admin.php', '/admin_log.php', '/admin_poznamky.php', '/admin_migrace.php', '/admin_nasazeni.php', '/admin_zaloha.php', '/editor.php', '/editor.php?tabulka=rasy&akce=edit&id=1',
     '/pravidla.php', '/hra/svety.php', '/hra/svet.php?id=1', '/hra/postava.php?id=2', '/hra/denik.php?id=2', '/hra/denik_tisk.php?id=2', '/hra/druzina.php?id=1', '/hra/cesta.php?id=1',
     '/hra/mapa.php?id=2', '/hra/svet_administrace.php?id=1'];
   for (const s of stranky) {

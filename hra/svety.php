@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/../includes/vtt.php';
+require_once __DIR__ . '/../includes/vtt_poznamky.php';
 
 $user = dracak_require_login();
 $isAdmin = $user['role'] === 'admin';
@@ -48,6 +49,9 @@ if ($isAdmin) {
     $svety = $stmt->fetchAll();
 }
 
+// Odznak „N nových poznámek“ u světa: poznámky, které ti někdo nasdílel a tys je ještě neotevřel.
+$novePoznamky = dracak_vtt_poznamky_nove_pocty(dracak_db(), (int)$user['id']);
+
 dracak_vtt_page_start('Světy', $user);
 ?>
   <main class="main" style="padding:24px;">
@@ -63,6 +67,9 @@ dracak_vtt_page_start('Světy', $user);
             <div class="rec-grid">
               <div class="k">PJ:</div><div><?= htmlspecialchars($s['pj_jmeno']) ?></div>
             </div>
+            <?php $nove = $novePoznamky[(int)$s['id']] ?? 0; if ($nove > 0): ?>
+              <div class="rec-body"><a class="svet-note-new-count" style="margin:0;text-decoration:none;" href="svet.php?id=<?= (int)$s['id'] ?>#poznamky"><?= $nove ?> <?= $nove === 1 ? 'nová poznámka' : ($nove <= 4 ? 'nové poznámky' : 'nových poznámek') ?></a></div>
+            <?php endif; ?>
             <?php if ($s['popis']): ?><div class="rec-body"><p><?= htmlspecialchars($s['popis']) ?></p></div><?php endif; ?>
             <div class="rec-actions"><a class="btn btn-secondary" href="svet.php?id=<?= (int)$s['id'] ?>">Otevřít</a></div>
           </div>

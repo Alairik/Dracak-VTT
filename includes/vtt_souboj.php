@@ -213,6 +213,21 @@ function dracak_vtt_souboj_akce_prepocet(int $celkem, int $zbyva, string $op, in
     return [$celkem, $zbyva];
 }
 
+// Přenos výsledku iniciativy ≤ 0 (h1622 b10805): kdo na konci kola skončil na 0 a méně, v dalším kole si znovu hodí, ale místo obvyklých
+// postihů použije tenhle výsledek (viz dracak_vtt_iniciativa_modifikator). Ukládá se k účastníkovi souboje, protože řádky kolo_iniciativa
+// se při přechodu do nového kola mažou. Ostatním (výsledek ≥ 1, nehodili) se přenos smaže. Volat dřív než DELETE FROM kolo_iniciativa.
+function dracak_vtt_iniciativa_prenos_uloz(PDO $pdo, int $mapaId): void
+{
+    if (!dracak_vtt_tokeny_funkce()['ini_prenos']) {
+        return;
+    }
+    $pdo->prepare(
+        'UPDATE kolo_ucastnik u LEFT JOIN kolo_iniciativa i ON i.mapa_id = u.mapa_id AND i.token_id = u.token_id
+         SET u.ini_prenos = IF(i.vysledek IS NOT NULL AND i.vysledek <= 0, i.vysledek, NULL)
+         WHERE u.mapa_id = ?'
+    )->execute([$mapaId]);
+}
+
 // Konec kola: čísla kola +1, další kolo začíná úmysly, iniciativa a úmysly se
 // smažou (h1622 — hází se na začátku KAŽDÉHO kola), překvapení platilo jen v
 // prvním kole, odpočítá se trvání efektů. Volat uvnitř transakce.
@@ -238,6 +253,7 @@ function dracak_vtt_souboj_nove_kolo(PDO $pdo, int $svetId, int $mapaId, int $uc
         'UPDATE kolo_stav SET cislo_kola = ?, aktivni_token_id = NULL, faze = "umysly", polovina = 1, prekvapeni = "zadne"
          WHERE mapa_id = ?'
     )->execute([$nove, $mapaId]);
+    dracak_vtt_iniciativa_prenos_uloz($pdo, $mapaId);
     $pdo->prepare('DELETE FROM kolo_iniciativa WHERE mapa_id = ?')->execute([$mapaId]);
     $pdo->prepare('UPDATE kolo_ucastnik SET umysl = NULL, umysl_cil_token_id = NULL WHERE mapa_id = ?')->execute([$mapaId]);
     $efekty = dracak_vtt_efekty_odpocet($pdo, $svetId, $mapaId, $ucetId, $stav['cislo_kola']);
@@ -773,14 +789,28 @@ function dracak_vtt_iniciativa_modifikator(PDO $pdo, array $token, array $bonusI
     $zbranBonus = ($zbran !== null ? $zbran['postih'] : 0) + ($trida !== null ? $trida['bonus'] : 0);
     $zbranDuvody = array_merge($zbran !== null ? [$zbran['popis']] : [], $trida !== null ? [$trida['popis']] : []);
     $modifikator = max(-100, min(100, (int)array_sum(array_column($vsechny, 'bonus')) + $jinyBonus + $efektyBonus + $zbranBonus));
+    $popisyVse = array_merge($popisy, array_map(fn($t) => $t . ' (automaticky)', array_merge($efektyDuvody, $zbranDuvody)));
+    $automatickeVse = array_merge(array_column($automaticke, 'popis'), $efektyDuvody, $zbranDuvody);
+    // Přenos z minulého kola (h1622 b10805): kdo skončil na 0 a méně, hází znovu, ale místo obvyklých postihů (tabulka, zbraň, únava,
+    // efekty) použije výsledek z minulého kola. Ruční úprava PJ zůstává; „nemůže jednat“ platí dál.
+    $prenos = null;
+    if ($ucastnik !== null && dracak_vtt_tokeny_funkce()['ini_prenos'] && ($ucastnik['ini_prenos'] ?? null) !== null) {
+        $prenos = max(-100, min(0, (int)$ucastnik['ini_prenos']));
+        $modifikator = max(-100, min(100, $prenos + $jinyBonus));
+        $popisyVse = ['Výsledek z minulého kola (' . $prenos . ') místo obvyklých postihů' . ($jinyBonus !== 0 ? ', ruční úprava ' . ($jinyBonus > 0 ? '+' : '') . $jinyBonus : '')];
+        $automatickeVse = [];
+        $trida = null;
+        $ignorovane = [];
+    }
     return [
         'modifikator' => $modifikator,
-        'popisy' => array_merge($popisy, array_map(fn($t) => $t . ' (automaticky)', array_merge($efektyDuvody, $zbranDuvody))),
+        'popisy' => $popisyVse,
         'bez_akci' => $ef['nemuze_jednat'] ?? null,
         'trida_bonus' => $trida,
-        'automaticke' => array_merge(array_column($automaticke, 'popis'), $efektyDuvody, $zbranDuvody),
+        'automaticke' => $automatickeVse,
         'ignorovano' => $ignorovane,
         'upozorneni' => $auto['upozorneni'],
+        'prenos' => $prenos,
     ];
 }
 

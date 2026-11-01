@@ -35,6 +35,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    if ($akce === 'odebrat_hrace') {
+        // Hráč přestane mít do světa přístup a poznámky světa, které mu někdo nasdílel, se mu přestanou ukazovat. Jeho postavy ve světě zůstávají
+        // (PJ je může přiřadit jinému hráči nebo smazat zvlášť), vlastní poznámky mu zůstávají.
+        if (!$isPjOrAdmin) { http_response_code(403); die('Jen PJ/admin odebírá hráče.'); }
+        $ucetId = (int)($_POST['ucet_id'] ?? 0);
+        if ($ucetId > 0 && $ucetId !== (int)$svet['pj_ucet_id']) {
+            dracak_db()->prepare('DELETE FROM svet_hraci WHERE svet_id = ? AND ucet_id = ?')->execute([$svetId, $ucetId]);
+            dracak_vtt_poznamky_zrus_sdileni_hrace(dracak_db(), $svetId, $ucetId);
+        }
+        header("Location: svet.php?id=$svetId");
+        exit;
+    }
+
     if ($akce === 'nova_mapa') {
         if (!$isPjOrAdmin) { http_response_code(403); die('Jen PJ/admin přidává mapy.'); }
         $nazev = trim(dracak_text($_POST['nazev'] ?? ''));
@@ -242,7 +255,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$mapaId, $svetId]);
             if (!$stmt->fetchColumn()) { $mapaId = null; }
         }
-        dracak_vtt_poznamka_pridat(dracak_db(), $svetId, (int)$user['id'], $text, $sdileno, (int)$svet['aktualni_den_offset'], $mapaId);
+        $postavaId = !empty($_POST['postava_id']) ? (int)$_POST['postava_id'] : null;
+        $stitek = dracak_vtt_poznamka_stitek_z_formulare(dracak_text($_POST['stitek'] ?? ''), $text, $mapaId, $postavaId);
+        dracak_vtt_poznamka_pridat(dracak_db(), $svetId, (int)$user['id'], $text, $sdileno, (int)$svet['aktualni_den_offset'], $mapaId, $stitek, $postavaId);
+        header("Location: svet.php?id=$svetId");
+        exit;
+    }
+
+    if ($akce === 'upravit_poznamku') {
+        // Jen autor, přepis na místě bez historie (viz includes/vtt_poznamky.php).
+        $text = trim(dracak_text($_POST['text'] ?? ''));
+        if ($text === '') { http_response_code(422); die('Poznámka nemůže být prázdná.'); }
+        $mapaId = !empty($_POST['mapa_id']) ? (int)$_POST['mapa_id'] : null;
+        if ($mapaId !== null) {
+            $stmt = dracak_db()->prepare('SELECT 1 FROM mapy WHERE id = ? AND svet_id = ?');
+            $stmt->execute([$mapaId, $svetId]);
+            if (!$stmt->fetchColumn()) { $mapaId = null; }
+        }
+        $postavaId = !empty($_POST['postava_id']) ? (int)$_POST['postava_id'] : null;
+        $stitek = dracak_vtt_poznamka_stitek_z_formulare(dracak_text($_POST['stitek'] ?? ''), $text, $mapaId, $postavaId);
+        $sdileno = array_map('intval', (array)($_POST['sdileno'] ?? []));
+        if (!dracak_vtt_poznamka_upravit(dracak_db(), $svetId, (int)($_POST['poznamka_id'] ?? 0), $user, $text, $sdileno, $mapaId, $stitek, $postavaId)) {
+            http_response_code(403);
+            die('Tuhle poznámku upravit nemůžeš — upravit ji smí jen její autor.');
+        }
         header("Location: svet.php?id=$svetId");
         exit;
     }
@@ -314,8 +350,22 @@ foreach ($postavy as $p) {
     $inventarePostav[(int)$p['id']] = dracak_vtt_inventar('postava', (int)$p['id']);
 }
 
-$poznamky = dracak_vtt_poznamky_viditelne(dracak_db(), $user, $svetId);
+$vsechnyPoznamky = dracak_vtt_poznamky_viditelne(dracak_db(), $user, $svetId);
 $moznostiSdileni = dracak_vtt_poznamky_moznosti_sdileni(dracak_db(), $svetId, (int)$user['id']);
+$poznamkyFunkce = dracak_vtt_poznamky_funkce(dracak_db());
+// Filtr podle štítku (?stitek=quest): počty ukazují všechny viditelné poznámky, výpis jen vybraný štítek.
+$filtrStitek = isset(DRACAK_VTT_POZNAMKY_STITKY[(string)($_GET['stitek'] ?? '')]) ? (string)$_GET['stitek'] : null;
+$poctyStitku = [];
+foreach ($vsechnyPoznamky as $p) {
+    if ($p['stitek'] !== null) { $poctyStitku[$p['stitek']] = ($poctyStitku[$p['stitek']] ?? 0) + 1; }
+}
+$poznamky = $filtrStitek === null ? $vsechnyPoznamky : array_values(array_filter($vsechnyPoznamky, fn(array $p): bool => $p['stitek'] === $filtrStitek));
+// Nové = nasdílené poznámky, které tenhle účet ještě nečetl; po zobrazení se označí jako přečtené (hned, ještě před výpisem).
+$noveIds = dracak_vtt_poznamky_nove_ids(dracak_db(), (int)$user['id'], $svetId);
+dracak_vtt_poznamky_oznac_prectene(dracak_db(), (int)$user['id'], $svetId);
+// Postavy a NPC, na které jde poznámku navázat (jen ty, které tenhle účet ve světě vidí v seznamu postav níž).
+$postavyProPoznamky = [];
+foreach ($postavy as $pp) { $postavyProPoznamky[(int)$pp['id']] = (string)$pp['nazev']; }
 
 $rasyOptions = dracak_db()->query('SELECT id, nazev FROM rasy ORDER BY nazev')->fetchAll();
 $povolaniOptions = dracak_db()->query('SELECT id, nazev FROM povolani ORDER BY nazev')->fetchAll();
@@ -594,36 +644,104 @@ dracak_vtt_page_start($svet['nazev'], $user, true);
         <?php endif; ?>
       </div>
 
-      <section class="svet-panel svet-notes">
-        <h2 class="svet-h2">Poznámky</h2>
+      <section class="svet-panel svet-notes" id="poznamky">
+        <h2 class="svet-h2">Poznámky<?php if ($noveIds): ?> <span class="svet-note-new-count"><?= count($noveIds) ?> <?= count($noveIds) === 1 ? 'nová' : (count($noveIds) <= 4 ? 'nové' : 'nových') ?></span><?php endif; ?></h2>
         <p class="svet-sub">Komu ji ukážeš, je na tobě — PJ ji vidí jen když mu ji nasdílíš.</p>
+        <?php if ($poznamkyFunkce['rozsireno'] && $vsechnyPoznamky): ?>
+          <div class="svet-note-filtr" role="navigation" aria-label="Štítky poznámek">
+            <a href="svet.php?id=<?= $svetId ?>#poznamky" <?= $filtrStitek === null ? 'aria-current="true"' : '' ?>>Vše (<?= count($vsechnyPoznamky) ?>)</a>
+            <?php foreach (DRACAK_VTT_POZNAMKY_STITKY as $kl => $nazevStitku): if (empty($poctyStitku[$kl])) { continue; } ?>
+              <a href="svet.php?id=<?= $svetId ?>&amp;stitek=<?= htmlspecialchars($kl) ?>#poznamky" <?= $filtrStitek === $kl ? 'aria-current="true"' : '' ?>><?= htmlspecialchars($nazevStitku) ?> (<?= (int)$poctyStitku[$kl] ?>)</a>
+            <?php endforeach; ?>
+          </div>
+        <?php endif; ?>
         <?php if (!$poznamky): ?>
-          <p class="svet-note-empty">Zatím žádná poznámka, kterou bys viděl.</p>
+          <p class="svet-note-empty"><?= $filtrStitek !== null ? 'Žádná poznámka s tímhle štítkem.' : 'Zatím žádná poznámka, kterou bys viděl.' ?></p>
         <?php else: ?>
           <div class="svet-note-list">
             <?php foreach ($poznamky as $p): $jeAutor = (int)$p['autor_ucet_id'] === (int)$user['id'];
-              $dniPred = (int)$svet['aktualni_den_offset'] - (int)$p['den_pri_vytvoreni']; ?>
-              <div class="svet-note">
+              $dniPred = (int)$svet['aktualni_den_offset'] - (int)$p['den_pri_vytvoreni'];
+              $jeNova = in_array((int)$p['id'], $noveIds, true); ?>
+              <div class="svet-note<?= $jeNova ? ' svet-note-nova' : '' ?>" id="poznamka-<?= (int)$p['id'] ?>">
                 <div class="svet-note-meta">
-                  <span><?= htmlspecialchars($p['autor_jmeno']) ?></span><span><?= dracak_vtt_pocet_dni_text($dniPred) ?></span>
+                  <span><?= htmlspecialchars($p['autor_jmeno']) ?>
+                    <?php if ($jeNova): ?><b class="svet-note-badge">Nové</b><?php endif; ?>
+                    <?php if ($p['stitek'] !== null): ?><b class="svet-note-tag svet-note-tag-<?= htmlspecialchars($p['stitek']) ?>"><?= htmlspecialchars(DRACAK_VTT_POZNAMKY_STITKY[$p['stitek']]) ?></b><?php endif; ?>
+                  </span>
+                  <span><?= dracak_vtt_pocet_dni_text($dniPred) ?><?= !empty($p['upraveno']) ? ' · upraveno' : '' ?></span>
                 </div>
                 <p><?= nl2br(htmlspecialchars($p['text'])) ?></p>
-                <?php if ($p['mapa_nazev'] || $jeAutor || $user['role'] === 'admin'): ?>
+                <?php $postavaNazev = !empty($p['postava_id']) ? ($postavyProPoznamky[(int)$p['postava_id']] ?? null) : null; ?>
+                <?php if ($p['mapa_nazev'] || $postavaNazev !== null || $jeAutor || $user['role'] === 'admin'): ?>
                 <div class="svet-note-foot">
                   <span>
-                    <?php if ($p['mapa_nazev']): ?>Místo: <?= htmlspecialchars($p['mapa_nazev']) ?><?php endif; ?>
+                    <?php $casti = [];
+                      if ($p['mapa_nazev']) { $casti[] = 'Místo: ' . htmlspecialchars($p['mapa_nazev']); }
+                      if ($postavaNazev !== null) { $casti[] = 'Postava: ' . htmlspecialchars($postavaNazev); }
+                      if ($jeAutor || $user['role'] === 'admin') { $casti[] = 'Nasdíleno: ' . ($p['sdileno_s'] ? htmlspecialchars(implode(', ', $p['sdileno_s'])) : 'nikomu'); }
+                      echo implode(' · ', $casti); ?>
+                  </span>
+                  <span class="svet-note-btns">
+                    <?php if ($jeAutor && $poznamkyFunkce['rozsireno']): ?>
+                      <a class="btn btn-ghost" href="#poznamka-uprava-<?= (int)$p['id'] ?>" data-otevri="poznamka-uprava-<?= (int)$p['id'] ?>">Upravit</a>
+                    <?php endif; ?>
                     <?php if ($jeAutor || $user['role'] === 'admin'): ?>
-                      <?= $p['mapa_nazev'] ? ' · ' : '' ?>Nasdíleno: <?= $p['sdileno_s'] ? htmlspecialchars(implode(', ', $p['sdileno_s'])) : 'nikomu' ?>
+                      <form method="post" data-potvrdit="Smazat tuhle poznámku?">
+                        <input type="hidden" name="akce" value="smazat_poznamku">
+                        <input type="hidden" name="poznamka_id" value="<?= (int)$p['id'] ?>">
+                        <button class="btn btn-ghost" type="submit">Smazat</button>
+                      </form>
                     <?php endif; ?>
                   </span>
-                  <?php if ($jeAutor || $user['role'] === 'admin'): ?>
-                    <form method="post" data-potvrdit="Smazat tuhle poznámku?">
-                      <input type="hidden" name="akce" value="smazat_poznamku">
-                      <input type="hidden" name="poznamka_id" value="<?= (int)$p['id'] ?>">
-                      <button class="btn btn-ghost" type="submit">Smazat</button>
-                    </form>
-                  <?php endif; ?>
                 </div>
+                <?php endif; ?>
+                <?php if ($jeAutor && $poznamkyFunkce['rozsireno']): ?>
+                <details class="svet-note-edit" id="poznamka-uprava-<?= (int)$p['id'] ?>">
+                  <summary>Upravit poznámku</summary>
+                  <form method="post">
+                    <input type="hidden" name="akce" value="upravit_poznamku">
+                    <input type="hidden" name="poznamka_id" value="<?= (int)$p['id'] ?>">
+                    <textarea name="text" aria-label="Text poznámky" required><?= htmlspecialchars($p['text']) ?></textarea>
+                    <div class="svet-note-edit-row">
+                      <label>Štítek
+                        <select class="input" name="stitek">
+                          <option value="auto">Automaticky podle textu</option>
+                          <?php foreach (DRACAK_VTT_POZNAMKY_STITKY as $kl => $nazevStitku): ?>
+                            <option value="<?= htmlspecialchars($kl) ?>" <?= $p['stitek'] === $kl ? 'selected' : '' ?>><?= htmlspecialchars($nazevStitku) ?></option>
+                          <?php endforeach; ?>
+                        </select>
+                      </label>
+                      <?php if ($mapy): ?>
+                      <label>Místo
+                        <select class="input" name="mapa_id">
+                          <option value="">— bez místa —</option>
+                          <?php foreach ($mapy as $m): ?>
+                            <option value="<?= (int)$m['id'] ?>" <?= (int)$p['mapa_id'] === (int)$m['id'] ? 'selected' : '' ?>><?= htmlspecialchars($m['nazev']) ?></option>
+                          <?php endforeach; ?>
+                        </select>
+                      </label>
+                      <?php endif; ?>
+                      <?php if ($postavyProPoznamky): ?>
+                      <label>Postava / NPC
+                        <select class="input" name="postava_id">
+                          <option value="">— bez postavy —</option>
+                          <?php foreach ($postavyProPoznamky as $pid => $pnazev): ?>
+                            <option value="<?= $pid ?>" <?= (int)($p['postava_id'] ?? 0) === $pid ? 'selected' : '' ?>><?= htmlspecialchars($pnazev) ?></option>
+                          <?php endforeach; ?>
+                        </select>
+                      </label>
+                      <?php endif; ?>
+                    </div>
+                    <?php if ($moznostiSdileni): ?>
+                    <div class="field"><label>Nasdílet komu</label>
+                      <?php foreach ($moznostiSdileni as $m): ?>
+                        <label class="chk"><input type="checkbox" name="sdileno[]" value="<?= (int)$m['id'] ?>" <?= in_array((int)$m['id'], $p['sdileno_ids'], true) ? 'checked' : '' ?>> <?= htmlspecialchars($m['jmeno']) ?></label>
+                      <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
+                    <div class="svet-note-actions"><button class="btn btn-primary" type="submit">Uložit změny</button></div>
+                  </form>
+                </details>
                 <?php endif; ?>
               </div>
             <?php endforeach; ?>
@@ -632,9 +750,29 @@ dracak_vtt_page_start($svet['nazev'], $user, true);
         <form method="post">
           <input type="hidden" name="akce" value="pridat_poznamku">
           <textarea name="text" placeholder="Napsat poznámku…" aria-label="Nová poznámka" required></textarea>
-          <?php if ($mapy || $moznostiSdileni): ?>
+          <?php if ($mapy || $moznostiSdileni || $poznamkyFunkce['rozsireno']): ?>
           <details class="svet-note-opts">
-            <summary>Místo a sdílení</summary>
+            <summary>Štítek, místo a sdílení</summary>
+            <?php if ($poznamkyFunkce['rozsireno']): ?>
+            <div class="field"><label for="poznamka_stitek">Štítek</label>
+              <select class="input" id="poznamka_stitek" name="stitek">
+                <option value="auto">Automaticky podle textu</option>
+                <?php foreach (DRACAK_VTT_POZNAMKY_STITKY as $kl => $nazevStitku): ?>
+                  <option value="<?= htmlspecialchars($kl) ?>"><?= htmlspecialchars($nazevStitku) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <?php if ($postavyProPoznamky): ?>
+            <div class="field"><label for="poznamka_postava_id">Postava / NPC (nepovinné)</label>
+              <select class="input" id="poznamka_postava_id" name="postava_id">
+                <option value="">— bez postavy —</option>
+                <?php foreach ($postavyProPoznamky as $pid => $pnazev): ?>
+                  <option value="<?= $pid ?>"><?= htmlspecialchars($pnazev) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <?php endif; ?>
+            <?php endif; ?>
             <?php if ($mapy): ?>
             <div class="field"><label for="poznamka_mapa_id">Místo (nepovinné)</label>
               <select class="input" id="poznamka_mapa_id" name="mapa_id">
@@ -750,7 +888,22 @@ dracak_vtt_page_start($svet['nazev'], $user, true);
   <?php if ($isPjOrAdmin): ?>
   <dialog class="svet-dialog" id="dlg-hraci">
     <div class="svet-dialog-head"><h2>Hráči ve světě</h2><button class="btn btn-ghost btn-icon" type="button" data-close aria-label="Zavřít">✕</button></div>
-    <p style="margin:0 0 10px;font-size:13px;"><?= $hraciVeSvete ? htmlspecialchars(implode(', ', array_column($hraciVeSvete, 'jmeno'))) : 'Zatím žádný hráč nepřidán.' ?></p>
+    <?php if (!$hraciVeSvete): ?>
+      <p style="margin:0 0 10px;font-size:13px;">Zatím žádný hráč nepřidán.</p>
+    <?php else: ?>
+      <ul class="svet-hraci-seznam" style="list-style:none;margin:0 0 12px;padding:0;font-size:13px;">
+        <?php foreach ($hraciVeSvete as $h): ?>
+          <li style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:3px 0;">
+            <span><?= htmlspecialchars($h['jmeno']) ?></span>
+            <form method="post" data-potvrdit="Odebrat hráče <?= htmlspecialchars($h['jmeno'], ENT_QUOTES) ?> ze světa? Přestane tu mít přístup a poznámky, které mu někdo nasdílel, se mu přestanou ukazovat. Jeho postavy ve světě zůstanou.">
+              <input type="hidden" name="akce" value="odebrat_hrace">
+              <input type="hidden" name="ucet_id" value="<?= (int)$h['id'] ?>">
+              <button class="btn btn-ghost" type="submit" style="font-size:11px;padding:2px 8px;">Odebrat</button>
+            </form>
+          </li>
+        <?php endforeach; ?>
+      </ul>
+    <?php endif; ?>
     <?php if ($volniHraci): ?>
     <form method="post" style="display:flex;gap:10px;">
       <input type="hidden" name="akce" value="pridat_hrace">
