@@ -36,7 +36,7 @@ na DB postavené od nuly. Co lze dělat **bez** ptaní (vždy s testy, `tests/ru
   výpis uživatelského textu je escapovaný (grep + test s `<script>` v názvech světa, postavy, tokenu, pinu, poznámky), `Secure`/`SameSite` cookie za proxy.
 - **Funkce ze starších plánů, které NEJSOU hotové** (úplný soupis 2026-11-01 — dřív tu byla jen údržba a bezpečnost; funkční kroky z plánů A–E a fází cestování/deníku zůstávaly rozeseté v textu níž):
   - *Plán náhrady Owlbear — blok B:* (9) dosah pohybu z pohyblivosti postavy po naložení a únavě (v boji se pohybuje po hexech podle akcí, takže jde hlavně o mapu mimo boj); (12) čitelné stavy na tokenu (pruh životů, ikony efektů, únava/přetížení).
-  - *Blok C — svět a cesta:* (14) pochod po mapě světa s měřítkem a trasou → kalkulačka cesty → čas a únava postavám [L]; (15) přechod mezi lokacemi: pin „Vstoupit“ přenese družinu na cílovou mapu [M]; (16) knihovna map (duplikace, pořadí scén); (17) hodiny světa — **čas ve dni a hoření světel hotové (2026-11-02, viz „Hodiny světa“ níž)**, nepropojené zatím s cestou, odpočinkem a spánkem.
+  - *Blok C — svět a cesta:* (14) pochod po mapě světa s měřítkem a trasou → kalkulačka cesty → čas a únava postavám [L]; (15) přechod mezi lokacemi — **hotový (2026-11-02, viz „Přechod mezi lokacemi“ níž)**; (16) knihovna map (duplikace, pořadí scén); (17) hodiny světa — **čas ve dni a hoření světel hotové (2026-11-02, viz „Hodiny světa“ níž)**, nepropojené zatím s cestou, odpočinkem a spánkem.
   - *Blok D:* (22) tablet a telefon na skutečném zařízení a (23) zkušební hra podle `docs/zkusebni-scenar-prvni-hra.md` — čeká na uživatele.
   - *Blok E — vidění a světlo:* základ je hotový (dveře, světlo, tma, infravidění). Zbývá: **zamčené a tajné dveře** (uživatel je bude potřebovat později), hladký polygonový stín místo buněk, automatická ztráta iniciativy ve tmě, další stavy osvětlení (pološero, soumrak — viz níže), Lovcův Příkrov stínů, hráčem otevíratelné dveře (zatím jen PJ). Hotové: zóny Tma a Temnota, stav mapy „Noc“ a noční vidění.
   - *Boj:* „obrana a krok“ (kniha neříká, kdy se krok udělá — potřebuje rozhodnutí), útok na neviditelného nebo kouzlícího tvora, čtyřstupňová škála hodu na dovednost (fatální neúspěch / totální úspěch — v přepisu knihy chybí, potřeba foto).
@@ -1274,7 +1274,7 @@ stavby“ v návrhu.**
 14. Pochod po mapě světa: měřítko mapy (km/px), PJ vyznačí trasu → výpočet z
     kalkulačky cesty (povrch, terén, tempo, zvíře/povoz) → čas + únava se
     zapíšou postavám [L]
-15. Přechod mezi lokacemi: pin → „Vstoupit“ přenese tokeny družiny na vstupní
+15. ✔ (2026-11-02, bez ručního SQL) Přechod mezi lokacemi: pin → „Vstoupit s družinou“ přenese tokeny družiny na vstupní
     bod cílové mapy a přepne aktivní mapu všem [M]
 16. Knihovna map: duplikace, velké obrázky (automatické zmenšení, limit
     hostingu), pořadí scén [M]
@@ -1338,6 +1338,12 @@ V noci i ve tmě hráč vidí jen osvětlené místo; v noci navíc **tvor s no�
 ani dovnitř). Boj: lupič (hráčova postava) s nočním viděním má v noci proti cíli, kterého nevidí, postih **−2** místo −5 (`'nocni'` v `dracak_vtt_videni_tma_volba`), cíl v dosahu nočního vidění vidí
 (žádný postih). Test: `tests/e2e/noc_videni_api.js` + rozšířený `boj_ve_tme_api.js`. **Další stavy (pološero +6, soumrak/úsvit +7, úplněk +5 z tabulky b3166) zatím nejsou:** kniha pro ně nemá vzdálenosti
 a nic neříká o tom, co mění, takže by to byly jen popisky — přidají se jako řádek v `DRACAK_VTT_OSVETLENI`, až bude jasné, co který stav dělá (např. „všichni vidí do X sáhů bez světla“).
+**Přechod mezi lokacemi (2026-11-02, bod 15 plánu; bez ručního SQL — používá jen existující tabulky):** v informaci o pinu s cílovou mapou má PJ tlačítko **„Vstoupit s družinou“**
+(`hra/api/pin_vstoupit.php`, `includes/vtt_prechod.php`). Přenese postavy **družiny** (postavy, které vlastní někdo jiný než PJ světa; nestvůry, NPC postavy PJ a obecné tokeny zůstávají) z mapy pinu na
+**vstupní bod** cílové mapy — pin na cílové mapě, který vede zpátky na zdrojovou mapu („dveře zpátky“), jinak střed cílové mapy — a rozmístí je na nejbližší **volné buňky** gridu kolem vstupu (hex i čtverec,
+bez gridu po 60 px; zdi se nekontrolují, PJ případně doladí tažením). Token se jen přehodí na jinou mapu (`mapa_id`, `x`, `y`), takže si nese vzhled, světlo i vidění; má-li postava na cílové mapě token už
+z dřívějška, přesune se ten a zdrojový se smaže (nezdvojí se). Přepne se `svet.aktivni_mapa_id` a pošle událost `aktivni_mapa_zmena` s příznakem `vstup` — **hráčům se mapa přepne sama** (`assets/js/mapa.js`);
+obyčejné „Nastavit jako aktivní“ nikoho nepřesouvá. **Za boje se družina nepřenáší** (409 — řádek v `kolo_stav` na zdrojové mapě). Jen PJ. Test: `tests/e2e/pin_vstoupit_api.js`.
 **Hodiny světa a hoření světel (2026-11-02, bod 17 plánu; ruční SQL: migrace `0109`, sloupce `svet.aktualni_smena` a `tokeny.svetlo_zbyva`):** den už počítal `svet.aktualni_den_offset`
 (PJova ruční volba), nově přibyl čas ve dni v **směnách** (`svet.aktualni_smena` 0–143; jedna směna ≈ 10 minut, kolo ≈ 10 vteřin, b33–b34; výchozí 48 = 8:00). Čas a datum vidí v horní liště mapy všichni
 (`includes/vtt_cas.php`, `dracak_vtt_cas_stav`), **posouvá ho jen PJ** tlačítky „+1 směna“ / „+1 hodina“ (`hra/api/cas_posun.php`, událost `cas_zmena` bez mapy) a v administraci světa ho nastaví přesně (hh:mm po 10 minutách;

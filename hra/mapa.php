@@ -442,6 +442,7 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
       <a class="btn btn-secondary" id="pinInfoOtevritBtn" href="#" style="flex:1;display:none;">Otevřít mapu</a>
       <button class="btn btn-secondary" type="button" id="pinInfoAktivniBtn" style="flex:1;display:none;">Nastavit jako aktivní</button>
     </div>
+    <button class="btn btn-primary" type="button" id="pinInfoVstoupitBtn" style="width:100%;margin-top:8px;display:none;" title="Přenese postavy družiny na vstupní bod cílové mapy, přepne aktivní mapu a hráče za ní přepne taky">Vstoupit s družinou</button>
     <button class="btn btn-secondary" type="button" id="pinInfoCestovatBtn" style="width:100%;margin-top:8px;display:none;">Cestovat sem</button>
     <button class="btn btn-secondary" type="button" id="pinInfoUpravitBtn" style="width:100%;margin-top:8px;display:none;">Upravit pin</button>
     <button class="btn btn-ghost" type="button" id="pinInfoSmazatBtn" style="width:100%;margin-top:8px;display:none;">Smazat pin</button>

@@ -2512,6 +2512,7 @@ function otevriPinInfo(bod) {
   }
   const otevritBtn = document.getElementById('pinInfoOtevritBtn');
   const aktivniBtn = document.getElementById('pinInfoAktivniBtn');
+  const vstoupitBtn = document.getElementById('pinInfoVstoupitBtn');
   const cestovatBtn = document.getElementById('pinInfoCestovatBtn');
   const upravitBtn = document.getElementById('pinInfoUpravitBtn');
   const smazatBtn = document.getElementById('pinInfoSmazatBtn');
@@ -2519,9 +2520,11 @@ function otevriPinInfo(bod) {
     otevritBtn.style.display = '';
     otevritBtn.href = 'mapa.php?id=' + bod.cilova_mapa_id;
     aktivniBtn.style.display = IS_PJ_OR_ADMIN ? '' : 'none';
+    if (vstoupitBtn) vstoupitBtn.style.display = IS_PJ_OR_ADMIN ? '' : 'none';
   } else {
     otevritBtn.style.display = 'none';
     aktivniBtn.style.display = 'none';
+    if (vstoupitBtn) vstoupitBtn.style.display = 'none';
   }
   cestovatBtn.style.display = IS_PJ_OR_ADMIN ? '' : 'none';
   upravitBtn.style.display = IS_PJ_OR_ADMIN ? '' : 'none';
@@ -2551,6 +2554,19 @@ if (pinInfoAktivniBtn) {
     if (!bod || !bod.cilova_mapa_id) return;
     postJson('api/aktivni_mapa_nastavit.php', {mapa_id: bod.cilova_mapa_id})
       .then(d => { if (d.error) { logLine('Chyba: ' + d.error); return; } logLine('Aktivní mapa nastavena na: ' + bod.nazev); });
+  });
+}
+// „Vstoupit s družinou“ (includes/vtt_prechod.php): PJ přenese družinu na cílovou mapu a přepne se tam; hráči se přepnou za ním (událost aktivni_mapa_zmena s příznakem vstup).
+const pinInfoVstoupitBtn = document.getElementById('pinInfoVstoupitBtn');
+if (pinInfoVstoupitBtn) {
+  pinInfoVstoupitBtn.addEventListener('click', () => {
+    const bod = MAPA_BODY.find(b => b.id === pinVybranyId);
+    if (!bod || !bod.cilova_mapa_id) return;
+    if (!confirm('Přenést družinu na „' + bod.nazev + '“ a přepnout tam všechny hráče?')) return;
+    postJson('api/pin_vstoupit.php', {bod_id: bod.id}).then(d => {
+      if (d.error) { logLine('Chyba: ' + d.error); return; }
+      location.href = 'mapa.php?id=' + d.mapa_id;
+    });
   });
 }
 const pinInfoCestovatBtn = document.getElementById('pinInfoCestovatBtn');
@@ -3096,6 +3112,11 @@ function applyEvent(u) {
       const z = zdiList.find(q => q.id === u.payload.id);
       if (z) { z.otevrene = !!u.payload.otevrene; renderZdi(); }
       obnovitMlhuPoPollu = true;   // dveře mění výhled
+    }
+  } else if (u.typ === 'aktivni_mapa_zmena') {
+    // Jen přechod přes pin („Vstoupit s družinou“) přepíná hráče; obyčejné „Nastavit jako aktivní“ nikoho nepřesouvá.
+    if (u.payload && u.payload.vstup && !IS_PJ_OR_ADMIN && String(u.payload.mapa_id) !== String(MAPA_ID)) {
+      location.href = 'mapa.php?id=' + u.payload.mapa_id;
     }
   } else if (u.typ === 'mapa_osvetleni') {
     if (u.mapa_id == MAPA_ID) {
