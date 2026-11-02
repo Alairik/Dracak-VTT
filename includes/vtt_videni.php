@@ -28,6 +28,15 @@ const DRACAK_VTT_SVETLO_PREDVOLBY = [
     'hul_lucerna' => ['Čarodějova hůl (jako lucerna)', 8.0],
 ];
 
+// Boj ve tmě (h1613 b10738 „Útok na neviditelného protivníka“, lupič b5663): postih k hodu na útok i na obranu pro toho, kdo protivníka nevidí.
+// klíč => [text oprav, postih]. nevidi −5 (bez zpráv o protivníkovi), tusi −4 (mlhavá představa, kde stojí), nocni −2 (lupič s nočním viděním ve tmě).
+// Zasáhne-li útočník s tímto postihem, zranění se počítá, jako by postih nebyl (viz dracak_vtt_utok_vyhodnot).
+const DRACAK_VTT_TMA_POSTIHY = [
+    'nevidi' => ['nevidí protivníka (tma)', -5],
+    'tusi' => ['tuší, kde protivník stojí (tma)', -4],
+    'nocni' => ['noční vidění (boj ve tmě)', -2],
+];
+
 // Jsou v DB všechny sloupce vidění (migrace 0107)? Bez nich se vidění nepoužívá.
 function dracak_vtt_videni_funkce(PDO $pdo): bool
 {
@@ -255,4 +264,40 @@ function dracak_vtt_videni_skryte_tokeny(PDO $pdo, array $mapa, int $ucetId): ar
         }
     }
     return $skryte;
+}
+
+// Nevidí ve tmě pozorovatel (token) cíl (token)? Vrací 'nevidi' (výchozí postih −5), nebo null — vidí, nebo se to nedá zjistit.
+// Automaticky se počítá jen za postavy hráčů (vidí jejich účtem, tedy světlem družiny a infraviděním); za nestvůry a NPC rozhoduje PJ v okně výzvy
+// (kniha neříká, kdo z nestvůr vidí ve tmě). Na mapě „Světlo“ se nic nezjišťuje.
+function dracak_vtt_videni_tma_volba(PDO $pdo, array $mapa, int $pozorovatelTokenId, int $cilTokenId): ?string
+{
+    $plna = dracak_vtt_videni_mapa($pdo, (int)$mapa['id']);
+    if ($plna === null || !dracak_vtt_videni_aktivni($pdo, $plna)) {
+        return null;
+    }
+    $q = $pdo->prepare(
+        'SELECT t.id, t.typ_entity, t.x, t.y, t.studeny, p.vlastnik_ucet_id FROM tokeny t
+         LEFT JOIN postavy p ON p.id = t.entita_id AND t.typ_entity = "postava" WHERE t.mapa_id = ? AND t.id IN (?, ?)'
+    );
+    $q->execute([(int)$plna['id'], $pozorovatelTokenId, $cilTokenId]);
+    $radky = [];
+    foreach ($q->fetchAll() as $r) {
+        $radky[(int)$r['id']] = $r;
+    }
+    if (!isset($radky[$pozorovatelTokenId], $radky[$cilTokenId])) {
+        return null;
+    }
+    $pj = (int)($pdo->query('SELECT pj_ucet_id FROM svet WHERE id = ' . (int)$plna['svet_id'])->fetchColumn() ?: 0);
+    $pozorovatel = $radky[$pozorovatelTokenId];
+    $ucet = (int)($pozorovatel['vlastnik_ucet_id'] ?? 0);
+    if ($pozorovatel['typ_entity'] !== 'postava' || $ucet <= 0 || $ucet === $pj) {
+        return null;
+    }
+    $v = dracak_vtt_videni_vypocet($pdo, $plna, $ucet);
+    if ($v === null) {
+        return null;
+    }
+    $cil = $radky[$cilTokenId];
+    $cil['druzina'] = $cil['typ_entity'] === 'postava' && (int)($cil['vlastnik_ucet_id'] ?? 0) > 0 && (int)$cil['vlastnik_ucet_id'] !== $pj;
+    return dracak_vtt_videni_token_viden($v, $cil) ? null : 'nevidi';
 }

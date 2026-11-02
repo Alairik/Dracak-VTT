@@ -20,6 +20,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/vtt_souboj.php';
 require_once __DIR__ . '/vtt_souboj_pohyb.php';
 require_once __DIR__ . '/vtt_denik.php';
+require_once __DIR__ . '/vtt_videni.php';
 
 // Tabulka rozdílu velikostí (h1610, b10702–b10708): [velikost obránce][velikost útočníka] = oprava
 // hodu na útok. Sloupce A0, A, B, C, D, E; hodnoty přesně podle knihy (i ty, které vypadají zvláštně).
@@ -351,7 +352,13 @@ function dracak_vtt_obrana_opravy(array $d): array
 
 function dracak_vtt_vyzva_opravy(string $druh, array $d): array
 {
-    return $druh === 'obrana' ? dracak_vtt_obrana_opravy($d) : ($d['opravy'] ?? []);
+    $o = $druh === 'obrana' ? dracak_vtt_obrana_opravy($d) : ($d['opravy'] ?? []);
+    // Boj ve tmě: kdo protivníka nevidí, má postih k útoku i k obraně (DRACAK_VTT_TMA_POSTIHY v includes/vtt_videni.php).
+    $tma = $d['tma'] ?? null;
+    if (($druh === 'utok' || $druh === 'obrana') && is_string($tma) && isset(DRACAK_VTT_TMA_POSTIHY[$tma])) {
+        $o[] = dracak_vtt_oprava(DRACAK_VTT_TMA_POSTIHY[$tma][0], DRACAK_VTT_TMA_POSTIHY[$tma][1]);
+    }
+    return $o;
 }
 
 // Číslo bez hodu: základ (ÚČ / OČ) + opravy + oprava PJ. Null, dokud základ chybí.
@@ -507,6 +514,11 @@ function dracak_vtt_utok_zahaj(PDO $pdo, array $mapa, array $info, array $utocni
     $cil = dracak_vtt_souboj_bojovnik($pdo, $info[$cilTokenId]);
     $d = dracak_vtt_utok_priprav($pdo, $utocnik, $cil, $rozbeh, dracak_vtt_souboj_utoku_v_kole($pdo, $mapaId, $utId));
     $d['strana'] = $cilToken ? dracak_vtt_utok_strana($mapa, $cilToken, $utocnikToken) : 'predni';
+    $tma = dracak_vtt_videni_tma_volba($pdo, $mapa, $utId, $cilTokenId);
+    if ($tma !== null) {
+        $d['tma'] = $tma;
+        $d['upozorneni'][] = 'Útočník nevidí cíl (tma): postih −5 k útoku; zasáhne-li, zranění se počítá bez něj (h1613 b10738). Ztrátu iniciativy a „útok jen v kole, kdy na něj protivník zaútočí“ hlídá PJ; tuší-li, kde cíl stojí (−4), nebo má noční vidění (−2), přepni níž.';
+    }
     $id = dracak_vtt_vyzva_vloz($pdo, $mapaId, 'utok', $utId, $cilTokenId, null, $d);
     dracak_vtt_log_event((int)$mapa['svet_id'], $mapaId, 'vyzva_nova', dracak_vtt_vyzva_payload($info, 'utok', $id, $utId, $cilTokenId), $ucetId);
     return $id;
@@ -575,7 +587,13 @@ function dracak_vtt_obrana_zaloz(PDO $pdo, array $mapa, array $info, array $utok
     if (!$ozZnamo) {
         $upozorneni[] = 'Obranu zbraní nestvůry (OZ) nestvůra v bestiáři nemá rozepsanou — když se brání, připiš ji do opravy' . $hintDenik . '.';
     }
+    // Boj ve tmě: obránce, který útočníka nevidí, má postih −5 k obraně (h1613 b10738); u nestvůr rozhoduje PJ.
+    $tmaObrana = dracak_vtt_videni_tma_volba($pdo, $mapa, $obrId, $utId);
+    if ($tmaObrana !== null) {
+        $upozorneni[] = $obr['label'] . ' nevidí útočníka (tma): postih −5 k obraně; tuší-li, odkud útok jde (−4), nebo má noční vidění (−2), přepni níž.';
+    }
     $d = [
+        'tma' => $tmaObrana,
         'utocnik_label' => $info[$utId]['label'],
         'obrance_label' => $info[$obrId]['label'],
         'zaklad' => $obr['oc'],
@@ -642,7 +660,10 @@ function dracak_vtt_utok_vyhodnot(PDO $pdo, array $mapa, array $info, array $uto
     $obrana = (int)$obranaVyzva['data']['celkem'];
     $utocnost = (int)($utokVyzva['data']['utocnost'] ?? 0);
     $zasah = $utok >= $obrana;
-    $zraneniZaklad = $zasah ? max(1, $utok - $obrana + $utocnost) : 0;
+    // Útočník, který cíl nevidí (tma), po zásahu zraňuje, jako by postih neměl (h1613 b10738).
+    $tmaUtok = $utokVyzva['data']['tma'] ?? null;
+    $tmaBonus = is_string($tmaUtok) && isset(DRACAK_VTT_TMA_POSTIHY[$tmaUtok]) ? -DRACAK_VTT_TMA_POSTIHY[$tmaUtok][1] : 0;
+    $zraneniZaklad = $zasah ? max(1, $utok - $obrana + $utocnost + $tmaBonus) : 0;
     $nasobek = max(1, (int)($obranaVyzva['data']['nasobek'] ?? 1));
     $zraneni = $zraneniZaklad * $nasobek;
     $obrId = (int)$obranaVyzva['token_id'];
@@ -674,6 +695,7 @@ function dracak_vtt_utok_vyhodnot(PDO $pdo, array $mapa, array $info, array $uto
         'utok' => $utok,
         'obrana' => $obrana,
         'utocnost' => $utocnost,
+        'tma_bonus' => $zasah ? $tmaBonus : 0,
         'hp_pred' => $hp['hp_pred'],
         'hp_nove' => $hp['hp_nove'],
         'max_hp' => $hp['max_hp'],
@@ -749,6 +771,7 @@ function dracak_vtt_vyzvy_klient(PDO $pdo, array $user, bool $jePj, array $info,
             'strana' => $d['strana'] ?? null,
             'popis' => $d['popis'] ?? null,
         ];
+        $radek['tma'] = in_array($v['druh'], ['utok', 'obrana'], true) ? ($d['tma'] ?? null) : null;
         if ($v['druh'] === 'utok') {
             $radek['varianty'] = $d['varianty'] ?? [];
             $radek['zbran_id'] = $d['zbran_id'] ?? null;

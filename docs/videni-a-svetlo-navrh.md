@@ -2,7 +2,7 @@
 
 Stav: 2026-11-02. **Hotové:** dveře (migrace `0106`), osvětlení mapy, zdroje světla, živé vidění po buňkách, skrývání tokenů mimo dohled a infravidění (migrace `0107`).
 Rozhodnutí uživatele: (1) ve tmě vidí hráč jen to, co právě osvětlí družina (doporučená varianta), (2) dveře smí otevírat jen PJ, (3) otázka na noční vidění lupiče zůstává otevřená
-(uživatel se ptal, co to je — viz níž). **Zbývá:** boj ve tmě, zóny kouzel Tma a Temnota, hoření světel v čase, noční vidění lupiče, zamčené a tajné dveře (na seznamu, zatím nejsou potřeba).
+(uživatel se ptal, co to je — viz níž). Boj ve tmě je hotový (postih −5/−4/−2, zranění bez postihu, přepínání PJ). **Zbývá:** zóny kouzel Tma a Temnota, hoření světel v čase, noční vidění lupiče, zamčené a tajné dveře (na seznamu, zatím nejsou potřeba).
 
 ## 1. Co říká kniha (zdroj pravdy: `content/pravidla-*.html`)
 

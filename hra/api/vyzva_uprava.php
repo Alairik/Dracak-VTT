@@ -71,6 +71,25 @@ try {
         $zmeneno[] = $pole;
     }
 
+    // Boj ve tmě (PJ): jak dobře tvor vidí protivníka — null (bez postihu), 'nevidi' −5, 'tusi' −4, 'nocni' −2 (DRACAK_VTT_TMA_POSTIHY).
+    if (array_key_exists('tma', $data)) {
+        if (!$jePj) {
+            $pdo->rollBack();
+            dracak_vtt_souboj_chyba(403, 'Tohle smí měnit jen PJ.');
+        }
+        if (!in_array($v['druh'], ['utok', 'obrana'], true)) {
+            $pdo->rollBack();
+            dracak_vtt_souboj_chyba(422, 'Postih za tmu se nastavuje jen u útoku a obrany.');
+        }
+        $tma = $data['tma'] === null || $data['tma'] === '' ? null : (string)$data['tma'];
+        if ($tma !== null && !isset(DRACAK_VTT_TMA_POSTIHY[$tma])) {
+            $pdo->rollBack();
+            dracak_vtt_souboj_chyba(422, 'Neznámá volba vidění (nevidi, tusi, nocni).');
+        }
+        $d['tma'] = $tma;
+        $zmeneno[] = 'tma';
+    }
+
     // Násobek zranění (spící / vyřazený) — PJ ho opraví, když se úroveň nestvůry nedala přečíst.
     if (array_key_exists('nasobek', $data)) {
         if (!$jePj) {

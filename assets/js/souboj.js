@@ -1481,6 +1481,21 @@ export function initSouboj(ctx) {
       r.appendChild(el('span', '', v.druh === 'past' ? 'oprava (PJ)' : 'oprava (PJ)'));
       r.appendChild(poleCisla(v.modifikator, -30, 30, (n) => upravitVyzvu(v, {modifikator: n === null ? 0 : n}), '64px'));
       tab.appendChild(r);
+      if (v.druh === 'utok' || v.druh === 'obrana') {
+        // Boj ve tmě (h1613 b10738): kdo protivníka nevidí, má postih k útoku i k obraně. Server ho navrhne u hráčů na mapě „Tma“, PJ ho přepne (nestvůry, oslepení, kouzla).
+        const t = el('div', 'vyzva-radek');
+        t.appendChild(el('span', '', 'vidí protivníka?'));
+        const sel = el('select', 'input');
+        [['', 'vidí (bez postihu)'], ['nevidi', 'nevidí (−5)'], ['tusi', 'tuší, kde stojí (−4)'], ['nocni', 'noční vidění (−2)']].forEach(([hodn, text]) => {
+          const o = el('option', '', text);
+          o.value = hodn;
+          if ((v.tma || '') === hodn) o.selected = true;
+          sel.appendChild(o);
+        });
+        sel.addEventListener('change', () => upravitVyzvu(v, {tma: sel.value || null}));
+        t.appendChild(sel);
+        tab.appendChild(t);
+      }
       if (v.druh === 'utok') {
         const u = el('div', 'vyzva-radek');
         u.appendChild(el('span', '', 'útočnost zbraně'));
@@ -1579,7 +1594,8 @@ export function initSouboj(ctx) {
     const kdo = (p.label || 'Někdo') + ' → ' + (p.cil_label || 'někdo');
     k.appendChild(el('strong', '', p.zasah ? 'Zásah! ' + kdo : 'Minul(a). ' + kdo));
     k.appendChild(el('div', 'vyzva-poznamka', 'Útok ' + p.utok + ' proti obraně ' + p.obrana
-      + (p.zasah ? ' → zranění ' + p.zraneni + (p.nasobek > 1 ? ' (' + p.zraneni_zaklad + ' × ' + p.nasobek + ', ' + p.nasobek_duvod + ')' : (p.nasobek_duvod ? ' (' + p.nasobek_duvod + ': násobí se úrovní)' : '')) : '')));
+      + (p.zasah ? ' → zranění ' + p.zraneni + (p.nasobek > 1 ? ' (' + p.zraneni_zaklad + ' × ' + p.nasobek + ', ' + p.nasobek_duvod + ')' : (p.nasobek_duvod ? ' (' + p.nasobek_duvod + ': násobí se úrovní)' : '')) : '')
+      + (p.zasah && p.tma_bonus ? ' (zranění bez postihu za tmu +' + p.tma_bonus + ')' : '')));
     if (p.zasah && p.hp_nove !== null && p.hp_nove !== undefined) {
       k.appendChild(el('div', '', (p.cil_label || 'Obránce') + ': ' + p.hp_nove + (p.max_hp ? '/' + p.max_hp : '') + ' životů'
         + (p.vyrazen ? ' — VYŘAZEN(A) z boje' : '')));
@@ -1656,7 +1672,7 @@ export function initSouboj(ctx) {
       }
       case 'souboj_vysledek':
         logLine((p.zasah ? 'Zásah: ' : 'Minul(a): ') + (p.label || 'někdo') + ' → ' + (p.cil_label || 'někdo') + ' — útok ' + p.utok + ' proti obraně ' + p.obrana
-          + (p.zasah ? ', zranění ' + p.zraneni + (p.nasobek > 1 ? ' (' + p.zraneni_zaklad + ' × ' + p.nasobek + ')' : (p.nasobek_duvod ? ' (násobí se úrovní: ' + p.nasobek_duvod + ')' : '')) + (p.hp_nove !== null && p.hp_nove !== undefined ? ' (zbývá ' + p.hp_nove + (p.max_hp ? '/' + p.max_hp : '') + ' životů)' : '') : '')
+          + (p.zasah ? ', zranění ' + p.zraneni + (p.nasobek > 1 ? ' (' + p.zraneni_zaklad + ' × ' + p.nasobek + ')' : (p.nasobek_duvod ? ' (násobí se úrovní: ' + p.nasobek_duvod + ')' : '')) + (p.tma_bonus ? ' (bez postihu za tmu +' + p.tma_bonus + ')' : '') + (p.hp_nove !== null && p.hp_nove !== undefined ? ' (zbývá ' + p.hp_nove + (p.max_hp ? '/' + p.max_hp : '') + ' životů)' : '') : '')
           + (p.vyrazen ? ' — VYŘAZEN(A)' : ''));
         ukazVysledek(p);
         break;
