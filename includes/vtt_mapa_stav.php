@@ -181,6 +181,25 @@ function dracak_vtt_token_hodnota_klice(array $radek, string $klic)
     };
 }
 
+// Doplňky tokenu jen pro PJ: strana ('hrac' = postava hráče, jinak 'pj'), podtitul pod jménem v raid panelu a únava postavy.
+function dracak_vtt_mapa_stav_pj_info(array $t, array $i): array
+{
+    $strana = 'pj';
+    $unava = null;
+    if ($t['typ_entity'] === 'postava') {
+        $hracova = (int)($i['vlastnik_ucet_id'] ?? 0) > 0 && (int)$i['vlastnik_ucet_id'] !== (int)($i['pj_ucet_id'] ?? 0);
+        $strana = $hracova ? 'hrac' : 'pj';
+        $druh = trim((string)($i['povolani'] ?? '') . ((int)($i['uroven'] ?? 0) > 0 ? ' ' . (int)$i['uroven'] . '. úr.' : ''));
+        $podtitul = ($druh !== '' ? $druh : 'Postava') . ($hracova ? ' · hráč ' . (string)($i['hrac'] ?? '?') : ' · NPC');
+        $unava = isset($i['unava']) ? (int)$i['unava'] : null;
+    } elseif ($t['typ_entity'] === 'nestvura_instance') {
+        $podtitul = 'Nestvůra' . (($i['druh'] ?? '') !== '' ? ' · ' . (string)$i['druh'] : '');
+    } else {
+        $podtitul = 'Značka nebo předmět';
+    }
+    return ['strana' => $strana, 'podtitul' => $podtitul, 'unava' => $unava];
+}
+
 function dracak_vtt_mapa_stav(PDO $pdo, array $user, array $mapa, bool $jePj): array
 {
     $mapaId = (int)$mapa['id'];
@@ -214,6 +233,25 @@ function dracak_vtt_mapa_stav(PDO $pdo, array $user, array $mapa, bool $jePj): a
     if (!$jePj) {
         require_once __DIR__ . '/vtt_videni.php';
         $skryteVidenim = dracak_vtt_videni_skryte_tokeny($pdo, $mapa, (int)$user['id']);
+    }
+    // Jen pro PJ (raid panel, assets/js/raid_panel.js): druh/povolání, jméno hráče a únava u každého tokenu — jedním dotazem.
+    $pjInfo = [];
+    if ($jePj) {
+        $q = $pdo->prepare(
+            'SELECT t.id, p.uroven, p.unava, p.vlastnik_ucet_id, po.nazev AS povolani, u.jmeno AS hrac, n.nazev AS druh, s.pj_ucet_id
+             FROM tokeny t
+             JOIN mapy m ON m.id = t.mapa_id JOIN svet s ON s.id = m.svet_id
+             LEFT JOIN postavy p ON p.id = t.entita_id AND t.typ_entity = "postava"
+             LEFT JOIN povolani po ON po.id = p.povolani_id
+             LEFT JOIN ucty u ON u.id = p.vlastnik_ucet_id
+             LEFT JOIN nestvura_instance ni ON ni.id = t.entita_id AND t.typ_entity = "nestvura_instance"
+             LEFT JOIN nestvury n ON n.id = ni.nestvura_id
+             WHERE t.mapa_id = ?'
+        );
+        $q->execute([$mapaId]);
+        foreach ($q->fetchAll() as $r) {
+            $pjInfo[(int)$r['id']] = $r;
+        }
     }
     $tokeny = [];
     foreach ($radky as $t) {
@@ -259,7 +297,7 @@ function dracak_vtt_mapa_stav(PDO $pdo, array $user, array $mapa, bool $jePj): a
             'noc' => isset($t['videni_noc_sahy']) && $t['videni_noc_sahy'] !== null ? (int)$t['videni_noc_sahy'] : null,
             'zbyva' => isset($t['svetlo_zbyva']) && $t['svetlo_zbyva'] !== null ? (int)$t['svetlo_zbyva'] : null,
             'studeny' => isset($t['studeny']) ? (bool)$t['studeny'] : false,
-        ];
+        ] + ($jePj ? dracak_vtt_mapa_stav_pj_info($t, $pjInfo[(int)$t['id']] ?? []) : []);
     }
 
     // Aktivní efekty všech entit s tokenem na téhle mapě — jeden dotaz.

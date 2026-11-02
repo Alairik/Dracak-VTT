@@ -9,6 +9,7 @@ const {hodit3D, nactiKostky, kostky3DPripraveny} = await import('./kostky3d.js?v
 const hexy = await import('./hexy.js?v=' + VERZE_MODULU);
 const initSouboj = window.MAPA.funkce.souboj ? (await import('./souboj.js?v=' + VERZE_MODULU)).initSouboj : null;
 const initDenikDock = (window.MAPA.denikPostavy || []).length ? (await import('./denik_dock.js?v=' + VERZE_MODULU)).initDenikDock : null;
+const initRaidPanel = window.MAPA.jePj && document.getElementById('raidPanel') ? (await import('./raid_panel.js?v=' + VERZE_MODULU)).initRaidPanel : null;
 
 // --- Kamera: zoom a posun přes CSS transform na #mapWrap ---
 // Souřadnice mapy (pixely původního obrázku) se na obrazovku převádějí jen
@@ -1216,6 +1217,7 @@ function jeVybrany(id) { return vybrane.has(id); }
 function aktualizujVyber() {
   tokenEl.forEach((el, id) => el.classList.toggle('vybrany', vybrane.has(id)));
   aktualizujRotacniUchyt();
+  if (typeof raid !== 'undefined' && raid) raid.prekresli();
 }
 function nastavVyber(ids) {
   vybrane.clear();
@@ -1276,6 +1278,7 @@ function pouzitZmenyTokenu(t, zmeny) {
   }
   nakreslitToken(t);
   aktualizujRotacniUchyt();
+  if (typeof raid !== 'undefined' && raid) raid.prekresli();
   if ('svetlo' in zmeny) renderSvetla();
   if (spravovanyToken && spravovanyToken.tokenId === t.id) obnovVzhledSekci();
 }
@@ -1576,6 +1579,28 @@ const denikDock = initDenikDock ? initDenikDock({
   },
 }) : null;
 // Otevře deník vybrané postavy (volitelně rovnou na sekci: boj, schopnosti, vybaveni). Používá se z tlačítek v detailu tokenu.
+// Raid panel (jen PJ; assets/js/raid_panel.js): boxy všech tvorů na mapě, plovoucí okno; myš nad boxem zvýrazní token a naopak.
+const raid = initRaidPanel ? initRaidPanel({
+  mapaId: MAPA_ID,
+  getTokeny: () => tokeny,
+  getKolo: () => koloStav,
+  getIniciativa: () => iniciativa,
+  getUcastnici: () => ucastnici,
+  jeVybrany: (id) => vybrane.has(id),
+  zvyraznit: (id, zap) => { const e = tokenEl.get(id); if (e) e.classList.toggle('raid-hover', !!zap); },
+  vybrat: (id) => {
+    const t = tokenData(id);
+    if (!t) return;
+    nastavVyber([id]);
+    otevritSpravovat(t);
+  },
+  obrazekUrl: (id) => (FUNKCE.obrazek && id ? 'obrazek.php?id=' + id : null),
+}) : null;
+if (raid) {
+  const tokenZPoloh = (e) => { const t = e.target.closest ? e.target.closest('.vtt-token') : null; return t ? parseInt(t.dataset.id, 10) : null; };
+  mapWrap.addEventListener('mouseover', (e) => { const id = tokenZPoloh(e); if (id !== null) raid.zvyraznenyToken(id); });
+  mapWrap.addEventListener('mouseout', (e) => { const id = tokenZPoloh(e); if (id !== null && !(e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('.vtt-token[data-id="' + id + '"]'))) raid.zvyraznenyToken(null); });
+}
 function otevritDenikVybrane(sekce) {
   if (!denikDock || !spravovanyToken || spravovanyToken.typEntity !== 'postava') return;
   denikDock.otevriPro(spravovanyToken.entitaId, sekce || null);
@@ -1664,6 +1689,7 @@ function aplikujStav(s) {
   nakreslitIniciativu();
   naplnitVolnePostavy();
   obnovPanelSpravovat();
+  if (raid) raid.prekresli();
   if (denikDock) {
     const naTahu = koloStav && koloStav.aktivni_token_id ? tokeny.find((x) => x.id === koloStav.aktivni_token_id) : null;
     denikDock.tah(naTahu && naTahu.typ_entity === 'postava' ? naTahu.entita_id : null);
@@ -3090,11 +3116,13 @@ function applyEvent(u) {
       t.hp = u.payload.nove_hp;
       if (u.payload.max_hp) t.max_hp = u.payload.max_hp;
       nakreslitToken(t);
+      if (raid) raid.prekresli();
       if (spravovanyToken && spravovanyToken.tokenId === t.id) obnovPanelSpravovat();
     }
   } else if (u.typ === 'magenergie_zmena') {
     const t = tokeny.find((x) => x.typ_entity === 'postava' && x.entita_id === u.payload.entita_id);
     if (t) t.magenergie = u.payload.nova_magenergie;
+    if (raid) raid.prekresli();
     if (spravovanyToken && spravovanyToken.typEntity === 'postava' && spravovanyToken.entitaId === u.payload.entita_id) {
       spravovanyToken.magenergie = u.payload.nova_magenergie;
       const txt = document.getElementById('spravovatMagenergieText');

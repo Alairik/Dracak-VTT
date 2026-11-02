@@ -230,6 +230,7 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
     <?php if ($isPjOrAdmin): ?>
       <button class="tbtn" type="button" id="tb-grid" title="Nastavení gridu"><?php dracak_icon('grid-2x2'); ?></button>
       <button class="tbtn" type="button" id="tb-mlha" title="Mlha války"><?php dracak_icon('cloud-fog'); ?></button>
+      <button class="tbtn" type="button" id="tb-raid" title="Panel tvorů — nestvůry a družina na jednom místě (plovoucí okno)"><?php dracak_icon('users'); ?></button>
       <?php if ($souboj): ?>
         <button class="tbtn" type="button" id="tb-souboj" title="Zahájit souboj"><?php dracak_icon('swords'); ?></button>
       <?php endif; ?>
@@ -782,6 +783,20 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
     </div>
   </div>
 
+  <?php if ($isPjOrAdmin): ?>
+  <div id="raidPanel" class="raid-panel" style="display:none;" role="dialog" aria-label="Panel tvorů na mapě">
+    <div class="raid-hlava" id="raidHlava" title="Tažením přesuneš okno">
+      <span class="raid-grip-okna" aria-hidden="true">⠿</span>
+      <div class="raid-nadpis"><strong id="raidTitul">Na mapě</strong><span id="raidPodtitul"></span></div>
+      <button type="button" class="raid-btn" id="raidReset" style="display:none;" title="Vrátit pořadí podle iniciativy (zahodit ruční přeřazení)">↺ pořadí</button>
+      <button type="button" class="raid-btn" id="raidRezim" title="Přepnout na kompaktní řádky">Kompakt</button>
+      <button type="button" class="raid-btn raid-ikona" id="raidSbalit" title="Sbalit na hlavičku" aria-label="Sbalit panel tvorů na hlavičku"><?php dracak_icon('minus', 16); ?></button>
+      <button type="button" class="raid-btn raid-ikona" id="raidZavrit" title="Zavřít" aria-label="Zavřít panel tvorů"><?php dracak_icon('x', 16); ?></button>
+    </div>
+    <div class="raid-seznam" id="raidSeznam"></div>
+  </div>
+  <?php endif; ?>
+
   <?php if ($denikPostavy): ?>
   <div id="denikDock" class="denik-dock" style="display:none;" role="dialog" aria-label="Deník postavy">
     <?php foreach (['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'] as $hrana): ?>
@@ -819,7 +834,7 @@ window.MAPA = <?= json_encode([
     'funkce' => dracak_vtt_tokeny_funkce(),
     'cas' => $casSveta,
     'pravidla' => dracak_vtt_souboj_pravidla(),
-    'verzeModulu' => max((int)@filemtime(__DIR__ . '/../assets/js/souboj.js'), (int)@filemtime(__DIR__ . '/../assets/js/kostky3d.js'), (int)@filemtime(__DIR__ . '/../assets/js/hexy.js'), (int)@filemtime(__DIR__ . '/../assets/js/denik_dock.js')),
+    'verzeModulu' => max((int)@filemtime(__DIR__ . '/../assets/js/souboj.js'), (int)@filemtime(__DIR__ . '/../assets/js/kostky3d.js'), (int)@filemtime(__DIR__ . '/../assets/js/hexy.js'), (int)@filemtime(__DIR__ . '/../assets/js/denik_dock.js'), (int)@filemtime(__DIR__ . '/../assets/js/raid_panel.js')),
     'grid' => [
         'px' => (int)($mapa['grid_velikost_px'] ?? 0),
         'typ' => $mapa['grid_typ'] ?? 'ctverec',

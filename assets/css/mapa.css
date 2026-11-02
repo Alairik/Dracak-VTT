@@ -423,3 +423,71 @@ body.denik-dock-cela { overflow:hidden; }
 .topbar .svet-cas { flex:none; display:flex; align-items:center; gap:6px; font-size:12px; padding-left:10px; border-left:1px solid rgba(255,255,255,.2); white-space:nowrap; }
 .topbar .svet-cas-btn { font:inherit; font-size:11px; color:#fff; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); border-radius:999px; padding:2px 8px; cursor:pointer; }
 .topbar .svet-cas-btn:hover { background:rgba(255,255,255,.22); }
+
+/* ---------- Raid panel (jen PJ; assets/js/raid_panel.js): plovoucí okno s boxy tvorů ---------- */
+.raid-panel { position:fixed; left:auto; top:70px; width:340px; z-index:201; display:flex; flex-direction:column; box-sizing:border-box;
+              background:rgba(24,22,20,.95); color:#f3ece2; border:1px solid rgba(255,255,255,.14); border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.5); }
+.raid-panel.tahne { user-select:none; box-shadow:0 16px 40px rgba(0,0,0,.65); }
+.raid-panel.sbaleno .raid-seznam { display:none; }
+.raid-hlava { display:flex; align-items:center; gap:6px; padding:8px 8px 8px 10px; cursor:move; touch-action:none; }
+.raid-grip-okna { color:#8d8379; font-size:16px; line-height:1; }
+.raid-nadpis { flex:1; min-width:0; display:flex; flex-direction:column; }
+.raid-nadpis strong { font-family:var(--font-heading, serif); font-size:15px; line-height:1.2; }
+.raid-nadpis span { font-size:11px; color:#b9aea0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.raid-btn { background:rgba(255,255,255,.08); color:#e9e0d4; border:1px solid rgba(255,255,255,.16); border-radius:999px; padding:3px 9px; font-size:11px; font-weight:600; cursor:pointer; white-space:nowrap; }
+.raid-btn:hover { background:rgba(255,255,255,.16); }
+.raid-btn.raid-ikona { padding:4px 6px; display:inline-flex; align-items:center; justify-content:center; }
+.raid-seznam { display:flex; flex-direction:column; gap:7px; padding:0 8px 8px; overflow-y:auto; scrollbar-width:thin; min-height:0; }
+.raid-skupina { font-size:11px; letter-spacing:.1em; text-transform:uppercase; font-weight:600; color:#b9aea0; padding:6px 4px 0; display:flex; align-items:center; gap:8px; }
+.raid-skupina::after { content:""; flex:1; height:1px; background:#3a3531; }
+.raid-prazdno { font-size:12px; color:#b9aea0; padding:10px 6px; }
+.raid-znacka { height:3px; border-radius:2px; background:#ffd166; box-shadow:0 0 6px rgba(255,209,102,.7); margin:-3px 14px; flex:none; }
+
+.raid-box { display:flex; align-items:center; gap:8px; box-sizing:border-box; padding:8px 10px 8px 4px; border-radius:12px; border:1.5px solid #3a3531; background:#23201d;
+            cursor:pointer; flex:none; }
+.raid-box:hover, .raid-box.zvyrazneny { background:#37332d; border-color:#ffd166; box-shadow:0 0 0 1px rgba(255,209,102,.5); }
+.raid-box.vybrany { background:#262a38; border-color:#8fb4ff; }
+.raid-box.na-tahu { background:#2c2618; border-color:#ffd166; box-shadow:0 0 0 1px rgba(255,209,102,.35), 0 6px 18px rgba(0,0,0,.5); }
+.raid-box.vyrazen { filter:grayscale(1); opacity:.55; }
+.raid-box.tazeny { opacity:.45; }
+.raid-box.vyrazen .raid-jmeno { text-decoration:line-through; }
+.raid-grip { color:#6e665e; font-size:18px; line-height:1; cursor:grab; flex:none; width:12px; text-align:center; }
+.raid-avatar-obal { position:relative; flex:none; }
+.raid-avatar { box-sizing:border-box; border-radius:50%; border:3px solid #d2694f; display:flex; align-items:center; justify-content:center; color:#fff;
+               font-family:var(--font-heading, serif); font-weight:700; text-shadow:0 1px 2px rgba(0,0,0,.6); background-size:cover; background-position:center; }
+.raid-avatar.hrac { border-color:#6fc3a0; }
+.raid-box.na-tahu .raid-avatar { border-color:#ffd166; }
+.raid-odznaky { position:absolute; top:-5px; right:-8px; display:flex; gap:2px; }
+.raid-odznak { width:18px; height:18px; border-radius:50%; background:#181614; border:1px solid #4a443e; color:#e9e0d4; font-size:10px; display:flex; align-items:center; justify-content:center; }
+.raid-telo { flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; }
+.raid-jmeno-radek { display:flex; flex-direction:column; gap:1px; }
+.raid-jmeno { font-family:var(--font-heading, serif); font-weight:700; font-size:14.5px; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.raid-podtitul { font-size:10.5px; color:#b9aea0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.raid-hp { position:relative; height:14px; border-radius:4px; background:#3a3531; overflow:hidden; }
+.raid-hp-vypln { position:absolute; left:0; top:0; bottom:0; }
+.raid-hp-text { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:10.5px; font-weight:700; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.8); }
+.raid-mag { display:flex; align-items:center; gap:6px; }
+.raid-mag-draha { position:relative; flex:1; height:6px; border-radius:3px; background:#3a3531; overflow:hidden; }
+.raid-mag-vypln { position:absolute; left:0; top:0; bottom:0; background:#4f8fd6; }
+.raid-mag-text { font-size:10px; font-weight:600; color:#9fc4f0; width:44px; text-align:right; }
+.raid-stitky { display:flex; flex-wrap:wrap; gap:4px; }
+.raid-stitek { font-size:10px; font-weight:600; line-height:1; padding:3px 7px; border-radius:999px; background:rgba(255,255,255,.1); color:#e9e0d4; white-space:nowrap; max-width:100%; overflow:hidden; text-overflow:ellipsis; }
+.raid-stitek.warn { background:#4a3a14; color:#f2c66b; }
+.raid-ini { flex:none; width:32px; display:flex; flex-direction:column; align-items:center; gap:1px; }
+.raid-ini-popisek { font-size:9px; letter-spacing:.1em; color:#8d8379; font-weight:600; }
+.raid-ini-cislo { font-size:21px; font-weight:700; line-height:1; color:#d9cfc2; }
+.raid-box.na-tahu .raid-ini-cislo { color:#ffd166; }
+
+/* kompaktní řádek */
+.raid-box.kompakt { height:42px; padding:0 10px 0 4px; gap:7px; border-radius:10px; }
+.raid-box.kompakt .raid-telo { flex:1; }
+.raid-box.kompakt .raid-jmeno { font-size:13.5px; }
+.raid-box.kompakt .raid-hp { flex:none; width:64px; height:11px; }
+.raid-box.kompakt .raid-hp-text { font-size:9px; }
+.raid-box.kompakt .raid-ini { width:22px; }
+.raid-box.kompakt .raid-ini-popisek { display:none; }
+.raid-box.kompakt .raid-ini-cislo { font-size:15px; }
+
+/* zvýraznění tokenu na mapě, když je myš nad jeho boxem */
+.vtt-token.raid-hover .puck { outline:3px solid #ffd166; outline-offset:3px; box-shadow:0 0 22px rgba(255,209,102,.7); }
+#tb-raid.aktivni { background:rgba(255,209,102,.22); }
