@@ -60,7 +60,7 @@ ním čeká, dokud se to neprovede ručně.
 
 **Ruční DDL blok je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný soubor, ve
 kterém jsou všechny dosud neprovedené DDL příkazy; uživatel ho dostává jako
-text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-11-01): čeká blok A+B v tomhle souboru — migrace `0104` (přenos výsledku iniciativy ≤ 0) a `0105` (poznámky světa); ověřeno na kopii produkčního stavu čistě, opakovaně i po částečném provedení a stránka Změny databáze po něm pod DML-only účtem doběhne; kód funguje i bez něj.** Dřívější stav (2026-10-27): nic nečekalo. Blok „Zbraně u sebe“ (`0101`, ALTER) i „Vytasení bez akce“ (`0102`, vkládání řádků; do ručního SQL šel, protože migrace z GitHubu nejely — viz „Deploy po 22. 10. a migrace z administrace“ níž) uživatel provedl, kontroly vyšly 1 a 2, 3, 1. Další migrace s daty se pouští tlačítkem v administraci. Blok „Iniciativa v2“ + „Zbraně a iniciativa“
+text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-11-02): čeká blok A+B+C v tomhle souboru — migrace `0104` (přenos výsledku iniciativy ≤ 0), `0105` (poznámky světa) a `0106` (dveře); ověřeno na kopii produkčního stavu čistě, opakovaně i po částečném provedení a stránka Změny databáze po něm pod DML-only účtem doběhne; kód funguje i bez něj.** Dřívější stav (2026-10-27): nic nečekalo. Blok „Zbraně u sebe“ (`0101`, ALTER) i „Vytasení bez akce“ (`0102`, vkládání řádků; do ručního SQL šel, protože migrace z GitHubu nejely — viz „Deploy po 22. 10. a migrace z administrace“ níž) uživatel provedl, kontroly vyšly 1 a 2, 3, 1. Další migrace s daty se pouští tlačítkem v administraci. Blok „Iniciativa v2“ + „Zbraně a iniciativa“
 uživatel provedl (kontrolní SELECT vyšel 1, 4, 3) po tom, co první „sql proběhlo“ nesedělo — deploy po předčasném přesunu `0093`
 skončil na `1142 ALTER denied`, takže sloupce na serveru nebyly. **Poučení: migraci přesouvat do `database/migrations/` až podle
 čísel z kontrolního SELECTu, ne podle slov.** Migrace `0091`–`0096` jsou v `database/migrations/`: sloupce efektů (`0091`) a data (`0092`),
@@ -1309,18 +1309,19 @@ stavby“ v návrhu.**
     (`includes/vtt_mlha.php`, `dracak_vtt_los_blokovana_zdi` v `includes/vtt.php`).
     Plný polygon („v2“) je zmíněný jen v komentáři v `includes/vtt_mlha.php`;
     v tomhle plánu dosud chyběl. [L]
-25. **Dveře** — zeď s přepínačem otevřeno/zavřeno (měnilo by `blokuje_pohyb`
-    a `blokuje_vystrel`; zmíněno v otevřených otázkách
-    `docs/vtt-datovy-model-navrh-v1.md`). [M]
+25. ✔ **Dveře** (2026-11-02, migrace `0106`, čeká na ruční SQL) — zeď s příznakem `dvere` a stavem `otevrene`; otevřené dveře neblokují pohyb, výhled ani střelu
+    (`dracak_vtt_zdi_bez_otevrenych_dveri` v `includes/vtt.php`, použito v pohybu hráče, LoS i v hexové cestě souboje). Zdi kreslí PJ zaškrtnutím „Dveře“ v nástroji Zeď;
+    klik PJ na dveře (nástroj Výběr) je otevře/zavře (`hra/api/zed_dvere.php`, událost `zed_zmena` — skrytým dveřím se hráčům nic neprozradí). Hráči dveře otevírat nesmí (zatím jen PJ).
+    Zamčené a tajné dveře zatím ne. Test: `tests/e2e/dvere_api.js`. Zbytek bloku E: viz `docs/videni-a-svetlo-navrh.md`.
 26. **Zdroje světla** na mapě (pochodeň, lucerna, kouzlo, slunce) s dosahem. Kniha
     má **Tabulku světel** (h286/b3166: svíčka +1 … sluneční světlo +9), ze které
     se dají odvodit úrovně osvětlení. [L]
 27. **Vidění ve tmě, které se pohybuje s postavou** (nápad uživatele): chová se
     jako mlha války, ale „bublina“ vidění jde s tokenem postavy, která ve tmě
     vidí — rasou nebo kouzlem. V pravidlech: trpasličí **infravidění** (v mlze
-    jen desetinový dosah b5663, vyřazuje ho Dokonalá tma b3601) a lupičovo
+    jen desetinový dosah b1939 — druidova Temnota; vyřazuje ho Dokonalá tma b3601) a lupičovo
     **noční vidění** (potřebuje aspoň trochu světla, v absolutní tmě nepomáhá,
-    h524/b5163). Před stavbou je potřeba z knihy dohledat dosahy v sázích
+    h630/b5663). Před stavbou je potřeba z knihy dohledat dosahy v sázích
     (nehádat). Navazuje na 24 a 26. [L]
 
 **Doporučené pořadí:** nejdřív blok A (1–3, 8), pak krátký zkušební

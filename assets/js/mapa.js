@@ -340,6 +340,14 @@ function renderZdi() {
     else if (!z.blokuje_pohyb && z.blokuje_vystrel) barva = '#3b5f8f';
     const vybrana = z.id === zedVybranaId;
     const sw = Math.max(2, z.sirka_px);
+    if (z.dvere) {
+      // Dveře: zavřené = plná hnědá čára s bílým okrajem, otevřené = tenká přerušovaná (nic neblokují). PJ je přepíná klikem.
+      html += z.otevrene
+        ? '<line x1="' + z.x1 + '" y1="' + z.y1 + '" x2="' + z.x2 + '" y2="' + z.y2 + '" stroke="' + (vybrana ? '#ffd166' : '#a9784a') + '" stroke-width="' + Math.max(2, sw / 2) + '" stroke-linecap="round" stroke-dasharray="3 6" opacity="' + (z.viditelna_hracum ? 0.9 : 0.5) + '"/>'
+        : '<line x1="' + z.x1 + '" y1="' + z.y1 + '" x2="' + z.x2 + '" y2="' + z.y2 + '" stroke="#f4ead8" stroke-width="' + (sw + 3) + '" stroke-linecap="butt" opacity="' + (z.viditelna_hracum ? 0.9 : 0.5) + '"/>'
+          + '<line x1="' + z.x1 + '" y1="' + z.y1 + '" x2="' + z.x2 + '" y2="' + z.y2 + '" stroke="' + (vybrana ? '#ffd166' : '#7a4a1e') + '" stroke-width="' + sw + '" stroke-linecap="butt" opacity="' + (z.viditelna_hracum ? 1 : 0.55) + '"' + (z.viditelna_hracum ? '' : ' stroke-dasharray="4 3"') + '/>';
+      return;
+    }
     html += '<line x1="' + z.x1 + '" y1="' + z.y1 + '" x2="' + z.x2 + '" y2="' + z.y2 + '"'
       + ' stroke="' + (vybrana ? '#ffd166' : barva) + '" stroke-width="' + sw + '" stroke-linecap="round"'
       + ' opacity="' + (z.viditelna_hracum ? 1 : 0.55) + '"'
@@ -2080,7 +2088,21 @@ function ulozPresunSkupiny(skupina, dx, dy) {
 }
 
 // Klik (ne tah) na mapu — nástroje ping / zeď / pin a pokládání tokenu.
+// Dveře: klik PJ na dveře (nástroj Výběr, na prázdném místě) je otevře nebo zavře.
+function prepniDvere(z) {
+  postJson('api/zed_dvere.php', {id: z.id}).then(d => {
+    if (d.error) { logLine('Chyba: ' + d.error); return; }
+    z.otevrene = !!d.otevrene;
+    posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
+    renderZdi();
+  });
+}
+
 function klikNaMapu(m) {
+  if (CFG.jePj && CFG.dvere && currentTool === 'select') {
+    const zed = najdiZedBlizkoBodu(m.x, m.y);
+    if (zed && zed.dvere) { prepniDvere(zed); return; }
+  }
   if (currentTool === 'ping') {
     const x = Math.round(m.x), y = Math.round(m.y);
     postJson('api/ping.php', {svet_id: SVET_ID, mapa_id: MAPA_ID, x, y})
@@ -2741,6 +2763,8 @@ if (zedUlozitBtn) {
     const blokujePohyb = document.getElementById('zedBlokujePohyb').checked;
     const blokujeVystrel = document.getElementById('zedBlokujeVystrel').checked;
     const viditelnaHracum = document.getElementById('zedViditelnaHracum').checked;
+    const dvereChk = document.getElementById('zedDvere');
+    const jeDvere = !!(dvereChk && dvereChk.checked && CFG.dvere);
     const useky = [];
     for (let i = 0; i < zedRozpracovaneBody.length - 1; i++) {
       useky.push([zedRozpracovaneBody[i], zedRozpracovaneBody[i + 1]]);
@@ -2758,12 +2782,12 @@ if (zedUlozitBtn) {
       const [a, b] = useky[i];
       postJson('api/zed_pridat.php', {
         mapa_id: MAPA_ID, x1: a.x, y1: a.y, x2: b.x, y2: b.y,
-        sirka_px: sirkaPx, blokuje_pohyb: blokujePohyb, blokuje_vystrel: blokujeVystrel, viditelna_hracum: viditelnaHracum,
+        sirka_px: sirkaPx, blokuje_pohyb: blokujePohyb, blokuje_vystrel: blokujeVystrel, viditelna_hracum: viditelnaHracum, dvere: jeDvere,
       }).then(d => {
         if (d.error) { logLine('Chyba: ' + d.error); return; }
         zdiList.push({
           id: d.id, x1: a.x, y1: a.y, x2: b.x, y2: b.y, sirka_px: sirkaPx,
-          blokuje_pohyb: blokujePohyb, blokuje_vystrel: blokujeVystrel, viditelna_hracum: viditelnaHracum,
+          blokuje_pohyb: blokujePohyb, blokuje_vystrel: blokujeVystrel, viditelna_hracum: viditelnaHracum, dvere: jeDvere, otevrene: false,
         });
         posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
         renderZdi();
@@ -2921,6 +2945,11 @@ function applyEvent(u) {
     if (u.mapa_id == MAPA_ID && !zdiList.some(z => z.id === u.payload.id)) {
       zdiList.push(u.payload);
       renderZdi();
+    }
+  } else if (u.typ === 'zed_zmena') {
+    if (u.mapa_id == MAPA_ID) {
+      const z = zdiList.find(q => q.id === u.payload.id);
+      if (z) { z.otevrene = !!u.payload.otevrene; renderZdi(); }
     }
   } else if (u.typ === 'zed_smazana') {
     if (u.mapa_id == MAPA_ID) {

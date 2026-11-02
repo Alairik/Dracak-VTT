@@ -15,6 +15,7 @@ $sirkaPx = max(1.0, (float)($data['sirka_px'] ?? 6));
 $blokujePohyb = !empty($data['blokuje_pohyb']) ? 1 : 0;
 $blokujeVystrel = !empty($data['blokuje_vystrel']) ? 1 : 0;
 $viditelnaHracum = !empty($data['viditelna_hracum']) ? 1 : 0;
+$dvere = !empty($data['dvere']) ? 1 : 0;   // jen s migrací 0106; bez ní se ignoruje
 
 $pdo = dracak_db();
 $stmt = $pdo->prepare('SELECT * FROM mapy WHERE id = ?');
@@ -36,11 +37,21 @@ if ($x1 === $x2 && $y1 === $y2) {
     exit;
 }
 
-$ins = $pdo->prepare(
-    'INSERT INTO zdi (mapa_id, x1, y1, x2, y2, sirka_px, blokuje_pohyb, blokuje_vystrel, viditelna_hracum)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
-);
-$ins->execute([$mapaId, $x1, $y1, $x2, $y2, $sirkaPx, $blokujePohyb, $blokujeVystrel, $viditelnaHracum]);
+$maDvere = dracak_vtt_zdi_ma_dvere($pdo);
+$dvere = $maDvere ? $dvere : 0;
+if ($maDvere) {
+    $ins = $pdo->prepare(
+        'INSERT INTO zdi (mapa_id, x1, y1, x2, y2, sirka_px, blokuje_pohyb, blokuje_vystrel, viditelna_hracum, dvere, otevrene)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)'
+    );
+    $ins->execute([$mapaId, $x1, $y1, $x2, $y2, $sirkaPx, $blokujePohyb, $blokujeVystrel, $viditelnaHracum, $dvere]);
+} else {
+    $ins = $pdo->prepare(
+        'INSERT INTO zdi (mapa_id, x1, y1, x2, y2, sirka_px, blokuje_pohyb, blokuje_vystrel, viditelna_hracum)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    );
+    $ins->execute([$mapaId, $x1, $y1, $x2, $y2, $sirkaPx, $blokujePohyb, $blokujeVystrel, $viditelnaHracum]);
+}
 $zedId = (int)$pdo->lastInsertId();
 
 // payload nese i viditelna_hracum — udalosti.php podle něj rozhoduje,
@@ -53,6 +64,8 @@ $eventId = dracak_vtt_log_event((int)$mapa['svet_id'], $mapaId, 'zed_pridana', [
     'blokuje_pohyb' => (bool)$blokujePohyb,
     'blokuje_vystrel' => (bool)$blokujeVystrel,
     'viditelna_hracum' => (bool)$viditelnaHracum,
+    'dvere' => (bool)$dvere,
+    'otevrene' => false,
 ], (int)$user['id']);
 
 echo json_encode(['ok' => true, 'udalost_id' => $eventId, 'id' => $zedId]);

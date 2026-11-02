@@ -163,6 +163,29 @@ function dracak_vtt_useky_se_protinaji(
     return false;
 }
 
+// Dveře (migrace 0106, ruční SQL: zdi.dvere, zdi.otevrene): jsou v DB oba sloupce? Bez nich se zdi chovají jako dosud.
+function dracak_vtt_zdi_ma_dvere(PDO $pdo): bool
+{
+    static $cache = [];
+    $klic = spl_object_id($pdo);
+    if (!isset($cache[$klic])) {
+        try {
+            $cache[$klic] = (int)$pdo->query(
+                'SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = "zdi" AND COLUMN_NAME IN ("dvere", "otevrene")'
+            )->fetchColumn() === 2;
+        } catch (Throwable $e) {
+            $cache[$klic] = false;
+        }
+    }
+    return $cache[$klic];
+}
+
+// Podmínka do SELECTu ze `zdi`: otevřené dveře nic neblokují (ani pohyb, ani výhled, ani střelu).
+function dracak_vtt_zdi_bez_otevrenych_dveri(PDO $pdo): string
+{
+    return dracak_vtt_zdi_ma_dvere($pdo) ? ' AND NOT (dvere = 1 AND otevrene = 1)' : '';
+}
+
 // Blokuje některá zeď (blokuje_pohyb=1) na týhle mapě cestu z bodu A do
 // bodu B? Volá se jen pro roli 'hrac' (viz hra/api/token_presun.php) —
 // PJ/admin token na/přes zeď položit smí (postava odhozená do zdi,
@@ -170,7 +193,7 @@ function dracak_vtt_useky_se_protinaji(
 // úmyslné umístění tokenu).
 function dracak_vtt_pohyb_prochazi_zdi(PDO $pdo, int $mapaId, float $x1, float $y1, float $x2, float $y2): bool
 {
-    $stmt = $pdo->prepare('SELECT x1, y1, x2, y2 FROM zdi WHERE mapa_id = ? AND blokuje_pohyb = 1');
+    $stmt = $pdo->prepare('SELECT x1, y1, x2, y2 FROM zdi WHERE mapa_id = ? AND blokuje_pohyb = 1' . dracak_vtt_zdi_bez_otevrenych_dveri($pdo));
     $stmt->execute([$mapaId]);
     foreach ($stmt->fetchAll() as $z) {
         if (dracak_vtt_useky_se_protinaji(
@@ -211,7 +234,7 @@ function dracak_vtt_px_na_sah(array $mapa): ?float
 // docs/vtt-datovy-model-navrh-v1.md, "Rozhodnutí, která už platí").
 function dracak_vtt_los_blokovana_zdi(PDO $pdo, int $mapaId, float $x1, float $y1, float $x2, float $y2): bool
 {
-    $stmt = $pdo->prepare('SELECT x1, y1, x2, y2 FROM zdi WHERE mapa_id = ? AND blokuje_vystrel = 1');
+    $stmt = $pdo->prepare('SELECT x1, y1, x2, y2 FROM zdi WHERE mapa_id = ? AND blokuje_vystrel = 1' . dracak_vtt_zdi_bez_otevrenych_dveri($pdo));
     $stmt->execute([$mapaId]);
     foreach ($stmt->fetchAll() as $z) {
         if (dracak_vtt_useky_se_protinaji(

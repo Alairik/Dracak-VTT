@@ -1,12 +1,14 @@
 -- Dračák VTT — SQL k ručnímu spuštění (phpMyAdmin, admin účet, vybraná databáze Dračáku — TA SAMÁ, kterou používá web).
 --
--- Dva bloky v jednom, jde spustit celé najednou:
+-- Tři bloky v jednom, jde spustit celé najednou:
 --  A) Přenos výsledku iniciativy 0 a méně do dalšího kola (migrace 0104): tvor, který skončí na 0 a méně, si v dalším kole znovu
 --     hodí, ale místo obvyklých postihů použije výsledek z minulého kola (h1622 b10805).
 --  B) Poznámky světa (migrace 0105): štítek (Úkol / NPC / Kořist / Příběh / Místo), vazba na postavu nebo NPC, čas úpravy,
 --     a tabulka „přečteno“ pro odznak nepřečtených poznámek.
+--  C) Dveře (migrace 0106): zeď, kterou jde otevřít a zavřít (otevřené dveře neblokují pohyb, výhled ani střelu).
 -- Samé přidávání sloupců a jedné tabulky — nic se nemění ani nemaže; jde spustit opakovaně a v libovolném stavu databáze.
--- Bez tohoto SQL zůstává iniciativa a poznámky jako dosud (nic se nepřenáší, poznámky jen s textem, místem a sdílením).
+-- Bez tohoto SQL zůstává iniciativa, poznámky i zdi jako dosud (nic se nepřenáší, poznámky jen s textem, místem a sdílením, dveře
+-- se v nabídce zdí nezobrazují).
 --
 -- Sem se zapisují jen příkazy, které migrate.php pod DML-only účtem neumí (CREATE, ALTER, DROP…).
 -- Každý blok musí jít spustit opakovaně a v libovolném stavu DB (kontrola přes information_schema
@@ -76,7 +78,25 @@ CREATE TABLE IF NOT EXISTS svet_poznamka_precteno (
     CONSTRAINT fk_precteno_ucet FOREIGN KEY (ucet_id) REFERENCES ucty (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Kontrola — očekávané hodnoty: 1, 3, 1, 1, 1
+-- C1) Zeď: je to dveře? (0 = obyčejná zeď)
+SET @s = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE zdi
+     ADD COLUMN dvere TINYINT(1) NOT NULL DEFAULT 0 COMMENT ''1 = dveře (zeď, kterou jde otevřít a zavřít)''',
+  'DO 0')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'zdi' AND COLUMN_NAME = 'dvere');
+PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
+
+-- C2) Dveře: jsou otevřené? (otevřené neblokují pohyb, výhled ani střelu)
+SET @s = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE zdi
+     ADD COLUMN otevrene TINYINT(1) NOT NULL DEFAULT 0 COMMENT ''1 = dveře jsou otevřené (neblokují pohyb, výhled ani střelu)''',
+  'DO 0')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'zdi' AND COLUMN_NAME = 'otevrene');
+PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
+
+-- Kontrola — očekávané hodnoty: 1, 3, 1, 1, 1, 2
 SELECT
   (SELECT COUNT(*) FROM information_schema.COLUMNS
     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'kolo_ucastnik' AND COLUMN_NAME = 'ini_prenos') AS ini_prenos,
@@ -87,4 +107,6 @@ SELECT
   (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'svet_poznamky' AND CONSTRAINT_NAME = 'fk_svet_poznamky_postava') AS cizi_klic,
   (SELECT COUNT(*) FROM information_schema.TABLES
-    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'svet_poznamka_precteno') AS tabulka_precteno;
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'svet_poznamka_precteno') AS tabulka_precteno,
+  (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'zdi' AND COLUMN_NAME IN ('dvere', 'otevrene')) AS sloupce_dveri;

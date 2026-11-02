@@ -43,7 +43,7 @@ if (!$isPjOrAdmin) {
             // Skrytá kresba (jen pro PJ) neputuje hráčům; autor ji vidí sám.
             return !empty($u['payload']['viditelne_hracum']) || (int)($u['payload']['ucet_id'] ?? 0) === (int)$user['id'];
         }
-        if ($u['typ'] !== 'zed_pridana') {
+        if ($u['typ'] !== 'zed_pridana' && $u['typ'] !== 'zed_zmena') {
             return true;
         }
         return !empty($u['payload']['viditelna_hracum']);

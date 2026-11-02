@@ -124,7 +124,7 @@ function dracak_vtt_souboj_pohyb(PDO $pdo, array $mapa, array $token, array $inf
         // Zdi hráčům do cesty nevstoupí (PJ smí všude, jako při tažení).
         $zedFn = null;
         if (!$jePj) {
-            $q = $pdo->prepare('SELECT x1, y1, x2, y2 FROM zdi WHERE mapa_id = ? AND blokuje_pohyb = 1');
+            $q = $pdo->prepare('SELECT x1, y1, x2, y2 FROM zdi WHERE mapa_id = ? AND blokuje_pohyb = 1' . dracak_vtt_zdi_bez_otevrenych_dveri($pdo));
             $q->execute([$mapaId]);
             $zdi = $q->fetchAll();
             $pamet = [];

@@ -25,8 +25,9 @@ $stav = dracak_vtt_mapa_stav(dracak_db(), $user, $mapa, $isPjOrAdmin);
 // Zdi (LoS/pohyb) — skrytá (viditelna_hracum=0) smí vidět jen PJ/admin,
 // stejný filtr jako u tokenů výš. udalosti.php stejnou podmínku vynucuje
 // i pro realtime polling, ať skrytá zeď neprosákne hráčům ani tudy.
+$zdiDvere = dracak_vtt_zdi_ma_dvere(dracak_db());
 $stmt = dracak_db()->prepare(
-    'SELECT id, x1, y1, x2, y2, sirka_px, blokuje_pohyb, blokuje_vystrel, viditelna_hracum FROM zdi WHERE mapa_id = ?'
+    'SELECT id, x1, y1, x2, y2, sirka_px, blokuje_pohyb, blokuje_vystrel, viditelna_hracum' . ($zdiDvere ? ', dvere, otevrene' : '') . ' FROM zdi WHERE mapa_id = ?'
 );
 $stmt->execute([$mapaId]);
 $zdi = $stmt->fetchAll();
@@ -42,6 +43,8 @@ foreach ($zdi as &$z) {
     $z['blokuje_pohyb'] = (bool)$z['blokuje_pohyb'];
     $z['blokuje_vystrel'] = (bool)$z['blokuje_vystrel'];
     $z['viditelna_hracum'] = (bool)$z['viditelna_hracum'];
+    $z['dvere'] = $zdiDvere && !empty($z['dvere']);
+    $z['otevrene'] = $zdiDvere && !empty($z['otevrene']);
 }
 unset($z);
 
@@ -331,6 +334,11 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
     <label style="display:flex;align-items:center;gap:6px;font-weight:400;">
       <input type="checkbox" id="zedViditelnaHracum" checked> Viditelná hráčům
     </label>
+    <?php if ($zdiDvere): ?>
+    <label style="display:flex;align-items:center;gap:6px;font-weight:400;">
+      <input type="checkbox" id="zedDvere"> Dveře (jdou otevřít a zavřít)
+    </label>
+    <?php endif; ?>
     <label style="display:flex;align-items:center;gap:6px;font-weight:400;">
       <input type="checkbox" id="zedSnap" checked> Přichytávat ke gridu
     </label>
@@ -766,6 +774,7 @@ window.MAPA = <?= json_encode([
         'offY' => (int)($mapa['grid_posun_y'] ?? 0),
     ],
     'zdi' => array_values($zdi),
+    'dvere' => $zdiDvere,
     'piny' => array_values($mapaBody),
     'svetPostavy' => $svetPostavyKorist,
     'denikPostavy' => $denikPostavy,
