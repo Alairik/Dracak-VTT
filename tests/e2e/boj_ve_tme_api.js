@@ -114,6 +114,19 @@ const stav = (page) => page.evaluate(async (m) => (await fetch('api/mapa_stav.ph
   await api(pj, 'token_uprava', { token_id: sindor, zmeny: { svetlo: null } });
   ok(cli(sindor, gob) === "'nevidi'", 'bez světla: hráč goblina nevidí (nevidi)');
   ok(cli(gob, sindor) === 'NULL', 'goblin jako pozorovatel: nestvůra nemá automatický postih, rozhoduje PJ');
+  // --- lupič s nočním viděním (b5663): v noci −2 místo −5, v absolutní tmě ani v kouzelné tmě nepomáhá ---
+  sql(`update tokeny set x=${stred(21, 10).x}, y=${stred(21, 10).y} where id=${gob}; update tokeny set videni_noc_sahy=1 where id=${sindor}`);   // goblin 8 hexů daleko, mimo dosah 1 sáhu
+  ok(cli(sindor, gob) === "'nevidi'", 'v úplné tmě noční vidění nepomáhá: −5 (nevidi)');
+  sql(`update mapy set osvetleni='noc' where id=${MAPA}`);
+  ok(cli(sindor, gob) === "'nocni'", 'v noci lupič cíl mimo dosah nevidí, ale bojuje s postihem −2 (nocni)');
+  sql(`update tokeny set videni_noc_sahy=60 where id=${sindor}`);
+  ok(cli(sindor, gob) === 'NULL', 'v noci cíl v dosahu nočního vidění lupič vidí: žádný postih');
+  const zonaId = (await api(pj, 'token_pridat', { mapa_id: MAPA, typ_entity: 'obecny', nazev: 'Tma', x: stred(21, 10).x, y: stred(21, 10).y })).token_id;
+  await api(pj, 'token_uprava', { token_id: zonaId, zmeny: { svetlo: 3, svetlo_typ: 'tma', viditelny: false } });
+  ok(cli(sindor, gob) === "'nevidi'", 'cíl uvnitř kouzelné tmy (Tma) lupič nevidí a noční vidění mu nepomáhá: −5');
+  await api(pj, 'token_smazat', { token_id: zonaId, mapa_id: MAPA });
+  sql(`update tokeny set videni_noc_sahy=NULL where id=${sindor}`);
+  ok(cli(sindor, gob) === "'nevidi'", 'bez nočního vidění je v noci postih −5');
   sql(`update mapy set osvetleni='den' where id=${MAPA}`);
   ok(cli(sindor, gob) === 'NULL', 'na mapě „Světlo“ se nic nezjišťuje');
 

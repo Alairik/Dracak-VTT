@@ -20,7 +20,7 @@ neodhadování mechaniky). **Fáze 1 a 2 ze sekce "Rozpracováno:
 cestování..." jsou v kódu hotové**; **Fáze 1b (váha/kontejnery) je
 hotová v kódu, stejně jako Fáze 2–5 (zvířata, povozy, kalkulačka cesty,
 přepínače) — celé "cestování, naložení, únava" je tím hotové a nasazené,
-žádné ruční SQL nečeká.** Další velký cíl je sekce "Plán: náhrada Owlbear
+ruční SQL čeká jen blok E (noční vidění, migrace `0108`, viz níž).** Další velký cíl je sekce "Plán: náhrada Owlbear
 Rodeo" níž. Stav předchozí
 konverzace je zapsaný přesně proto, aby ses nemusel/a ptát na věci, co
 už byly rozhodnuté (viz "Architektonická rozhodnutí" a celá sekce
@@ -38,7 +38,7 @@ na DB postavené od nuly. Co lze dělat **bez** ptaní (vždy s testy, `tests/ru
   - *Plán náhrady Owlbear — blok B:* (9) dosah pohybu z pohyblivosti postavy po naložení a únavě (v boji se pohybuje po hexech podle akcí, takže jde hlavně o mapu mimo boj); (12) čitelné stavy na tokenu (pruh životů, ikony efektů, únava/přetížení).
   - *Blok C — svět a cesta:* (14) pochod po mapě světa s měřítkem a trasou → kalkulačka cesty → čas a únava postavám [L]; (15) přechod mezi lokacemi: pin „Vstoupit“ přenese družinu na cílovou mapu [M]; (16) knihovna map (duplikace, pořadí scén); (17) hodiny světa propojené s cestou, odpočinkem a spánkem.
   - *Blok D:* (22) tablet a telefon na skutečném zařízení a (23) zkušební hra podle `docs/zkusebni-scenar-prvni-hra.md` — čeká na uživatele.
-  - *Blok E — vidění a světlo:* základ je hotový (dveře, světlo, tma, infravidění). Zbývá: **zamčené a tajné dveře** (uživatel je bude potřebovat později), hladký polygonový stín místo buněk, zóny kouzel Tma a Temnota, automatická ztráta iniciativy ve tmě, hoření světel v čase, noční vidění lupiče, hráčem otevíratelné dveře (zatím jen PJ).
+  - *Blok E — vidění a světlo:* základ je hotový (dveře, světlo, tma, infravidění). Zbývá: **zamčené a tajné dveře** (uživatel je bude potřebovat později), hladký polygonový stín místo buněk, automatická ztráta iniciativy ve tmě, hoření světel v čase, další stavy osvětlení (pološero, soumrak — viz níže), Lovcův Příkrov stínů, hráčem otevíratelné dveře (zatím jen PJ). Hotové: zóny Tma a Temnota, stav mapy „Noc“ a noční vidění.
   - *Boj:* „obrana a krok“ (kniha neříká, kdy se krok udělá — potřebuje rozhodnutí), útok na neviditelného nebo kouzlícího tvora, čtyřstupňová škála hodu na dovednost (fatální neúspěch / totální úspěch — v přepisu knihy chybí, potřeba foto).
   - *Nestvůry:* deník nestvůry **před bojem** (zadání uživatele 2026-10-20; design navrhne uživatel), kořist, výbava z katalogu s dopočtem ÚČ/OČ ze zbraně a zbroje, inteligence/charisma/pohyblivost/vytrvalost jako hratelná data, kouzla nestvůr, automatický bonus k iniciativě podle „N× za kolo“.
   - *Cestování:* jezdecká zvířata jen 7 z asi 40 řádků tabulky h2057 (potřebuje rozhodnutí, jak značit letecké a pozemní varianty a co znamená sloupec „Ujede“); povozy bez nehod (hod kočího), dovednosti Kočí, otevřených kočárů a více povozů v jedné cestě; vnořené kontejnery; povoz není trvalá entita.
@@ -60,7 +60,7 @@ ním čeká, dokud se to neprovede ručně.
 
 **Ruční DDL blok je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný soubor, ve
 kterém jsou všechny dosud neprovedené DDL příkazy; uživatel ho dostává jako
-text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-11-02): nic nečeká. Bloky A–D (migrace `0104` přenos výsledku iniciativy ≤ 0, `0105` poznámky světa, `0106` dveře, `0107` vidění a světlo) uživatel provedl, kontrola vyšla 1, 3, 1, 1, 1, 2, 5; ověřeno na kopii produkčního stavu čistě, opakovaně i po částečném provedení a stránka Změny databáze po něm pod DML-only účtem doběhne; kód funguje i bez něj.** Dřívější stav (2026-10-27): nic nečekalo. Blok „Zbraně u sebe“ (`0101`, ALTER) i „Vytasení bez akce“ (`0102`, vkládání řádků; do ručního SQL šel, protože migrace z GitHubu nejely — viz „Deploy po 22. 10. a migrace z administrace“ níž) uživatel provedl, kontroly vyšly 1 a 2, 3, 1. Další migrace s daty se pouští tlačítkem v administraci. Blok „Iniciativa v2“ + „Zbraně a iniciativa“
+text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-11-02): čeká blok E — noční vidění (migrace `0108`, jediný `ALTER TABLE tokeny ADD COLUMN videni_noc_sahy`; ověřeno na kopii produkčního stavu: bez něj stránka Změny databáze správně řekne, že potřebuje ruční SQL, blok jde spustit opakovaně a po něm stránka 0108 pod DML-only účtem přeskočí a zapíše; kód funguje i bez něj, jen se u tokenu nenabízí řádek Noční vidění). Dřívější stav: nic nečekalo. Bloky A–D (migrace `0104` přenos výsledku iniciativy ≤ 0, `0105` poznámky světa, `0106` dveře, `0107` vidění a světlo) uživatel provedl, kontrola vyšla 1, 3, 1, 1, 1, 2, 5; ověřeno na kopii produkčního stavu čistě, opakovaně i po částečném provedení a stránka Změny databáze po něm pod DML-only účtem doběhne; kód funguje i bez něj.** Dřívější stav (2026-10-27): nic nečekalo. Blok „Zbraně u sebe“ (`0101`, ALTER) i „Vytasení bez akce“ (`0102`, vkládání řádků; do ručního SQL šel, protože migrace z GitHubu nejely — viz „Deploy po 22. 10. a migrace z administrace“ níž) uživatel provedl, kontroly vyšly 1 a 2, 3, 1. Další migrace s daty se pouští tlačítkem v administraci. Blok „Iniciativa v2“ + „Zbraně a iniciativa“
 uživatel provedl (kontrolní SELECT vyšel 1, 4, 3) po tom, co první „sql proběhlo“ nesedělo — deploy po předčasném přesunu `0093`
 skončil na `1142 ALTER denied`, takže sloupce na serveru nebyly. **Poučení: migraci přesouvat do `database/migrations/` až podle
 čísel z kontrolního SELECTu, ne podle slov.** Migrace `0091`–`0096` jsou v `database/migrations/`: sloupce efektů (`0091`) a data (`0092`),
@@ -1313,7 +1313,7 @@ stavby“ v návrhu.**
     hůl jako pochodeň / lucerna, vlastní dosah 0,5–60 sáhů; zóny Tma a Temnota viz níže); pochodeň na zdi = obecný token se světlem (může být skrytý). Čísla z knihy (h1685 b11183–b11185, b4601). Kouzlo Světlo (2 magy za sáh)
     zatím jen ručně jako vlastní dosah. PJ vidí na mapě přerušovaný kruh dosahu každého světla. [L]
 27. ✔ (2026-11-02) **Vidění ve tmě, které se pohybuje s postavou** — infravidění (`tokeny.videni_infra_sahy`, PJ nastaví: trpaslík 20, lovec 50) ukáže tvory s teplou krví v dosahu a na přímý výhled
-    (ne mapu, ne zdí; `studeny` je vynechá). **Noční vidění lupiče zatím ne** — kniha nemá dosah při slabém světle, čeká na rozhodnutí uživatele (viz `docs/videni-a-svetlo-navrh.md`). [L]
+    (ne mapu, ne zdí; `studeny` je vynechá). **Noční vidění: viz „Stav mapy Noc a noční vidění“ níž.** [L]
 
 *Vidění a světlo — stav (2026-11-02, rozhodnutí uživatele: „ve tmě vidí hráč jen to, co právě osvětlí družina“):* mapa má **Osvětlení: Světlo / Tma** (popover „Mlha války“, jen PJ; výchozí
 Světlo = dosavadní chování beze změny). Na mapě **Tma** (a se zapnutou mlhou a gridem) server (`includes/vtt_videni.php`) počítá po buňkách: osvětlené buňky (v dosahu světla, volný paprsek) ∩ buňky, kam
@@ -1331,7 +1331,14 @@ jen na 30 coulů = 0,3 sáhu (b1938; 1 sáh = 100 coulů, `content/pravidla-hrac
 nebo cíl (b1939). Zóna sama nesvítí. Test: `tests/e2e/zony_tmy_api.js`. **Neřešíme (rozhodnutí PJ):** zákaz ohnivých a světelných kouzel v Temnotě (b1938), úvaha o tom, že Tma by měla stínit i paprsky
 procházející zónou (zóna působí jen na buňky a zdroje uvnitř), Tma za 6 magů — „šero jako od malé pochodně, infravidění funguje“ (b3601): kniha dosah malé pochodně nemá, proto se zóna nezakládá a PJ
 dá na střed obyčejné světlo s vlastním dosahem. Lovcův **Příkrov stínů** (h1003 b7357–b7359, 5 magů za 60 sáhů, uhasí zdroje světla, Lovec v něm vidí) zatím není — vyžaduje výjimku „vidí ten, kdo ji vyvolal“.
-Úplně zbývá: **hoření pochodní a lampy v čase** (3 směny / 24 směn — čeká na „hodiny světa“), **noční vidění lupiče**, sdílené vidění družiny mezi hráči (dnes každý hráč vidí svými tokeny a světla družiny
+**Stav mapy „Noc“ a noční vidění (2026-11-02, rozhodnutí uživatele: „stav noc chci, klidně až 5 stavů tmy/světla“; ruční SQL: migrace `0108`, sloupec `tokeny.videni_noc_sahy`):**
+osvětlení mapy má tři stavy v konstantě `DRACAK_VTT_OSVETLENI` (`includes/vtt_videni.php`): **den** (dosavadní mlha), **noc** (nepatrné světlo, např. měsíc v úplňku, h286 b3166) a **tma** (absolutní tma).
+V noci i ve tmě hráč vidí jen osvětlené místo; v noci navíc **tvor s nočním viděním** (PJ mu v panelu tokenu zadá dosah v sázích — kniha číslo nemá) vidí všechny buňky do dosahu, kam vede volný paprsek
+(ne přes zeď a zavřené dveře). **Ve tmě noční vidění nepomáhá** (h630 b5663: „s absolutní tmou v podzemí či v kouzlem vytvořené tmě mu noční vidění nepomáhá“) a nepomáhá ani uvnitř zón Tma a Temnota (zevnitř
+ani dovnitř). Boj: lupič (hráčova postava) s nočním viděním má v noci proti cíli, kterého nevidí, postih **−2** místo −5 (`'nocni'` v `dracak_vtt_videni_tma_volba`), cíl v dosahu nočního vidění vidí
+(žádný postih). Test: `tests/e2e/noc_videni_api.js` + rozšířený `boj_ve_tme_api.js`. **Další stavy (pološero +6, soumrak/úsvit +7, úplněk +5 z tabulky b3166) zatím nejsou:** kniha pro ně nemá vzdálenosti
+a nic neříká o tom, co mění, takže by to byly jen popisky — přidají se jako řádek v `DRACAK_VTT_OSVETLENI`, až bude jasné, co který stav dělá (např. „všichni vidí do X sáhů bez světla“).
+Úplně zbývá: **hoření pochodní a lampy v čase** (3 směny / 24 směn — čeká na „hodiny světa“), sdílené vidění družiny mezi hráči (dnes každý hráč vidí svými tokeny a světla družiny
 osvětlují všem), souboj panel (pořadí iniciativy) skrytou nestvůru ve tmě pořád ukáže, pokud ji PJ označil jako viditelnou.
 
 **Doporučené pořadí:** nejdřív blok A (1–3, 8), pak krátký zkušební

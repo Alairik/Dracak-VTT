@@ -29,6 +29,15 @@ const DRACAK_VTT_SVETLO_PREDVOLBY = [
     'hul_lucerna' => ['Čarodějova hůl (jako lucerna)', 8.0],
 ];
 
+// Stavy osvětlení mapy (mapy.osvetleni, VARCHAR(8)): klíč => [název, živé vidění?]. Živé vidění (hráč vidí jen osvětlené místo) mají „noc“ a „tma“; „den“ je dosavadní mlha války.
+// „noc“ = nepatrné světlo (kniha: měsíc v úplňku, h286 b3166): bez zdroje světla nevidí nikdo kromě tvorů s nočním viděním (lupič se Zlepšením zraku, h630 b5663),
+// „tma“ = absolutní tma (podzemí): noční vidění nepomáhá. Další stavy (pološero, soumrak…) sem přibudou jako další řádek, až bude jasné, co mění — kniha pro ně nemá vzdálenosti.
+const DRACAK_VTT_OSVETLENI = [
+    'den' => ['Světlo', false],
+    'noc' => ['Noc', true],
+    'tma' => ['Tma', true],
+];
+
 // Zóny tmy (kouzla) — token se svetlo_typ 'tma' nebo 'temnota' NENÍ zdroj světla, ale kruh o poloměru svetlo_sahy (sáhů), který světlo a infravidění potlačuje.
 // Bez nových sloupců (žádné ruční SQL): typ i poloměr se drží ve stejných dvou sloupcích jako světlo, jen se v dracak_vtt_videni_zdroje() vynechávají.
 //   'tma'     — Tma (Obscurum, h318 b3600–b3601): 4 magy za sáh poloměru, dokonalá tma. Uvnitř nic nesvítí (zdroj světla uvnitř nesvítí vůbec)
@@ -68,6 +77,23 @@ function dracak_vtt_videni_funkce(PDO $pdo): bool
     return $cache[$klic];
 }
 
+// Je v DB sloupec nočního vidění (migrace 0108)? Bez něj stav „noc“ funguje jako „tma“ a noční vidění tvorů se nepočítá.
+function dracak_vtt_videni_noc_funkce(PDO $pdo): bool
+{
+    static $cache = [];
+    $klic = spl_object_id($pdo);
+    if (!isset($cache[$klic])) {
+        try {
+            $cache[$klic] = (int)$pdo->query(
+                'SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = "tokeny" AND COLUMN_NAME = "videni_noc_sahy"'
+            )->fetchColumn() === 1;
+        } catch (Throwable $e) {
+            $cache[$klic] = false;
+        }
+    }
+    return $cache[$klic];
+}
+
 function dracak_vtt_videni_mapa(PDO $pdo, int $mapaId): ?array
 {
     $q = $pdo->prepare('SELECT * FROM mapy WHERE id = ?');
@@ -75,11 +101,11 @@ function dracak_vtt_videni_mapa(PDO $pdo, int $mapaId): ?array
     return $q->fetch() ?: null;
 }
 
-// Platí na téhle mapě živé vidění? Jen mapa „Tma“ se zapnutou mlhou a s mřížkou (bez ní nejsou buňky, podle kterých se vidění počítá).
+// Platí na téhle mapě živé vidění? Jen mapa „Noc“ nebo „Tma“ se zapnutou mlhou a s mřížkou (bez ní nejsou buňky, podle kterých se vidění počítá).
 function dracak_vtt_videni_aktivni(PDO $pdo, array $mapa): bool
 {
     return dracak_vtt_videni_funkce($pdo)
-        && ($mapa['osvetleni'] ?? 'den') === 'tma'
+        && (DRACAK_VTT_OSVETLENI[$mapa['osvetleni'] ?? 'den'][1] ?? false)
         && !empty($mapa['mlha_aktivni'])
         && (int)($mapa['grid_velikost_px'] ?? 0) > 0
         && (int)($mapa['sirka_px'] ?? 0) > 0
@@ -156,7 +182,7 @@ function dracak_vtt_videni_v_zone(array $zony, float $x, float $y, string $typ):
 function dracak_vtt_videni_divaci(PDO $pdo, int $mapaId, int $ucetId): array
 {
     $q = $pdo->prepare(
-        'SELECT t.id, t.x, t.y, t.videni_infra_sahy FROM tokeny t
+        'SELECT t.id, t.x, t.y, t.videni_infra_sahy' . (dracak_vtt_videni_noc_funkce($pdo) ? ', t.videni_noc_sahy' : '') . ' FROM tokeny t
          JOIN postavy p ON p.id = t.entita_id AND t.typ_entity = "postava"
          WHERE t.mapa_id = ? AND p.vlastnik_ucet_id = ?'
     );
@@ -234,6 +260,24 @@ function dracak_vtt_videni_vypocet(PDO $pdo, array $mapa, int $ucetId): ?array
             }
             if (!dracak_vtt_videni_blokovano($zdi, $dx, $dy, $bx, $by)) {
                 $videno[$idx] = "\x01";
+            }
+        }
+        // Noční vidění (jen mapa „Noc“): tvor vidí všechny buňky do svého dosahu, kam vede volný paprsek, i bez světla. Uvnitř kouzelné tmy (Tma, Temnota) nepomáhá
+        // ani zevnitř, ani dovnitř (b5663: „v kouzlem vytvořené tmě mu noční vidění nepomáhá“).
+        $nocDosah = ($mapa['osvetleni'] ?? 'den') === 'noc' ? (int)($d['videni_noc_sahy'] ?? 0) : 0;
+        if ($nocDosah > 0 && !dracak_vtt_videni_v_zone($zony, $dx, $dy, 'tma') && !dracak_vtt_videni_v_zone($zony, $dx, $dy, 'temnota')) {
+            $r = $nocDosah * $pxSah;
+            foreach (dracak_vtt_mlha_bunky_v_obdelniku($roz, $dx - $r, $dy - $r, $dx + $r, $dy + $r) as $b) {
+                $idx = dracak_vtt_mlha_bunka_idx($roz, $b['row'], $b['col']);
+                if ($idx === null || $videno[$idx] === "\x01" || hypot($b['x'] - $dx, $b['y'] - $dy) > $r) {
+                    continue;
+                }
+                if ($zony && (dracak_vtt_videni_v_zone($zony, $b['x'], $b['y'], 'tma') || dracak_vtt_videni_v_zone($zony, $b['x'], $b['y'], 'temnota'))) {
+                    continue;
+                }
+                if (!dracak_vtt_videni_blokovano($zdi, $dx, $dy, $b['x'], $b['y'])) {
+                    $videno[$idx] = "\x01";
+                }
             }
         }
     }
@@ -330,7 +374,7 @@ function dracak_vtt_videni_skryte_tokeny(PDO $pdo, array $mapa, int $ucetId): ar
     return $skryte;
 }
 
-// Nevidí ve tmě pozorovatel (token) cíl (token)? Vrací 'nevidi' (výchozí postih −5), nebo null — vidí, nebo se to nedá zjistit.
+// Nevidí ve tmě pozorovatel (token) cíl (token)? Vrací 'nevidi' (výchozí postih −5), 'nocni' (−2, lupič s nočním viděním v noci), nebo null — vidí, nebo se to nedá zjistit.
 // Automaticky se počítá jen za postavy hráčů (vidí jejich účtem, tedy světlem družiny a infraviděním); za nestvůry a NPC rozhoduje PJ v okně výzvy
 // (kniha neříká, kdo z nestvůr vidí ve tmě). Na mapě „Světlo“ se nic nezjišťuje.
 function dracak_vtt_videni_tma_volba(PDO $pdo, array $mapa, int $pozorovatelTokenId, int $cilTokenId): ?string
@@ -363,5 +407,20 @@ function dracak_vtt_videni_tma_volba(PDO $pdo, array $mapa, int $pozorovatelToke
     }
     $cil = $radky[$cilTokenId];
     $cil['druzina'] = $cil['typ_entity'] === 'postava' && (int)($cil['vlastnik_ucet_id'] ?? 0) > 0 && (int)$cil['vlastnik_ucet_id'] !== $pj;
-    return dracak_vtt_videni_token_viden($v, $cil) ? null : 'nevidi';
+    if (dracak_vtt_videni_token_viden($v, $cil)) {
+        return null;
+    }
+    // Lupič s nočním viděním (b5663) bojuje ve tmě s postihem −2 místo −5 a ví, kde protivník stojí — ale jen v „noci“; v absolutní tmě ani v kouzelné tmě mu zrak nepomáhá.
+    if (($plna['osvetleni'] ?? 'den') === 'noc') {
+        foreach ($v['divaci'] as $d) {
+            if ((int)$d['id'] === $pozorovatelTokenId && (int)($d['videni_noc_sahy'] ?? 0) > 0
+                && !dracak_vtt_videni_v_zone($v['zony'], (float)$pozorovatel['x'], (float)$pozorovatel['y'], 'tma')
+                && !dracak_vtt_videni_v_zone($v['zony'], (float)$pozorovatel['x'], (float)$pozorovatel['y'], 'temnota')
+                && !dracak_vtt_videni_v_zone($v['zony'], (float)$cil['x'], (float)$cil['y'], 'tma')
+                && !dracak_vtt_videni_v_zone($v['zony'], (float)$cil['x'], (float)$cil['y'], 'temnota')) {
+                return 'nocni';
+            }
+        }
+    }
+    return 'nevidi';
 }

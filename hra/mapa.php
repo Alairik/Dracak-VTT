@@ -470,9 +470,10 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
     <label for="mapaOsvetleni" style="margin-top:10px;">Osvětlení mapy</label>
     <select class="input" id="mapaOsvetleni">
       <option value="den" <?= ($mapa['osvetleni'] ?? 'den') === 'den' ? 'selected' : '' ?>>Světlo (mlha jako dosud)</option>
-      <option value="tma" <?= ($mapa['osvetleni'] ?? 'den') === 'tma' ? 'selected' : '' ?>>Tma (hráči vidí jen osvětlené místo)</option>
+      <option value="noc" <?= ($mapa['osvetleni'] ?? 'den') === 'noc' ? 'selected' : '' ?>>Noc (nepatrné světlo, vidí jen tvorové s nočním viděním)</option>
+      <option value="tma" <?= ($mapa['osvetleni'] ?? 'den') === 'tma' ? 'selected' : '' ?>>Tma (úplná tma, vidí jen osvětlené místo)</option>
     </select>
-    <p class="note" style="margin-top:4px;">Ve tmě hráč vidí jen to, co osvítí pochodeň, lucerna nebo jiný zdroj světla (nastavíš u tokenu). Kudy prošel, zůstane ztlumeně; nestvůry mimo dohled nevidí. Funguje při zapnuté mlze a nastaveném gridu.</p>
+    <p class="note" style="margin-top:4px;">V noci i ve tmě hráč vidí jen to, co osvítí pochodeň, lucerna nebo jiný zdroj světla (nastavíš u tokenu). V noci navíc vidí do nastaveného dosahu tvorové s nočním viděním (např. lupič se Zlepšením zraku) — ve tmě ne (absolutní tma jim nepomáhá). Kudy prošel, zůstane ztlumeně; nestvůry mimo dohled nevidí. Funguje při zapnuté mlze a nastaveném gridu.</p>
     <?php endif; ?>
     <p class="note" style="margin-top:4px;">Vypnuté = hráči vidí celou mapu bez odhalování, stejně jako ty. Mlha vyžaduje nastavený grid (respektuje jeho buňky/hexy) — bez gridu nejde zapnout.</p>
     <div style="display:flex;gap:6px;margin-top:10px;">
@@ -618,6 +619,10 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
         <label for="vzhledInfra">Infravidění (sáhů; prázdné = nemá)</label>
         <input class="input" type="number" id="vzhledInfra" min="1" max="200" step="1" placeholder="např. 20" style="width:6rem;">
         <label class="vz-check"><input type="checkbox" id="vzhledStudeny"> Studenokrevný (infravidění ho nevidí)</label>
+      </div>
+      <div id="vzhledNocRadek" class="vz-radek" style="display:none;">
+        <label for="vzhledNoc">Noční vidění (sáhů; prázdné = nemá)</label>
+        <input class="input" type="number" id="vzhledNoc" min="1" max="200" step="1" placeholder="dosah" style="width:6rem;">
       </div>
     </div>
 

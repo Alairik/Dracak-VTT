@@ -817,7 +817,9 @@ if (mapaOsvetleniSel) {
       if (d.error) { logLine('Chyba: ' + d.error); mapaOsvetleniSel.value = CFG.osvetleni || 'den'; return; }
       CFG.osvetleni = d.osvetleni;
       posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
-      logLine(d.osvetleni === 'tma' ? 'Mapa je ve tmě — hráči vidí jen osvětlené místo.' : 'Mapa je zase osvětlená — mlha jako dosud.');
+      logLine(d.osvetleni === 'tma' ? 'Mapa je ve tmě — hráči vidí jen osvětlené místo.'
+        : d.osvetleni === 'noc' ? 'Mapa je v noci — hráči vidí jen osvětlené místo, tvorové s nočním viděním do svého dosahu.'
+        : 'Mapa je zase osvětlená — mlha jako dosud.');
       osvezitMlhu();
     });
   });
@@ -1311,6 +1313,7 @@ const vzhledEl = {
   skrytyRadek: document.getElementById('vzhledSkrytyRadek'), skryty: document.getElementById('vzhledSkryty'),
   svetloRadek: document.getElementById('vzhledSvetloRadek'), svetlo: document.getElementById('vzhledSvetlo'), svetloSahy: document.getElementById('vzhledSvetloSahy'),
   infraRadek: document.getElementById('vzhledInfraRadek'), infra: document.getElementById('vzhledInfra'), studeny: document.getElementById('vzhledStudeny'),
+  nocRadek: document.getElementById('vzhledNocRadek'), noc: document.getElementById('vzhledNoc'),
 };
 function spravovanyTokenData() { return spravovanyToken ? tokenData(spravovanyToken.tokenId) : null; }
 let svetloRozpracovano = null;   // {tokenId, hodnota} — vybraná možnost „vlastní dosah“ čekající na zadání čísla
@@ -1331,6 +1334,7 @@ function obnovVzhledSekci() {
     [vzhledEl.skrytyRadek, pj && FUNKCE.udalosti],
     [vzhledEl.svetloRadek, pj && FUNKCE.videni],
     [vzhledEl.infraRadek, pj && FUNKCE.videni && ['postava', 'nestvura_instance'].includes(t.typ_entity)],
+    [vzhledEl.nocRadek, pj && FUNKCE.videni && FUNKCE.videni_noc && ['postava', 'nestvura_instance'].includes(t.typ_entity)],
   ];
   radky.forEach(([el, zobrazit]) => { if (el) el.style.display = zobrazit ? '' : 'none'; });
   vzhledEl.sekce.style.display = radky.some(([, z]) => z) ? '' : 'none';
@@ -1357,6 +1361,7 @@ function obnovVzhledSekci() {
     if (document.activeElement !== vzhledEl.svetloSahy) vzhledEl.svetloSahy.value = t.svetlo && vlastniDosah ? t.svetlo : '';
   }
   if (vzhledEl.infra && document.activeElement !== vzhledEl.infra) vzhledEl.infra.value = t.infra || '';
+  if (vzhledEl.noc && document.activeElement !== vzhledEl.noc) vzhledEl.noc.value = t.noc || '';
   if (vzhledEl.studeny) vzhledEl.studeny.checked = !!t.studeny;
   if (vzhledEl.obrazekNahled) {
     vzhledEl.obrazekNahled.style.backgroundImage = t.obrazek_id ? "url('obrazek.php?id=" + t.obrazek_id + "')" : '';
@@ -1422,6 +1427,10 @@ if (vzhledEl.sekce) {
       if (t) upravToken(t, {infra: parseInt(vzhledEl.infra.value, 10) || null});
     });
     vzhledEl.studeny.addEventListener('change', () => { const t = spravovanyTokenData(); if (t) upravToken(t, {studeny: vzhledEl.studeny.checked}); });
+    if (vzhledEl.noc) vzhledEl.noc.addEventListener('change', () => {
+      const t = spravovanyTokenData();
+      if (t) upravToken(t, {noc: parseInt(vzhledEl.noc.value, 10) || null});
+    });
   }
   const ulozNazev = () => {
     const t = spravovanyTokenData();
@@ -3028,7 +3037,7 @@ function applyEvent(u) {
     } else {
       pouzitZmenyTokenu(t, zm);
     }
-    if (naTeteMape && ('svetlo' in zm || 'svetlo_typ' in zm || 'infra' in zm || 'studeny' in zm)) { obnovitMlhuPoPollu = true; renderSvetla(); }
+    if (naTeteMape && ('svetlo' in zm || 'svetlo_typ' in zm || 'infra' in zm || 'noc' in zm || 'studeny' in zm)) { obnovitMlhuPoPollu = true; renderSvetla(); }
   } else if (u.typ === 'kostka_hod') {
     logLine((u.payload.hodil || '?') + ' hodil ' + u.payload.notace + ': [' + u.payload.hody.join(', ') + ']'
       + (u.payload.bonus ? (u.payload.bonus > 0 ? '+' : '') + u.payload.bonus : '') + ' = ' + u.payload.celkem);

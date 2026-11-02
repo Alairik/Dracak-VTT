@@ -178,6 +178,19 @@ foreach ($zmeny as $klic => $hodnota) {
                 $vysledek['infra'] = $infra;
             }
             break;
+        case 'noc':
+            // Noční vidění tvora v sázích (lupič se Zlepšením zraku h630 b5663 atd.); prázdné / 0 = nemá. Strop jen proti překlepu, ne pravidlo.
+            if (!$funkce['videni'] || empty($funkce['videni_noc'])) token_uprava_chyba(409, 'Noční vidění ještě není zapnuté (chybí ruční SQL).');
+            if ($hodnota === null || $hodnota === '' || (int)$hodnota <= 0) {
+                $sloupce['videni_noc_sahy'] = null;
+                $vysledek['noc'] = null;
+            } else {
+                $noc = (int)$hodnota;
+                if ($noc > 200) token_uprava_chyba(422, 'Noční vidění může sahat nejvýš 200 sáhů.');
+                $sloupce['videni_noc_sahy'] = $noc;
+                $vysledek['noc'] = $noc;
+            }
+            break;
         case 'studeny':
             if (!$funkce['videni']) token_uprava_chyba(409, 'Světlo a tma ještě nejsou zapnuté (chybí ruční SQL).');
             $sloupce['studeny'] = $hodnota ? 1 : 0;

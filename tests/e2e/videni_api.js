@@ -39,7 +39,7 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   ok(r.s === 403 && sqlVal(`select osvetleni from mapy where id=${MAPA}`) === 'den', 'hráč osvětlení mapy měnit nesmí (403)');
   r = await api(hrac, 'token_uprava', { token_id: h, zmeny: { svetlo: 6, svetlo_typ: 'pochoden' } });
   ok(r.s === 403, 'hráč si světlo nastavit nesmí (403): ' + r.s);
-  r = await api(pj, 'mapa_osvetleni', { mapa_id: MAPA, osvetleni: 'noc' });
+  r = await api(pj, 'mapa_osvetleni', { mapa_id: MAPA, osvetleni: 'soumrak' });
   ok(r.s === 422, 'neplatné osvětlení se odmítne (422)');
 
   // --- tma bez světla ---
