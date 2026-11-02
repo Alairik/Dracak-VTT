@@ -225,12 +225,12 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
     <?php if ($isPjOrAdmin): ?>
       <button class="tbtn" type="button" id="tb-pin" title="Přidat pin (místo)"><?php dracak_icon('map-pin'); ?></button>
     <?php endif; ?>
+    <button class="tbtn" type="button" id="tb-raid" title="<?= $isPjOrAdmin ? 'Panel tvorů a souboje — nestvůry, družina, pořadí tahů (plovoucí okno)' : 'Družina a pořadí tahů (plovoucí okno)' ?>"><?php dracak_icon('users'); ?></button>
     <button class="tbtn" type="button" id="tb-kostky" title="Hodit kostkou"><?php dracak_icon('dices'); ?></button>
     <button class="tbtn" type="button" id="tb-log" title="Log"><?php dracak_icon('scroll-text'); ?></button>
     <?php if ($isPjOrAdmin): ?>
       <button class="tbtn" type="button" id="tb-grid" title="Nastavení gridu"><?php dracak_icon('grid-2x2'); ?></button>
       <button class="tbtn" type="button" id="tb-mlha" title="Mlha války"><?php dracak_icon('cloud-fog'); ?></button>
-      <button class="tbtn" type="button" id="tb-raid" title="Panel tvorů — nestvůry a družina na jednom místě (plovoucí okno)"><?php dracak_icon('users'); ?></button>
       <?php if ($souboj): ?>
         <button class="tbtn" type="button" id="tb-souboj" title="Zahájit souboj"><?php dracak_icon('swords'); ?></button>
       <?php endif; ?>
@@ -249,20 +249,6 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
     <button class="tbtn" type="button" id="zoom-fit" title="Celá mapa (0)"><?php dracak_icon('maximize', 18); ?></button>
   </div>
 
-  <div id="panelIniciativa" style="display:none;">
-    <div class="ini-titul" id="iniciativaTitle">Pořadí tahů</div>
-    <div class="ini-faze" id="iniciativaFaze"></div>
-    <div id="iniciativaList"></div>
-    <div id="souborAkce"></div>
-    <?php if ($isPjOrAdmin): ?>
-      <div class="ini-pj" id="souborPj">
-        <?php if ($souboj): ?>
-          <button class="btn btn-ghost" type="button" id="souborUcastniciBtn" title="Přidat nebo odebrat účastníky, změnit strany a překvapení">Účastníci…</button>
-        <?php endif; ?>
-        <button class="btn btn-ghost" type="button" id="souborjKonecBtn" title="Smaže pořadí tahů; hráči se zase mohou volně hýbat">Ukončit souboj</button>
-      </div>
-    <?php endif; ?>
-  </div>
 
   <div class="popover" id="popover-pridat">
     <button class="close-x" data-close-popover><?php dracak_icon('x', 14); ?></button>
@@ -783,19 +769,30 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
     </div>
   </div>
 
-  <?php if ($isPjOrAdmin): ?>
-  <div id="raidPanel" class="raid-panel" style="display:none;" role="dialog" aria-label="Panel tvorů na mapě">
+  <div id="raidPanel" class="raid-panel" style="display:none;" role="dialog" aria-label="Tvorové na mapě a pořadí tahů">
     <div class="raid-hlava" id="raidHlava" title="Tažením přesuneš okno">
       <span class="raid-grip-okna" aria-hidden="true">⠿</span>
       <div class="raid-nadpis"><strong id="raidTitul">Na mapě</strong><span id="raidPodtitul"></span></div>
       <button type="button" class="raid-btn" id="raidReset" style="display:none;" title="Vrátit pořadí podle iniciativy (zahodit ruční přeřazení)">↺ pořadí</button>
       <button type="button" class="raid-btn" id="raidRezim" title="Přepnout na kompaktní řádky">Kompakt</button>
-      <button type="button" class="raid-btn raid-ikona" id="raidSbalit" title="Sbalit na hlavičku" aria-label="Sbalit panel tvorů na hlavičku"><?php dracak_icon('minus', 16); ?></button>
-      <button type="button" class="raid-btn raid-ikona" id="raidZavrit" title="Zavřít" aria-label="Zavřít panel tvorů"><?php dracak_icon('x', 16); ?></button>
+      <button type="button" class="raid-btn raid-ikona" id="raidSbalit" title="Sbalit na hlavičku" aria-label="Sbalit panel na hlavičku"><?php dracak_icon('minus', 16); ?></button>
+      <button type="button" class="raid-btn raid-ikona" id="raidZavrit" title="Zavřít" aria-label="Zavřít panel"><?php dracak_icon('x', 16); ?></button>
     </div>
-    <div class="raid-seznam" id="raidSeznam"></div>
+    <div class="raid-telo-okna">
+      <div class="raid-faze" id="raidFaze"></div>
+      <div class="raid-info" id="raidInfo"></div>
+      <div class="raid-seznam" id="raidSeznam"></div>
+      <div class="raid-akce" id="raidAkce"></div>
+      <?php if ($isPjOrAdmin): ?>
+        <div class="ini-pj" id="souborPj" style="display:none;">
+          <?php if ($souboj): ?>
+            <button class="btn btn-ghost" type="button" id="souborUcastniciBtn" title="Přidat nebo odebrat účastníky, změnit strany a překvapení">Účastníci…</button>
+          <?php endif; ?>
+          <button class="btn btn-ghost" type="button" id="souborjKonecBtn" title="Smaže pořadí tahů; hráči se zase mohou volně hýbat">Ukončit souboj</button>
+        </div>
+      <?php endif; ?>
+    </div>
   </div>
-  <?php endif; ?>
 
   <?php if ($denikPostavy): ?>
   <div id="denikDock" class="denik-dock" style="display:none;" role="dialog" aria-label="Deník postavy">

@@ -9,7 +9,7 @@ const {hodit3D, nactiKostky, kostky3DPripraveny} = await import('./kostky3d.js?v
 const hexy = await import('./hexy.js?v=' + VERZE_MODULU);
 const initSouboj = window.MAPA.funkce.souboj ? (await import('./souboj.js?v=' + VERZE_MODULU)).initSouboj : null;
 const initDenikDock = (window.MAPA.denikPostavy || []).length ? (await import('./denik_dock.js?v=' + VERZE_MODULU)).initDenikDock : null;
-const initRaidPanel = window.MAPA.jePj && document.getElementById('raidPanel') ? (await import('./raid_panel.js?v=' + VERZE_MODULU)).initRaidPanel : null;
+const initRaidPanel = document.getElementById('raidPanel') ? (await import('./raid_panel.js?v=' + VERZE_MODULU)).initRaidPanel : null;
 
 // --- Kamera: zoom a posun přes CSS transform na #mapWrap ---
 // Souřadnice mapy (pixely původního obrázku) se na obrazovku převádějí jen
@@ -1540,12 +1540,10 @@ if (modalObrazky) {
   });
 }
 
-// --- Pořadí tahů (panel vpravo nahoře) ---
-const iniPanel = document.getElementById('panelIniciativa');
-const iniList = document.getElementById('iniciativaList');
-const iniTitle = document.getElementById('iniciativaTitle');
+// --- Pořadí tahů a souboj: jedno plovoucí okno (raid panel) ---
 // Souboj s fázemi (assets/js/souboj.js) — jen když je na serveru zapnutý
 // (ruční SQL 0085); jinak zůstává dnešní jednoduchá iniciativa.
+let raid = null;   // raid panel (assets/js/raid_panel.js) — vznikne hned za soubojem, který do něj vkládá ovládání tvorů
 const souboj = initSouboj ? initSouboj({
   mapaId: MAPA_ID,
   jePj: IS_PJ_OR_ADMIN,
@@ -1568,6 +1566,7 @@ const souboj = initSouboj ? initSouboj({
   tvarTokenu,
   getZdi: () => zdiList,
   soubojSvg: document.getElementById('soubojSvg'),
+  raidPrekresli: () => { if (raid) raid.prekresli(); },
 }) : null;
 // Deník postavy v plovoucím okně přes mapu (assets/js/denik_dock.js) — upravuje se přímo při hře.
 const denikDock = initDenikDock ? initDenikDock({
@@ -1579,9 +1578,13 @@ const denikDock = initDenikDock ? initDenikDock({
   },
 }) : null;
 // Otevře deník vybrané postavy (volitelně rovnou na sekci: boj, schopnosti, vybaveni). Používá se z tlačítek v detailu tokenu.
-// Raid panel (jen PJ; assets/js/raid_panel.js): boxy všech tvorů na mapě, plovoucí okno; myš nad boxem zvýrazní token a naopak.
-const raid = initRaidPanel ? initRaidPanel({
+// Raid panel (assets/js/raid_panel.js): plovoucí okno s boxy tvorů a ovládáním souboje; myš nad boxem zvýrazní token a naopak.
+// PJ vidí všechny tvory a všechny údaje, hráč družinu / účastníky souboje a jen pruh životů.
+raid = initRaidPanel ? initRaidPanel({
   mapaId: MAPA_ID,
+  jePj: IS_PJ_OR_ADMIN,
+  maSouboj: !!FUNKCE.souboj,
+  radekExtra: (id) => (souboj ? souboj.radekExtra(id) : null),
   getTokeny: () => tokeny,
   getKolo: () => koloStav,
   getIniciativa: () => iniciativa,
@@ -1620,31 +1623,9 @@ if (denikDock) {
   });
 }
 function nakreslitIniciativu() {
+  // Souboj s fázemi kreslí své ovládání do raid panelu sám; bez něj (starý souboj bez fází) se panel jen překreslí s pořadím tahů.
   if (souboj) { souboj.aplikuj({kolo: koloStav, iniciativa, ucastnici, vyzvy}); return; }
-  if (!iniPanel) return;
-  if (!koloStav) { iniPanel.style.display = 'none'; return; }
-  iniPanel.style.display = '';
-  iniTitle.textContent = 'Kolo ' + koloStav.cislo_kola + ' — pořadí tahů';
-  iniList.innerHTML = '';
-  iniciativa.forEach((r) => {
-    const aktivni = r.token_id === koloStav.aktivni_token_id;
-    const radek = document.createElement('div');
-    radek.className = 'ini-radek' + (aktivni ? ' aktivni' : '');
-    radek.dataset.tokenId = String(r.token_id);
-    const jmeno = document.createElement('span');
-    jmeno.textContent = r.label || '?';
-    const cisla = document.createElement('span');
-    cisla.textContent = r.hod + (r.modifikator >= 0 ? '+' : '') + r.modifikator + '=' + r.vysledek + ' · ' + r.akce_zbyvajici + '/' + r.akce_celkem + ' akcí';
-    radek.append(jmeno, cisla);
-    iniList.appendChild(radek);
-  });
-}
-if (iniList && !FUNKCE.souboj) {
-  iniList.addEventListener('click', (e) => {
-    const radek = e.target.closest('.ini-radek');
-    const t = radek ? tokenData(parseInt(radek.dataset.tokenId, 10)) : null;
-    if (t) kamera.vystredit(t.x, t.y);
-  });
+  if (raid) raid.prekresli();
 }
 
 // --- Postavy, které ještě nemají na mapě token (výběr v "Přidat token") ---

@@ -42,24 +42,25 @@ const txt = (page, sel) => page.$eval(sel, e => e.innerText).catch(() => '(nenal
   const rad = await pj.$$eval('#soubojUcastnici .souboj-radek', r => r.map(x => x.innerText.trim().replace(/\s+/g, ' ')));
   console.log('účastníci v okně:', rad.join(' | '));
   await pj.click('#soubojUlozit');
-  await pj.waitForSelector('#panelIniciativa', { state: 'visible' });
+  await pj.waitForSelector('#raidPanel', { state: 'visible' });
   await pj.waitForTimeout(600);
   await pj.screenshot({ path: SHOTS + '/02_umysly_pj.png' });
-  ok((await txt(pj, '#iniciativaTitle')).includes('kolo 1'), 'panel: ' + (await txt(pj, '#iniciativaTitle')));
+  ok((await txt(pj, '#raidTitul')).includes('kolo 1'), 'panel: ' + (await txt(pj, '#raidTitul')));
 
   // hráč vidí jen Sindora
   await hr.waitForTimeout(2500);
   await hr.screenshot({ path: SHOTS + '/03_umysly_hrac.png' });
-  const hrRad = await hr.$$eval('#iniciativaList .ini-radek', r => r.map(x => x.innerText.trim().replace(/\s+/g, ' ')));
+  const hrRad = await hr.$$eval('#raidSeznam .raid-box .raid-jmeno', r => r.map(x => x.innerText.trim().replace(/\s+/g, ' ')));
   ok(hrRad.length === 1 && hrRad[0].startsWith('Sindor'), 'hráč v panelu: ' + hrRad.join(' | '));
+  ok(await hr.locator('#raidSeznam .raid-podtitul, #raidSeznam .raid-hp-text, #raidSeznam .raid-mag').count() === 0 && await hr.locator('#raidSeznam .raid-hp').count() === 1, 'hráč v panelu vidí jen pruh životů, bez čísel a dalších údajů');
 
   // úmysly: hráč kouzlení; PJ: gobliny útok (skupina)
-  await hr.selectOption('#iniciativaList .ini-umysl select >> nth=0', 'kouzleni');
+  await hr.selectOption('#raidSeznam .ini-umysl select >> nth=0', 'kouzleni');
   await pj.waitForTimeout(300);
-  const pjSel = await pj.$$('#iniciativaList .ini-radek');
+  const pjSel = await pj.$$('#raidSeznam .raid-box');
   console.log('PJ řádků v úmyslech:', pjSel.length);
-  const gobRadek = pj.locator('#iniciativaList .ini-radek').filter({ has: pj.locator('.ini-jmeno', { hasText: 'Goblin' }) });
-  ok(await gobRadek.count() === 1, 'gobliny sloučeni do skupiny: ' + (await gobRadek.first().innerText()).replace(/\s+/g, ' '));
+  const gobRadek = pj.locator('#raidSeznam .raid-box').filter({ has: pj.locator('.raid-jmeno', { hasText: 'Goblin' }) }).filter({ has: pj.locator('select') });
+  ok(await gobRadek.count() === 1, 'gobliny sloučeni do skupiny (ovládání má jen první): ' + (await gobRadek.first().innerText()).replace(/\s+/g, ' '));
   await gobRadek.locator('select').first().selectOption('utok');
   await pj.waitForTimeout(1800);
   await pj.screenshot({ path: SHOTS + '/04_umysly_pj_po.png' });
@@ -69,7 +70,7 @@ const txt = (page, sel) => page.$eval(sel, e => e.innerText).catch(() => '(nenal
   await pj.waitForTimeout(2200);
   await hr.waitForTimeout(500);
   await hr.screenshot({ path: SHOTS + '/05_ini_hrac.png' });
-  await hr.click('#iniciativaList button:has-text("Hodit")');
+  await hr.click('#raidSeznam button:has-text("Hodit")');
   await hr.waitForSelector('#modalHod', { state: 'visible' });
   await hr.screenshot({ path: SHOTS + '/06_hod_okno.png' });
   console.log('tlačítko hodu:', (await txt(hr, '#hodKostkaBtn')).trim());
@@ -84,20 +85,20 @@ const txt = (page, sel) => page.$eval(sel, e => e.innerText).catch(() => '(nenal
   // PJ: gobliny 3D hod (skupinový), Hrun ručně
   await pj.waitForTimeout(2000);
   await pj.screenshot({ path: SHOTS + '/09_ini_pj.png' });
-  await pj.locator('#iniciativaList .ini-radek').filter({ has: pj.locator('.ini-jmeno', { hasText: 'Goblin' }) }).locator('button:has-text("Hodit")').click();
+  await pj.locator('#raidSeznam .raid-box').filter({ has: pj.locator('.raid-jmeno', { hasText: 'Goblin' }) }).locator('button:has-text("Hodit")').first().click();
   await pj.waitForSelector('#modalHod', { state: 'visible' });
   console.log('nadpis hodu PJ:', (await txt(pj, '#hodNadpis')));
   await pj.click('#hodKostkaBtn');
   await pj.waitForFunction(() => document.getElementById('modalHod').style.display === 'none', null, { timeout: 15000 }).catch(() => console.log('modál PJ se nezavřel'));
   await pj.waitForTimeout(600);
-  await pj.locator('#iniciativaList .ini-radek').filter({ has: pj.locator('.ini-jmeno', { hasText: 'Hrun' }) }).locator('button:has-text("Hodit")').click();
+  await pj.locator('#raidSeznam .raid-box').filter({ has: pj.locator('.raid-jmeno', { hasText: 'Hrun' }) }).locator('button:has-text("Hodit")').first().click();
   await pj.waitForSelector('#modalHod', { state: 'visible' });
   await pj.fill('#hodRucne', '4');
   await pj.click('#hodRucneBtn');
   await pj.waitForFunction(() => document.getElementById('modalHod').style.display === 'none', null, { timeout: 10000 }).catch(() => console.log('modál ručně se nezavřel'));
   await pj.waitForTimeout(700);
   await pj.screenshot({ path: SHOTS + '/10_ini_pj_po.png' });
-  console.log('PJ řádky iniciativy:', (await pj.$$eval('#iniciativaList .ini-radek', r => r.map(x => x.innerText.trim().replace(/\s+/g, ' ')))).join(' | '));
+  console.log('PJ řádky iniciativy:', (await pj.$$eval('#raidSeznam .raid-box', r => r.map(x => x.innerText.trim().replace(/\s+/g, ' ')))).join(' | '));
 
   // --- tahy ---
   await pj.click('text=Začít kolo');
@@ -105,16 +106,16 @@ const txt = (page, sel) => page.$eval(sel, e => e.innerText).catch(() => '(nenal
   await hr.waitForTimeout(1800);
   await pj.screenshot({ path: SHOTS + '/11_tahy_pj.png' });
   await hr.screenshot({ path: SHOTS + '/12_tahy_hrac.png' });
-  console.log('PJ tahy:', (await pj.$$eval('#iniciativaList > *', r => r.map(x => x.innerText.trim().replace(/\s+/g, ' ')))).join(' | '));
-  console.log('Hráč tahy:', (await hr.$$eval('#iniciativaList > *', r => r.map(x => x.innerText.trim().replace(/\s+/g, ' ')))).join(' | '));
+  console.log('PJ tahy:', (await pj.$$eval('#raidInfo > *', r => r.map(x => x.innerText.trim().replace(/\s+/g, ' ')))).join(' | '));
+  console.log('Hráč tahy:', (await hr.$$eval('#raidInfo > *', r => r.map(x => x.innerText.trim().replace(/\s+/g, ' ')))).join(' | '));
 
   // proklikat celé kolo: vždy ten, kdo má na tahu ovládání
   for (let i = 0; i < 20; i++) {
-    const fz = await txt(pj, '#iniciativaFaze');
-    if (!fz.includes('Tahy') || (await txt(pj, '#iniciativaFaze')).includes('Tahy') === false) break;
-    const t = await txt(pj, '#iniciativaTitle');
+    const fz = await txt(pj, '#raidFaze');
+    if (!fz.includes('Tahy') || (await txt(pj, '#raidFaze')).includes('Tahy') === false) break;
+    const t = await txt(pj, '#raidTitul');
     if (!t.includes('kolo 1')) break;
-    const jenHrac = (await txt(hr, '#iniciativaList .tah-info')).includes('Sindor');
+    const jenHrac = (await txt(hr, '#raidInfo .tah-info')).includes('Sindor');
     const strana = jenHrac ? hr : pj;
     if (!(await strana.$('.akce-lista'))) { console.log('žádné ovládání, konec smyčky', t); break; }
     await strana.click('.akce-btn:has-text("' + (jenHrac ? 'Kouzlení' : 'Čekání') + '")');   // Sindor slíbil kouzlení (h1622)
@@ -122,12 +123,13 @@ const txt = (page, sel) => page.$eval(sel, e => e.innerText).catch(() => '(nenal
   }
   await pj.waitForTimeout(1500);
   await pj.screenshot({ path: SHOTS + '/13_kolo2_pj.png' });
-  ok((await txt(pj, '#iniciativaTitle')).includes('kolo 2'), 'po kole: ' + (await txt(pj, '#iniciativaTitle')) + ' / ' + (await txt(pj, '#iniciativaFaze')).replace(/\s+/g, ' '));
+  ok((await txt(pj, '#raidTitul')).includes('kolo 2'), 'po kole: ' + (await txt(pj, '#raidTitul')) + ' / ' + (await txt(pj, '#raidFaze')).replace(/\s+/g, ' '));
 
   // konec
   await pj.click('#souborjKonecBtn');
   await pj.waitForTimeout(1500);
-  ok(await pj.$eval('#panelIniciativa', e => e.style.display) === 'none', 'panel po konci souboje skryt');
+  ok((await txt(pj, '#raidFaze')).trim() === '' && (await txt(pj, '#raidTitul')) === 'Na mapě', 'po konci souboje zmizí fáze a nadpis se vrátí na „Na mapě“');
+  ok(await pj.locator('#souborPj').isHidden(), 'tlačítka souboje (Účastníci, Ukončit) po konci souboje zmizí');
   const log = await pj.$$eval('#logList div', d => d.map(x => x.textContent));
   console.log('LOG:\n' + log.slice(-25).join('\n'));
   console.log(errs.length ? 'JS CHYBY:\n' + errs.join('\n') : 'bez JS chyb');

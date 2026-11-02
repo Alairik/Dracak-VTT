@@ -49,25 +49,19 @@ export function initSouboj(ctx) {
   // Hexy (viz assets/js/hexy.js; mapa.js je načítá s číslem verze a předává sem)
   const {hexy, jeHexMapa, hexBunka, hexStred, gridPx, getZdi, soubojSvg, pravidla, tvarTokenu} = ctx;
   const POHYB = (pravidla && pravidla.pohyb) || POHYB_ZALOHA;
-  const panel = document.getElementById('panelIniciativa');
-  if (!panel) return {aplikuj() {}, logUdalost() {}, planuje: () => false, klik() {}, zrusitPlan() {}, prekreslitOverlay() {}};
-  const titul = document.getElementById('iniciativaTitle');
-  const fazeEl = document.getElementById('iniciativaFaze');
-  const seznam = document.getElementById('iniciativaList');
-  const akceEl = document.getElementById('souborAkce');
+  // Souboj žije v plovoucím okně raid panelu (assets/js/raid_panel.js): nadpis a fáze nahoře, pod boxy tvorů ovládání akcí, dole tlačítka PJ.
+  // Ovládání jednoho tvora (úmysl, hod, akce…) se vyrobí tady a raid panel ho vloží do jeho boxu (radekExtra).
+  const panel = document.getElementById('raidPanel');
+  if (!panel) return {aplikuj() {}, logUdalost() {}, planuje: () => false, klik() {}, zrusitPlan() {}, prekreslitOverlay() {}, radekExtra: () => null};
+  const titul = document.getElementById('raidTitul');
+  const fazeEl = document.getElementById('raidFaze');
+  const seznam = document.getElementById('raidInfo');
+  const akceEl = document.getElementById('raidAkce');
+  const pjEl = document.getElementById('souborPj');
   const tbSouboj = document.getElementById('tb-souboj');
   const tbKolo = document.getElementById('tb-kolo');
-
-  // Sbalení panelu (na malé mapě zakrývá tokeny) si prohlížeč pamatuje
-  const SBALENO_KLIC = 'dracak_souboj_sbaleno';
-  const ctiSbaleno = () => { try { return localStorage.getItem(SBALENO_KLIC) === '1'; } catch (e) { return false; } };
-  titul.title = 'Sbalit / rozbalit panel';
-  titul.addEventListener('click', () => {
-    const nove = !panel.classList.contains('sbaleno');
-    panel.classList.toggle('sbaleno', nove);
-    try { localStorage.setItem(SBALENO_KLIC, nove ? '1' : '0'); } catch (e) { /* bez paměti prohlížeče */ }
-  });
-  panel.classList.toggle('sbaleno', ctiSbaleno());
+  const extra = new Map();   // token_id → prvek s ovládáním tvora vložený do jeho boxu v raid panelu
+  const prekresliRaid = () => { if (ctx.raidPrekresli) ctx.raidPrekresli(); };
 
   let kolo = null;
   let iniciativa = [];
@@ -93,21 +87,18 @@ export function initSouboj(ctx) {
   const nazevSkupiny = (s) => (s.radky.length > 1 ? zakladJmena(s.radky[0].label) + ' ×' + s.radky.length : s.radky[0].label);
   const idSkupiny = (s) => s.radky.map((u) => u.token_id);
 
-  function strana(u) {
-    const d = el('span', 'ini-strana ' + (u.strana === 'druzina' ? 'druzina' : 'nepratele'));
-    d.title = u.strana === 'druzina' ? 'Družina' : 'Nepřátelé';
-    return d;
-  }
-  function jmenoBunka(s) {
-    const u = s.radky[0];
-    const w = el('span', 'ini-jmeno');
-    w.append(strana(u), el('span', '', nazevSkupiny(s)));
+  // Ovládání skupiny tvorů (PJ ovládá stejné nestvůry společně) patří do boxu prvního z nich; ostatní členové skupiny ukážou odkaz.
+  function nastavExtra(s, widget) {
+    const ids = idSkupiny(s);
+    const obal = el('div', 'raid-extra-obsah');
     if (jePj && s.radky.every((r) => r.skryta)) {
       const t = el('span', 'ini-skryto', 'skryto');
       t.title = 'Hráči nevidí iniciativu ani úmysly tohoto tvora.';
-      w.append(t);
+      obal.append(t);
     }
-    return w;
+    obal.append(widget);
+    extra.set(ids[0], obal);
+    ids.slice(1).forEach((id) => extra.set(id, el('span', 'ini-ticho', '↑ společně s ' + s.radky[0].label)));
   }
   // Slib úkonu, za který tvor dostal bonus k iniciativě (h1622): první akce kola a aspoň polovina akcí (kdo polovinu nesplní, ztratí v příštím kole iniciativu: −3).
   function textZavazku(r, dlouhy) {
@@ -150,21 +141,23 @@ export function initSouboj(ctx) {
     if (tbSouboj) tbSouboj.classList.toggle('active', !!kolo);
     // Ruční „Konec kola“ (odpočet efektů) by v souboji odpočítal efekty dvakrát — kolo končí samo.
     if (tbKolo) tbKolo.style.display = kolo ? 'none' : '';
-    if (!kolo) { panel.style.display = 'none'; return; }
-    panel.style.display = '';
+    seznam.innerHTML = '';
+    akceEl.innerHTML = '';
+    fazeEl.innerHTML = '';
+    extra.clear();
+    if (pjEl) pjEl.style.display = kolo ? '' : 'none';
+    if (!kolo) { prekresliRaid(); return; }
     titul.textContent = 'Souboj · kolo ' + kolo.cislo_kola
       + (kolo.faze === 'kolo' ? ' · ' + kolo.polovina + '. půlka' : '')
       + (!jePj && kolo.faze === 'kolo' && kolo.ovladam_aktivniho && kolo.aktivni_token_id !== null ? ' · tvůj tah' : '');
-    fazeEl.innerHTML = '';
     FAZE.forEach(([k, t], i) => fazeEl.append(el('span', 'faze-chip' + (k === kolo.faze ? ' aktivni' : ''), (i + 1) + '. ' + t)));
     if (kolo.cislo_kola === 1 && PREKVAPENI_TEXT[kolo.prekvapeni] && kolo.faze !== 'kolo') {
       fazeEl.append(el('span', 'faze-chip prekvapeni', 'Překvapení: ' + PREKVAPENI_TEXT[kolo.prekvapeni] + ' (−6)'));
     }
-    seznam.innerHTML = '';
-    akceEl.innerHTML = '';
     if (kolo.faze === 'umysly') kreslitUmysly();
     else if (kolo.faze === 'iniciativa') kreslitHody();
     else kreslitTahy();
+    prekresliRaid();
   }
 
   function selectUmyslu(s) {
@@ -225,13 +218,7 @@ export function initSouboj(ctx) {
       ? 'Každý ohlásí, co bude v tomto kole dělat — podle toho se určí bonusy k iniciativě (kouzlení +1; při útoku nebo střelbě se zadá, kolik útoků za 2 kola umí). Kdo za úkon dostane bonus, má mu věnovat první akci kola a aspoň polovinu akcí, jinak v příštím kole ztratí iniciativu (−3).'
       : 'Každý ohlásí, co bude v tomto kole dělat — podle toho se určí bonusy k iniciativě (kouzlení +1).'));
     const skupiny = seskupit(ucastnici, () => '');
-    skupiny.forEach((s) => {
-      const r = el('div', 'ini-radek');
-      r.append(jmenoBunka(s));
-      r.append(s.radky.every((u) => u.ovladam) ? selectUmyslu(s) : textUmyslu(s.radky[0]));
-      r.addEventListener('click', (e) => { if (!e.target.closest('select')) stredNaToken(s.radky[0].token_id); });
-      seznam.append(r);
-    });
+    skupiny.forEach((s) => nastavExtra(s, s.radky.every((u) => u.ovladam) ? selectUmyslu(s) : textUmyslu(s.radky[0])));
     if (jePj) {
       const bez = ucastnici.filter((u) => !u.umysl).length;
       akceEl.append(el('p', 'ini-napoveda', bez ? 'Úmysl zatím nemá ' + bez + ' z ' + ucastnici.length + '.' : 'Všichni mají úmysl.'));
@@ -246,8 +233,6 @@ export function initSouboj(ctx) {
     const skupiny = seskupit(ucastnici, (u) => (u.hozeno ? 'h' + u.hod + '|' + u.modifikator : 'n'));
     skupiny.forEach((s) => {
       const u = s.radky[0];
-      const r = el('div', 'ini-radek');
-      r.append(jmenoBunka(s));
       const pravy = el('span', 'ini-pravy');
       if (u.hozeno) {
         const t = el('span', 'ini-vysledek', u.vysledek + ' · ' + u.akce_celkem + ' ' + akci(u.akce_celkem));
@@ -259,8 +244,7 @@ export function initSouboj(ctx) {
       } else {
         pravy.append(el('span', 'ini-ticho', 'čeká…'));
       }
-      r.append(pravy);
-      seznam.append(r);
+      nastavExtra(s, pravy);
     });
     if (jePj) {
       const nehozeno = ucastnici.filter((u) => !u.hozeno).length;
@@ -289,16 +273,9 @@ export function initSouboj(ctx) {
     if (naTahu && naTahu.zavazek) seznam.append(el('p', 'ini-napoveda ini-zavazek', textZavazku(naTahu, true)));
 
     iniciativa.forEach((r) => {
-      const aktivni = r.token_id === kolo.aktivni_token_id;
-      const radek = el('div', 'ini-radek' + (aktivni ? ' aktivni' : '') + (r.akce_zbyvajici === 0 ? ' hotovo' : ''));
-      radek.dataset.tokenId = String(r.token_id);
-      const jm = el('span', 'ini-jmeno');
-      jm.append(strana(r), el('span', '', r.label));
-      if (jePj && r.skryta) jm.append(el('span', 'ini-skryto', 'skryto'));
+      // Výsledek iniciativy ukazuje sám box; tady zbývá, co se dá dělat s akcemi (puntíky, slib, úprava pro PJ).
       const pr = el('span', 'ini-pravy');
-      const v = el('b', 'ini-vysledek', String(r.vysledek));
-      v.title = 'Hod ' + r.hod + (r.modifikator >= 0 ? ' +' : ' ') + r.modifikator + ' = ' + r.vysledek;
-      pr.append(v, pips(r.akce_celkem, r.akce_zbyvajici));
+      pr.append(pips(r.akce_celkem, r.akce_zbyvajici));
       if (r.zavazek) {
         const z = el('span', 'ini-slib', textZavazku(r, false));
         z.title = textZavazku(r, true);
@@ -311,9 +288,8 @@ export function initSouboj(ctx) {
           kreslit();
         }, 'Upravit počet akcí (PJ)'));
       }
-      radek.append(jm, pr);
-      radek.addEventListener('click', () => stredNaToken(r.token_id));
-      seznam.append(radek);
+      const obal = el('div', 'raid-extra-obsah');
+      obal.append(pr);
       if (jePj && rozbaleno.has(r.token_id)) {
         const strip = el('div', 'ini-uprava');
         strip.append(el('span', 'ini-ticho', 'Akce:'));
@@ -326,19 +302,16 @@ export function initSouboj(ctx) {
         );
         if (r.zavazek) strip.append(tlacitko('Zrušit slib', 'btn-ghost ini-mini', () => uprav({op: 'zavazek_zrusit'}),
           'Tvor už nemusí první akci a polovinu akcí věnovat slíbenému úkonu a neztratí kvůli tomu iniciativu (bonus mu zůstává)'));
-        seznam.append(strip);
+        obal.append(strip);
       }
+      extra.set(r.token_id, obal);
     });
 
     // Kdo se přidal uprostřed kola: akce dostane z iniciativy, tedy až v příštím kole
     const bez = ucastnici.filter((u) => !u.hozeno);
     if (bez.length) {
-      seznam.append(el('p', 'ini-napoveda', 'Nastoupí v příštím kole (iniciativa se hází na jeho začátku):'));
-      seskupit(bez, () => 'n').forEach((s) => {
-        const r = el('div', 'ini-radek hotovo');
-        r.append(jmenoBunka(s));
-        seznam.append(r);
-      });
+      seznam.append(el('p', 'ini-napoveda', 'Nastoupí v příštím kole (iniciativa se hází na jeho začátku): '
+        + seskupit(bez, () => 'n').map((s) => nazevSkupiny(s)).join(', ') + '.'));
     }
 
     // Ovládání tahu: jen ten, kdo smí za tvora na tahu jednat
@@ -1106,11 +1079,6 @@ export function initSouboj(ctx) {
     }
   }
 
-  function stredNaToken(id) {
-    const t = tokenPodleId(id);
-    if (t) vystredit(t.x, t.y);
-  }
-
   // --- Okno hodu na iniciativu ---
   const mHod = document.getElementById('modalHod');
   const hodNadpis = document.getElementById('hodNadpis');
@@ -1752,5 +1720,7 @@ export function initSouboj(ctx) {
     zrusitPlan,
     prekreslitOverlay,
     logUdalost,
+    // Ovládání tvora pro jeho box v raid panelu (úmysl, hod, akce); null, když tvor nic takového nemá.
+    radekExtra: (tokenId) => extra.get(tokenId) || null,
   };
 }

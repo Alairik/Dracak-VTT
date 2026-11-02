@@ -181,14 +181,12 @@ function dracak_vtt_token_hodnota_klice(array $radek, string $klic)
     };
 }
 
-// Doplňky tokenu jen pro PJ: strana ('hrac' = postava hráče, jinak 'pj'), podtitul pod jménem v raid panelu a únava postavy.
+// Doplňky tokenu jen pro PJ: podtitul pod jménem v raid panelu (druh a úroveň, jméno hráče) a únava postavy.
 function dracak_vtt_mapa_stav_pj_info(array $t, array $i): array
 {
-    $strana = 'pj';
     $unava = null;
     if ($t['typ_entity'] === 'postava') {
         $hracova = (int)($i['vlastnik_ucet_id'] ?? 0) > 0 && (int)$i['vlastnik_ucet_id'] !== (int)($i['pj_ucet_id'] ?? 0);
-        $strana = $hracova ? 'hrac' : 'pj';
         $druh = trim((string)($i['povolani'] ?? '') . ((int)($i['uroven'] ?? 0) > 0 ? ' ' . (int)$i['uroven'] . '. úr.' : ''));
         $podtitul = ($druh !== '' ? $druh : 'Postava') . ($hracova ? ' · hráč ' . (string)($i['hrac'] ?? '?') : ' · NPC');
         $unava = isset($i['unava']) ? (int)$i['unava'] : null;
@@ -197,7 +195,7 @@ function dracak_vtt_mapa_stav_pj_info(array $t, array $i): array
     } else {
         $podtitul = 'Značka nebo předmět';
     }
-    return ['strana' => $strana, 'podtitul' => $podtitul, 'unava' => $unava];
+    return ['podtitul' => $podtitul, 'unava' => $unava];
 }
 
 function dracak_vtt_mapa_stav(PDO $pdo, array $user, array $mapa, bool $jePj): array
@@ -253,6 +251,8 @@ function dracak_vtt_mapa_stav(PDO $pdo, array $user, array $mapa, bool $jePj): a
             $pjInfo[(int)$r['id']] = $r;
         }
     }
+    // Strana pro raid panel (všichni): 'hrac' = postava, kterou vlastní někdo jiný než PJ světa (družina), jinak 'pj'.
+    $pjUcetId = (int)($pdo->query('SELECT pj_ucet_id FROM svet WHERE id = ' . (int)$mapa['svet_id'])->fetchColumn() ?: 0);
     $tokeny = [];
     foreach ($radky as $t) {
         if (!$jePj && (!(bool)$t['viditelny_hracum'] || isset($skryteVidenim[(int)$t['id']]))) {
@@ -297,6 +297,7 @@ function dracak_vtt_mapa_stav(PDO $pdo, array $user, array $mapa, bool $jePj): a
             'noc' => isset($t['videni_noc_sahy']) && $t['videni_noc_sahy'] !== null ? (int)$t['videni_noc_sahy'] : null,
             'zbyva' => isset($t['svetlo_zbyva']) && $t['svetlo_zbyva'] !== null ? (int)$t['svetlo_zbyva'] : null,
             'studeny' => isset($t['studeny']) ? (bool)$t['studeny'] : false,
+            'strana' => $jePostava && (int)($t['vlastnik_ucet_id'] ?? 0) > 0 && (int)$t['vlastnik_ucet_id'] !== $pjUcetId ? 'hrac' : 'pj',
         ] + ($jePj ? dracak_vtt_mapa_stav_pj_info($t, $pjInfo[(int)$t['id']] ?? []) : []);
     }
 

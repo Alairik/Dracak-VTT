@@ -30,11 +30,17 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   ok(g1 && g2 && h, 'dva goblini a postava hráče jsou na mapě');
   const poradi = async () => (await pj.$$eval('#raidSeznam .raid-box', bs => bs.map(b => parseInt(b.dataset.tokenId, 10))));
 
-  // --- hráč panel nemá ---
+  // --- hráč: družina a jen pruh životů ---
   await hr.goto(BASE + '/hra/mapa.php?id=' + MAPA); await hr.waitForTimeout(1000);
-  ok(await hr.locator('#raidPanel').count() === 0 && await hr.locator('#tb-raid').count() === 0, 'hráč nemá ani panel tvorů, ani tlačítko v liště');
+  ok(await hr.locator('#tb-raid').count() === 1 && await hr.locator('#souborPj').count() === 0, 'hráč má tlačítko panelu v liště, ale ne tlačítka PJ souboje');
+  await hr.click('#tb-raid');
+  await hr.waitForTimeout(500);
+  const hrJmena = await hr.$$eval('#raidSeznam .raid-box .raid-jmeno', e => e.map(x => x.textContent));
+  ok(hrJmena.length === 1 && !/Goblin/.test(hrJmena.join()), 'hráč vidí v panelu jen družinu, žádné nestvůry PJ: ' + hrJmena.join(', '));
+  ok(await hr.locator('#raidSeznam .raid-podtitul, #raidSeznam .raid-hp-text, #raidSeznam .raid-mag, #raidSeznam .raid-stitky, #raidSeznam .raid-odznaky, #raidSeznam .raid-skupina').count() === 0
+    && await hr.locator('#raidSeznam .raid-hp').count() === 1, 'u hráče je v boxu jen avatar, jméno a pruh životů (bez čísel, podtitulu, magenergie, štítků)');
   const stavHr = await (await hr.request.get(BASE + '/hra/api/mapa_stav.php?mapa_id=' + MAPA)).json();
-  ok(stavHr.tokeny.every(t => !('podtitul' in t) && !('strana' in t) && !('unava' in t)), 'hráč nedostane PJ doplňky tokenu (podtitul, strana, únava)');
+  ok(stavHr.tokeny.every(t => !('podtitul' in t) && !('unava' in t)) && stavHr.tokeny.some(t => t.strana === 'hrac'), 'hráč nedostane PJ doplňky tokenu (podtitul, únava), jen stranu');
 
   // --- PJ: otevření a řazení ---
   await pj.goto(BASE + '/hra/mapa.php?id=' + MAPA); await pj.waitForTimeout(1200);
@@ -73,6 +79,8 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   ok(await pj.locator('#raidSeznam .raid-box[data-token-id="' + h + '"]').evaluate(e => e.classList.contains('vybrany')), 'vybraný box je označený');
 
   // --- přetažení boxu ---
+  await pj.click('#panel-spravovat .close-x');   // detail tokenu, který klik otevřel, panel překrývá
+  await pj.waitForTimeout(200);
   await pj.dragAndDrop('#raidSeznam .raid-box[data-token-id="' + g2 + '"] .raid-grip', '#raidSeznam .raid-box[data-token-id="' + g1 + '"]', { targetPosition: { x: 100, y: 4 } });
   await pj.waitForTimeout(400);
   p = await poradi();
