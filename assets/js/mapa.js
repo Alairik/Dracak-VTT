@@ -352,7 +352,10 @@ function renderSvetla() {
   if (IS_PJ_OR_ADMIN && sah > 0) {
     tokeny.forEach(t => {
       if (!t.svetlo) return;
-      html += '<circle cx="' + t.x + '" cy="' + t.y + '" r="' + (t.svetlo * sah) + '" fill="rgba(255,196,80,0.10)" stroke="#e8a838" stroke-width="2" stroke-dasharray="6 5" vector-effect="non-scaling-stroke"/>';
+      // Zóna tmy (Tma, Temnota) se kreslí fialově a tmavě, světlo žlutě.
+      const zona = t.svetlo_typ === 'tma' || t.svetlo_typ === 'temnota';
+      html += '<circle cx="' + t.x + '" cy="' + t.y + '" r="' + (t.svetlo * sah) + '" fill="' + (zona ? 'rgba(40,20,70,0.28)' : 'rgba(255,196,80,0.10)')
+        + '" stroke="' + (zona ? '#8a6bd1' : '#e8a838') + '" stroke-width="2" stroke-dasharray="6 5" vector-effect="non-scaling-stroke"/>';
     });
   }
   svg.innerHTML = html;
@@ -1310,6 +1313,7 @@ const vzhledEl = {
   infraRadek: document.getElementById('vzhledInfraRadek'), infra: document.getElementById('vzhledInfra'), studeny: document.getElementById('vzhledStudeny'),
 };
 function spravovanyTokenData() { return spravovanyToken ? tokenData(spravovanyToken.tokenId) : null; }
+let svetloRozpracovano = null;   // {tokenId, hodnota} — vybraná možnost „vlastní dosah“ čekající na zadání čísla
 
 function obnovVzhledSekci() {
   const t = spravovanyTokenData();
@@ -1338,11 +1342,19 @@ function obnovVzhledSekci() {
   if (vzhledEl.skryty) vzhledEl.skryty.checked = !t.viditelny;
   if (vzhledEl.svetlo) {
     // Výběr podle uloženého druhu a dosahu; neodpovídá-li žádné předvolbě, je to „Vlastní“.
+    // Zóna Tma má vždy zadaný vlastní poloměr, Temnota druida má pevný (300 sáhů).
     const klic = t.svetlo ? (t.svetlo_typ || 'vlastni') + ':' + t.svetlo : '';
     const znama = Array.from(vzhledEl.svetlo.options).some((o) => o.value === klic);
-    vzhledEl.svetlo.value = !t.svetlo ? '' : (znama ? klic : 'vlastni');
-    vzhledEl.svetloSahy.style.display = vzhledEl.svetlo.value === 'vlastni' ? '' : 'none';
-    if (document.activeElement !== vzhledEl.svetloSahy) vzhledEl.svetloSahy.value = t.svetlo && vzhledEl.svetlo.value === 'vlastni' ? t.svetlo : '';
+    let hodnota = !t.svetlo ? '' : (znama ? klic : 'vlastni');
+    if (t.svetlo && t.svetlo_typ === 'tma') hodnota = 'tma:vlastni';
+    else if (t.svetlo && t.svetlo_typ === 'temnota') hodnota = 'temnota:300';
+    // PJ si vybral „vlastní dosah“ a ještě ho nezadal: obnova panelu z pollingu mu pole nesmí zase schovat.
+    if (svetloRozpracovano && spravovanyToken && svetloRozpracovano.tokenId === spravovanyToken.tokenId) hodnota = svetloRozpracovano.hodnota;
+    vzhledEl.svetlo.value = hodnota;
+    const vlastniDosah = hodnota === 'vlastni' || hodnota === 'tma:vlastni';
+    vzhledEl.svetloSahy.style.display = vlastniDosah ? '' : 'none';
+    vzhledEl.svetloSahy.placeholder = hodnota === 'tma:vlastni' ? 'poloměr (sáhů)' : 'sáhů';
+    if (document.activeElement !== vzhledEl.svetloSahy) vzhledEl.svetloSahy.value = t.svetlo && vlastniDosah ? t.svetlo : '';
   }
   if (vzhledEl.infra && document.activeElement !== vzhledEl.infra) vzhledEl.infra.value = t.infra || '';
   if (vzhledEl.studeny) vzhledEl.studeny.checked = !!t.studeny;
@@ -1385,15 +1397,25 @@ if (vzhledEl.sekce) {
       const t = spravovanyTokenData();
       if (!t) return;
       const v = vzhledEl.svetlo.value;
+      svetloRozpracovano = null;
       if (v === '') { upravToken(t, {svetlo: null, svetlo_typ: null}); return; }
-      if (v === 'vlastni') { vzhledEl.svetloSahy.style.display = ''; vzhledEl.svetloSahy.focus(); return; }
+      if (v === 'vlastni' || v === 'tma:vlastni') {
+        svetloRozpracovano = {tokenId: spravovanyToken.tokenId, hodnota: v};
+        vzhledEl.svetloSahy.placeholder = v === 'tma:vlastni' ? 'poloměr (sáhů)' : 'sáhů';
+        vzhledEl.svetloSahy.style.display = ''; vzhledEl.svetloSahy.focus(); return;
+      }
       const [typ, sahy] = v.split(':');
-      upravToken(t, {svetlo: parseFloat(sahy), svetlo_typ: typ});
+      const zmeny = {svetlo: parseFloat(sahy), svetlo_typ: typ};
+      if (typ === 'temnota') zmeny.viditelny = false;   // zónu tmy hráči jako token vidět nemají
+      upravToken(t, zmeny);
     });
     vzhledEl.svetloSahy.addEventListener('change', () => {
       const t = spravovanyTokenData();
       const sahy = parseFloat(vzhledEl.svetloSahy.value);
-      if (t && sahy > 0) upravToken(t, {svetlo: sahy, svetlo_typ: 'vlastni'});
+      if (!t || !(sahy > 0)) return;
+      svetloRozpracovano = null;
+      if (vzhledEl.svetlo.value === 'tma:vlastni') upravToken(t, {svetlo: sahy, svetlo_typ: 'tma', viditelny: false});
+      else upravToken(t, {svetlo: sahy, svetlo_typ: 'vlastni'});
     });
     vzhledEl.infra.addEventListener('change', () => {
       const t = spravovanyTokenData();
@@ -3006,7 +3028,7 @@ function applyEvent(u) {
     } else {
       pouzitZmenyTokenu(t, zm);
     }
-    if (naTeteMape && ('svetlo' in zm || 'infra' in zm || 'studeny' in zm)) { obnovitMlhuPoPollu = true; renderSvetla(); }
+    if (naTeteMape && ('svetlo' in zm || 'svetlo_typ' in zm || 'infra' in zm || 'studeny' in zm)) { obnovitMlhuPoPollu = true; renderSvetla(); }
   } else if (u.typ === 'kostka_hod') {
     logLine((u.payload.hodil || '?') + ' hodil ' + u.payload.notace + ': [' + u.payload.hody.join(', ') + ']'
       + (u.payload.bonus ? (u.payload.bonus > 0 ? '+' : '') + u.payload.bonus : '') + ' = ' + u.payload.celkem);

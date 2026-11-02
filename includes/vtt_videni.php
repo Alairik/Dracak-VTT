@@ -11,7 +11,8 @@ declare(strict_types=1);
 // dosavadní mlha, bez plného viditelnostního polygonu:
 //   1. osvětlené buňky = buňka v dosahu zdroje světla, kam od světla vede volný paprsek (zdi, zavřené dveře),
 //   2. vidět teď = osvětlená buňka, kam vede volný paprsek od některého tokenu hráče, plus buňka, na které hráčův token stojí,
-//   3. infravidění (tokeny.videni_infra_sahy) ukáže tokeny s teplou krví v dosahu a na přímý výhled — ne mapu.
+//   3. infravidění (tokeny.videni_infra_sahy) ukáže tokeny s teplou krví v dosahu a na přímý výhled — ne mapu,
+//   4. zóny tmy (kouzla Tma a Temnota) potlačují světlo a infravidění; viz DRACAK_VTT_ZONY_TMY.
 // Kdo smí vidět co, rozhoduje server; klient jen kreslí (mlha) a dostává jen tokeny, které smí.
 
 require_once __DIR__ . '/vtt.php';
@@ -27,6 +28,17 @@ const DRACAK_VTT_SVETLO_PREDVOLBY = [
     'hul_pochoden' => ['Čarodějova hůl (jako pochodeň)', 6.0],
     'hul_lucerna' => ['Čarodějova hůl (jako lucerna)', 8.0],
 ];
+
+// Zóny tmy (kouzla) — token se svetlo_typ 'tma' nebo 'temnota' NENÍ zdroj světla, ale kruh o poloměru svetlo_sahy (sáhů), který světlo a infravidění potlačuje.
+// Bez nových sloupců (žádné ruční SQL): typ i poloměr se drží ve stejných dvou sloupcích jako světlo, jen se v dracak_vtt_videni_zdroje() vynechávají.
+//   'tma'     — Tma (Obscurum, h318 b3600–b3601): 4 magy za sáh poloměru, dokonalá tma. Uvnitř nic nesvítí (zdroj světla uvnitř nesvítí vůbec)
+//               a trpasličí infravidění nefunguje (ani zevnitř ven, ani zvenku dovnitř). Variantu za 6 magů (šero jako od malé pochodně, infravidění
+//               funguje) kniha nezměřila — dosah „malé pochodně“ v ní není — proto se zóna nezakládá, PJ dá na střed světlo s vlastním dosahem.
+//   'temnota' — Temnota druida (h193 b1936–b1939): okruh 300 sáhů, pohlcuje veškeré světlo (pochodeň není vidět déle než 30 coulů = 0,3 sáhu,
+//               1 sáh = 100 coulů) a infravidění v ní má desetinový dosah.
+const DRACAK_VTT_ZONY_TMY = ['tma', 'temnota'];
+const DRACAK_VTT_TEMNOTA_SVETLO_SAHY = 0.3;
+const DRACAK_VTT_TEMNOTA_INFRA_PODIL = 0.1;
 
 // Boj ve tmě (h1613 b10738 „Útok na neviditelného protivníka“, lupič b5663): postih k hodu na útok i na obranu pro toho, kdo protivníka nevidí.
 // klíč => [text oprav, postih]. nevidi −5 (bez zpráv o protivníkovi), tusi −4 (mlhavá představa, kde stojí), nocni −2 (lupič s nočním viděním ve tmě).
@@ -106,13 +118,38 @@ function dracak_vtt_videni_blokovano(array $zdi, float $ax, float $ay, float $bx
 // Zdroje světla na mapě: [x, y, r (px)]. Svítí i skrytý token (např. pochodeň na zdi, kterou hráči nemají vidět jako předmět).
 function dracak_vtt_videni_zdroje(PDO $pdo, int $mapaId, float $pxSah): array
 {
-    $q = $pdo->prepare('SELECT x, y, svetlo_sahy FROM tokeny WHERE mapa_id = ? AND svetlo_sahy IS NOT NULL AND svetlo_sahy > 0');
+    $q = $pdo->prepare('SELECT x, y, svetlo_sahy FROM tokeny WHERE mapa_id = ? AND svetlo_sahy IS NOT NULL AND svetlo_sahy > 0
+                          AND (svetlo_typ IS NULL OR svetlo_typ NOT IN ("tma", "temnota"))');
     $q->execute([$mapaId]);
     $zdroje = [];
     foreach ($q->fetchAll() as $r) {
         $zdroje[] = ['x' => (float)$r['x'], 'y' => (float)$r['y'], 'r' => (float)$r['svetlo_sahy'] * $pxSah];
     }
     return $zdroje;
+}
+
+// Zóny tmy na mapě: [x, y, r (px), typ]. Zóna působí i jako skrytý token (PJ ji obvykle před hráči skrývá).
+function dracak_vtt_videni_zony(PDO $pdo, int $mapaId, float $pxSah): array
+{
+    $q = $pdo->prepare('SELECT x, y, svetlo_sahy, svetlo_typ FROM tokeny WHERE mapa_id = ? AND svetlo_sahy IS NOT NULL AND svetlo_sahy > 0
+                          AND svetlo_typ IN ("tma", "temnota")');
+    $q->execute([$mapaId]);
+    $zony = [];
+    foreach ($q->fetchAll() as $r) {
+        $zony[] = ['x' => (float)$r['x'], 'y' => (float)$r['y'], 'r' => (float)$r['svetlo_sahy'] * $pxSah, 'typ' => (string)$r['svetlo_typ']];
+    }
+    return $zony;
+}
+
+// Leží místo [x, y] v nějaké zóně (daného typu)?
+function dracak_vtt_videni_v_zone(array $zony, float $x, float $y, string $typ): bool
+{
+    foreach ($zony as $z) {
+        if ($z['typ'] === $typ && hypot($x - $z['x'], $y - $z['y']) <= $z['r']) {
+            return true;
+        }
+    }
+    return false;
 }
 
 // Tokeny, kterýma hráč vidí: postavy, jejichž vlastníkem je jeho účet.
@@ -128,7 +165,7 @@ function dracak_vtt_videni_divaci(PDO $pdo, int $mapaId, int $ucetId): array
 }
 
 // Spočítá vidění jednoho hráče na mapě „Tma“. Vrací null, když vidění na mapě neplatí.
-// ['rozmery', 'osvetleno' (bitmapa), 'videno' (bitmapa), 'divaci', 'zdi', 'px_sah']
+// ['rozmery', 'osvetleno' (bitmapa), 'videno' (bitmapa), 'divaci', 'zdi', 'px_sah', 'zony']
 function dracak_vtt_videni_vypocet(PDO $pdo, array $mapa, int $ucetId): ?array
 {
     if (!dracak_vtt_videni_aktivni($pdo, $mapa)) {
@@ -146,14 +183,29 @@ function dracak_vtt_videni_vypocet(PDO $pdo, array $mapa, int $ucetId): ?array
     // 1. osvětlené buňky
     $osvetleno = str_repeat("\x00", $n);
     $osvetleneSeznam = [];
+    $zony = dracak_vtt_videni_zony($pdo, $mapaId, $pxSah);
+    $rTemnota = DRACAK_VTT_TEMNOTA_SVETLO_SAHY * $pxSah;
     foreach (dracak_vtt_videni_zdroje($pdo, $mapaId, $pxSah) as $z) {
         $r = $z['r'];
+        // Zdroj uvnitř Tmy nesvítí vůbec, zdroj uvnitř Temnoty svítí nejdál 0,3 sáhu.
+        if ($zony && dracak_vtt_videni_v_zone($zony, $z['x'], $z['y'], 'tma')) {
+            continue;
+        }
+        if ($zony && dracak_vtt_videni_v_zone($zony, $z['x'], $z['y'], 'temnota')) {
+            $r = min($r, $rTemnota);
+        }
         foreach (dracak_vtt_mlha_bunky_v_obdelniku($roz, $z['x'] - $r, $z['y'] - $r, $z['x'] + $r, $z['y'] + $r) as $b) {
             $idx = dracak_vtt_mlha_bunka_idx($roz, $b['row'], $b['col']);
             if ($idx === null || $osvetleno[$idx] === "\x01") {
                 continue;
             }
-            if (hypot($b['x'] - $z['x'], $b['y'] - $z['y']) > $r) {
+            $vzdal = hypot($b['x'] - $z['x'], $b['y'] - $z['y']);
+            if ($vzdal > $r) {
+                continue;
+            }
+            // Buňka uvnitř Tmy se neosvětlí nikdy, uvnitř Temnoty jen do 0,3 sáhu od zdroje.
+            if ($zony && (dracak_vtt_videni_v_zone($zony, $b['x'], $b['y'], 'tma')
+                || ($vzdal > $rTemnota && dracak_vtt_videni_v_zone($zony, $b['x'], $b['y'], 'temnota')))) {
                 continue;
             }
             if (dracak_vtt_videni_blokovano($zdi, $z['x'], $z['y'], $b['x'], $b['y'])) {
@@ -185,7 +237,7 @@ function dracak_vtt_videni_vypocet(PDO $pdo, array $mapa, int $ucetId): ?array
             }
         }
     }
-    return ['rozmery' => $roz, 'osvetleno' => $osvetleno, 'videno' => $videno, 'divaci' => $divaci, 'zdi' => $zdi, 'px_sah' => $pxSah];
+    return ['rozmery' => $roz, 'osvetleno' => $osvetleno, 'videno' => $videno, 'divaci' => $divaci, 'zdi' => $zdi, 'px_sah' => $pxSah, 'zony' => $zony];
 }
 
 // Přidá vidět teď do trvalé paměti hráče (mlha_valky) a vrátí výpočet. Volá se při pohybu hráčova tokenu a při načtení mlhy.
@@ -232,8 +284,20 @@ function dracak_vtt_videni_token_viden(array $v, array $token): bool
             if ($dosah <= 0) {
                 continue;
             }
-            if (hypot($x - (float)$d['x'], $y - (float)$d['y']) <= $dosah * $v['px_sah']
-                && !dracak_vtt_videni_blokovano($v['zdi'], (float)$d['x'], (float)$d['y'], $x, $y)) {
+            $dx = (float)$d['x']; $dy = (float)$d['y'];
+            $dosahPx = $dosah * $v['px_sah'];
+            $zony = $v['zony'] ?? [];
+            if ($zony) {
+                // Tma (Obscurum) infravidění vyřazuje; v Temnotě má jen desetinový dosah. Stačí, aby v zóně stál pozorovatel nebo cíl.
+                if (dracak_vtt_videni_v_zone($zony, $dx, $dy, 'tma') || dracak_vtt_videni_v_zone($zony, $x, $y, 'tma')) {
+                    continue;
+                }
+                if (dracak_vtt_videni_v_zone($zony, $dx, $dy, 'temnota') || dracak_vtt_videni_v_zone($zony, $x, $y, 'temnota')) {
+                    $dosahPx *= DRACAK_VTT_TEMNOTA_INFRA_PODIL;
+                }
+            }
+            if (hypot($x - $dx, $y - $dy) <= $dosahPx
+                && !dracak_vtt_videni_blokovano($v['zdi'], $dx, $dy, $x, $y)) {
                 return true;
             }
         }

@@ -607,8 +607,12 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
           <option value="hul:6">Čarodějova hůl jako pochodeň (6 sáhů)</option>
           <option value="hul:8">Čarodějova hůl jako lucerna (8 sáhů)</option>
           <option value="vlastni">Vlastní dosah…</option>
+          <optgroup label="Zóna tmy (kouzlo, tma potlačí světlo i infravidění)">
+            <option value="tma:vlastni">Tma / Obscurum (4 magy za sáh poloměru)…</option>
+            <option value="temnota:300">Temnota druida (300 sáhů)</option>
+          </optgroup>
         </select>
-        <input class="input" type="number" id="vzhledSvetloSahy" min="0.5" max="60" step="0.5" placeholder="sáhů" style="display:none;width:6rem;">
+        <input class="input" type="number" id="vzhledSvetloSahy" min="0.5" max="300" step="0.5" placeholder="sáhů" style="display:none;width:6rem;">
       </div>
       <div id="vzhledInfraRadek" class="vz-radek" style="display:none;">
         <label for="vzhledInfra">Infravidění (sáhů; prázdné = nemá)</label>

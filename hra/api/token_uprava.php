@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__ . '/../../includes/vtt.php';
 require_once __DIR__ . '/../../includes/vtt_mapa_stav.php';
+require_once __DIR__ . '/../../includes/vtt_videni.php';
 
 // Úprava vzhledu a polohy tokenu: otočení, velikost, barva, zámek, název,
 // obrázek, viditelnost pro hráče, pořadí vrstev. PJ/admin smí všechno;
@@ -150,7 +151,10 @@ foreach ($zmeny as $klic => $hodnota) {
                 $vysledek['svetlo_typ'] = null;
             } else {
                 $sahy = round((float)$hodnota * 2) / 2;
-                if ($sahy < 0.5 || $sahy > 60) token_uprava_chyba(422, 'Světlo svítí od 0,5 do 60 sáhů.');
+                // Zóna tmy (kouzla Tma, Temnota) má poloměr až 300 sáhů (Temnota druida); obyčejné světlo 60 sáhů — strop jen proti překlepu, ne pravidlo.
+                $typZony = in_array($zmeny['svetlo_typ'] ?? ($token['svetlo_typ'] ?? ''), DRACAK_VTT_ZONY_TMY, true);
+                $strop = $typZony ? 300 : 60;
+                if ($sahy < 0.5 || $sahy > $strop) token_uprava_chyba(422, $typZony ? 'Zóna tmy má poloměr od 0,5 do 300 sáhů.' : 'Světlo svítí od 0,5 do 60 sáhů.');
                 $sloupce['svetlo_sahy'] = $sahy;
                 $vysledek['svetlo'] = $sahy;
             }
@@ -158,7 +162,7 @@ foreach ($zmeny as $klic => $hodnota) {
         case 'svetlo_typ':
             if (!$funkce['videni']) token_uprava_chyba(409, 'Světlo a tma ještě nejsou zapnuté (chybí ruční SQL).');
             $typ = is_string($hodnota) ? trim($hodnota) : '';
-            if (!in_array($typ, ['', 'pochoden', 'lucerna', 'hul', 'svetlo', 'vlastni'], true)) token_uprava_chyba(422, 'Neznámý druh světla.');
+            if (!in_array($typ, array_merge(['', 'pochoden', 'lucerna', 'hul', 'svetlo', 'vlastni'], DRACAK_VTT_ZONY_TMY), true)) token_uprava_chyba(422, 'Neznámý druh světla.');
             $sloupce['svetlo_typ'] = $typ === '' ? null : $typ;
             $vysledek['svetlo_typ'] = $typ === '' ? null : $typ;
             break;

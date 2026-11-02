@@ -1310,7 +1310,7 @@ stavby“ v návrhu.**
     klik PJ na dveře (nástroj Výběr) je otevře/zavře (`hra/api/zed_dvere.php`, událost `zed_zmena` — skrytým dveřím se hráčům nic neprozradí). **Hráči dveře otevírat nesmí
     (rozhodnutí uživatele 2026-11-02: jen PJ).** **Zamčené a tajné dveře zatím ne — uživatel je bude potřebovat později, zatím nejsou potřeba (25b, na seznamu).** Test: `tests/e2e/dvere_api.js`. [M]
 26. ✔ (2026-11-02, migrace `0107`) **Zdroje světla** — světlo je vlastnost tokenu (`tokeny.svetlo_sahy`, `svetlo_typ`; PJ je nastaví v panelu tokenu: pochodeň 6, lucerna 8 / 4 / 2,
-    hůl jako pochodeň / lucerna, vlastní dosah 0,5–60 sáhů); pochodeň na zdi = obecný token se světlem (může být skrytý). Čísla z knihy (h1685 b11183–b11185, b4601). Kouzlo Světlo (2 magy za sáh)
+    hůl jako pochodeň / lucerna, vlastní dosah 0,5–60 sáhů; zóny Tma a Temnota viz níže); pochodeň na zdi = obecný token se světlem (může být skrytý). Čísla z knihy (h1685 b11183–b11185, b4601). Kouzlo Světlo (2 magy za sáh)
     zatím jen ručně jako vlastní dosah. PJ vidí na mapě přerušovaný kruh dosahu každého světla. [L]
 27. ✔ (2026-11-02) **Vidění ve tmě, které se pohybuje s postavou** — infravidění (`tokeny.videni_infra_sahy`, PJ nastaví: trpaslík 20, lovec 50) ukáže tvory s teplou krví v dosahu a na přímý výhled
     (ne mapu, ne zdí; `studeny` je vynechá). **Noční vidění lupiče zatím ne** — kniha nemá dosah při slabém světle, čeká na rozhodnutí uživatele (viz `docs/videni-a-svetlo-navrh.md`). [L]
@@ -1323,8 +1323,15 @@ i události pohybu, změn, životů a příchodu v `hra/api/udalosti.php`); dru�
 na obranu (obránce); PJ v okně výzvy přepne „vidí / nevidí −5 / tuší, kde stojí −4 / noční vidění −2“ (h1613 b10738, lupič h630 b5663). Zasáhne-li útočník s tímto postihem, zranění se počítá, jako by ho neměl
 (`dracak_vtt_utok_vyhodnot`, v odpovědi `tma_bonus`). Za nestvůry a NPC se postih sám nenavrhuje (kniha neříká, kdo vidí ve tmě) — PJ ho nastaví ručně. **Ztrátu iniciativy a „útok jen v kole, kdy na něj
 protivník zaútočí“ (b10738) automaticky neřešíme** — okno na to upozorní, hlídá to PJ. Test: `tests/e2e/boj_ve_tme_api.js`.
-Úplně zbývá: **zóny kouzel Tma a Temnota** (Dokonalá tma vyřazuje infravidění, b3601; Temnota 1/10 dosahu,
-b1939), **hoření pochodní a lampy v čase** (3 směny / 24 směn — čeká na „hodiny světa“), **noční vidění lupiče**, sdílené vidění družiny mezi hráči (dnes každý hráč vidí svými tokeny a světla družiny
+**Zóny kouzel Tma a Temnota (2026-11-02, bez DDL a bez ručního SQL):** zóna je token (obvykle obecný, skrytý před hráči) s `svetlo_typ` = `tma` / `temnota` a poloměrem v `svetlo_sahy`
+— stejné dva sloupce jako světlo, jen se z nich v `dracak_vtt_videni_zdroje()` vynechají a čtou se zvlášť v `dracak_vtt_videni_zony()`. PJ je nastaví v panelu tokenu (Vzhled → Světlo → skupina
+„Zóna tmy“): **Tma (Obscurum)** zadá poloměr ručně (4 magy za sáh poloměru → magy ÷ 4, h318 b3600), **Temnota druida** má pevných 300 sáhů (h193 b1936); obě se ukládají se „skrýt před hráči“.
+Pravidla ve výpočtu: **Tma** — buňky uvnitř se nikdy neosvětlí, zdroj světla uvnitř nesvítí vůbec, infravidění nefunguje, když v zóně stojí pozorovatel nebo cíl (b3601). **Temnota** — světlo je v ní vidět
+jen na 30 coulů = 0,3 sáhu (b1938; 1 sáh = 100 coulů, `content/pravidla-hrac.html` řádek 37), tedy v praxi jen buňka, na které zdroj stojí; infravidění má desetinový dosah, když v zóně stojí pozorovatel
+nebo cíl (b1939). Zóna sama nesvítí. Test: `tests/e2e/zony_tmy_api.js`. **Neřešíme (rozhodnutí PJ):** zákaz ohnivých a světelných kouzel v Temnotě (b1938), úvaha o tom, že Tma by měla stínit i paprsky
+procházející zónou (zóna působí jen na buňky a zdroje uvnitř), Tma za 6 magů — „šero jako od malé pochodně, infravidění funguje“ (b3601): kniha dosah malé pochodně nemá, proto se zóna nezakládá a PJ
+dá na střed obyčejné světlo s vlastním dosahem. Lovcův **Příkrov stínů** (h1003 b7357–b7359, 5 magů za 60 sáhů, uhasí zdroje světla, Lovec v něm vidí) zatím není — vyžaduje výjimku „vidí ten, kdo ji vyvolal“.
+Úplně zbývá: **hoření pochodní a lampy v čase** (3 směny / 24 směn — čeká na „hodiny světa“), **noční vidění lupiče**, sdílené vidění družiny mezi hráči (dnes každý hráč vidí svými tokeny a světla družiny
 osvětlují všem), souboj panel (pořadí iniciativy) skrytou nestvůru ve tmě pořád ukáže, pokud ji PJ označil jako viditelnou.
 
 **Doporučené pořadí:** nejdřív blok A (1–3, 8), pak krátký zkušební
