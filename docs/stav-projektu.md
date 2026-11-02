@@ -20,7 +20,7 @@ neodhadování mechaniky). **Fáze 1 a 2 ze sekce "Rozpracováno:
 cestování..." jsou v kódu hotové**; **Fáze 1b (váha/kontejnery) je
 hotová v kódu, stejně jako Fáze 2–5 (zvířata, povozy, kalkulačka cesty,
 přepínače) — celé "cestování, naložení, únava" je tím hotové a nasazené,
-žádné ruční SQL nečeká.** Další velký cíl je sekce "Plán: náhrada Owlbear
+ruční SQL čeká jen blok F (hodiny světa, migrace `0109`, viz níž).** Další velký cíl je sekce "Plán: náhrada Owlbear
 Rodeo" níž. Stav předchozí
 konverzace je zapsaný přesně proto, aby ses nemusel/a ptát na věci, co
 už byly rozhodnuté (viz "Architektonická rozhodnutí" a celá sekce
@@ -36,9 +36,9 @@ na DB postavené od nuly. Co lze dělat **bez** ptaní (vždy s testy, `tests/ru
   výpis uživatelského textu je escapovaný (grep + test s `<script>` v názvech světa, postavy, tokenu, pinu, poznámky), `Secure`/`SameSite` cookie za proxy.
 - **Funkce ze starších plánů, které NEJSOU hotové** (úplný soupis 2026-11-01 — dřív tu byla jen údržba a bezpečnost; funkční kroky z plánů A–E a fází cestování/deníku zůstávaly rozeseté v textu níž):
   - *Plán náhrady Owlbear — blok B:* (9) dosah pohybu z pohyblivosti postavy po naložení a únavě (v boji se pohybuje po hexech podle akcí, takže jde hlavně o mapu mimo boj); (12) čitelné stavy na tokenu (pruh životů, ikony efektů, únava/přetížení).
-  - *Blok C — svět a cesta:* (14) pochod po mapě světa s měřítkem a trasou → kalkulačka cesty → čas a únava postavám [L]; (15) přechod mezi lokacemi: pin „Vstoupit“ přenese družinu na cílovou mapu [M]; (16) knihovna map (duplikace, pořadí scén); (17) hodiny světa propojené s cestou, odpočinkem a spánkem.
+  - *Blok C — svět a cesta:* (14) pochod po mapě světa s měřítkem a trasou → kalkulačka cesty → čas a únava postavám [L]; (15) přechod mezi lokacemi: pin „Vstoupit“ přenese družinu na cílovou mapu [M]; (16) knihovna map (duplikace, pořadí scén); (17) hodiny světa — **čas ve dni a hoření světel hotové (2026-11-02, viz „Hodiny světa“ níž)**, nepropojené zatím s cestou, odpočinkem a spánkem.
   - *Blok D:* (22) tablet a telefon na skutečném zařízení a (23) zkušební hra podle `docs/zkusebni-scenar-prvni-hra.md` — čeká na uživatele.
-  - *Blok E — vidění a světlo:* základ je hotový (dveře, světlo, tma, infravidění). Zbývá: **zamčené a tajné dveře** (uživatel je bude potřebovat později), hladký polygonový stín místo buněk, automatická ztráta iniciativy ve tmě, hoření světel v čase, další stavy osvětlení (pološero, soumrak — viz níže), Lovcův Příkrov stínů, hráčem otevíratelné dveře (zatím jen PJ). Hotové: zóny Tma a Temnota, stav mapy „Noc“ a noční vidění.
+  - *Blok E — vidění a světlo:* základ je hotový (dveře, světlo, tma, infravidění). Zbývá: **zamčené a tajné dveře** (uživatel je bude potřebovat později), hladký polygonový stín místo buněk, automatická ztráta iniciativy ve tmě, další stavy osvětlení (pološero, soumrak — viz níže), Lovcův Příkrov stínů, hráčem otevíratelné dveře (zatím jen PJ). Hotové: zóny Tma a Temnota, stav mapy „Noc“ a noční vidění.
   - *Boj:* „obrana a krok“ (kniha neříká, kdy se krok udělá — potřebuje rozhodnutí), útok na neviditelného nebo kouzlícího tvora, čtyřstupňová škála hodu na dovednost (fatální neúspěch / totální úspěch — v přepisu knihy chybí, potřeba foto).
   - *Nestvůry:* deník nestvůry **před bojem** (zadání uživatele 2026-10-20; design navrhne uživatel), kořist, výbava z katalogu s dopočtem ÚČ/OČ ze zbraně a zbroje, inteligence/charisma/pohyblivost/vytrvalost jako hratelná data, kouzla nestvůr, automatický bonus k iniciativě podle „N× za kolo“.
   - *Cestování:* jezdecká zvířata jen 7 z asi 40 řádků tabulky h2057 (potřebuje rozhodnutí, jak značit letecké a pozemní varianty a co znamená sloupec „Ujede“); povozy bez nehod (hod kočího), dovednosti Kočí, otevřených kočárů a více povozů v jedné cestě; vnořené kontejnery; povoz není trvalá entita.
@@ -60,7 +60,7 @@ ním čeká, dokud se to neprovede ručně.
 
 **Ruční DDL blok je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný soubor, ve
 kterém jsou všechny dosud neprovedené DDL příkazy; uživatel ho dostává jako
-text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-11-02): nic nečeká. Blok E — noční vidění (migrace `0108`, jediný `ALTER TABLE tokeny ADD COLUMN videni_noc_sahy`) uživatel provedl, kontrola vyšla 1; ověřeno na kopii produkčního stavu (bez něj stránka Změny databáze správně řekne, že potřebuje ruční SQL, blok jde spustit opakovaně a po něm stránka 0108 pod DML-only účtem přeskočí a zapíše). Bloky A–D (migrace `0104` přenos výsledku iniciativy ≤ 0, `0105` poznámky světa, `0106` dveře, `0107` vidění a světlo) uživatel provedl, kontrola vyšla 1, 3, 1, 1, 1, 2, 5; ověřeno na kopii produkčního stavu čistě, opakovaně i po částečném provedení a stránka Změny databáze po něm pod DML-only účtem doběhne; kód funguje i bez něj.** Dřívější stav (2026-10-27): nic nečekalo. Blok „Zbraně u sebe“ (`0101`, ALTER) i „Vytasení bez akce“ (`0102`, vkládání řádků; do ručního SQL šel, protože migrace z GitHubu nejely — viz „Deploy po 22. 10. a migrace z administrace“ níž) uživatel provedl, kontroly vyšly 1 a 2, 3, 1. Další migrace s daty se pouští tlačítkem v administraci. Blok „Iniciativa v2“ + „Zbraně a iniciativa“
+text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-11-02): čeká blok F — hodiny světa (migrace `0109`, dva `ALTER TABLE … ADD COLUMN`: `svet.aktualni_smena`, `tokeny.svetlo_zbyva`; ověřeno na kopii produkčního stavu: bez něj stránka Změny databáze správně řekne, že potřebuje ruční SQL, blok jde spustit opakovaně i po částečném provedení a po něm stránka 0109 pod DML-only účtem přeskočí a zapíše; kód funguje i bez něj — čas se nezobrazuje a světla hoří bez limitu). Dřív: blok E — noční vidění (migrace `0108`, jediný `ALTER TABLE tokeny ADD COLUMN videni_noc_sahy`) uživatel provedl, kontrola vyšla 1; ověřeno na kopii produkčního stavu (bez něj stránka Změny databáze správně řekne, že potřebuje ruční SQL, blok jde spustit opakovaně a po něm stránka 0108 pod DML-only účtem přeskočí a zapíše). Bloky A–D (migrace `0104` přenos výsledku iniciativy ≤ 0, `0105` poznámky světa, `0106` dveře, `0107` vidění a světlo) uživatel provedl, kontrola vyšla 1, 3, 1, 1, 1, 2, 5; ověřeno na kopii produkčního stavu čistě, opakovaně i po částečném provedení a stránka Změny databáze po něm pod DML-only účtem doběhne; kód funguje i bez něj.** Dřívější stav (2026-10-27): nic nečekalo. Blok „Zbraně u sebe“ (`0101`, ALTER) i „Vytasení bez akce“ (`0102`, vkládání řádků; do ručního SQL šel, protože migrace z GitHubu nejely — viz „Deploy po 22. 10. a migrace z administrace“ níž) uživatel provedl, kontroly vyšly 1 a 2, 3, 1. Další migrace s daty se pouští tlačítkem v administraci. Blok „Iniciativa v2“ + „Zbraně a iniciativa“
 uživatel provedl (kontrolní SELECT vyšel 1, 4, 3) po tom, co první „sql proběhlo“ nesedělo — deploy po předčasném přesunu `0093`
 skončil na `1142 ALTER denied`, takže sloupce na serveru nebyly. **Poučení: migraci přesouvat do `database/migrations/` až podle
 čísel z kontrolního SELECTu, ne podle slov.** Migrace `0091`–`0096` jsou v `database/migrations/`: sloupce efektů (`0091`) a data (`0092`),
@@ -1278,7 +1278,7 @@ stavby“ v návrhu.**
     bod cílové mapy a přepne aktivní mapu všem [M]
 16. Knihovna map: duplikace, velké obrázky (automatické zmenšení, limit
     hostingu), pořadí scén [M]
-17. Jedny „hodiny světa“ (den/hodina) propojené s cestou, odpočinkem a
+17. ✔ (v1, 2026-11-02: čas ve dni a hoření světel; zbývá propojení s cestou, odpočinkem a spánkem) Jedny „hodiny světa“ (den/hodina) propojené s cestou, odpočinkem a
     spánkem [M]
 
 *D. Příprava na ostré hraní*
@@ -1338,7 +1338,14 @@ V noci i ve tmě hráč vidí jen osvětlené místo; v noci navíc **tvor s no�
 ani dovnitř). Boj: lupič (hráčova postava) s nočním viděním má v noci proti cíli, kterého nevidí, postih **−2** místo −5 (`'nocni'` v `dracak_vtt_videni_tma_volba`), cíl v dosahu nočního vidění vidí
 (žádný postih). Test: `tests/e2e/noc_videni_api.js` + rozšířený `boj_ve_tme_api.js`. **Další stavy (pološero +6, soumrak/úsvit +7, úplněk +5 z tabulky b3166) zatím nejsou:** kniha pro ně nemá vzdálenosti
 a nic neříká o tom, co mění, takže by to byly jen popisky — přidají se jako řádek v `DRACAK_VTT_OSVETLENI`, až bude jasné, co který stav dělá (např. „všichni vidí do X sáhů bez světla“).
-Úplně zbývá: **hoření pochodní a lampy v čase** (3 směny / 24 směn — čeká na „hodiny světa“), sdílené vidění družiny mezi hráči (dnes každý hráč vidí svými tokeny a světla družiny
+**Hodiny světa a hoření světel (2026-11-02, bod 17 plánu; ruční SQL: migrace `0109`, sloupce `svet.aktualni_smena` a `tokeny.svetlo_zbyva`):** den už počítal `svet.aktualni_den_offset`
+(PJova ruční volba), nově přibyl čas ve dni v **směnách** (`svet.aktualni_smena` 0–143; jedna směna ≈ 10 minut, kolo ≈ 10 vteřin, b33–b34; výchozí 48 = 8:00). Čas a datum vidí v horní liště mapy všichni
+(`includes/vtt_cas.php`, `dracak_vtt_cas_stav`), **posouvá ho jen PJ** tlačítky „+1 směna“ / „+1 hodina“ (`hra/api/cas_posun.php`, událost `cas_zmena` bez mapy) a v administraci světa ho nastaví přesně (hh:mm po 10 minutách;
+oprava nic neodečítá). Nic se nepočítá samo z pohybu ani z boje (kniha b11115 sice říká, že i krátký boj se počítá za celou směnu, ale kdy čas posunout, nechává na PJ). **Hoření:** `tokeny.svetlo_zbyva` = kolik směn světlo
+(nebo zóna tmy) ještě vydrží, prázdné = bez limitu; posun času o N směn odečte N u všech takových tokenů ve světě a na nule světlo zhasne (smaže se `svetlo_sahy`, `svetlo_typ`, `svetlo_zbyva`, přijde událost `token_zmena`).
+Předvolby v panelu tokenu nastaví dobu samy: **pochodeň 3 směny** (h1685 b11183), **lucerna 24 směn** na láhev oleje (b11184), poloviční spotřeba 48 a čtvrtinová 96 směn (odvozeno: spotřeba poloviční = olej vydrží 2× déle),
+**Temnota druida 3 směny** (b1936); hůl a vlastní dosah bez limitu, PJ doplní ručně v řádku „Vydrží ještě“ (např. kouzlo Světlo nebo Tma na 1–5 směn). Test: `tests/e2e/hodiny_sveta_api.js`.
+Úplně zbývá: sdílené vidění družiny mezi hráči (dnes každý hráč vidí svými tokeny a světla družiny
 osvětlují všem), souboj panel (pořadí iniciativy) skrytou nestvůru ve tmě pořád ukáže, pokud ji PJ označil jako viditelnou.
 
 **Doporučené pořadí:** nejdřív blok A (1–3, 8), pak krátký zkušební

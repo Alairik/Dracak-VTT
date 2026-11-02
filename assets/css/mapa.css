@@ -418,3 +418,8 @@ body.denik-dock-cela { overflow:hidden; }
   .denik-dock-hlava { cursor:default; }
   .denik-hrana { display:none; }
 }
+
+/* Čas ve světě v horní liště (includes/vtt_cas.php): datum a hodina, PJ má tlačítka posunu. */
+.topbar .svet-cas { flex:none; display:flex; align-items:center; gap:6px; font-size:12px; padding-left:10px; border-left:1px solid rgba(255,255,255,.2); white-space:nowrap; }
+.topbar .svet-cas-btn { font:inherit; font-size:11px; color:#fff; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); border-radius:999px; padding:2px 8px; cursor:pointer; }
+.topbar .svet-cas-btn:hover { background:rgba(255,255,255,.22); }

@@ -18,6 +18,7 @@ $svetId = (int)$svet['id'];
 $isPjOrAdmin = dracak_vtt_je_pj_sveta($user, $svetId);
 
 require_once __DIR__ . '/../includes/vtt_mapa_stav.php';
+require_once __DIR__ . '/../includes/vtt_cas.php';
 // Tokeny, efekty, pořadí tahů a postavy k položení — jediný zdroj pravdy
 // sdílený s hra/api/mapa_stav.php (obnova "na místě" bez přenačtení stránky).
 $stav = dracak_vtt_mapa_stav(dracak_db(), $user, $mapa, $isPjOrAdmin);
@@ -158,6 +159,15 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
     <?php endforeach; ?>
   </div>
   <span class="typ">(<?= $mapa['typ_mapy'] === 'svet' ? 'světová mapa' : 'zóna' ?>)</span>
+  <?php $casSveta = dracak_vtt_cas_stav(dracak_db(), $svetId); ?>
+  <?php if ($casSveta !== null): ?>
+  <span class="svet-cas" id="svetCas" title="Čas ve světě — 1 směna je zhruba 10 minut. Posouvá ho PJ."><span id="svetCasText"><?= htmlspecialchars($casSveta['datum'] . ' · ' . $casSveta['text']) ?></span>
+    <?php if ($isPjOrAdmin): ?>
+    <button type="button" class="svet-cas-btn" data-cas-posun="1" title="Posunout čas o 1 směnu (10 minut)">+1 směna</button>
+    <button type="button" class="svet-cas-btn" data-cas-posun="6" title="Posunout čas o hodinu (6 směn)">+1 hodina</button>
+    <?php endif; ?>
+  </span>
+  <?php endif; ?>
   <a class="topbar-pravidla" href="../pravidla.php" target="_blank" rel="noopener" title="Pravidla — otevře se v nové záložce, mapa zůstane, jak je">Pravidla ↗</a>
 </div>
 
@@ -615,6 +625,10 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
         </select>
         <input class="input" type="number" id="vzhledSvetloSahy" min="0.5" max="300" step="0.5" placeholder="sáhů" style="display:none;width:6rem;">
       </div>
+      <div id="vzhledZbyvaRadek" class="vz-radek" style="display:none;">
+        <label for="vzhledZbyva">Vydrží ještě (směn; prázdné = bez limitu)</label>
+        <input class="input" type="number" id="vzhledZbyva" min="1" max="9999" step="1" placeholder="např. 3" style="width:6rem;">
+      </div>
       <div id="vzhledInfraRadek" class="vz-radek" style="display:none;">
         <label for="vzhledInfra">Infravidění (sáhů; prázdné = nemá)</label>
         <input class="input" type="number" id="vzhledInfra" min="1" max="200" step="1" placeholder="např. 20" style="width:6rem;">
@@ -802,6 +816,7 @@ window.MAPA = <?= json_encode([
     'jePj' => $isPjOrAdmin,
     'pohybAuto' => ['unava' => $pohybNastaveni['auto_unava'], 'nalozeni' => $pohybNastaveni['auto_naklad'], 'zbran' => $zbraneIni && $souboj],
     'funkce' => dracak_vtt_tokeny_funkce(),
+    'cas' => $casSveta,
     'pravidla' => dracak_vtt_souboj_pravidla(),
     'verzeModulu' => max((int)@filemtime(__DIR__ . '/../assets/js/souboj.js'), (int)@filemtime(__DIR__ . '/../assets/js/kostky3d.js'), (int)@filemtime(__DIR__ . '/../assets/js/hexy.js'), (int)@filemtime(__DIR__ . '/../assets/js/denik_dock.js')),
     'grid' => [

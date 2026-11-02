@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__ . '/../includes/vtt.php';
 require_once __DIR__ . '/../includes/vtt_pohyblivost.php';
+require_once __DIR__ . '/../includes/vtt_cas.php';
 
 // Administrace světa — PJ-only stránka, kam patří věci, co nejsou
 // denní provoz (hráči/mapy/postavy na hra/svet.php), ale nastavení
@@ -63,6 +64,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    if ($akce === 'nastavit_cas_dne') {
+        // Čas ve dni přesně (hh:mm po deseti minutách = po směnách); nic nehoří, jde o opravu času (includes/vtt_cas.php).
+        if (preg_match('/^(\d{1,2}):(\d{2})$/', (string)($_POST['cas_dne'] ?? ''), $m) && (int)$m[1] < 24 && (int)$m[2] < 60) {
+            dracak_vtt_cas_nastav(dracak_db(), $svetId, intdiv((int)$m[1] * 60 + (int)$m[2], 10), (int)$user['id']);
+        }
+        header("Location: svet_administrace.php?id=$svetId");
+        exit;
+    }
+
     if ($akce === 'posunout_cas') {
         // Celé číslo, i záporné (oprava přehmatu) — viz komentář u
         // aktualni_den_offset v migraci, posun je výhradně PJova ruční
@@ -102,6 +112,17 @@ dracak_vtt_page_start('Administrace — ' . $svet['nazev'], $user);
         <button class="btn btn-primary" type="submit">Posunout</button>
       </form>
       <p class="note" style="margin:0 0 10px;">Ruční posun — čas světa se po cestě sám neposouvá (svět eviduje jen celé dny); délku cesty spočítá kalkulačka cesty, tady posuneš čas podle ní. Kladné číslo posune čas dopředu, záporné ho vrátí zpět (oprava přehmatu); pod nulu offset neklesne.</p>
+      <?php $casDne = dracak_vtt_cas_stav(dracak_db(), $svetId); ?>
+      <?php if ($casDne !== null): ?>
+      <form method="post" style="display:flex;gap:8px;align-items:flex-end;margin-bottom:14px;">
+        <input type="hidden" name="akce" value="nastavit_cas_dne">
+        <div class="field" style="flex:1;margin:0;"><label for="cas_dne">Čas ve dni (po deseti minutách = jedna směna)</label>
+          <input class="input" type="time" id="cas_dne" name="cas_dne" step="600" value="<?= htmlspecialchars(str_pad($casDne['text'], 5, '0', STR_PAD_LEFT)) ?>">
+        </div>
+        <button class="btn btn-secondary" type="submit">Nastavit</button>
+      </form>
+      <p class="note" style="margin:0 0 10px;">Hodinu posouváš tlačítky v liště mapy (+1 směna = 10 minut, +1 hodina); posun odečte hoření světel. Tady čas jen opravíš, nic se neodečte.</p>
+      <?php endif; ?>
       <form method="post" style="display:flex;gap:8px;align-items:flex-end;">
         <input type="hidden" name="akce" value="upravit_datum">
         <div class="field" style="flex:1;margin:0;"><label for="pocatecni_datum">Počáteční datum</label>

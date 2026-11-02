@@ -178,6 +178,21 @@ foreach ($zmeny as $klic => $hodnota) {
                 $vysledek['infra'] = $infra;
             }
             break;
+        case 'zbyva':
+            // Kolik směn světlo (nebo zóna tmy) ještě vydrží; prázdné / 0 = bez limitu. Odečítá se při posunu času (hra/api/cas_posun.php).
+            if (empty($funkce['svetlo_zbyva'])) token_uprava_chyba(409, 'Hoření světel ještě není zapnuté (chybí ruční SQL).');
+            // Token bez světla (nebo se světlem zhasnutým ve stejné žádosti) dobu hoření mít nemůže — pozdní změna pole „Vydrží ještě“ po zhasnutí ji nesmí oživit.
+            $svitiPoZmene = array_key_exists('svetlo', $zmeny) ? !($zmeny['svetlo'] === null || $zmeny['svetlo'] === '' || (float)$zmeny['svetlo'] <= 0) : !empty($token['svetlo_sahy']);
+            if (!$svitiPoZmene || $hodnota === null || $hodnota === '' || (int)$hodnota <= 0) {
+                $sloupce['svetlo_zbyva'] = null;
+                $vysledek['zbyva'] = null;
+            } else {
+                $zbyva = (int)$hodnota;
+                if ($zbyva > 9999) token_uprava_chyba(422, 'Světlo může hořet nejvýš 9999 směn.');
+                $sloupce['svetlo_zbyva'] = $zbyva;
+                $vysledek['zbyva'] = $zbyva;
+            }
+            break;
         case 'noc':
             // Noční vidění tvora v sázích (lupič se Zlepšením zraku h630 b5663 atd.); prázdné / 0 = nemá. Strop jen proti překlepu, ne pravidlo.
             if (!$funkce['videni'] || empty($funkce['videni_noc'])) token_uprava_chyba(409, 'Noční vidění ještě není zapnuté (chybí ruční SQL).');

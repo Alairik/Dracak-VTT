@@ -4,7 +4,8 @@ Stav: 2026-11-02. **Hotové:** dveře (migrace `0106`), osvětlení mapy, zdroje
 Rozhodnutí uživatele: (1) ve tmě vidí hráč jen to, co právě osvětlí družina (doporučená varianta), (2) dveře smí otevírat jen PJ, (3) otázka na noční vidění lupiče zůstává otevřená
 (uživatel se ptal, co to je — viz níž). Boj ve tmě je hotový (postih −5/−4/−2, zranění bez postihu, přepínání PJ). **Zóny kouzel Tma a Temnota jsou hotové (2026-11-02, bez DDL: token se `svetlo_typ` `tma` / `temnota` a poloměrem ve `svetlo_sahy`, viz `docs/stav-projektu.md` a `includes/vtt_videni.php`).**
 **Stav mapy „Noc“ a noční vidění lupiče jsou hotové (2026-11-02, migrace `0108`; rozhodnutí uživatele: „stav noc chci, klidně až 5 stavů tmy/světla“).**
-**Zbývá:** hoření světel v čase, další stavy osvětlení (pološero, soumrak — až bude jasné, co mění), Lovcův Příkrov stínů (h1003 b7357–b7359), zamčené a tajné dveře (na seznamu, zatím nejsou potřeba).
+**Hoření světel v čase je hotové (2026-11-02, migrace `0109`, hodiny světa — viz `docs/stav-projektu.md`).**
+**Zbývá:** další stavy osvětlení (pološero, soumrak — až bude jasné, co mění), Lovcův Příkrov stínů (h1003 b7357–b7359), zamčené a tajné dveře (na seznamu, zatím nejsou potřeba).
 
 ## 1. Co říká kniha (zdroj pravdy: `content/pravidla-*.html`)
 
