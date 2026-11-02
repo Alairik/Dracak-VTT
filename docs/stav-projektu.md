@@ -20,7 +20,7 @@ neodhadování mechaniky). **Fáze 1 a 2 ze sekce "Rozpracováno:
 cestování..." jsou v kódu hotové**; **Fáze 1b (váha/kontejnery) je
 hotová v kódu, stejně jako Fáze 2–5 (zvířata, povozy, kalkulačka cesty,
 přepínače) — celé "cestování, naložení, únava" je tím hotové a nasazené,
-ruční SQL čeká jen blok E (noční vidění, migrace `0108`, viz níž).** Další velký cíl je sekce "Plán: náhrada Owlbear
+žádné ruční SQL nečeká.** Další velký cíl je sekce "Plán: náhrada Owlbear
 Rodeo" níž. Stav předchozí
 konverzace je zapsaný přesně proto, aby ses nemusel/a ptát na věci, co
 už byly rozhodnuté (viz "Architektonická rozhodnutí" a celá sekce
@@ -60,7 +60,7 @@ ním čeká, dokud se to neprovede ručně.
 
 **Ruční DDL blok je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný soubor, ve
 kterém jsou všechny dosud neprovedené DDL příkazy; uživatel ho dostává jako
-text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-11-02): čeká blok E — noční vidění (migrace `0108`, jediný `ALTER TABLE tokeny ADD COLUMN videni_noc_sahy`; ověřeno na kopii produkčního stavu: bez něj stránka Změny databáze správně řekne, že potřebuje ruční SQL, blok jde spustit opakovaně a po něm stránka 0108 pod DML-only účtem přeskočí a zapíše; kód funguje i bez něj, jen se u tokenu nenabízí řádek Noční vidění). Dřívější stav: nic nečekalo. Bloky A–D (migrace `0104` přenos výsledku iniciativy ≤ 0, `0105` poznámky světa, `0106` dveře, `0107` vidění a světlo) uživatel provedl, kontrola vyšla 1, 3, 1, 1, 1, 2, 5; ověřeno na kopii produkčního stavu čistě, opakovaně i po částečném provedení a stránka Změny databáze po něm pod DML-only účtem doběhne; kód funguje i bez něj.** Dřívější stav (2026-10-27): nic nečekalo. Blok „Zbraně u sebe“ (`0101`, ALTER) i „Vytasení bez akce“ (`0102`, vkládání řádků; do ručního SQL šel, protože migrace z GitHubu nejely — viz „Deploy po 22. 10. a migrace z administrace“ níž) uživatel provedl, kontroly vyšly 1 a 2, 3, 1. Další migrace s daty se pouští tlačítkem v administraci. Blok „Iniciativa v2“ + „Zbraně a iniciativa“
+text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-11-02): nic nečeká. Blok E — noční vidění (migrace `0108`, jediný `ALTER TABLE tokeny ADD COLUMN videni_noc_sahy`) uživatel provedl, kontrola vyšla 1; ověřeno na kopii produkčního stavu (bez něj stránka Změny databáze správně řekne, že potřebuje ruční SQL, blok jde spustit opakovaně a po něm stránka 0108 pod DML-only účtem přeskočí a zapíše). Bloky A–D (migrace `0104` přenos výsledku iniciativy ≤ 0, `0105` poznámky světa, `0106` dveře, `0107` vidění a světlo) uživatel provedl, kontrola vyšla 1, 3, 1, 1, 1, 2, 5; ověřeno na kopii produkčního stavu čistě, opakovaně i po částečném provedení a stránka Změny databáze po něm pod DML-only účtem doběhne; kód funguje i bez něj.** Dřívější stav (2026-10-27): nic nečekalo. Blok „Zbraně u sebe“ (`0101`, ALTER) i „Vytasení bez akce“ (`0102`, vkládání řádků; do ručního SQL šel, protože migrace z GitHubu nejely — viz „Deploy po 22. 10. a migrace z administrace“ níž) uživatel provedl, kontroly vyšly 1 a 2, 3, 1. Další migrace s daty se pouští tlačítkem v administraci. Blok „Iniciativa v2“ + „Zbraně a iniciativa“
 uživatel provedl (kontrolní SELECT vyšel 1, 4, 3) po tom, co první „sql proběhlo“ nesedělo — deploy po předčasném přesunu `0093`
 skončil na `1142 ALTER denied`, takže sloupce na serveru nebyly. **Poučení: migraci přesouvat do `database/migrations/` až podle
 čísel z kontrolního SELECTu, ne podle slov.** Migrace `0091`–`0096` jsou v `database/migrations/`: sloupce efektů (`0091`) a data (`0092`),
