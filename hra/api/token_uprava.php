@@ -140,6 +140,45 @@ foreach ($zmeny as $klic => $hodnota) {
                 $vysledek['obrazek_id'] = (int)$hodnota;
             }
             break;
+        case 'svetlo':
+            // Dosah světla tokenu v sázích (prázdné / 0 = nesvítí). Strop 60 sáhů hlídá jen proti překlepu, ne pravidlo.
+            if (!$funkce['videni']) token_uprava_chyba(409, 'Světlo a tma ještě nejsou zapnuté (chybí ruční SQL).');
+            if ($hodnota === null || $hodnota === '' || (float)$hodnota <= 0) {
+                $sloupce['svetlo_sahy'] = null;
+                $sloupce['svetlo_typ'] = null;
+                $vysledek['svetlo'] = null;
+                $vysledek['svetlo_typ'] = null;
+            } else {
+                $sahy = round((float)$hodnota * 2) / 2;
+                if ($sahy < 0.5 || $sahy > 60) token_uprava_chyba(422, 'Světlo svítí od 0,5 do 60 sáhů.');
+                $sloupce['svetlo_sahy'] = $sahy;
+                $vysledek['svetlo'] = $sahy;
+            }
+            break;
+        case 'svetlo_typ':
+            if (!$funkce['videni']) token_uprava_chyba(409, 'Světlo a tma ještě nejsou zapnuté (chybí ruční SQL).');
+            $typ = is_string($hodnota) ? trim($hodnota) : '';
+            if (!in_array($typ, ['', 'pochoden', 'lucerna', 'hul', 'svetlo', 'vlastni'], true)) token_uprava_chyba(422, 'Neznámý druh světla.');
+            $sloupce['svetlo_typ'] = $typ === '' ? null : $typ;
+            $vysledek['svetlo_typ'] = $typ === '' ? null : $typ;
+            break;
+        case 'infra':
+            if (!$funkce['videni']) token_uprava_chyba(409, 'Světlo a tma ještě nejsou zapnuté (chybí ruční SQL).');
+            if ($hodnota === null || $hodnota === '' || (int)$hodnota <= 0) {
+                $sloupce['videni_infra_sahy'] = null;
+                $vysledek['infra'] = null;
+            } else {
+                $infra = (int)$hodnota;
+                if ($infra > 200) token_uprava_chyba(422, 'Infravidění může sahat nejvýš 200 sáhů.');
+                $sloupce['videni_infra_sahy'] = $infra;
+                $vysledek['infra'] = $infra;
+            }
+            break;
+        case 'studeny':
+            if (!$funkce['videni']) token_uprava_chyba(409, 'Světlo a tma ještě nejsou zapnuté (chybí ruční SQL).');
+            $sloupce['studeny'] = $hodnota ? 1 : 0;
+            $vysledek['studeny'] = (bool)$hodnota;
+            break;
         case 'viditelny':
             $sloupce['viditelny_hracum'] = $hodnota ? 1 : 0;
             $vysledek['viditelny'] = (bool)$hodnota;

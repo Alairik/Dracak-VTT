@@ -246,12 +246,26 @@ function renderMlha(stav) {
   ctx.clearRect(0, 0, w, h);
   if (!stav || stav.zadna_mlha || !stav.sloupcu || !stav.radku) return;
   const bin = atob(stav.bitmapa_b64);
+  // Mapa „Tma“ (includes/vtt_videni.php): „videne_b64“ = buňky, které hráč vidí TEĎ. Co už viděl, ale teď nevidí, je jen ztlumené (paměť),
+  // co neviděl nikdy, je zahalené jako dřív.
+  const videno = stav.videni && stav.videne_b64 ? atob(stav.videne_b64) : null;
   ctx.fillStyle = mlhaBarvaSkryte();
   for (let r = 0; r < stav.radku; r++) {
     for (let c = 0; c < stav.sloupcu; c++) {
       if (bin.charCodeAt(r * stav.sloupcu + c) === 1) continue;
       const stred = mlhaBunkaStred(r + stav.min_row, c + stav.min_col);
       ctx.fill(mlhaBunkaTvarCesta(stred.x, stred.y));
+    }
+  }
+  if (videno !== null) {
+    ctx.fillStyle = 'rgba(8,8,10,0.62)';
+    for (let r = 0; r < stav.radku; r++) {
+      for (let c = 0; c < stav.sloupcu; c++) {
+        const i = r * stav.sloupcu + c;
+        if (bin.charCodeAt(i) !== 1 || videno.charCodeAt(i) === 1) continue;
+        const stred = mlhaBunkaStred(r + stav.min_row, c + stav.min_col);
+        ctx.fill(mlhaBunkaTvarCesta(stred.x, stred.y));
+      }
     }
   }
 }
@@ -267,7 +281,11 @@ function osvezitMlhu() {
   }
   fetch('api/mlha_stav.php?mapa_id=' + MAPA_ID)
     .then(r => r.json())
-    .then(renderMlha)
+    .then((stav) => {
+      renderMlha(stav);
+      // Mapa „Tma“: co hráč vidí, se mění s pohybem a světlem — tokeny mimo dohled zmizí, nově spatřené se objeví.
+      if (stav && stav.videni) planujObnovuStavu();
+    })
     .catch(() => {});
 }
 
@@ -325,6 +343,20 @@ function renderGrid() {
 // --- Zdi: vykreslení (barva podle blokuje_pohyb/blokuje_vystrel, skrytá
 // zeď jen v náhledu PJ jako přerušovaná a poloprůhledná — hráčům se sem
 // vůbec nedostane, viz filtr v mapa.php i udalosti.php). ---
+// Dosah světel (jen PJ): přerušovaný kruh kolem každého tokenu, který svítí. Hráčům se nekreslí (nesmí vidět, co je kde zapálené).
+function renderSvetla() {
+  const svg = document.getElementById('svetlaSvg');
+  if (!svg) return;
+  const sah = pxNaSah();
+  let html = '';
+  if (IS_PJ_OR_ADMIN && sah > 0) {
+    tokeny.forEach(t => {
+      if (!t.svetlo) return;
+      html += '<circle cx="' + t.x + '" cy="' + t.y + '" r="' + (t.svetlo * sah) + '" fill="rgba(255,196,80,0.10)" stroke="#e8a838" stroke-width="2" stroke-dasharray="6 5" vector-effect="non-scaling-stroke"/>';
+    });
+  }
+  svg.innerHTML = html;
+}
 function renderZdi() {
   const svg = document.getElementById('zdiSvg');
   if (!svg) return;
@@ -774,6 +806,19 @@ if (mlhaAktivniChk) {
       });
   });
 }
+const mapaOsvetleniSel = document.getElementById('mapaOsvetleni');
+if (mapaOsvetleniSel) {
+  mapaOsvetleniSel.addEventListener('change', () => {
+    const nove = mapaOsvetleniSel.value;
+    postJson('api/mapa_osvetleni.php', {mapa_id: MAPA_ID, osvetleni: nove}).then(d => {
+      if (d.error) { logLine('Chyba: ' + d.error); mapaOsvetleniSel.value = CFG.osvetleni || 'den'; return; }
+      CFG.osvetleni = d.osvetleni;
+      posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
+      logLine(d.osvetleni === 'tma' ? 'Mapa je ve tmě — hráči vidí jen osvětlené místo.' : 'Mapa je zase osvětlená — mlha jako dosud.');
+      osvezitMlhu();
+    });
+  });
+}
 const mlhaNahledSelect = document.getElementById('mlhaNahledSelect');
 const mlhaKresliciFields = document.getElementById('mlhaKresliciFields');
 function zrusitMlhaNahled() {
@@ -1149,6 +1194,7 @@ function nakreslitTelo(t, el) {
 }
 
 function nakreslitTokeny() {
+  if (typeof renderSvetla === 'function') setTimeout(renderSvetla, 0);
   const zive = new Set();
   tokeny.forEach((t) => { zive.add(t.id); nakreslitToken(t); });
   for (const [id, el] of tokenEl) {
@@ -1225,6 +1271,7 @@ function pouzitZmenyTokenu(t, zmeny) {
   }
   nakreslitToken(t);
   aktualizujRotacniUchyt();
+  if ('svetlo' in zmeny) renderSvetla();
   if (spravovanyToken && spravovanyToken.tokenId === t.id) obnovVzhledSekci();
 }
 function upravToken(t, zmeny) {
@@ -1259,6 +1306,8 @@ const vzhledEl = {
   obrazekRadek: document.getElementById('vzhledObrazekRadek'), obrazekNahled: document.getElementById('vzhledObrazekNahled'),
   zamcenoRadek: document.getElementById('vzhledZamcenoRadek'), zamceno: document.getElementById('vzhledZamceno'),
   skrytyRadek: document.getElementById('vzhledSkrytyRadek'), skryty: document.getElementById('vzhledSkryty'),
+  svetloRadek: document.getElementById('vzhledSvetloRadek'), svetlo: document.getElementById('vzhledSvetlo'), svetloSahy: document.getElementById('vzhledSvetloSahy'),
+  infraRadek: document.getElementById('vzhledInfraRadek'), infra: document.getElementById('vzhledInfra'), studeny: document.getElementById('vzhledStudeny'),
 };
 function spravovanyTokenData() { return spravovanyToken ? tokenData(spravovanyToken.tokenId) : null; }
 
@@ -1276,6 +1325,8 @@ function obnovVzhledSekci() {
     [vzhledEl.obrazekRadek, smiObrazek],
     [vzhledEl.zamcenoRadek, pj && FUNKCE.zamek],
     [vzhledEl.skrytyRadek, pj && FUNKCE.udalosti],
+    [vzhledEl.svetloRadek, pj && FUNKCE.videni],
+    [vzhledEl.infraRadek, pj && FUNKCE.videni && ['postava', 'nestvura_instance'].includes(t.typ_entity)],
   ];
   radky.forEach(([el, zobrazit]) => { if (el) el.style.display = zobrazit ? '' : 'none'; });
   vzhledEl.sekce.style.display = radky.some(([, z]) => z) ? '' : 'none';
@@ -1285,6 +1336,16 @@ function obnovVzhledSekci() {
   if (vzhledEl.hexu) vzhledEl.hexu.querySelectorAll('button').forEach((b) => b.classList.toggle('aktivni', parseInt(b.dataset.hexu, 10) === (t.hexu || 1)));
   if (vzhledEl.zamceno) vzhledEl.zamceno.checked = !!t.zamceno;
   if (vzhledEl.skryty) vzhledEl.skryty.checked = !t.viditelny;
+  if (vzhledEl.svetlo) {
+    // Výběr podle uloženého druhu a dosahu; neodpovídá-li žádné předvolbě, je to „Vlastní“.
+    const klic = t.svetlo ? (t.svetlo_typ || 'vlastni') + ':' + t.svetlo : '';
+    const znama = Array.from(vzhledEl.svetlo.options).some((o) => o.value === klic);
+    vzhledEl.svetlo.value = !t.svetlo ? '' : (znama ? klic : 'vlastni');
+    vzhledEl.svetloSahy.style.display = vzhledEl.svetlo.value === 'vlastni' ? '' : 'none';
+    if (document.activeElement !== vzhledEl.svetloSahy) vzhledEl.svetloSahy.value = t.svetlo && vzhledEl.svetlo.value === 'vlastni' ? t.svetlo : '';
+  }
+  if (vzhledEl.infra && document.activeElement !== vzhledEl.infra) vzhledEl.infra.value = t.infra || '';
+  if (vzhledEl.studeny) vzhledEl.studeny.checked = !!t.studeny;
   if (vzhledEl.obrazekNahled) {
     vzhledEl.obrazekNahled.style.backgroundImage = t.obrazek_id ? "url('obrazek.php?id=" + t.obrazek_id + "')" : '';
   }
@@ -1318,6 +1379,28 @@ if (vzhledEl.sekce) {
   document.getElementById('vzhledOtocR').addEventListener('click', () => { const t = spravovanyTokenData(); if (t) otocitTokenO(t, krokOtoceni()); });
   vzhledEl.zamceno.addEventListener('change', () => { const t = spravovanyTokenData(); if (t) upravToken(t, {zamceno: vzhledEl.zamceno.checked}); });
   vzhledEl.skryty.addEventListener('change', () => { const t = spravovanyTokenData(); if (t) upravToken(t, {viditelny: !vzhledEl.skryty.checked}); });
+  // Světlo, infravidění a studenokrevnost (jen PJ, mapa „Tma“ — viz includes/vtt_videni.php).
+  if (vzhledEl.svetlo) {
+    vzhledEl.svetlo.addEventListener('change', () => {
+      const t = spravovanyTokenData();
+      if (!t) return;
+      const v = vzhledEl.svetlo.value;
+      if (v === '') { upravToken(t, {svetlo: null, svetlo_typ: null}); return; }
+      if (v === 'vlastni') { vzhledEl.svetloSahy.style.display = ''; vzhledEl.svetloSahy.focus(); return; }
+      const [typ, sahy] = v.split(':');
+      upravToken(t, {svetlo: parseFloat(sahy), svetlo_typ: typ});
+    });
+    vzhledEl.svetloSahy.addEventListener('change', () => {
+      const t = spravovanyTokenData();
+      const sahy = parseFloat(vzhledEl.svetloSahy.value);
+      if (t && sahy > 0) upravToken(t, {svetlo: sahy, svetlo_typ: 'vlastni'});
+    });
+    vzhledEl.infra.addEventListener('change', () => {
+      const t = spravovanyTokenData();
+      if (t) upravToken(t, {infra: parseInt(vzhledEl.infra.value, 10) || null});
+    });
+    vzhledEl.studeny.addEventListener('change', () => { const t = spravovanyTokenData(); if (t) upravToken(t, {studeny: vzhledEl.studeny.checked}); });
+  }
   const ulozNazev = () => {
     const t = spravovanyTokenData();
     if (t) upravToken(t, {nazev: vzhledEl.nazev.value.trim()}).then(() => { document.getElementById('spravovatNazev').textContent = vzhledEl.nazev.value.trim() || t.label; });
@@ -2886,6 +2969,9 @@ function applyEvent(u) {
       t.x = u.payload.x_po;
       t.y = u.payload.y_po;
       if (!drzeneTokeny.has(t.id)) nakreslitToken(t);
+      if (t.svetlo) renderSvetla();
+    } else if (naTeteMape) {
+      planujObnovuStavu();   // token, který klient nezná (třeba právě vstoupil do dohledu)
     }
     if (naTeteMape) obnovitMlhuPoPollu = true;
   } else if (u.typ === 'kresba_pridana') {
@@ -2920,6 +3006,7 @@ function applyEvent(u) {
     } else {
       pouzitZmenyTokenu(t, zm);
     }
+    if (naTeteMape && ('svetlo' in zm || 'infra' in zm || 'studeny' in zm)) { obnovitMlhuPoPollu = true; renderSvetla(); }
   } else if (u.typ === 'kostka_hod') {
     logLine((u.payload.hodil || '?') + ' hodil ' + u.payload.notace + ': [' + u.payload.hody.join(', ') + ']'
       + (u.payload.bonus ? (u.payload.bonus > 0 ? '+' : '') + u.payload.bonus : '') + ' = ' + u.payload.celkem);
@@ -2950,6 +3037,15 @@ function applyEvent(u) {
     if (u.mapa_id == MAPA_ID) {
       const z = zdiList.find(q => q.id === u.payload.id);
       if (z) { z.otevrene = !!u.payload.otevrene; renderZdi(); }
+      obnovitMlhuPoPollu = true;   // dveře mění výhled
+    }
+  } else if (u.typ === 'mapa_osvetleni') {
+    if (u.mapa_id == MAPA_ID) {
+      CFG.osvetleni = u.payload.osvetleni;
+      const sel = document.getElementById('mapaOsvetleni');
+      if (sel) sel.value = u.payload.osvetleni;
+      obnovitMlhuPoPollu = true;
+      planujObnovuStavu();
     }
   } else if (u.typ === 'zed_smazana') {
     if (u.mapa_id == MAPA_ID) {

@@ -1,14 +1,15 @@
 -- Dračák VTT — SQL k ručnímu spuštění (phpMyAdmin, admin účet, vybraná databáze Dračáku — TA SAMÁ, kterou používá web).
 --
--- Tři bloky v jednom, jde spustit celé najednou:
+-- Čtyři bloky v jednom, jde spustit celé najednou:
 --  A) Přenos výsledku iniciativy 0 a méně do dalšího kola (migrace 0104): tvor, který skončí na 0 a méně, si v dalším kole znovu
 --     hodí, ale místo obvyklých postihů použije výsledek z minulého kola (h1622 b10805).
 --  B) Poznámky světa (migrace 0105): štítek (Úkol / NPC / Kořist / Příběh / Místo), vazba na postavu nebo NPC, čas úpravy,
 --     a tabulka „přečteno“ pro odznak nepřečtených poznámek.
 --  C) Dveře (migrace 0106): zeď, kterou jde otevřít a zavřít (otevřené dveře neblokují pohyb, výhled ani střelu).
+--  D) Vidění a světlo (migrace 0107): osvětlení mapy (den / tma), světlo a infravidění u tokenu, studenokrevný tvor.
 -- Samé přidávání sloupců a jedné tabulky — nic se nemění ani nemaže; jde spustit opakovaně a v libovolném stavu databáze.
--- Bez tohoto SQL zůstává iniciativa, poznámky i zdi jako dosud (nic se nepřenáší, poznámky jen s textem, místem a sdílením, dveře
--- se v nabídce zdí nezobrazují).
+-- Bez tohoto SQL zůstává iniciativa, poznámky, zdi i mapa jako dosud (nic se nepřenáší, poznámky jen s textem, místem a sdílením, dveře
+-- se v nabídce zdí nezobrazují, světlo a tma se u mapy a tokenů nenabízí).
 --
 -- Sem se zapisují jen příkazy, které migrate.php pod DML-only účtem neumí (CREATE, ALTER, DROP…).
 -- Každý blok musí jít spustit opakovaně a v libovolném stavu DB (kontrola přes information_schema
@@ -96,7 +97,52 @@ SET @s = (SELECT IF(COUNT(*) = 0,
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'zdi' AND COLUMN_NAME = 'otevrene');
 PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
 
--- Kontrola — očekávané hodnoty: 1, 3, 1, 1, 1, 2
+-- D1) Mapa: osvětlení (den = jako dosud, tma = hráči vidí jen osvětlené místo).
+SET @s = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE mapy
+     ADD COLUMN osvetleni VARCHAR(8) NOT NULL DEFAULT ''den'' COMMENT ''den / tma — ve tmě hráči vidí jen osvětlené místo''',
+  'DO 0')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mapy' AND COLUMN_NAME = 'osvetleni');
+PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
+
+-- D2) Token: dosah světla v sázích (prázdné = nesvítí).
+SET @s = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE tokeny
+     ADD COLUMN svetlo_sahy DECIMAL(4,1) NULL COMMENT ''dosah světla tokenu v sázích (NULL = nesvítí)''',
+  'DO 0')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tokeny' AND COLUMN_NAME = 'svetlo_sahy');
+PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
+
+-- D3) Token: druh světla (pro rozhraní).
+SET @s = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE tokeny
+     ADD COLUMN svetlo_typ VARCHAR(16) NULL COMMENT ''pochoden / lucerna / hul / svetlo / vlastni''',
+  'DO 0')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tokeny' AND COLUMN_NAME = 'svetlo_typ');
+PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
+
+-- D4) Token: dosah infravidění v sázích (trpaslík 20, lovec 50).
+SET @s = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE tokeny
+     ADD COLUMN videni_infra_sahy SMALLINT UNSIGNED NULL COMMENT ''dosah infravidění v sázích (NULL = nemá)''',
+  'DO 0')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tokeny' AND COLUMN_NAME = 'videni_infra_sahy');
+PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
+
+-- D5) Token: studenokrevný tvor (infravidění ho nevidí).
+SET @s = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE tokeny
+     ADD COLUMN studeny TINYINT(1) NOT NULL DEFAULT 0 COMMENT ''1 = studenokrevný tvor, infravidění ho nevidí''',
+  'DO 0')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tokeny' AND COLUMN_NAME = 'studeny');
+PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
+
+-- Kontrola — očekávané hodnoty: 1, 3, 1, 1, 1, 2, 5
 SELECT
   (SELECT COUNT(*) FROM information_schema.COLUMNS
     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'kolo_ucastnik' AND COLUMN_NAME = 'ini_prenos') AS ini_prenos,
@@ -109,4 +155,7 @@ SELECT
   (SELECT COUNT(*) FROM information_schema.TABLES
     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'svet_poznamka_precteno') AS tabulka_precteno,
   (SELECT COUNT(*) FROM information_schema.COLUMNS
-    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'zdi' AND COLUMN_NAME IN ('dvere', 'otevrene')) AS sloupce_dveri;
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'zdi' AND COLUMN_NAME IN ('dvere', 'otevrene')) AS sloupce_dveri,
+  (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND ((TABLE_NAME = 'mapy' AND COLUMN_NAME = 'osvetleni')
+      OR (TABLE_NAME = 'tokeny' AND COLUMN_NAME IN ('svetlo_sahy', 'svetlo_typ', 'videni_infra_sahy', 'studeny')))) AS sloupce_videni;

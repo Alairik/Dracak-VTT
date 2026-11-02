@@ -24,7 +24,7 @@ function dracak_vtt_ddl_mapa(): array
     if ($stav !== null) {
         return $stav;
     }
-    $stav = ['sloupce' => [], 'typ_entity' => '', 'udalosti_varchar' => false, 'tabulky' => [], 'kolo_sloupce' => [], 'efekty_sloupce' => [], 'ini_sloupce' => []];
+    $stav = ['sloupce' => [], 'typ_entity' => '', 'udalosti_varchar' => false, 'tabulky' => [], 'kolo_sloupce' => [], 'efekty_sloupce' => [], 'ini_sloupce' => [], 'videni_sloupce' => []];
     try {
         $pdo = dracak_db();
         foreach ($pdo->query(
@@ -59,6 +59,13 @@ function dracak_vtt_ddl_mapa(): array
                AND COLUMN_NAME IN ("utoku_za_2_kola", "zavazek", "zavazek_akci", "zavazek_hotovo", "akce_hotovo", "chvat", "trida_zbrane", "ini_postih", "ini_prenos")'
         )->fetchAll(PDO::FETCH_NUM) as [$tabulka, $sloupec]) {
             $stav['ini_sloupce'][$tabulka . '.' . $sloupec] = true;
+        }
+        foreach ($pdo->query(
+            'SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND ((TABLE_NAME = "mapy" AND COLUMN_NAME = "osvetleni")
+               OR (TABLE_NAME = "tokeny" AND COLUMN_NAME IN ("svetlo_sahy", "svetlo_typ", "videni_infra_sahy", "studeny")))'
+        )->fetchAll(PDO::FETCH_NUM) as [$tabulka, $sloupec]) {
+            $stav['videni_sloupce'][$tabulka . '.' . $sloupec] = true;
         }
         foreach ($pdo->query(
             'SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS
@@ -118,6 +125,8 @@ function dracak_vtt_tokeny_funkce(): array
         // postih držené zbraně se přičte k iniciativě sám, místo ručního zaškrtávání „Obouruční zbraň“ / „Těžká kuše“.
         // Přenos výsledku iniciativy ≤ 0 do dalšího kola (ruční SQL: kolo_ucastnik.ini_prenos, migrace 0104): bez sloupce se nepřenáší.
         'ini_prenos' => $udalosti && isset($ddl['tabulky']['kolo_ucastnik']) && isset($ddl['ini_sloupce']['kolo_ucastnik.ini_prenos']),
+        // Vidění a světlo (ruční SQL, migrace 0107: mapy.osvetleni, tokeny.svetlo_sahy…): mapa „Tma“ a zdroje světla na tokenech.
+        'videni' => count($ddl['videni_sloupce']) === 5,
         'zbrane_ini' => isset($ddl['ini_sloupce']['predmety.chvat'], $ddl['ini_sloupce']['predmety.trida_zbrane'], $ddl['ini_sloupce']['predmety.ini_postih']),
         'efekty_mech' => isset($ddl['tabulky']['efekt_slozky'])
             && isset($ddl['efekty_sloupce']['efekty.mechanika_stav'], $ddl['efekty_sloupce']['efekty.trvani_kol'],
@@ -138,6 +147,10 @@ const DRACAK_VTT_TOKEN_KLIC_NA_SLOUPEC = [
     'obrazek_id' => 'obrazek_id',
     'viditelny' => 'viditelny_hracum',
     'z' => 'z_poradi',
+    'svetlo' => 'svetlo_sahy',
+    'svetlo_typ' => 'svetlo_typ',
+    'infra' => 'videni_infra_sahy',
+    'studeny' => 'studeny',
 ];
 
 // Hodnota klíče z řádku tabulky tokeny ve tvaru, v jakém ji nese token_zmena.
@@ -151,7 +164,9 @@ function dracak_vtt_token_hodnota_klice(array $radek, string $klic)
     return match ($klic) {
         'smer', 'z', 'hexu' => (int)$h,
         'velikost' => (float)$h,
-        'zamceno', 'viditelny' => (bool)$h,
+        'zamceno', 'viditelny', 'studeny' => (bool)$h,
+        'svetlo' => $h === null ? null : (float)$h,
+        'infra' => $h === null ? null : (int)$h,
         'obrazek_id' => $h === null ? null : (int)$h,
         default => $h === null ? null : (string)$h,
     };
@@ -185,9 +200,15 @@ function dracak_vtt_mapa_stav(PDO $pdo, array $user, array $mapa, bool $jePj): a
     $koloStav = $stmt->fetch() ?: null;
     $aktivniTokenId = $koloStav ? (int)($koloStav['aktivni_token_id'] ?? 0) : 0;
 
+    // Mapa „Tma“: hráč nedostane tokeny, které zrovna nevidí (jen družina a to, co osvětlí světlo nebo prozradí infravidění).
+    $skryteVidenim = [];
+    if (!$jePj) {
+        require_once __DIR__ . '/vtt_videni.php';
+        $skryteVidenim = dracak_vtt_videni_skryte_tokeny($pdo, $mapa, (int)$user['id']);
+    }
     $tokeny = [];
     foreach ($radky as $t) {
-        if (!$jePj && !(bool)$t['viditelny_hracum']) {
+        if (!$jePj && (!(bool)$t['viditelny_hracum'] || isset($skryteVidenim[(int)$t['id']]))) {
             continue;
         }
         $jePostava = $t['typ_entity'] === 'postava';
@@ -223,6 +244,10 @@ function dracak_vtt_mapa_stav(PDO $pdo, array $user, array $mapa, bool $jePj): a
             'barva' => isset($t['barva']) && $t['barva'] !== null && $t['barva'] !== '' ? (string)$t['barva'] : null,
             'zamceno' => isset($t['zamceno']) ? (bool)$t['zamceno'] : false,
             'obrazek_id' => isset($t['obrazek_id']) && $t['obrazek_id'] !== null ? (int)$t['obrazek_id'] : null,
+            'svetlo' => isset($t['svetlo_sahy']) && $t['svetlo_sahy'] !== null ? (float)$t['svetlo_sahy'] : null,
+            'svetlo_typ' => isset($t['svetlo_typ']) && $t['svetlo_typ'] !== null ? (string)$t['svetlo_typ'] : null,
+            'infra' => isset($t['videni_infra_sahy']) && $t['videni_infra_sahy'] !== null ? (int)$t['videni_infra_sahy'] : null,
+            'studeny' => isset($t['studeny']) ? (bool)$t['studeny'] : false,
         ];
     }
 

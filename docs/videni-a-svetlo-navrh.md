@@ -1,7 +1,8 @@
 # Vidění a světlo — podklady z knihy a návrh stavby (blok E plánu „náhrada Owlbear“)
 
-Stav: 2026-11-02. **Dveře jsou hotové** (migrace `0106`). Zbytek (osvětlení mapy, zdroje světla, živé vidění, infravidění, boj ve tmě) čeká na
-rozhodnutí uživatele z oddílu „Otázky“ — jsou to rozhodnutí o tom, co má hra dělat, ne technická.
+Stav: 2026-11-02. **Hotové:** dveře (migrace `0106`), osvětlení mapy, zdroje světla, živé vidění po buňkách, skrývání tokenů mimo dohled a infravidění (migrace `0107`).
+Rozhodnutí uživatele: (1) ve tmě vidí hráč jen to, co právě osvětlí družina (doporučená varianta), (2) dveře smí otevírat jen PJ, (3) otázka na noční vidění lupiče zůstává otevřená
+(uživatel se ptal, co to je — viz níž). **Zbývá:** boj ve tmě, zóny kouzel Tma a Temnota, hoření světel v čase, noční vidění lupiče, zamčené a tajné dveře (na seznamu, zatím nejsou potřeba).
 
 ## 1. Co říká kniha (zdroj pravdy: `content/pravidla-*.html`)
 
@@ -57,12 +58,12 @@ Drobnost k proofreadingu: paladin „září jako Lucerna (7 sáhů)“ (h1299 b
 - Když útočník (jeho strana) cíl nevidí, útok nabídne postih **−5** (a −4, má-li PJ za to, že tuší, kde stojí); lupič s nočním viděním −2. Využije existující okno „Obrana / útok“
   s opravami; PJ může kdykoli přepsat. Iniciativu neřeší automaticky (kniha říká „ztrácí iniciativu“ — nechává se na PJ, aby to nebylo překvapení).
 
-## 4. Otázky pro uživatele (lidsky, s příkladem a doporučením)
+## 4. Otázky pro uživatele a odpovědi (2026-11-02)
 
-1. **Má hráč ve tmě vidět jen to, co zrovna osvětlí jeho družina (a jak daleko vidí)?**
+1. **ODPOVĚZENO: ano, podle doporučení.** **Má hráč ve tmě vidět jen to, co zrovna osvětlí jeho družina (a jak daleko vidí)?**
    Příklad: družina jde chodbou s pochodní, vidí 6 sáhů. Goblin stojí 10 sáhů před nimi ve tmě. *Doporučení:* hráči goblina **nevidí**, dokud nevstoupí do světla;
    to, kudy družina prošla, zůstane na mapě ztlumeně jako paměť, ale nestvůry v ní hráči nevidí. Trpaslík s infraviděním ho uvidí do 20 sáhů jako červenou skvrnu.
    Alternativa: dosavadní chování (co družina jednou odhalila, vidí navždy včetně nestvůr) a světlo jen rozhoduje, co se odhalí.
-2. **Kdo smí otevírat a zavírat dveře?** Dnes jen PJ (hráč řekne, PJ klikne). *Doporučení:* začít tak; později můžeme dovolit hráči dveře, u kterých stojí jeho postava.
-3. **Jak daleko vidí lupič s nočním viděním při slabém světle?** Kniha říká jen „potřebuje nepatrně světla“ (číslo v ní není). *Doporučení:* vidí dvakrát dál než ostatní
+2. **ODPOVĚZENO: jen PJ.** **Kdo smí otevírat a zavírat dveře?** Dnes jen PJ (hráč řekne, PJ klikne). *Doporučení:* začít tak; později můžeme dovolit hráči dveře, u kterých stojí jeho postava.
+3. **ČEKÁ (uživatel se zeptal, co noční vidění je: lupičova schopnost „Zlepšení zraku“, h630 b5663 — vidí při nepatrném světle, v úplné tmě ne, a není to infravidění).** **Jak daleko vidí lupič s nočním viděním při slabém světle?** Kniha říká jen „potřebuje nepatrně světla“ (číslo v ní není). *Doporučení:* vidí dvakrát dál než ostatní
    kolem každého zdroje světla, v úplné tmě nic — ale to je moje domněnka, rozhodnutí je tvoje. Podobně **dosah svíčky** kniha neuvádí (lze zadat ručně u každého světla).

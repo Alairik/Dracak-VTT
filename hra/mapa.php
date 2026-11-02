@@ -169,6 +169,7 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
     <div id="mapWrap">
       <img id="mapImg" src="mapa_obrazek.php?id=<?= $mapaId ?>" draggable="false" style="display:block;max-width:none;-webkit-user-drag:none;user-select:none;">
       <svg id="gridSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:0;"></svg>
+      <svg id="svetlaSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:4;"></svg>
       <svg id="zdiSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:5;"></svg>
       <svg id="kresbySvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:8;"></svg>
       <svg id="soubojSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:95;"></svg>
@@ -465,6 +466,14 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
     <label style="display:flex;align-items:center;gap:6px;font-weight:400;">
       <input type="checkbox" id="mlhaAktivniChk" <?= $mapa['mlha_aktivni'] ? 'checked' : '' ?>> Mlha aktivní na týhle mapě
     </label>
+    <?php if (dracak_vtt_tokeny_funkce()['videni']): ?>
+    <label for="mapaOsvetleni" style="margin-top:10px;">Osvětlení mapy</label>
+    <select class="input" id="mapaOsvetleni">
+      <option value="den" <?= ($mapa['osvetleni'] ?? 'den') === 'den' ? 'selected' : '' ?>>Světlo (mlha jako dosud)</option>
+      <option value="tma" <?= ($mapa['osvetleni'] ?? 'den') === 'tma' ? 'selected' : '' ?>>Tma (hráči vidí jen osvětlené místo)</option>
+    </select>
+    <p class="note" style="margin-top:4px;">Ve tmě hráč vidí jen to, co osvítí pochodeň, lucerna nebo jiný zdroj světla (nastavíš u tokenu). Kudy prošel, zůstane ztlumeně; nestvůry mimo dohled nevidí. Funguje při zapnuté mlze a nastaveném gridu.</p>
+    <?php endif; ?>
     <p class="note" style="margin-top:4px;">Vypnuté = hráči vidí celou mapu bez odhalování, stejně jako ty. Mlha vyžaduje nastavený grid (respektuje jeho buňky/hexy) — bez gridu nejde zapnout.</p>
     <div style="display:flex;gap:6px;margin-top:10px;">
       <button class="btn btn-secondary" type="button" id="mlhaOdhalitVseBtn" style="flex:1;font-size:12px;">Odhalit mapu všem</button>
@@ -587,6 +596,25 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
       </div>
       <label id="vzhledZamcenoRadek" class="vz-check" style="display:none;"><input type="checkbox" id="vzhledZamceno"> Zamknout polohu</label>
       <label id="vzhledSkrytyRadek" class="vz-check" style="display:none;"><input type="checkbox" id="vzhledSkryty"> Skrýt před hráči</label>
+      <div id="vzhledSvetloRadek" class="vz-radek" style="display:none;">
+        <label for="vzhledSvetlo">Světlo</label>
+        <select class="input" id="vzhledSvetlo">
+          <option value="">Nesvítí</option>
+          <option value="pochoden:6">Pochodeň (6 sáhů)</option>
+          <option value="lucerna:8">Lucerna (8 sáhů)</option>
+          <option value="lucerna:4">Lucerna, poloviční spotřeba (4 sáhy)</option>
+          <option value="lucerna:2">Lucerna, čtvrtinová spotřeba (2 sáhy)</option>
+          <option value="hul:6">Čarodějova hůl jako pochodeň (6 sáhů)</option>
+          <option value="hul:8">Čarodějova hůl jako lucerna (8 sáhů)</option>
+          <option value="vlastni">Vlastní dosah…</option>
+        </select>
+        <input class="input" type="number" id="vzhledSvetloSahy" min="0.5" max="60" step="0.5" placeholder="sáhů" style="display:none;width:6rem;">
+      </div>
+      <div id="vzhledInfraRadek" class="vz-radek" style="display:none;">
+        <label for="vzhledInfra">Infravidění (sáhů; prázdné = nemá)</label>
+        <input class="input" type="number" id="vzhledInfra" min="1" max="200" step="1" placeholder="např. 20" style="width:6rem;">
+        <label class="vz-check"><input type="checkbox" id="vzhledStudeny"> Studenokrevný (infravidění ho nevidí)</label>
+      </div>
     </div>
 
     <div id="sekceEntita">
@@ -775,6 +803,7 @@ window.MAPA = <?= json_encode([
     ],
     'zdi' => array_values($zdi),
     'dvere' => $zdiDvere,
+    'osvetleni' => (string)($mapa['osvetleni'] ?? 'den'),
     'piny' => array_values($mapaBody),
     'svetPostavy' => $svetPostavyKorist,
     'denikPostavy' => $denikPostavy,

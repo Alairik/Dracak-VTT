@@ -32,7 +32,9 @@ $stmt = dracak_db()->prepare(
 $stmt->execute([$mapaId]);
 $tokeny = $stmt->fetchAll();
 if (!dracak_vtt_je_pj_sveta($user, $svetId)) {
-    $tokeny = array_values(array_filter($tokeny, fn($t) => (bool)$t['viditelny_hracum']));
+    require_once __DIR__ . '/../../includes/vtt_videni.php';
+    $skryteVidenim = dracak_vtt_videni_skryte_tokeny(dracak_db(), $mapa, (int)$user['id']);
+    $tokeny = array_values(array_filter($tokeny, fn($t) => (bool)$t['viditelny_hracum'] && !isset($skryteVidenim[(int)$t['id']])));
 }
 
 echo json_encode([

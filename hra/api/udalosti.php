@@ -59,7 +59,7 @@ if (!$isPjOrAdmin && $udalosti) {
     $tokenIds = [];
     $entity = [];
     foreach ($udalosti as $u) {
-        if (in_array($u['typ'], ['token_presun', 'token_zmena'], true) && !empty($u['payload']['token_id'])) {
+        if (in_array($u['typ'], ['token_presun', 'token_zmena', 'token_pridan'], true) && !empty($u['payload']['token_id'])) {
             $tokenIds[(int)$u['payload']['token_id']] = true;
         }
         if ($u['typ'] === 'tokeny_presun' && is_array($u['payload']['presuny'] ?? null)) {
@@ -71,6 +71,21 @@ if (!$isPjOrAdmin && $udalosti) {
             $entity[] = [$u['payload']['typ_entity'] ?? '', (int)$u['payload']['entita_id'], (int)$u['mapa_id']];
         }
     }
+    // Mapa „Tma“ (includes/vtt_videni.php): token, který hráč zrovna nevidí, se chová jako skrytý — jeho pohyb, změny, životy ani příchod se nepošlou.
+    require_once __DIR__ . '/../../includes/vtt_videni.php';
+    $skryteVidenim = [];   // token_id => true
+    $mapyUdalosti = [];
+    foreach ($udalosti as $u) {
+        if ($u['mapa_id'] !== null && in_array($u['typ'], ['token_presun', 'token_zmena', 'token_pridan', 'tokeny_presun', 'hp_zmena'], true)) {
+            $mapyUdalosti[(int)$u['mapa_id']] = true;
+        }
+    }
+    foreach (array_keys($mapyUdalosti) as $mid) {
+        $mapaRadek = dracak_vtt_videni_mapa($pdo, $mid);
+        if ($mapaRadek !== null) {
+            $skryteVidenim += dracak_vtt_videni_skryte_tokeny($pdo, $mapaRadek, (int)$user['id']);
+        }
+    }
     $skryteTokeny = [];
     if ($tokenIds) {
         $in = implode(',', array_fill(0, count($tokenIds), '?'));
@@ -78,12 +93,16 @@ if (!$isPjOrAdmin && $udalosti) {
         $q->execute(array_keys($tokenIds));
         $skryteTokeny = array_flip($q->fetchAll(PDO::FETCH_COLUMN));
     }
+    $skryteTokeny += $skryteVidenim;
     $skryteEntity = [];
     if ($entity) {
-        $q = $pdo->prepare('SELECT typ_entity, entita_id, mapa_id FROM tokeny WHERE viditelny_hracum = 0 AND mapa_id IN (' . implode(',', array_fill(0, count($entity), '?')) . ')');
-        $q->execute(array_column($entity, 2));
+        $mapyEntit = array_values(array_unique(array_column($entity, 2)));
+        $q = $pdo->prepare('SELECT id, typ_entity, entita_id, mapa_id, viditelny_hracum FROM tokeny WHERE mapa_id IN (' . implode(',', array_fill(0, count($mapyEntit), '?')) . ')');
+        $q->execute($mapyEntit);
         foreach ($q->fetchAll() as $r) {
-            $skryteEntity[$r['typ_entity'] . ':' . $r['entita_id'] . ':' . $r['mapa_id']] = true;
+            if ((int)$r['viditelny_hracum'] === 0 || isset($skryteVidenim[(int)$r['id']])) {
+                $skryteEntity[$r['typ_entity'] . ':' . $r['entita_id'] . ':' . $r['mapa_id']] = true;
+            }
         }
     }
     // Společný přesun: ze seznamu se vyřadí skryté tokeny, událost zůstane,
@@ -100,6 +119,9 @@ if (!$isPjOrAdmin && $udalosti) {
     $udalosti = array_values(array_filter($udalosti, function (array $u) use ($skryteTokeny, $skryteEntity): bool {
         if ($u['typ'] === 'tokeny_presun') {
             return !empty($u['payload']['presuny']);
+        }
+        if ($u['typ'] === 'token_pridan') {
+            return !isset($skryteTokeny[(int)($u['payload']['token_id'] ?? 0)]);
         }
         if (in_array($u['typ'], ['token_presun', 'token_zmena'], true)) {
             $id = (int)($u['payload']['token_id'] ?? 0);

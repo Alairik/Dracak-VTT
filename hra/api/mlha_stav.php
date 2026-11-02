@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__ . '/../../includes/vtt.php';
 require_once __DIR__ . '/../../includes/vtt_mlha.php';
+require_once __DIR__ . '/../../includes/vtt_videni.php';
 
 header('Content-Type: application/json; charset=utf-8');
 $user = dracak_current_user();
@@ -31,8 +32,12 @@ if (dracak_vtt_je_pj_sveta($user, (int)$mapa['svet_id']) || !$mapa['mlha_aktivni
     exit;
 }
 
+// Mapa „Tma“: nejdřív se zapíše, co hráč vidí teď (paměť roste), a odpověď nese i aktuální výhled.
+$videni = dracak_vtt_videni_zaznamenej($pdo, $mapa, (int)$user['id']);
 $stav = dracak_vtt_mlha_nacti($pdo, $mapa, (int)$user['id']);
 echo json_encode([
+    'videni' => $videni !== null,
+    'videne_b64' => $videni !== null ? base64_encode($videni['videno']) : null,
     'typ' => $stav['typ'],
     'bunka_px' => $stav['bunka_px'],
     'sloupcu' => $stav['sloupcu'],

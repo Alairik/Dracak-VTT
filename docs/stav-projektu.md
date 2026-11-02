@@ -38,7 +38,7 @@ na DB postavené od nuly. Co lze dělat **bez** ptaní (vždy s testy, `tests/ru
   - *Plán náhrady Owlbear — blok B:* (9) dosah pohybu z pohyblivosti postavy po naložení a únavě (v boji se pohybuje po hexech podle akcí, takže jde hlavně o mapu mimo boj); (12) čitelné stavy na tokenu (pruh životů, ikony efektů, únava/přetížení).
   - *Blok C — svět a cesta:* (14) pochod po mapě světa s měřítkem a trasou → kalkulačka cesty → čas a únava postavám [L]; (15) přechod mezi lokacemi: pin „Vstoupit“ přenese družinu na cílovou mapu [M]; (16) knihovna map (duplikace, pořadí scén); (17) hodiny světa propojené s cestou, odpočinkem a spánkem.
   - *Blok D:* (22) tablet a telefon na skutečném zařízení a (23) zkušební hra podle `docs/zkusebni-scenar-prvni-hra.md` — čeká na uživatele.
-  - *Blok E — vidění a světlo (nic nestaví):* (24) stíny za zdmi (plný viditelnostní polygon), (25) dveře otevřeno/zavřeno, (26) zdroje světla podle Tabulky světel h286, (27) vidění ve tmě, které jde s postavou (infravidění, noční vidění; dosahy nejdřív dohledat v knize).
+  - *Blok E — vidění a světlo:* základ je hotový (dveře, světlo, tma, infravidění). Zbývá: **zamčené a tajné dveře** (uživatel je bude potřebovat později), hladký polygonový stín místo buněk, boj ve tmě (postihy −5/−4/−2), zóny kouzel Tma a Temnota, hoření světel v čase, noční vidění lupiče, hráčem otevíratelné dveře (zatím jen PJ).
   - *Boj:* „obrana a krok“ (kniha neříká, kdy se krok udělá — potřebuje rozhodnutí), útok na neviditelného nebo kouzlícího tvora, čtyřstupňová škála hodu na dovednost (fatální neúspěch / totální úspěch — v přepisu knihy chybí, potřeba foto).
   - *Nestvůry:* deník nestvůry **před bojem** (zadání uživatele 2026-10-20; design navrhne uživatel), kořist, výbava z katalogu s dopočtem ÚČ/OČ ze zbraně a zbroje, inteligence/charisma/pohyblivost/vytrvalost jako hratelná data, kouzla nestvůr, automatický bonus k iniciativě podle „N× za kolo“.
   - *Cestování:* jezdecká zvířata jen 7 z asi 40 řádků tabulky h2057 (potřebuje rozhodnutí, jak značit letecké a pozemní varianty a co znamená sloupec „Ujede“); povozy bez nehod (hod kočího), dovednosti Kočí, otevřených kočárů a více povozů v jedné cestě; vnořené kontejnery; povoz není trvalá entita.
@@ -60,7 +60,7 @@ ním čeká, dokud se to neprovede ručně.
 
 **Ruční DDL blok je v `docs/sql-k-rucnimu-spusteni.sql`** — jediný soubor, ve
 kterém jsou všechny dosud neprovedené DDL příkazy; uživatel ho dostává jako
-text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-11-02): čeká blok A+B+C v tomhle souboru — migrace `0104` (přenos výsledku iniciativy ≤ 0), `0105` (poznámky světa) a `0106` (dveře); ověřeno na kopii produkčního stavu čistě, opakovaně i po částečném provedení a stránka Změny databáze po něm pod DML-only účtem doběhne; kód funguje i bez něj.** Dřívější stav (2026-10-27): nic nečekalo. Blok „Zbraně u sebe“ (`0101`, ALTER) i „Vytasení bez akce“ (`0102`, vkládání řádků; do ručního SQL šel, protože migrace z GitHubu nejely — viz „Deploy po 22. 10. a migrace z administrace“ níž) uživatel provedl, kontroly vyšly 1 a 2, 3, 1. Další migrace s daty se pouští tlačítkem v administraci. Blok „Iniciativa v2“ + „Zbraně a iniciativa“
+text ke zkopírování (viz pravidlo v `CLAUDE.md`). **Stav (2026-11-02): čeká blok A+B+C+D v tomhle souboru — migrace `0104` (přenos výsledku iniciativy ≤ 0), `0105` (poznámky světa), `0106` (dveře) a `0107` (vidění a světlo); ověřeno na kopii produkčního stavu čistě, opakovaně i po částečném provedení a stránka Změny databáze po něm pod DML-only účtem doběhne; kód funguje i bez něj.** Dřívější stav (2026-10-27): nic nečekalo. Blok „Zbraně u sebe“ (`0101`, ALTER) i „Vytasení bez akce“ (`0102`, vkládání řádků; do ručního SQL šel, protože migrace z GitHubu nejely — viz „Deploy po 22. 10. a migrace z administrace“ níž) uživatel provedl, kontroly vyšly 1 a 2, 3, 1. Další migrace s daty se pouští tlačítkem v administraci. Blok „Iniciativa v2“ + „Zbraně a iniciativa“
 uživatel provedl (kontrolní SELECT vyšel 1, 4, 3) po tom, co první „sql proběhlo“ nesedělo — deploy po předčasném přesunu `0093`
 skončil na `1142 ALTER denied`, takže sloupce na serveru nebyly. **Poučení: migraci přesouvat do `database/migrations/` až podle
 čísel z kontrolního SELECTu, ne podle slov.** Migrace `0091`–`0096` jsou v `database/migrations/`: sloupce efektů (`0091`) a data (`0092`),
@@ -1303,26 +1303,25 @@ stavby“ v návrhu.**
     zařízeních [S] — **scénář napsaný: `docs/zkusebni-scenar-prvni-hra.md`** (2026-10-28), projití na dvou zařízeních čeká na uživatele
 
 *E. Vidění, světlo a stíny (přidáno 2026-10-14; zatím jen seznam, nic nestaví)*
-24. **Stíny za zdmi** — plný viditelnostní polygon z tokenu (zatemnění všeho, co
-    zdi zakrývají). Dnes je jen „levné v1“: mlha války odhaluje kolem postavy
-    buňky v okruhu 8 sáhů, pokud k nim vede volný paprsek přes zdi
-    (`includes/vtt_mlha.php`, `dracak_vtt_los_blokovana_zdi` v `includes/vtt.php`).
-    Plný polygon („v2“) je zmíněný jen v komentáři v `includes/vtt_mlha.php`;
-    v tomhle plánu dosud chyběl. [L]
-25. ✔ **Dveře** (2026-11-02, migrace `0106`, čeká na ruční SQL) — zeď s příznakem `dvere` a stavem `otevrene`; otevřené dveře neblokují pohyb, výhled ani střelu
+24. ✔ (v1, 2026-11-02) **Stíny za zdmi** — živé vidění po buňkách gridu (ne plný polygon): hráč vidí osvětlené buňky, kam vede volný paprsek přes zdi a zavřené dveře; viz
+    níže „Vidění a světlo“ a `docs/videni-a-svetlo-navrh.md`. Hladký polygonový stín místo kostiček zůstává možným vylepšením. [L]
+25. ✔ **Dveře** (2026-11-02, migrace `0106`) — zeď s příznakem `dvere` a stavem `otevrene`; otevřené dveře neblokují pohyb, výhled ani střelu
     (`dracak_vtt_zdi_bez_otevrenych_dveri` v `includes/vtt.php`, použito v pohybu hráče, LoS i v hexové cestě souboje). Zdi kreslí PJ zaškrtnutím „Dveře“ v nástroji Zeď;
-    klik PJ na dveře (nástroj Výběr) je otevře/zavře (`hra/api/zed_dvere.php`, událost `zed_zmena` — skrytým dveřím se hráčům nic neprozradí). Hráči dveře otevírat nesmí (zatím jen PJ).
-    Zamčené a tajné dveře zatím ne. Test: `tests/e2e/dvere_api.js`. Zbytek bloku E: viz `docs/videni-a-svetlo-navrh.md`.
-26. **Zdroje světla** na mapě (pochodeň, lucerna, kouzlo, slunce) s dosahem. Kniha
-    má **Tabulku světel** (h286/b3166: svíčka +1 … sluneční světlo +9), ze které
-    se dají odvodit úrovně osvětlení. [L]
-27. **Vidění ve tmě, které se pohybuje s postavou** (nápad uživatele): chová se
-    jako mlha války, ale „bublina“ vidění jde s tokenem postavy, která ve tmě
-    vidí — rasou nebo kouzlem. V pravidlech: trpasličí **infravidění** (v mlze
-    jen desetinový dosah b1939 — druidova Temnota; vyřazuje ho Dokonalá tma b3601) a lupičovo
-    **noční vidění** (potřebuje aspoň trochu světla, v absolutní tmě nepomáhá,
-    h630/b5663). Před stavbou je potřeba z knihy dohledat dosahy v sázích
-    (nehádat). Navazuje na 24 a 26. [L]
+    klik PJ na dveře (nástroj Výběr) je otevře/zavře (`hra/api/zed_dvere.php`, událost `zed_zmena` — skrytým dveřím se hráčům nic neprozradí). **Hráči dveře otevírat nesmí
+    (rozhodnutí uživatele 2026-11-02: jen PJ).** **Zamčené a tajné dveře zatím ne — uživatel je bude potřebovat později, zatím nejsou potřeba (25b, na seznamu).** Test: `tests/e2e/dvere_api.js`. [M]
+26. ✔ (2026-11-02, migrace `0107`) **Zdroje světla** — světlo je vlastnost tokenu (`tokeny.svetlo_sahy`, `svetlo_typ`; PJ je nastaví v panelu tokenu: pochodeň 6, lucerna 8 / 4 / 2,
+    hůl jako pochodeň / lucerna, vlastní dosah 0,5–60 sáhů); pochodeň na zdi = obecný token se světlem (může být skrytý). Čísla z knihy (h1685 b11183–b11185, b4601). Kouzlo Světlo (2 magy za sáh)
+    zatím jen ručně jako vlastní dosah. PJ vidí na mapě přerušovaný kruh dosahu každého světla. [L]
+27. ✔ (2026-11-02) **Vidění ve tmě, které se pohybuje s postavou** — infravidění (`tokeny.videni_infra_sahy`, PJ nastaví: trpaslík 20, lovec 50) ukáže tvory s teplou krví v dosahu a na přímý výhled
+    (ne mapu, ne zdí; `studeny` je vynechá). **Noční vidění lupiče zatím ne** — kniha nemá dosah při slabém světle, čeká na rozhodnutí uživatele (viz `docs/videni-a-svetlo-navrh.md`). [L]
+
+*Vidění a světlo — stav (2026-11-02, rozhodnutí uživatele: „ve tmě vidí hráč jen to, co právě osvětlí družina“):* mapa má **Osvětlení: Světlo / Tma** (popover „Mlha války“, jen PJ; výchozí
+Světlo = dosavadní chování beze změny). Na mapě **Tma** (a se zapnutou mlhou a gridem) server (`includes/vtt_videni.php`) počítá po buňkách: osvětlené buňky (v dosahu světla, volný paprsek) ∩ buňky, kam
+vede volný paprsek od hráčových tokenů; co hráč viděl, zůstává ztlumeně jako paměť (tabulka `mlha_valky`), co nikdy neviděl, je černé. **Server hráči neposílá tokeny, které nevidí** (seznam tokenů
+i události pohybu, změn, životů a příchodu v `hra/api/udalosti.php`); družina (postavy hráčů) se vidí vždy, PJ vidí vše. Světlo, infravidění, dveře a osvětlení nastavuje jen PJ.
+Úplně zbývá: **boj ve tmě** (postih −5 / −4 útočníkovi, který cíl nevidí; lupič −2, h1613 b10738 a h630 b5663), **zóny kouzel Tma a Temnota** (Dokonalá tma vyřazuje infravidění, b3601; Temnota 1/10 dosahu,
+b1939), **hoření pochodní a lampy v čase** (3 směny / 24 směn — čeká na „hodiny světa“), **noční vidění lupiče**, sdílené vidění družiny mezi hráči (dnes každý hráč vidí svými tokeny a světla družiny
+osvětlují všem), souboj panel (pořadí iniciativy) skrytou nestvůru ve tmě pořád ukáže, pokud ji PJ označil jako viditelnou.
 
 **Doporučené pořadí:** nejdřív blok A (1–3, 8), pak krátký zkušební
 večer, teprve potom B a C podle toho, co v praxi vadí nejvíc.

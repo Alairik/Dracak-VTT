@@ -234,6 +234,16 @@ function dracak_vtt_mlha_uloz(PDO $pdo, int $mapaId, int $ucetId, string $bitmap
 // stejná bool paprsek-zeď kontrola jako u seslání kouzla/útoku.
 function dracak_vtt_mlha_odhal_kolem_bodu(PDO $pdo, array $mapa, int $ucetId, float $x, float $y): void
 {
+    // Mapa „Tma“: nic se neodhaluje „kolem postavy“ — odhalí se jen to, co hráč skutečně vidí (světlo a výhled), viz includes/vtt_videni.php.
+    // Volající někdy posílá jen část řádku mapy, proto se řádek znovu načte z DB.
+    require_once __DIR__ . '/vtt_videni.php';
+    if (dracak_vtt_videni_funkce($pdo)) {
+        $plna = dracak_vtt_videni_mapa($pdo, (int)$mapa['id']);
+        if ($plna !== null && dracak_vtt_videni_aktivni($pdo, $plna)) {
+            dracak_vtt_videni_zaznamenej($pdo, $plna, $ucetId);
+            return;
+        }
+    }
     $rozmery = dracak_vtt_mlha_rozmery($mapa);
     if ($rozmery['sloupcu'] <= 0 || $rozmery['radku'] <= 0) {
         return;

@@ -33,8 +33,12 @@ if (!$stmt->fetchColumn()) {
     exit;
 }
 
+require_once __DIR__ . '/../../includes/vtt_videni.php';
 $stav = dracak_vtt_mlha_nacti($pdo, $mapa, $ucetId);
+$videni = dracak_vtt_videni_vypocet($pdo, $mapa, $ucetId);   // náhled nic nezapisuje do paměti hráče
 echo json_encode([
+    'videni' => $videni !== null,
+    'videne_b64' => $videni !== null ? base64_encode($videni['videno']) : null,
     'typ' => $stav['typ'],
     'bunka_px' => $stav['bunka_px'],
     'sloupcu' => $stav['sloupcu'],
