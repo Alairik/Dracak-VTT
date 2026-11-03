@@ -745,3 +745,9 @@ p.hb-src em{color:inherit;font-style:normal;}
 .text-edit-save:disabled{opacity:.6;cursor:default;}
 .text-edit-cancel{background:none;border:1px solid var(--border);color:var(--ink);}
 
+/* Úzký displej: dlouhé štítky v řádku vlastností (délka, cena, účinek…) se smí zalomit, jinak natahují stránku do šířky (telefon 390 px: 612 px). */
+@media (max-width:520px){
+  .statline .chip{white-space:normal;}
+  /* dlouhé odkazy na zdroj (celé adresy bez mezer) jinak natahují stránku */
+  .content p, .content li, .content a, .content strong, .content u, .content h2, .content h3, .content h4, .content h5{overflow-wrap:anywhere;}
+}

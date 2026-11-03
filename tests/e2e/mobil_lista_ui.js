@@ -1,5 +1,5 @@
 // Telefon (390×844): horní lišta se láme do řádků a všechno v ní je vidět (hodiny s tlačítky posunu času pro PJ, odkaz Pravidla), raid panel je pruh přes šířku
-// pod lištou (dřív ho přebila základní pravidla ve stylu a překrýval lištu), stránka nepřetéká vodorovně. Po resetu dat: mysql dracak < ../fixture/seed.sql; node mobil_lista_ui.js
+// pod lištou (dřív ho přebila základní pravidla ve stylu a překrýval lištu), stránka nepřetéká vodorovně, pravidla taky. Po resetu dat: mysql dracak < ../fixture/seed.sql; node mobil_lista_ui.js
 const { chromium } = require(process.env.PLAYWRIGHT || '/opt/node22/lib/node_modules/playwright');
 const BASE = process.env.BASE || 'http://127.0.0.1:8099';
 let chyb = 0;
@@ -33,6 +33,10 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
     const panel = await rect(p, '#raidPanel');
     ok(panel && panel.t >= lista.b - 1, kdo + ': raid panel začíná pod horní lištou (' + (panel && Math.round(panel.t)) + ' ≥ ' + Math.round(lista.b) + ')');
     ok(panel && panel.l < 20 && panel.r > 370, kdo + ': raid panel je pruh přes šířku (' + (panel && Math.round(panel.l)) + '–' + (panel && Math.round(panel.r)) + ')');
+    // Pravidla na telefonu: dlouhé adresy zdrojů a štítky řádku vlastností se zalamují, stránka se nenatahuje do šířky.
+    await p.goto(BASE + '/pravidla.php'); await p.waitForTimeout(600);
+    const sirkaPravidla = await p.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+    ok(sirkaPravidla.sw <= sirkaPravidla.cw, kdo + ': pravidla.php nepřetékají vodorovně (' + sirkaPravidla.sw + ' / ' + sirkaPravidla.cw + ')');
     ok(p.chybyJs.length === 0, kdo + ': žádná chyba JavaScriptu: ' + p.chybyJs.join('|'));
     await p.context().close();
   }
