@@ -349,12 +349,44 @@ function dracak_vtt_videni_token_viden(array $v, array $token): bool
     return false;
 }
 
-// Id tokenů na mapě, které hráč (podle vidění) NEVIDÍ. Prázdné pole, když vidění neplatí. Vlastní tokeny a družina se nikdy neskrývají.
+// Neviditelní tvorové na mapě (aktivní efekt „Neviditelnost…“, lektvar a kouzlo neviditelnosti, h3237 b3237–b3241): token_id => true. Neviditelný je „absolutně nezjistitelný
+// žádným vizuálním prostředkem (zrakem, infravidění atd.)“, takže ho hráč nevidí ani na osvětlené mapě; vlastník své postavy ji vidí vždycky (viz skryte_tokeny).
+// Kdy neviditelnost končí (útok, řeč, psychická schopnost — b3238), rozhoduje PJ: efekt prostě sundá.
+function dracak_vtt_videni_neviditelne_tokeny(PDO $pdo, int $mapaId): array
+{
+    try {
+        $q = $pdo->prepare(
+            'SELECT DISTINCT t.id FROM tokeny t
+             JOIN aktivni_efekty ae ON ae.typ_entity = t.typ_entity AND ae.entita_id = t.entita_id
+             JOIN efekty e ON e.id = ae.efekt_id
+             WHERE t.mapa_id = ? AND e.nazev LIKE "Neviditelnost%"'
+        );
+        $q->execute([$mapaId]);
+        return array_fill_keys(array_map('intval', $q->fetchAll(PDO::FETCH_COLUMN)), true);
+    } catch (Throwable $e) {
+        return [];
+    }
+}
+
+// Id tokenů na mapě, které hráč NEVIDÍ: neviditelní tvorové (kromě jeho vlastních postav) a — na mapě „Noc“ / „Tma“ — to, co mu nedovolí vidění.
+// Vlastní tokeny a družina se viděním nikdy neskrývají.
 function dracak_vtt_videni_skryte_tokeny(PDO $pdo, array $mapa, int $ucetId): array
 {
+    $nevidi = [];
+    $neviditelne = dracak_vtt_videni_neviditelne_tokeny($pdo, (int)$mapa['id']);
+    if ($neviditelne) {
+        $q = $pdo->prepare('SELECT t.id FROM tokeny t JOIN postavy p ON p.id = t.entita_id AND t.typ_entity = "postava" WHERE t.mapa_id = ? AND p.vlastnik_ucet_id = ?');
+        $q->execute([(int)$mapa['id'], $ucetId]);
+        $vlastni = array_flip(array_map('intval', $q->fetchAll(PDO::FETCH_COLUMN)));
+        foreach (array_keys($neviditelne) as $id) {
+            if (!isset($vlastni[$id])) {
+                $nevidi[$id] = true;
+            }
+        }
+    }
     $v = dracak_vtt_videni_vypocet($pdo, $mapa, $ucetId);
     if ($v === null) {
-        return [];
+        return $nevidi;
     }
     $pjId = (int)($pdo->query('SELECT pj_ucet_id FROM svet WHERE id = ' . (int)$mapa['svet_id'])->fetchColumn() ?: 0);
     $q = $pdo->prepare(
@@ -363,7 +395,7 @@ function dracak_vtt_videni_skryte_tokeny(PDO $pdo, array $mapa, int $ucetId): ar
          WHERE t.mapa_id = ?'
     );
     $q->execute([(int)$mapa['id']]);
-    $skryte = [];
+    $skryte = $nevidi;
     foreach ($q->fetchAll() as $t) {
         // Družina = postava, kterou vlastní někdo jiný než PJ světa (NPC postavy PJ do družiny nepatří).
         $t['druzina'] = $t['typ_entity'] === 'postava' && (int)($t['vlastnik_ucet_id'] ?? 0) !== $pjId && (int)($t['vlastnik_ucet_id'] ?? 0) > 0;
@@ -380,7 +412,13 @@ function dracak_vtt_videni_skryte_tokeny(PDO $pdo, array $mapa, int $ucetId): ar
 function dracak_vtt_videni_tma_volba(PDO $pdo, array $mapa, int $pozorovatelTokenId, int $cilTokenId): ?string
 {
     $plna = dracak_vtt_videni_mapa($pdo, (int)$mapa['id']);
-    if ($plna === null || !dracak_vtt_videni_aktivni($pdo, $plna)) {
+    if ($plna === null) {
+        return null;
+    }
+    // Neviditelný cíl (b3237–b3239: platí pravidla pro boj s neviditelným protivníkem, h1613 b10738) se nevidí ani na osvětlené mapě — postih −5, jako když není vidět ve tmě.
+    $neviditelne = dracak_vtt_videni_neviditelne_tokeny($pdo, (int)$plna['id']);
+    $cilNeviditelny = isset($neviditelne[$cilTokenId]) && !isset($neviditelne[$pozorovatelTokenId]);
+    if (!$cilNeviditelny && !dracak_vtt_videni_aktivni($pdo, $plna)) {
         return null;
     }
     $q = $pdo->prepare(
@@ -400,6 +438,9 @@ function dracak_vtt_videni_tma_volba(PDO $pdo, array $mapa, int $pozorovatelToke
     $ucet = (int)($pozorovatel['vlastnik_ucet_id'] ?? 0);
     if ($pozorovatel['typ_entity'] !== 'postava' || $ucet <= 0 || $ucet === $pj) {
         return null;
+    }
+    if ($cilNeviditelny) {
+        return 'nevidi';
     }
     $v = dracak_vtt_videni_vypocet($pdo, $plna, $ucet);
     if ($v === null) {

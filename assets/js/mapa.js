@@ -1136,7 +1136,7 @@ function nakreslitToken(t) {
   el.classList.toggle('not-turn', !t.na_tahu && t.owned);
   el.classList.toggle('movable', t.owned && t.na_tahu && !t.zamceno);
   el.classList.toggle('zamceno', !!t.zamceno);
-  el.classList.toggle('skryty', !t.viditelny);
+  el.classList.toggle('skryty', !t.viditelny || !!t.neviditelny);
   el.classList.toggle('aktivni-tah', !!koloStav && koloStav.aktivni_token_id === t.id);
   el.classList.toggle('vybrany', typeof jeVybrany === 'function' && jeVybrany(t.id));
   const puck = el.querySelector('.puck');

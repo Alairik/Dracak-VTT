@@ -256,6 +256,10 @@ function dracak_vtt_mapa_stav(PDO $pdo, array $user, array $mapa, bool $jePj): a
     }
     // Strana pro raid panel (všichni): 'hrac' = postava, kterou vlastní někdo jiný než PJ světa (družina), jinak 'pj'.
     $pjUcetId = (int)($pdo->query('SELECT pj_ucet_id FROM svet WHERE id = ' . (int)$mapa['svet_id'])->fetchColumn() ?: 0);
+    // Neviditelní tvorové (efekt Neviditelnost): hráči je vidí jen u vlastních postav (viz dracak_vtt_videni_skryte_tokeny), PJ a vlastník dostanou příznak a token se jim
+    // kreslí jako polopropustný.
+    require_once __DIR__ . '/vtt_videni.php';
+    $neviditelne = dracak_vtt_videni_neviditelne_tokeny($pdo, $mapaId);
     $tokeny = [];
     foreach ($radky as $t) {
         if (!$jePj && (!(bool)$t['viditelny_hracum'] || isset($skryteVidenim[(int)$t['id']]))) {
@@ -300,6 +304,7 @@ function dracak_vtt_mapa_stav(PDO $pdo, array $user, array $mapa, bool $jePj): a
             'noc' => isset($t['videni_noc_sahy']) && $t['videni_noc_sahy'] !== null ? (int)$t['videni_noc_sahy'] : null,
             'zbyva' => isset($t['svetlo_zbyva']) && $t['svetlo_zbyva'] !== null ? (int)$t['svetlo_zbyva'] : null,
             'studeny' => isset($t['studeny']) ? (bool)$t['studeny'] : false,
+            'neviditelny' => isset($neviditelne[(int)$t['id']]),
             'strana' => $jePostava && (int)($t['vlastnik_ucet_id'] ?? 0) > 0 && (int)$t['vlastnik_ucet_id'] !== $pjUcetId ? 'hrac' : 'pj',
         ] + ($jePj ? dracak_vtt_mapa_stav_pj_info($t, $pjInfo[(int)$t['id']] ?? []) : []);
     }

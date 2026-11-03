@@ -517,7 +517,7 @@ function dracak_vtt_utok_zahaj(PDO $pdo, array $mapa, array $info, array $utocni
     $tma = dracak_vtt_videni_tma_volba($pdo, $mapa, $utId, $cilTokenId);
     if ($tma !== null) {
         $d['tma'] = $tma;
-        $d['upozorneni'][] = 'Útočník nevidí cíl (tma): postih −5 k útoku; zasáhne-li, zranění se počítá bez něj (h1613 b10738). Ztrátu iniciativy a „útok jen v kole, kdy na něj protivník zaútočí“ hlídá PJ; tuší-li, kde cíl stojí (−4), nebo má noční vidění (−2), přepni níž.';
+        $d['upozorneni'][] = 'Útočník nevidí cíl (tma, nebo je cíl neviditelný): postih −5 k útoku; zasáhne-li, zranění se počítá bez něj (h1613 b10738). Ztrátu iniciativy a „útok jen v kole, kdy na něj protivník zaútočí“ hlídá PJ; tuší-li, kde cíl stojí (−4), nebo má noční vidění (−2), přepni níž.';
     }
     $id = dracak_vtt_vyzva_vloz($pdo, $mapaId, 'utok', $utId, $cilTokenId, null, $d);
     dracak_vtt_log_event((int)$mapa['svet_id'], $mapaId, 'vyzva_nova', dracak_vtt_vyzva_payload($info, 'utok', $id, $utId, $cilTokenId), $ucetId);
@@ -590,7 +590,7 @@ function dracak_vtt_obrana_zaloz(PDO $pdo, array $mapa, array $info, array $utok
     // Boj ve tmě: obránce, který útočníka nevidí, má postih −5 k obraně (h1613 b10738); u nestvůr rozhoduje PJ.
     $tmaObrana = dracak_vtt_videni_tma_volba($pdo, $mapa, $obrId, $utId);
     if ($tmaObrana !== null) {
-        $upozorneni[] = $obr['label'] . ' nevidí útočníka (tma): postih −5 k obraně; tuší-li, odkud útok jde (−4), nebo má noční vidění (−2), přepni níž.';
+        $upozorneni[] = $obr['label'] . ' nevidí útočníka (tma, nebo je útočník neviditelný): postih −5 k obraně; tuší-li, odkud útok jde (−4), nebo má noční vidění (−2), přepni níž.';
     }
     $d = [
         'tma' => $tmaObrana,
