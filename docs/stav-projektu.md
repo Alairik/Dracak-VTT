@@ -50,7 +50,10 @@ na DB postavené od nuly. Co lze dělat **bez** ptaní (vždy s testy, `tests/ru
 
 **Čeká na rozhodnutí uživatele (neřešit samo):** (1) ostatní značky Zlatého tetování mimo Dikobraza (mechanika?); (2) druh zbraně u 13 položek
 (`docs/kontrolni-seznam-neuplnych-mist.md`: Fuuma shuriken, Atlatl, Řetězový meč, Khakkhara, Hůl „Minami no mori“, Rachejtle); (3) které kroky deníku v2 (figurína, Dovednosti, Společníci) a s jakými pravidly;
-(4) nastavení subdomény `vtt` u WEDOSu na složku `vtt` (hezká adresa bez `/vtt/`).
+(4) nastavení subdomény `vtt` u WEDOSu na složku `vtt` (hezká adresa bez `/vtt/`);
+(5) **kouzlení v souboji** (h1625 b10841+: kouzlo s vyvoláním N kol vyžaduje 2N po sobě jdoucích akcí kouzlení; kdo kouzlí, je pro útočníky „nehybný“, a je-li zraněn aspoň za 1 život před dokončením, kouzlo se nezdaří a magenergie propadne) — dnes engine zná jen úmysl „kouzlení“ (bonus k iniciativě) a magy se strhnou hned; jak to hrát u stolu (PJ hlásí počet akcí? stavový efekt „Kouzlí“ na tvorovi?) zvolit s uživatelem;
+(6) **boj ve tmě — automatická ztráta iniciativy** (h1613 b10738: útočník bez zpráv o protivníkovi vždy ztrácí iniciativu a nemůže útočit v kole, kdy na něj protivník nezaútočí) — dnes se řeší jen postih −5 / −4 / −2; kniha mluví o dvojici útočník–konkrétní protivník, engine pořadí tahů po dvojicích nezná;
+(7) **Lovcův Příkrov stínů** (h1003 b7357–b7359): zóna, kde zdroje světla zhasnou a Lovec vidí „jako by tam tma nebyla“ — kniha říká „přirozená tma“, ale nerozlišuje, jestli v ní funguje infravidění ostatních a jestli ji vidí i spolubojovníci; nejbližší hotový stavební kámen je zóna Temnota.
 
 ### Čeká na ruční spuštění přes phpMyAdmin (admin účet)
 
@@ -1301,6 +1304,8 @@ stavby“ v návrhu.**
     nemění). **Šest hráčů v rychlém režimu = ~300 požadavků a ~940 dotazů za minutu (5 požadavků / 16 dotazů za vteřinu)**, v klidu (4 s) zhruba třetina; pro
     MariaDB je to zanedbatelné, limit hostingu na počet souběžných PHP procesů se ukáže až v ostré hře (případné 503 / 508 od hostingu aplikace nezachytí — to je vidět jen v logu
     hostingu a hráči jako výpadek aktualizací). Další úspora by šla jen sloučením dotazů nebo delším intervalem; nedělá se, dokud se problém neprojeví.
+    **Dodatek 2026-11-03 (vidění):** výpočet vidění při pollingu (`dracak_vtt_videni_skryte_tokeny`, jednou za poll, který nese události mapy se vděním) změřen na zatěžové mapě
+    (4000×3000 px, buňka 50 px, 300 zdí, 9 pochodní, divák s nočním viděním 30 sáhů): **~26 ms na volání** (CPU, bez sítě). Šest hráčů v rychlém režimu = pod 0,1 s CPU za vteřinu; není co optimalizovat.
 22. Rozvržení na tabletu/telefonu (panely, toolbar) [M] — **kontrola 2026-10-28** (Playwright, telefon 390×844, tablet 820×1180 a 1180×820, hráč i PJ, mapa a
     deník): žádné vodorovné přetékání stránky, panely a lišta nástrojů se vejdou, deník na telefonu má záhlaví statické a záložky pod ním; skutečné zařízení a
     dotyková gesta (pinch, dlouhý stisk) dál čekají na zkoušku uživatele (scénář `docs/zkusebni-scenar-prvni-hra.md`)

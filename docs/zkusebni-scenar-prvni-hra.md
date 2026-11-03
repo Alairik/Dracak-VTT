@@ -7,7 +7,7 @@ testem toku pozvání, viz konec).
 ## Příprava (jednorázově)
 
 1. Admin (ty) je přihlášený. **Správa účtů → Nový účet**: jeden účet s rolí PJ, jeden s rolí hráč (heslo aspoň 12 znaků).
-2. **Změny databáze** (menu administrace): pokud tam něco čeká, klikni na „Spustit čekající změny“. Má tam být „Všechno je aplikované“.
+2. **Změny databáze** (menu administrace): pokud tam něco čeká, klikni na „Spustit čekající změny“. Má tam být „Všechno je aplikované“. Pokud se zastaví na příkazu, který potřebuje ruční SQL, pošli to Claudovi — dostaneš hotový text ke zkopírování do phpMyAdminu.
 3. **Kontrola nasazení**: po posledním nasazení má být „Všech N souborů sedí“. Tlačítko „Zkontrolovat“ má ukázat zavřené cesty (✓).
 4. **Chybový log** (menu administrace): před hrou ho vymaž tlačítkem „Vymazat log“, ať je po hře vidět jen to, co se stalo při ní.
 
@@ -27,6 +27,13 @@ testem toku pozvání, viz konec).
 | 10 | PJ | Nasadit efekt (např. Spánek, nebo Dikobraz u postavy s vrhacími zbraněmi). | Štítek na tokenu, trvání se odpočítává na konci kola, vytasení vrhací zbraně bez akce platí. |
 | 11 | PJ | Strhnout hráči životy z panelu tokenu. | Hráč to hned vidí v deníku (nemusí nic obnovovat). |
 | 12 | PJ | **Konec souboje**, pak v deníku postavy: odpočinek/spánek a únava. | Únava klesne podle pravidel, deník to ukáže. |
+| 13 | PJ + hráč | V liště mapy otevři **Panel tvorů a souboje** (ikona skupiny lidí). PJ: přetáhni okno jinam, přepni plné/kompaktní řádky, přetáhni box tvora na jiné místo v pořadí. Hráč otevře stejný panel. | PJ vidí nestvůry nahoře, pak družinu s počty životů, štítky a únavou. Hráč vidí jen družinu: avatar, jméno a pruh životů bez čísel. Najetí myší na box zvýrazní token na mapě a naopak. |
+| 14 | PJ | V nastavení mapy zvol **Osvětlení mapy → Tma** (nebo Noc). Hráčově postavě dej v panelu tokenu **Vzhled → Světlo → pochodeň**. Nestvůru postav mimo dosah světla. | Hráč bez světla vidí jen sebe; s pochodní osvětlený kruh (6 sáhů). Nestvůra mimo světlo se mu vůbec neposílá. Dveře (zeď s příznakem dveře) PJ otevře klikem — zavřené blokují výhled i pohyb. |
+| 15 | PJ | Nahoře v liště klikni **+1 směna** a **+1 hodina**; pochodni nastav v panelu tokenu dobu hoření (předvolba 3 směny). | Čas světa se posune všem, pochodeň po dohoření zhasne a hráč přestane vidět. |
+| 16 | PJ | U pinu na mapě s cílovou mapou: **Vstoupit s družinou**. | Družina se přenese na cílovou mapu, aktivní mapa světa se přepne a hráči se přepnou s ní. |
+| 17 | PJ | Na světové mapě nastav **Měřítko mapy** (míle na 1000 px), vezmi nástroj **Měřit**, změř trasu; **Shift** naváže další úsek. Klikni na **Spočítat cestu**. | Odkaz ukáže součet mil, kalkulačka cesty ho převezme. Zápis cesty zapíše postavám únavu a (po zaškrtnutí) posune čas světa. |
+| 18 | PJ | V kalkulačce cesty zapni **povoz**, tempo spěch (klus), zvol Kočího. Klikni na **Hodit řízení za celou cestu**. | Ukáže šanci řízení, počet hodů a šanci na cestu bez nehody; hod vypíše nehodu (směna, hod, o kolik nad hranicí), nebo že cesta proběhla. |
+| 19 | PJ nebo hráč | V panelu tokenu postavy otevři **Dosah pohybu…** a zvol povrch. | Kolik sáhů postava uběhne za kolo (poklus / běh / sprint) a ujde za směnu; tlačítko to ukáže jako kruh na mapě. |
 
 ## Po hře
 
