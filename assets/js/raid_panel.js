@@ -71,7 +71,9 @@ export function initRaidPanel(ctx) {
     okno.classList.toggle('sbaleno', !!stav.sbaleno);
     if (window.innerWidth <= TELEFON) {
       // Na telefonu je panel pruh přes horní část mapy (styl v CSS), okno se nepřesouvá.
-      okno.style.left = okno.style.top = okno.style.width = okno.style.maxHeight = '';
+      okno.style.left = okno.style.width = okno.style.maxHeight = '';
+      const lista = document.querySelector('.topbar');
+      okno.style.top = (lista ? Math.round(lista.getBoundingClientRect().bottom + 8) : 92) + 'px'; // pod horní lištou, ať je jedno, kolik má řádků
     } else {
       okno.style.left = stav.x + 'px';
       okno.style.top = stav.y + 'px';

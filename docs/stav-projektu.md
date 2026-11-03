@@ -1304,9 +1304,9 @@ stavby“ v návrhu.**
     nemění). **Šest hráčů v rychlém režimu = ~300 požadavků a ~940 dotazů za minutu (5 požadavků / 16 dotazů za vteřinu)**, v klidu (4 s) zhruba třetina; pro
     MariaDB je to zanedbatelné, limit hostingu na počet souběžných PHP procesů se ukáže až v ostré hře (případné 503 / 508 od hostingu aplikace nezachytí — to je vidět jen v logu
     hostingu a hráči jako výpadek aktualizací). Další úspora by šla jen sloučením dotazů nebo delším intervalem; nedělá se, dokud se problém neprojeví.
-    **Dodatek 2026-11-03 (vidění):** výpočet vidění při pollingu (`dracak_vtt_videni_skryte_tokeny`, jednou za poll, který nese události mapy se vděním) změřen na zatěžové mapě
+    **Dodatek 2026-11-03 (vidění):** výpočet vidění při pollingu (`dracak_vtt_videni_skryte_tokeny`, jednou za poll, který nese události mapy s viděním) změřen na zatěžové mapě
     (4000×3000 px, buňka 50 px, 300 zdí, 9 pochodní, divák s nočním viděním 30 sáhů): **~26 ms na volání** (CPU, bez sítě). Šest hráčů v rychlém režimu = pod 0,1 s CPU za vteřinu; není co optimalizovat.
-22. Rozvržení na tabletu/telefonu (panely, toolbar) [M] — **kontrola 2026-10-28** (Playwright, telefon 390×844, tablet 820×1180 a 1180×820, hráč i PJ, mapa a
+22. Rozvržení na tabletu/telefonu (panely, toolbar) [M] — **kontrola 2026-11-03 po raid panelu a hodinách světa:** na telefonu se horní lišta s hodinami PJ ořezávala a raid panel (pruh přes šířku) se kvůli pořadí pravidel ve stylu nezobrazoval jako pruh a překrýval lištu — opraveno (`mobil_lista_ui.js`). **Dřívější kontrola 2026-10-28** (Playwright, telefon 390×844, tablet 820×1180 a 1180×820, hráč i PJ, mapa a
     deník): žádné vodorovné přetékání stránky, panely a lišta nástrojů se vejdou, deník na telefonu má záhlaví statické a záložky pod ním; skutečné zařízení a
     dotyková gesta (pinch, dlouhý stisk) dál čekají na zkoušku uživatele (scénář `docs/zkusebni-scenar-prvni-hra.md`)
 23. Zkušební scénář „první ostrá hra“ (cca 12 kroků) a jeho projití na dvou
