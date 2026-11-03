@@ -996,7 +996,13 @@ function drawRuler(a, b) {
     obrysy = '<polygon points="' + hexObrys(ha.x, ha.y, GRID_PX) + '" fill="rgba(255,179,71,.15)" stroke="#ffb347" stroke-width="1.5" vector-effect="non-scaling-stroke"/>'
       + '<polygon points="' + hexObrys(hb.x, hb.y, GRID_PX) + '" fill="rgba(255,179,71,.25)" stroke="#ffb347" stroke-width="1.5" vector-effect="non-scaling-stroke"/>';
   }
-  const label = popisVzdalenosti(ca, cb);
+  let label = popisVzdalenosti(ca, cb);
+  // Světová mapa s měřítkem: přidej míle a PJ nabídni kalkulačku cesty s touto vzdáleností.
+  if (MERITKO) {
+    const mil = Math.hypot(cb.x - ca.x, cb.y - ca.y) / 1000 * MERITKO;
+    label += ' · ≈ ' + (mil < 10 ? mil.toFixed(1) : Math.round(mil)).toString().replace('.', ',') + ' mil';
+    nabidniCestu(mil);
+  }
   // Písmo a body mají stejnou velikost na obrazovce bez ohledu na zoom.
   const k = 1 / kamera.stav.z;
   rulerSvg.innerHTML = obrysy +
@@ -1005,6 +1011,29 @@ function drawRuler(a, b) {
     '<circle cx="' + cb.x + '" cy="' + cb.y + '" r="' + (4 * k) + '" fill="#ffb347"/>' +
     '<text x="' + (ca.x + cb.x) / 2 + '" y="' + ((ca.y + cb.y) / 2 - 10 * k) + '" fill="#fff" font-size="' + (14 * k) + '" ' +
     'text-anchor="middle" paint-order="stroke" stroke="#000" stroke-width="' + (3 * k) + '">' + label + '</text>';
+}
+// Měřítko světové mapy (kolik mil je 1000 px; PJ ho nastaví v nastavení gridu) a odkaz do kalkulačky cesty pod měřidlem.
+let MERITKO = CFG.meritko || null;
+let cestaPillTimer = null;
+function nabidniCestu(mil) {
+  const a = document.getElementById('meridloCesta');
+  if (!a || !(mil >= 0.1)) return;
+  a.href = 'cesta.php?id=' + SVET_ID + '&vzdalenost=' + mil.toFixed(2);
+  a.textContent = 'Spočítat cestu: ' + mil.toFixed(1).replace('.', ',') + ' mil →';
+  a.style.display = '';
+  clearTimeout(cestaPillTimer);
+  cestaPillTimer = setTimeout(() => { a.style.display = 'none'; }, 25000);
+}
+const meritkoUlozitBtn = document.getElementById('meritkoUlozitBtn');
+if (meritkoUlozitBtn) {
+  meritkoUlozitBtn.addEventListener('click', () => {
+    const v = document.getElementById('meritkoMil').value.trim();
+    postJson('api/mapa_meritko.php', {mapa_id: MAPA_ID, mil_na_1000px: v === '' ? null : parseFloat(v)}).then((d) => {
+      if (d.error) { logLine('Chyba: ' + d.error); return; }
+      MERITKO = d.mil_na_1000px || null;
+      logLine(MERITKO ? 'Měřítko mapy: 1000 px = ' + String(MERITKO).replace('.', ',') + ' mil.' : 'Měřítko mapy zrušeno.');
+    });
+  });
 }
 function clearRulerSoon() {
   rulerClearTimer = setTimeout(() => { if (rulerSvg) rulerSvg.innerHTML = ''; }, 2500);

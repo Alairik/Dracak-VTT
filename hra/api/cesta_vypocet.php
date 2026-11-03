@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__ . '/../../includes/vtt.php';
 require_once __DIR__ . '/../../includes/vtt_cestovani.php';
+require_once __DIR__ . '/../../includes/vtt_cas.php';
 
 // Kalkulačka cesty (hra/cesta.php) — jen PJ/admin světa. Spočítá úsek cesty
 // hodinovou simulací (includes/vtt_cestovani.php) a volitelně ZAPÍŠE
@@ -14,7 +15,7 @@ require_once __DIR__ . '/../../includes/vtt_cestovani.php';
 //   zastav (1–3: úsek končí těsně před tímto stupněm únavy),
 //   ucastnici [{postava_id, vaha_jezdce, na_povoze}], zvirata [{zvire_id, naklad}],
 //   povoz {povoz_id, vaha_vozu, nasobek, zvire_id, pocet (1/2/3/4/6), naklad} | null,
-//   zapsat (bool)
+//   zapsat (bool), posunout_cas (bool; jen spolu se zapsat — čas světa se posune o hodiny cesty, 1 hodina = 6 směn, hodiny světa viz includes/vtt_cas.php)
 header('Content-Type: application/json; charset=utf-8');
 $user = dracak_require_login();
 
@@ -121,6 +122,7 @@ $stupne = [0 => 'bez únavy', 1 => 'unavená', 2 => 'vyčerpaná', 3 => 'úplně
 $sim = $vypocet['simulace'];
 $vysledek = null;
 $zapsano = [];
+$cas = null;
 if ($sim) {
     $nazvy = [];
     foreach ($vypocet['subjekty_sim'] as $s) {
@@ -170,6 +172,13 @@ if ($sim) {
             $pdo->rollBack();
             odpoved_cesta(500, ['error' => 'Zápis únavy selhal.']);
         }
+        // Čas světa: cesta trvala N hodin = 6N směn (po 10 minutách); dny se přelijí samy, světla s omezenou dobou hoření odečtou směny (PJ rozhoduje zaškrtnutím).
+        if (!empty($data['posunout_cas']) && !empty(dracak_vtt_tokeny_funkce()['hodiny'])) {
+            $smeny = (int)min(1440, round((float)$sim['hodin'] * 6));
+            if ($smeny >= 1) {
+                $cas = dracak_vtt_cas_posun($pdo, $svetId, $smeny, (int)$user['id']);
+            }
+        }
     }
 }
 
@@ -182,4 +191,5 @@ odpoved_cesta(200, [
     'povoz' => $vypocet['povoz'] ?? null,
     'vysledek' => $vysledek,
     'zapsano' => $zapsano,
+    'cas' => $cas,
 ]);

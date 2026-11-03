@@ -75,7 +75,7 @@
       svet_id: SVET, vzdalenost: num($('cs-vzdalenost').value, 0), povrch: num($('cs-povrch').value, 0),
       teren: num($('cs-teren').value, 1), vliv: num($('cs-vliv').value, 1),
       tempo: wrap.querySelector('input[name="cs-tempo"]:checked').value, zastav: Number($('cs-zastav').value),
-      ucastnici, zvirata, zapsat: !!zapsat,
+      ucastnici, zvirata, zapsat: !!zapsat, posunout_cas: !!(zapsat && $('cs-posunout-cas') && $('cs-posunout-cas').checked),
       povoz: povozZap && povozZap.checked ? {
         povoz_id: Number($('cs-povoz-typ').value), vaha_vozu: num($('cs-povoz-vaha').value, 0), nasobek: num($('cs-povoz-nasobek').value, 0),
         zvire_id: Number($('cs-povoz-zvire').value), pocet: Number($('cs-povoz-pocet').value), naklad: num($('cs-povoz-naklad').value, 0),
@@ -140,16 +140,20 @@
       if (poznamky.length) h += '<ul class="cs-chyby">' + poznamky.map((p) => '<li>' + esc(p) + '</li>').join('') + '</ul>';
       h += '<p class="note">Únava zvířat se nikam neukládá (zvíře není evidovaná postava); jejich únava se jen hlídá kvůli zastavení. Jezdec dostane třetinu bodů únavy zvířete. Únava postav zpomaluje, protože ubírá bonus za sílu a obratnost (Tabulka únavy); jak únava ovlivňuje samotná zvířata, kniha neříká, jejich rychlost se proto s únavou nemění.</p>';
       if (d.zapsano && d.zapsano.length) {
-        h += '<p class="cs-ulozeno">Únava zapsána: ' + d.zapsano.map((z) => esc(z.nazev) + ' → ' + z.unava).join(', ') + '.</p>';
+        h += '<p class="cs-ulozeno">Únava zapsána: ' + d.zapsano.map((z) => esc(z.nazev) + ' → ' + z.unava).join(', ') + '.'
+          + (d.cas ? ' Čas světa posunut na <strong>' + esc(d.cas.datum) + ' · ' + esc(d.cas.text) + '</strong>' + (d.cas.zhasla && d.cas.zhasla.length ? ' (' + d.cas.zhasla.length + ' světl' + (d.cas.zhasla.length === 1 ? 'o dohořelo' : 'a dohořela') + ')' : '') + '.' : '') + '</p>';
       } else if (v.duvod !== 'nelze' && v.duvod !== 'hotovo_na_zacatku' && v.konec.some((k) => k.klic.startsWith('p:'))) {
-        h += '<button type="button" class="btn btn-secondary" id="cs-zapsat">Zapsat únavu postavám (celé body)</button>';
+        h += '<button type="button" class="btn btn-secondary" id="cs-zapsat">Zapsat cestu (únava postavám' + (window.CESTA_HODINY ? ' + čas světa' : '') + ')</button>';
+        if (window.CESTA_HODINY) {
+          h += ' <label class="cs-radek"><input type="checkbox" id="cs-posunout-cas" checked> posunout čas světa o ' + hodiny(v.hodin) + ' (' + Math.max(1, Math.round(v.hodin * 6)) + ' směn; světla s omezenou dobou hoření ubudou)</label>';
+        }
       }
     }
     box.innerHTML = h;
     box.hidden = false;
     const zap = $('cs-zapsat');
     if (zap) zap.addEventListener('click', async () => {
-      if (!window.confirm('Zapsat postavám body únavy po téhle cestě? Přepíše to jejich současnou únavu.')) return;
+      if (!window.confirm('Zapsat postavám body únavy po téhle cestě' + ($('cs-posunout-cas') && $('cs-posunout-cas').checked ? ' a posunout čas světa' : '') + '? Únava přepíše jejich současnou.')) return;
       const d2 = await volej(true);
       if (d2) vykresli(d2);
     });

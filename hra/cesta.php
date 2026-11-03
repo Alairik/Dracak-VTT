@@ -3,6 +3,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../includes/vtt.php';
 require_once __DIR__ . '/../includes/vtt_denik.php';
 require_once __DIR__ . '/../includes/vtt_cestovani.php';
+require_once __DIR__ . '/../includes/vtt_cas.php';
 
 // Kalkulačka cesty družiny (jen PJ/admin světa): vzdálenost + povrch/terén/
 // vlivy + tempo -> hodinová simulace, kolik hodin cesta zabere, kdy se
@@ -72,7 +73,8 @@ dracak_vtt_page_start('Cesta — ' . $svet['nazev'], $user, true, ['../assets/cs
     <div class="dn-karta">
       <h3 class="dn-h3">Trasa</h3>
       <div class="field"><label for="cs-vzdalenost">Vzdálenost (míle)</label>
-        <input type="number" id="cs-vzdalenost" min="0.1" max="5000" step="0.1" value="20"></div>
+        <input type="number" id="cs-vzdalenost" min="0.1" max="5000" step="0.1" value="<?= isset($_GET['vzdalenost']) && (float)$_GET['vzdalenost'] >= 0.1 ? $e(round(min(5000.0, (float)$_GET['vzdalenost']), 2)) : '20' ?>"></div>
+      <?php if (isset($_GET['vzdalenost'])): ?><p class="note">Vzdálenost přenesená z měřidla na mapě.</p><?php endif; ?>
 
       <div class="field"><label for="cs-povrch-vyber">Povrch (body chůze na míli)</label>
         <select id="cs-povrch-vyber" data-vyber="povrch">
@@ -199,5 +201,6 @@ dracak_vtt_page_start('Cesta — ' . $svet['nazev'], $user, true, ['../assets/cs
   <section class="dn-karta dn-sirka-cela" id="cs-vysledek" hidden></section>
 </div>
 </div>
+<script nonce="<?= dracak_csp_nonce() ?>">window.CESTA_HODINY = <?= !empty(dracak_vtt_tokeny_funkce()['hodiny']) ? 'true' : 'false' ?>;</script>
 <script src="../assets/js/cesta.js?v=<?= filemtime(__DIR__ . '/../assets/js/cesta.js') ?>"></script>
 <?php dracak_vtt_page_end(); ?>

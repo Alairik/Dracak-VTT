@@ -242,6 +242,10 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
     <?php endif; ?>
   </div>
 
+  <?php if ($isPjOrAdmin): ?>
+  <a id="meridloCesta" class="meridlo-cesta" href="#" style="display:none;" title="Otevře kalkulačku cesty s touto vzdáleností"></a>
+  <?php endif; ?>
+
   <div id="zoomCtl">
     <button class="tbtn" type="button" id="zoom-minus" title="Oddálit (−)"><?php dracak_icon('zoom-out', 18); ?></button>
     <span id="zoomInfo">100 %</span>
@@ -456,6 +460,14 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
     </div>
     <button class="btn btn-primary" type="button" id="gridUlozitBtn" style="width:100%;margin-top:10px;">Uložit</button>
     <p class="note">Náhled na mapě se mění hned, uloží se až tlačítkem.</p>
+    <?php if (dracak_vtt_tokeny_funkce()['meritko']): ?>
+    <div style="border-top:1px solid rgba(255,255,255,.15);margin-top:10px;padding-top:8px;">
+      <label for="meritkoMil">Měřítko mapy — kolik mil je 1000 px (světová mapa; prázdné = bez měřítka)</label>
+      <input class="input" type="number" id="meritkoMil" min="0.01" max="100000" step="0.1" placeholder="např. 25" value="<?= isset($mapa['mil_na_1000px']) && $mapa['mil_na_1000px'] !== null ? htmlspecialchars((string)(float)$mapa['mil_na_1000px']) : '' ?>">
+      <button class="btn btn-secondary" type="button" id="meritkoUlozitBtn" style="width:100%;margin-top:6px;">Uložit měřítko</button>
+      <p class="note">S měřítkem ukáže měřidlo vzdálenost i v mílích a jedním klikem ji pošleš do kalkulačky cesty.</p>
+    </div>
+    <?php endif; ?>
   </div>
 
   <div class="popover" id="popover-mlha">
@@ -841,6 +853,7 @@ window.MAPA = <?= json_encode([
     'zdi' => array_values($zdi),
     'dvere' => $zdiDvere,
     'osvetleni' => (string)($mapa['osvetleni'] ?? 'den'),
+    'meritko' => isset($mapa['mil_na_1000px']) && $mapa['mil_na_1000px'] !== null ? (float)$mapa['mil_na_1000px'] : null,
     'piny' => array_values($mapaBody),
     'svetPostavy' => $svetPostavyKorist,
     'denikPostavy' => $denikPostavy,

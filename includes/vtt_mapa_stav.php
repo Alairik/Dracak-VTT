@@ -64,6 +64,7 @@ function dracak_vtt_ddl_mapa(): array
             'SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS
              WHERE TABLE_SCHEMA = DATABASE() AND ((TABLE_NAME = "mapy" AND COLUMN_NAME = "osvetleni")
                OR (TABLE_NAME = "svet" AND COLUMN_NAME = "aktualni_smena")
+               OR (TABLE_NAME = "mapy" AND COLUMN_NAME = "mil_na_1000px")
                OR (TABLE_NAME = "tokeny" AND COLUMN_NAME IN ("svetlo_sahy", "svetlo_typ", "videni_infra_sahy", "studeny", "videni_noc_sahy", "svetlo_zbyva")))'
         )->fetchAll(PDO::FETCH_NUM) as [$tabulka, $sloupec]) {
             $stav['videni_sloupce'][$tabulka . '.' . $sloupec] = true;
@@ -133,6 +134,8 @@ function dracak_vtt_tokeny_funkce(): array
         'videni_noc' => isset($ddl['videni_sloupce']['tokeny.videni_noc_sahy']),
         // Hodiny světa (ruční SQL, migrace 0109): čas ve dni (svet.aktualni_smena) a hoření světel (tokeny.svetlo_zbyva). Bez sloupců zůstává všechno jako dosud.
         'hodiny' => isset($ddl['videni_sloupce']['svet.aktualni_smena']),
+        // Měřítko světové mapy (ruční SQL, migrace 0110: mapy.mil_na_1000px): měřidlo ukáže míle a pošle je do kalkulačky cesty.
+        'meritko' => isset($ddl['videni_sloupce']['mapy.mil_na_1000px']),
         'svetlo_zbyva' => isset($ddl['videni_sloupce']['tokeny.svetlo_zbyva']) && isset($ddl['videni_sloupce']['tokeny.svetlo_sahy']),
         'zbrane_ini' => isset($ddl['ini_sloupce']['predmety.chvat'], $ddl['ini_sloupce']['predmety.trida_zbrane'], $ddl['ini_sloupce']['predmety.ini_postih']),
         'efekty_mech' => isset($ddl['tabulky']['efekt_slozky'])

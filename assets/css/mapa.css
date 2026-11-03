@@ -493,3 +493,8 @@ body.denik-dock-cela { overflow:hidden; }
 .raid-box.hotovo:not(.na-tahu) { opacity:.6; }
 .raid-box.kompakt.s-extra { height:auto; padding-top:6px; padding-bottom:6px; }
 .raid-box.kompakt .raid-extra { padding-left:6px; }
+
+/* Měřidlo světové mapy: změřená vzdálenost v mílích a odkaz do kalkulačky cesty (jen PJ, jen s měřítkem mapy). */
+.meridlo-cesta { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); z-index:205; padding:8px 16px; border-radius:999px; background:rgba(24,22,20,.92); color:#ffd166;
+                 font-weight:600; font-size:13px; text-decoration:none; border:1px solid rgba(255,209,102,.5); box-shadow:0 6px 18px rgba(0,0,0,.5); }
+.meridlo-cesta:hover { background:#2c2618; }
