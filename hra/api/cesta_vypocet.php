@@ -127,6 +127,7 @@ $sim = $vypocet['simulace'];
 $vysledek = null;
 $zapsano = [];
 $cas = null;
+$casChyba = null;
 if ($sim) {
     $nazvy = [];
     foreach ($vypocet['subjekty_sim'] as $s) {
@@ -187,7 +188,13 @@ if ($sim) {
         if (!empty($data['posunout_cas']) && !empty(dracak_vtt_tokeny_funkce()['hodiny'])) {
             $smeny = (int)min(1440, round((float)$sim['hodin'] * 6));
             if ($smeny >= 1) {
-                $cas = dracak_vtt_cas_posun($pdo, $svetId, $smeny, (int)$user['id']);
+                // Únava už je zapsaná (vlastní transakce); selže-li posun času, nehlásí se 500 — opakování by únavu připočetlo podruhé. PJ dostane zprávu a čas posune ručně.
+                try {
+                    $cas = dracak_vtt_cas_posun($pdo, $svetId, $smeny, (int)$user['id']);
+                } catch (Throwable $e) {
+                    dracak_log_zapis('vyjimka', 'Cesta: posun času světa po zápisu únavy selhal: ' . $e->getMessage());
+                    $casChyba = 'Únava je zapsaná, ale čas světa se nepodařilo posunout (zkus tlačítko +1 hodina ručně, nebo to zapiš znovu až po kontrole únavy).';
+                }
             }
         }
     }
@@ -203,4 +210,5 @@ odpoved_cesta(200, [
     'vysledek' => $vysledek,
     'zapsano' => $zapsano,
     'cas' => $cas,
+    'cas_chyba' => $casChyba,
 ]);

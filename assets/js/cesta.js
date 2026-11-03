@@ -145,6 +145,7 @@
       h += '<p class="note">Únava zvířat se nikam neukládá (zvíře není evidovaná postava); jejich únava se jen hlídá kvůli zastavení. Jezdec dostane třetinu bodů únavy zvířete. Únava postav zpomaluje, protože ubírá bonus za sílu a obratnost (Tabulka únavy); jak únava ovlivňuje samotná zvířata, kniha neříká, jejich rychlost se proto s únavou nemění.</p>';
       if (d.zapsano && d.zapsano.length) {
         h += '<p class="cs-ulozeno">Únava zapsána: ' + d.zapsano.map((z) => esc(z.nazev) + ' → ' + z.unava).join(', ') + '.'
+          + (d.cas_chyba ? ' <strong>' + esc(d.cas_chyba) + '</strong>' : '')
           + (d.cas ? ' Čas světa posunut na <strong>' + esc(d.cas.datum) + ' · ' + esc(d.cas.text) + '</strong>' + (d.cas.zhasla && d.cas.zhasla.length ? ' (' + d.cas.zhasla.length + ' světl' + (d.cas.zhasla.length === 1 ? 'o dohořelo' : 'a dohořela') + ')' : '') + '.' : '') + '</p>';
       } else if (v.duvod !== 'nelze' && v.duvod !== 'hotovo_na_zacatku' && v.konec.some((k) => k.klic.startsWith('p:'))) {
         h += '<button type="button" class="btn btn-secondary" id="cs-zapsat">Zapsat cestu (únava postavám' + (window.CESTA_HODINY ? ' + čas světa' : '') + ')</button>';
