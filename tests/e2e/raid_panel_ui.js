@@ -137,6 +137,10 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   ok(ini.length === 3 && cisla.every((c, i) => i === 0 || cisla[i - 1] >= c) && ini.every(x => x[1] !== null), 'v souboji jsou boxy podle iniciativy sestupně: ' + ini.map(x => x[0] + '=' + x[1]).join(', '));
   ok(await pj.locator('#raidSeznam .raid-skupina').count() === 0, 've souboji nejsou nadpisy skupin');
   ok(await pj.locator('#raidSeznam .raid-box.na-tahu').count() === 1, 'tvor na tahu má zlatý box');
+  // hráč v souboji: účastníci, které smí znát — nestvůry PJ v panelu nejsou
+  await hr.goto(BASE + '/hra/mapa.php?id=' + MAPA); await hr.waitForTimeout(1800);
+  const hrSouboj = await hr.$$eval('#raidSeznam .raid-box .raid-jmeno', e => e.map(x => x.textContent));
+  ok(await hr.locator('#raidPanel').isVisible() && hrSouboj.length === 1 && !/Goblin/.test(hrSouboj.join()), 'hráč v souboji vidí v panelu jen sebe, ne nestvůry PJ: ' + hrSouboj.join(', '));
   await api(pj, 'souboj_konec', { mapa_id: MAPA });
 
   ok(pj.chybyJs.length === 0 && hr.chybyJs.length === 0, 'žádná chyba JavaScriptu: ' + pj.chybyJs.concat(hr.chybyJs).join('; '));

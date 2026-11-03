@@ -198,8 +198,11 @@ export function initRaidPanel(ctx) {
     grip.title = 'Přetažením změníš pořadí';
     grip.setAttribute('aria-hidden', 'true');
     // Přetahuje se jen za úchyt — jinak by box s výběrem úmyslu nebo tlačítky šel „chytit“ za ovládací prvky.
-    grip.addEventListener('mousedown', () => { b.draggable = true; });
-    grip.addEventListener('mouseup', () => { b.draggable = false; });
+    grip.addEventListener('mousedown', () => {
+      b.draggable = true;
+      // Tlačítko pustěné kdekoli (i mimo úchyt, když se tažení nespustí) vrátí box do stavu bez tažení, ať nejde chytit za výběry a tlačítka.
+      document.addEventListener('mouseup', () => { b.draggable = false; }, {once: true, capture: true});
+    });
     b.append(grip);
 
     const av = el('div', 'raid-avatar-obal');

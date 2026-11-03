@@ -123,11 +123,12 @@ function dracak_vtt_prechod_vstoupit(PDO $pdo, array $bod, int $ucetId): array
     $naCili = $q->fetchAll();
     $obsazene = [];
     $uzNaCili = [];   // postava => token, který už na cílové mapě stojí (vrátila se) — přesune se, ne zdvojí
+    $druzinaPostavy = array_flip(array_map(static fn($t) => (int)$t['entita_id'], $druzina));
     foreach ($naCili as $t) {
-        if ($t['typ_entity'] === 'postava') {
-            $uzNaCili[(int)$t['entita_id']] = (int)$t['id'];
+        if ($t['typ_entity'] === 'postava' && isset($druzinaPostavy[(int)$t['entita_id']])) {
+            $uzNaCili[(int)$t['entita_id']] = (int)$t['id'];   // postava družiny, která tu už stojí: přesune se, pole nezabírá
         } else {
-            $obsazene[] = [(int)$t['x'], (int)$t['y']];
+            $obsazene[] = [(int)$t['x'], (int)$t['y']];        // nestvůra, obecný token i NPC postava PJ pole zabírají
         }
     }
     $mista = dracak_vtt_prechod_volna_mista($cil, $vx, $vy, $obsazene, count($druzina));

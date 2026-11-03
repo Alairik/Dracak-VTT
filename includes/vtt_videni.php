@@ -354,6 +354,11 @@ function dracak_vtt_videni_token_viden(array $v, array $token): bool
 // Kdy neviditelnost končí (útok, řeč, psychická schopnost — b3238), rozhoduje PJ: efekt prostě sundá.
 function dracak_vtt_videni_neviditelne_tokeny(PDO $pdo, int $mapaId): array
 {
+    // Jeden dotaz na požadavek a mapu (mapa_stav i filtr tokenů ho volají za sebou); efekty se v rámci jednoho požadavku na čtení nemění.
+    static $cache = [];
+    if (isset($cache[$mapaId])) {
+        return $cache[$mapaId];
+    }
     try {
         $q = $pdo->prepare(
             'SELECT DISTINCT t.id FROM tokeny t
@@ -362,7 +367,7 @@ function dracak_vtt_videni_neviditelne_tokeny(PDO $pdo, int $mapaId): array
              WHERE t.mapa_id = ? AND e.nazev LIKE "Neviditelnost%"'
         );
         $q->execute([$mapaId]);
-        return array_fill_keys(array_map('intval', $q->fetchAll(PDO::FETCH_COLUMN)), true);
+        return $cache[$mapaId] = array_fill_keys(array_map('intval', $q->fetchAll(PDO::FETCH_COLUMN)), true);
     } catch (Throwable $e) {
         return [];
     }
