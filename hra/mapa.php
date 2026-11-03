@@ -214,7 +214,7 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
     <button class="tbtn armed" type="button" id="tb-move" title="Vybrat / přesunout (V)"><?php dracak_icon('move'); ?></button>
     <button class="tbtn" type="button" id="tb-vyber" title="Výběr rámečkem — táhni přes tokeny, klepnutím přidáš další (jde i Shiftem)"><?php dracak_icon('mouse-pointer-2'); ?></button>
     <button class="tbtn" type="button" id="tb-ruka" title="Posouvat mapu (ruka) — jde i mezerníkem, pravým tlačítkem nebo dvěma prsty"><?php dracak_icon('hand'); ?></button>
-    <button class="tbtn" type="button" id="tb-ruler" title="Měřit vzdálenost"><?php dracak_icon('ruler'); ?></button>
+    <button class="tbtn" type="button" id="tb-ruler" title="Měřit vzdálenost (na mapě světa s měřítkem navazuje Shift další úsek trasy)"><?php dracak_icon('ruler'); ?></button>
     <button class="tbtn" type="button" id="tb-kresleni" title="Kreslit na mapu (čára, šipka, obrazec, text)" style="display:none;"><?php dracak_icon('pen-line'); ?></button>
     <button class="tbtn" type="button" id="tb-ping" title="Ukázat na mapu ostatním"><?php dracak_icon('crosshair'); ?></button>
     <?php if ($mapaStrom): ?>

@@ -54,8 +54,17 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   await pj.mouse.up();
   const href = await pill.getAttribute('href');
   ok(/cesta\.php\?id=1&vzdalenost=\d/.test(href), 'odkaz míří do kalkulačky s vzdáleností: ' + href);
+  // Trasa po více bodech: Shift naváže další úsek na konec předchozího (900,450 → 900,650), odkaz nese součet.
+  await pj.keyboard.down('Shift');
+  await pj.mouse.move(700, 600); await pj.mouse.down(); await pj.mouse.move(900, 650, { steps: 6 });
+  await pj.waitForTimeout(200);
+  const textTrasa = await pill.textContent();
+  await pj.mouse.up(); await pj.keyboard.up('Shift');
+  const milTrasa = parseFloat(textTrasa.replace(/[^\d,]/g, '').replace(',', '.'));
+  const cekaneTrasa = 600 / zoom / 1000 * 25;
+  ok(Math.abs(milTrasa - cekaneTrasa) < Math.max(0.3, cekaneTrasa * 0.05), 'trasa ze dvou úseků: odkaz nese součet ' + textTrasa + ' (čekáno ≈ ' + cekaneTrasa.toFixed(1) + ')');
   await Promise.all([pj.waitForNavigation(), pill.click()]);
-  ok(Math.abs(parseFloat(await pj.inputValue('#cs-vzdalenost')) - mil) < 0.2, 'kalkulačka má vzdálenost z měřidla: ' + await pj.inputValue('#cs-vzdalenost'));
+  ok(Math.abs(parseFloat(await pj.inputValue('#cs-vzdalenost')) - milTrasa) < 0.2, 'kalkulačka má vzdálenost z celé trasy: ' + await pj.inputValue('#cs-vzdalenost'));
 
   // --- zápis cesty posune i čas světa ---
   await pj.fill('#cs-vzdalenost', '12');

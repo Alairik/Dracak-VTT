@@ -692,6 +692,7 @@ function setTool(tool) {
     if (btn) btn.classList.toggle('armed', t === tool);
   }
   rulerStart = null;
+  rulerTrasa = []; rulerPosledni = null;
   if (rulerSvg) rulerSvg.innerHTML = '';
   zedRozpracovaneBody = [];
   aktualizovatZedUlozitTlacitko();
@@ -900,6 +901,8 @@ if (mlhaZatahnoutVseBtn) mlhaZatahnoutVseBtn.addEventListener('click', () => mlh
 
 // --- Ruler: čistě klientská pomůcka, nic se neukládá ani nesynchronizuje ---
 let rulerStart = null, rulerClearTimer = null;
+// Trasa po více bodech (jen na mapě s měřítkem): Shift při táhnutí naváže na konec předchozího úseku; úseky = {ca, cb}.
+let rulerTrasa = [], rulerPosledni = null;
 let zedRozpracovaneBody = [];
 let mlhaKreslim = false, mlhaPosledniBunka = null;
 let mlhaRezimObdelnik = false, mlhaObdelnikStart = null;
@@ -997,15 +1000,25 @@ function drawRuler(a, b) {
       + '<polygon points="' + hexObrys(hb.x, hb.y, GRID_PX) + '" fill="rgba(255,179,71,.25)" stroke="#ffb347" stroke-width="1.5" vector-effect="non-scaling-stroke"/>';
   }
   let label = popisVzdalenosti(ca, cb);
-  // Světová mapa s měřítkem: přidej míle a PJ nabídni kalkulačku cesty s touto vzdáleností.
-  if (MERITKO) {
-    const mil = Math.hypot(cb.x - ca.x, cb.y - ca.y) / 1000 * MERITKO;
-    label += ' · ≈ ' + (mil < 10 ? mil.toFixed(1) : Math.round(mil)).toString().replace('.', ',') + ' mil';
-    nabidniCestu(mil);
-  }
   // Písmo a body mají stejnou velikost na obrazovce bez ohledu na zoom.
   const k = 1 / kamera.stav.z;
-  rulerSvg.innerHTML = obrysy +
+  // Světová mapa s měřítkem: přidej míle a PJ nabídni kalkulačku cesty s celkovou vzdáleností trasy (Shift navazuje další úsek).
+  let predchozi = '';
+  if (MERITKO) {
+    const pxUsek = Math.hypot(cb.x - ca.x, cb.y - ca.y);
+    const pxPredtim = rulerTrasa.reduce((suma, u) => suma + Math.hypot(u.cb.x - u.ca.x, u.cb.y - u.ca.y), 0);
+    const fmtMil = (v) => (v < 10 ? v.toFixed(1) : String(Math.round(v))).replace('.', ',');
+    label += ' · ≈ ' + fmtMil(pxUsek / 1000 * MERITKO) + ' mil';
+    if (rulerTrasa.length) label += ' · celkem ' + fmtMil((pxPredtim + pxUsek) / 1000 * MERITKO) + ' mil';
+    nabidniCestu((pxPredtim + pxUsek) / 1000 * MERITKO);
+    rulerPosledni = {ca, cb};
+    for (const u of rulerTrasa) {
+      predchozi += '<line x1="' + u.ca.x + '" y1="' + u.ca.y + '" x2="' + u.cb.x + '" y2="' + u.cb.y + '" stroke="#ffb347" stroke-width="2" stroke-dasharray="6 4" vector-effect="non-scaling-stroke"/>' +
+        '<circle cx="' + u.cb.x + '" cy="' + u.cb.y + '" r="' + (4 * k) + '" fill="#ffb347"/>';
+    }
+    if (rulerTrasa.length) predchozi += '<circle cx="' + rulerTrasa[0].ca.x + '" cy="' + rulerTrasa[0].ca.y + '" r="' + (4 * k) + '" fill="#ffb347"/>';
+  }
+  rulerSvg.innerHTML = obrysy + predchozi +
     '<line x1="' + ca.x + '" y1="' + ca.y + '" x2="' + cb.x + '" y2="' + cb.y + '" stroke="#ffb347" stroke-width="2" stroke-dasharray="6 4" vector-effect="non-scaling-stroke"/>' +
     '<circle cx="' + ca.x + '" cy="' + ca.y + '" r="' + (4 * k) + '" fill="#ffb347"/>' +
     '<circle cx="' + cb.x + '" cy="' + cb.y + '" r="' + (4 * k) + '" fill="#ffb347"/>' +
@@ -1090,7 +1103,8 @@ if (dosahBtn) {
   document.getElementById('dosahUkazat').addEventListener('click', ukazDosahNaMape);
 }
 function clearRulerSoon() {
-  rulerClearTimer = setTimeout(() => { if (rulerSvg) rulerSvg.innerHTML = ''; }, 2500);
+  // Na mapě s měřítkem zůstane trasa dost dlouho na navázání dalšího úseku (Shift).
+  rulerClearTimer = setTimeout(() => { if (rulerSvg) rulerSvg.innerHTML = ''; rulerTrasa = []; }, MERITKO ? 25000 : 2500);
 }
 
 // --- Ping: efemérní ukazovátko, viditelné i ostatním přes polling ---
@@ -2076,8 +2090,13 @@ function zacitAkci(e, pinEl) {
   }
   if (currentTool === 'ruler') {
     akce.typ = 'ruler';
-    rulerStart = m;
-    drawRuler(m, m);
+    if (e.shiftKey && MERITKO && rulerTrasa.length) {
+      rulerStart = rulerTrasa[rulerTrasa.length - 1].cb; // navázání na konec trasy
+    } else {
+      rulerStart = m;
+      rulerTrasa = [];
+    }
+    drawRuler(rulerStart, m);
     return;
   }
   if (currentTool === 'mlha') {
@@ -2161,7 +2180,7 @@ function zrusitAkci() {
       drzeneTokeny.delete(m.id);
     });
   }
-  if (a.typ === 'ruler' || a.typ === 'kresleni') { rulerStart = null; if (rulerSvg) rulerSvg.innerHTML = ''; }
+  if (a.typ === 'ruler' || a.typ === 'kresleni') { rulerStart = null; rulerTrasa = []; rulerPosledni = null; if (rulerSvg) rulerSvg.innerHTML = ''; }
   if (a.typ === 'mlha') { mlhaKreslim = false; mlhaObdelnikStart = null; if (rulerSvg) rulerSvg.innerHTML = ''; }
 }
 
@@ -2453,6 +2472,8 @@ function dokoncitAkci(a, e) {
       else if (rulerSvg) rulerSvg.innerHTML = '';
       break;
     case 'ruler':
+      if (MERITKO && rulerPosledni && Math.hypot(rulerPosledni.cb.x - rulerPosledni.ca.x, rulerPosledni.cb.y - rulerPosledni.ca.y) > 1) rulerTrasa.push(rulerPosledni);
+      rulerPosledni = null;
       rulerStart = null;
       clearRulerSoon();
       break;
