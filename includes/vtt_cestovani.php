@@ -321,14 +321,24 @@ function dracak_vtt_povoz_sprezeni(PDO $pdo, array $zvire, int $pocet, float $ce
 // kočímu na k% víc, nastane nehoda. Hodnota se hází za každou započatou
 // směnu jízdy. V hodinové simulaci jsou jen tempa chůze, z nich se řízení
 // týká spěchu (= klus; procházka a chůze = volný krok a krok se nehází).
-// null = řízení se nehází. Dovednost Kočí tuhle šanci ještě mění (ne tady).
-function dracak_vtt_povoz_rizeni(array $povoz, string $tempo, float $narocnost): ?float
+// null = řízení se nehází.
+//
+// Dovednost Kočí (h1727, PPP „Kočí (řízení spřežení a povozů)“) mění
+// pravděpodobnost nehody: totální úspěch −20 %, úspěch beze změny, neúspěch
+// +10 %, fatální neúspěch +30 %. Kniha neříká, jestli jde o procentní body,
+// nebo o podíl; beru body (stejně jako „o 1 % za bod náročnosti“ v Tabulce
+// řízení hned vedle) — úspěch řízení = základ + úprava, strop 0–100 %.
+// Zapsáno v docs/kontrolni-seznam-neuplnych-mist.md k ověření.
+const DRACAK_VTT_KOCI_UPRAVA = ['bez' => 0, 'totalni' => 20, 'uspech' => 0, 'neuspech' => -10, 'fatalni' => -30];
+
+function dracak_vtt_povoz_rizeni(array $povoz, string $tempo, float $narocnost, string $koci = 'bez'): ?float
 {
     if ($tempo !== 'spech') {
         return null;
     }
     $zaklad = (float)$povoz['rizeni_klus'];
-    return max(0.0, min(100.0, $zaklad - max(0.0, $narocnost - 10) * (float)$povoz['rizeni_snizeni']));
+    $upravaKoci = (float)(DRACAK_VTT_KOCI_UPRAVA[$koci] ?? 0);
+    return max(0.0, min(100.0, $zaklad - max(0.0, $narocnost - 10) * (float)$povoz['rizeni_snizeni'] + $upravaKoci));
 }
 
 // Sestaví subjekty simulace z postav a zvířat a spustí ji.
@@ -560,14 +570,14 @@ function dracak_vtt_cesta_vypocet(PDO $pdo, array $ucastnici, array $zvirata, fl
                 'rychlost' => [0 => $rychlost, 1 => $rychlost, 2 => $rychlost, 3 => $rychlost],
             ];
         }
-        $rizeni = dracak_vtt_povoz_rizeni($pv, $tempo, $narocnost);
+        $rizeni = dracak_vtt_povoz_rizeni($pv, $tempo, $narocnost, (string)($povoz['koci'] ?? 'bez'));
         $povozInfo = [
             'nazev' => $pv['nazev'], 'vaha_vozu' => $vahaVozu, 'provozni_naklad' => $provozni,
             'max_provozni_naklad' => $maxProvozni, 'procento' => $procento,
             'celkem_pro_sprezeni' => $vahaVozu + $provozni, 'sprezeni' => $pocetZvirat . '× ' . $zv['nazev'],
             'nosnost_v_zaprahu_mn' => $sp['nosnost_v_zaprahu_mn'], 'max_uveze_mn' => $sp['max_uveze_mn'],
             'nalozeni' => $sp['nalozeni']['kod'], 'pohyblivost' => $sp['pohyblivost'], 'bonus' => $sp['bonus'],
-            'rychlost' => $rychlost, 'rizeni_procent' => $rizeni,
+            'rychlost' => $rychlost, 'rizeni_procent' => $rizeni, 'koci' => (string)($povoz['koci'] ?? 'bez'),
             'hodu_rizeni_za_hodinu' => $rizeni !== null ? 6 : 0,
             'unava_cestujiciho_za_body_zvirete' => (int)$pv['unava_za_body_zvirete'],
             'poznamky' => $pozn,

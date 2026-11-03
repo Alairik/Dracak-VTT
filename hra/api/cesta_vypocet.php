@@ -14,7 +14,7 @@ require_once __DIR__ . '/../../includes/vtt_cas.php';
 //   povrch × teren × vliv, PJ pravidla h2366), tempo (prochazka|chuze|spech),
 //   zastav (1–3: úsek končí těsně před tímto stupněm únavy),
 //   ucastnici [{postava_id, vaha_jezdce, na_povoze}], zvirata [{zvire_id, naklad}],
-//   povoz {povoz_id, vaha_vozu, nasobek, zvire_id, pocet (1/2/3/4/6), naklad} | null,
+//   povoz {povoz_id, vaha_vozu, nasobek, zvire_id, pocet (1/2/3/4/6), naklad, koci (bez|totalni|uspech|neuspech|fatalni — výsledek dovednosti Kočí)} | null,
 //   zapsat (bool), posunout_cas (bool; jen spolu se zapsat — čas světa se posune o hodiny cesty, 1 hodina = 6 směn, hodiny světa viz includes/vtt_cas.php)
 header('Content-Type: application/json; charset=utf-8');
 $user = dracak_require_login();
@@ -110,9 +110,13 @@ if (is_array($pd) && !empty($pd['povoz_id'])) {
     if ($vahaVozu < 500 || $vahaVozu > 30000 || $nasobek < 0.5 || $nasobek > 5) {
         odpoved_cesta(422, ['error' => 'Váha vozu (500–30000 mn) nebo násobek nosnosti (0,5–5) je mimo rozsah.']);
     }
+    $koci = dracak_text($pd['koci'] ?? 'bez');
+    if (!isset(DRACAK_VTT_KOCI_UPRAVA[$koci])) {
+        odpoved_cesta(422, ['error' => 'Neznámý výsledek dovednosti Kočí (bez, totální úspěch, úspěch, neúspěch, fatální neúspěch).']);
+    }
     $povoz = [
         'povoz' => $pv, 'vaha_vozu' => $vahaVozu, 'nasobek' => $nasobek, 'zvire' => $tazne, 'pocet' => $pocet,
-        'naklad' => max(0, min(1000000, (float)($pd['naklad'] ?? 0))),
+        'naklad' => max(0, min(1000000, (float)($pd['naklad'] ?? 0))), 'koci' => $koci,
     ];
 }
 
@@ -149,6 +153,13 @@ if ($sim) {
         'hodin' => round($sim['hodin'], 3), 'mil' => round($sim['mil'], 2), 'zbyva_mil' => round($sim['zbyva_mil'], 2),
         'segmenty' => $segmenty, 'konec' => $konec,
     ];
+    // Řízení klusem: kočí hází za každou započatou směnu (10 min) jízdy; šance, že se cesta obejde bez nehody, je p^směn.
+    $sanceRizeni = $vypocet['povoz']['rizeni_procent'] ?? null;
+    if ($sanceRizeni !== null && $sim['hodin'] > 0) {
+        $pocetSmen = max(1, (int)ceil((float)$sim['hodin'] * 6 - 1e-9));
+        $vypocet['povoz']['rizeni_smen'] = $pocetSmen;
+        $vypocet['povoz']['rizeni_bez_nehody'] = round(pow($sanceRizeni / 100, $pocetSmen) * 100, 1);
+    }
 
     if (!empty($data['zapsat'])) {
         if ($ucastnici && !array_key_exists('unava', $ucastnici[0]['postava'])) {

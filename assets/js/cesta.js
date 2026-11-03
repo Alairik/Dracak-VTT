@@ -78,7 +78,7 @@
       ucastnici, zvirata, zapsat: !!zapsat, posunout_cas: !!(zapsat && $('cs-posunout-cas') && $('cs-posunout-cas').checked),
       povoz: povozZap && povozZap.checked ? {
         povoz_id: Number($('cs-povoz-typ').value), vaha_vozu: num($('cs-povoz-vaha').value, 0), nasobek: num($('cs-povoz-nasobek').value, 0),
-        zvire_id: Number($('cs-povoz-zvire').value), pocet: Number($('cs-povoz-pocet').value), naklad: num($('cs-povoz-naklad').value, 0),
+        zvire_id: Number($('cs-povoz-zvire').value), pocet: Number($('cs-povoz-pocet').value), naklad: num($('cs-povoz-naklad').value, 0), koci: $('cs-povoz-koci').value,
       } : null,
     };
   }
@@ -115,9 +115,13 @@
         '<tr><td>Spřežení ' + esc(pv.sprezeni) + ': nosnost v zápřahu / nejvíc uveze</td><td class="c">' + fmt(pv.nosnost_v_zaprahu_mn, 0) + ' / ' + fmt(pv.max_uveze_mn, 0) + ' mn</td></tr>' +
         '<tr><td>Naložení zvířat / jejich pohyblivost</td><td class="c">' + esc(nal[pv.nalozeni] || pv.nalozeni) + ' / ' + (pv.pohyblivost !== null ? pv.pohyblivost : '—') + (pv.bonus !== null ? ' (bonus ' + (pv.bonus > 0 ? '+' : '') + pv.bonus + ')' : '') + '</td></tr>' +
         '<tr><td>Cestující dostane 1 bod únavy za</td><td class="c">' + pv.unava_cestujiciho_za_body_zvirete + ' bodů únavy zvířat</td></tr>' +
-        (pv.rizeni_procent !== null ? '<tr><td>Řízení klusem: úspěch kočího (hází se za každou započatou směnu)</td><td class="c">' + fmt(pv.rizeni_procent, 1) + ' %</td></tr>' : '') +
+        (pv.rizeni_procent !== null ? '<tr><td>Řízení klusem: úspěch kočího (hází se za každou započatou směnu)' + (pv.koci && pv.koci !== 'bez' ? ' — s úpravou za dovednost Kočí' : '') + '</td><td class="c">' + fmt(pv.rizeni_procent, 1) + ' %</td></tr>' : '') +
+        (pv.rizeni_smen ? '<tr><td>Jízda trvá ' + pv.rizeni_smen + ' směn (hodů kočího), šance na cestu bez jediné nehody</td><td class="c">' + fmt(pv.rizeni_bez_nehody, 1) + ' %</td></tr>' : '') +
         '</tbody></table></div>';
       if (pv.poznamky && pv.poznamky.length) h += '<ul class="cs-chyby">' + pv.poznamky.map((p) => '<li>' + esc(p) + '</li>').join('') + '</ul>';
+      if (pv.rizeni_smen) {
+        h += '<p><button type="button" class="btn" data-hod-rizeni data-sance="' + pv.rizeni_procent + '" data-smen="' + pv.rizeni_smen + '">Hodit řízení za celou cestu (' + pv.rizeni_smen + '× k%)</button> <span id="cs-hod-rizeni" class="cs-stav" aria-live="polite"></span></p>';
+      }
     }
     const v = d.vysledek;
     if (v) {
@@ -156,6 +160,20 @@
       if (!window.confirm('Zapsat postavám body únavy po téhle cestě' + ($('cs-posunout-cas') && $('cs-posunout-cas').checked ? ' a posunout čas světa' : '') + '? Únava přepíše jejich současnou.')) return;
       const d2 = await volej(true);
       if (d2) vykresli(d2);
+    });
+    const hodBtn = box.querySelector('[data-hod-rizeni]');
+    if (hodBtn) hodBtn.addEventListener('click', () => {
+      // Hod kočího: za každou započatou směnu k% proti šanci úspěchu; padne-li víc, nastane nehoda (čím víc nad hranicí, tím horší následky — PJ).
+      const sance = Number(hodBtn.dataset.sance), smen = Number(hodBtn.dataset.smen);
+      const vystup = $('cs-hod-rizeni');
+      for (let i = 1; i <= smen; i++) {
+        const hod = 1 + Math.floor(Math.random() * 100);
+        if (hod > sance) {
+          vystup.textContent = 'NEHODA ve směně ' + i + ' z ' + smen + ': padlo ' + hod + ' při hranici ' + fmt(sance, 1) + ' — o ' + fmt(hod - sance, 0) + ' % nad hranicí. Následky určí PJ (čím víc nad, tím horší).';
+          return;
+        }
+      }
+      vystup.textContent = 'Cesta bez nehody (' + smen + ' hodů v pořádku).';
     });
     box.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }

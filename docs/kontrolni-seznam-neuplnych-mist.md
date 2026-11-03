@@ -437,6 +437,10 @@ knihou a opraví najednou. Pravidlo je v `CLAUDE.md`.
 - [ ] Hlavička sloupce Ujede: „číslo : 10“ — význam nevysvětlen (u prvních sedmi zvířat jde o „ujede (mil)“ z h1635); v kalkulačce cesty se nepoužívá.
 - [ ] Mořský kůň (vytrvalost a Ujede „-“) a Draci (pohyblivost „bestiář“) jsou z číselníku vynechaní — chybí číslo, které je potřeba.
 
+**Řízení povozu a dovednost Kočí (2026-11-03)**
+- [ ] Kočí (h1727): „Pravděpodobnost nehody se snižuje o 20 % / zvyšuje o 10 % / o 30 %“ — kniha neříká, jestli jde o procentní body, nebo o podíl nehody. V kalkulačce cesty jsou to **procentní body** šance úspěchu (stejně jako „o 1 % za bod náročnosti“ v Tabulce řízení). Ověřit; při jiném výkladu změnit `DRACAK_VTT_KOCI_UPRAVA` v `includes/vtt_cestovani.php`.
+- [ ] PJ příklad Tabulky řízení počítá krytý vůz **klusem při náročnosti 12** (78 %), ale Tabulka naložení/rychlosti povozů v DB klus krytého vozu nad náročnost 10 zakazuje (`povozy.klus = jen_dobra_cesta`). Kalkulačka drží zákaz; rozpor v knize.
+
 **Deník postavy, prototyp v2 (2026-10-27)**
 - [ ] Tabulka **Objevení mechanismů** uvádí násobek 3× Obr, text u ní 2× Obr. Rozpor nechán, jak je; nezjištěno, který údaj platí.
 - [ ] **Elixír Démonní krve** (h1067): „+2 stupeň síly a obratnosti – max 21+5“. Prototyp bere +2 body vlastnosti; pokud je „stupeň“ krok v tabulce

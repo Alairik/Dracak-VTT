@@ -186,6 +186,8 @@ dracak_vtt_page_start('Cesta — ' . $svet['nazev'], $user, true, ['../assets/cs
             <select id="cs-povoz-zvire"><?php foreach ($zvirata as $z): ?><option value="<?= (int)$z['id'] ?>" <?= $z['nazev'] === 'klasický kůň' ? 'selected' : '' ?>><?= $e($z['nazev']) ?><?= !empty($z['nosnost_tah_mn']) ? ' (v tahu ' . (int)$z['nosnost_tah_mn'] . ' mn)' : ' (nosnost ' . (int)$z['nosnost_mn'] . ' mn)' ?></option><?php endforeach; ?></select></div>
           <div class="field"><label for="cs-povoz-pocet">Spřežení</label>
             <select id="cs-povoz-pocet"><option value="1">1 zvíře</option><option value="2" selected>pár (2)</option><option value="3">trojka (3)</option><option value="4">2 páry (4)</option><option value="6">3 páry (6)</option></select></div>
+          <div class="field"><label for="cs-povoz-koci">Dovednost Kočí (výsledek ověření)</label>
+            <select id="cs-povoz-koci"><option value="bez">neověřuje se</option><option value="totalni">totální úspěch (nehoda −20 %)</option><option value="uspech">úspěch (beze změny)</option><option value="neuspech">neúspěch (nehoda +10 %)</option><option value="fatalni">fatální neúspěch (nehoda +30 %)</option></select></div>
         </div>
         <p class="note">Váha vozu se předvyplní středem rozsahu podle upravených (homebrew) pravidel — přepiš podle konkrétního vozu. Do váhy pro spřežení se počítá vůz, posádka a náklad; zvíře se pak nakládá jako při jízdě (čtvrtina váhy proti nosnosti spřežení). Postavy označené "Na povoze" jedou na povoze, jejich váha a náklad se přičtou. Vozy se dají jet nejvýše krokem, klusem jen po velmi dobré cestě (maringotka nikdy); řízení klusem je riziko nehody.</p>
       </div>
