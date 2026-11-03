@@ -29,13 +29,19 @@ const DRACAK_VTT_SVETLO_PREDVOLBY = [
     'hul_lucerna' => ['Čarodějova hůl (jako lucerna)', 8.0],
 ];
 
-// Stavy osvětlení mapy (mapy.osvetleni, VARCHAR(8)): klíč => [název, živé vidění?]. Živé vidění (hráč vidí jen osvětlené místo) mají „noc“ a „tma“; „den“ je dosavadní mlha války.
-// „noc“ = nepatrné světlo (kniha: měsíc v úplňku, h286 b3166): bez zdroje světla nevidí nikdo kromě tvorů s nočním viděním (lupič se Zlepšením zraku, h630 b5663),
-// „tma“ = absolutní tma (podzemí): noční vidění nepomáhá. Další stavy (pološero, soumrak…) sem přibudou jako další řádek, až bude jasné, co mění — kniha pro ně nemá vzdálenosti.
+// Stavy osvětlení mapy (mapy.osvetleni, VARCHAR(8)): klíč => [název, živé vidění?, noční vidění funguje?]. Stupnice podle Lektvaru sovích očí (h3243 b3244–b3249; uživatel
+// 2026-11-03: „tmu na 5“) od nejtmavší: naprostá tma, hustá tma, tma, řídká tma, pološero; k tomu „den“ (dosavadní mlha války).
+// Živé vidění (hráč vidí jen osvětlené místo): všechny stupně tmy kromě pološera — soumrak je dost světla, aby se vidělo jako ve dne (mlha jako dosud).
+// Noční vidění (lupič se Zlepšením zraku, h630 b5663: „potřebuje jen nepatrně světla, s absolutní tmou v podzemí či v kouzlem vytvořené tmě nepomáhá“) funguje
+// v husté tmě, ve tmě i v řídké tmě, v naprosté tmě ne. Kniha u žádného stupně neříká, jak daleko se vidí — dosah nočního vidění zadává PJ u tvora; stupně se liší
+// tím, co je z knihy známo (noční vidění, postihy lektvaru sovích očí: hustá tma −1 k boji, tma 0, řídká tma ostře, pološero −1).
 const DRACAK_VTT_OSVETLENI = [
-    'den' => ['Světlo', false],
-    'noc' => ['Noc', true],
-    'tma' => ['Tma', true],
+    'den' => ['Světlo', false, false],
+    'polosero' => ['Pološero (soumrak, úsvit)', false, false],
+    'ridka' => ['Řídká tma (měsíc v úplňku)', true, true],
+    'noc' => ['Tma (slabě svítí hvězdy)', true, true],
+    'husta' => ['Hustá tma (bezvětrná noc, hustý les)', true, true],
+    'tma' => ['Naprostá tma (podzemí, kouzelná tma)', true, false],
 ];
 
 // Zóny tmy (kouzla) — token se svetlo_typ 'tma' nebo 'temnota' NENÍ zdroj světla, ale kruh o poloměru svetlo_sahy (sáhů), který světlo a infravidění potlačuje.
@@ -262,9 +268,9 @@ function dracak_vtt_videni_vypocet(PDO $pdo, array $mapa, int $ucetId): ?array
                 $videno[$idx] = "\x01";
             }
         }
-        // Noční vidění (jen mapa „Noc“): tvor vidí všechny buňky do svého dosahu, kam vede volný paprsek, i bez světla. Uvnitř kouzelné tmy (Tma, Temnota) nepomáhá
+        // Noční vidění (stupně tmy, kde funguje — viz DRACAK_VTT_OSVETLENI): tvor vidí všechny buňky do svého dosahu, kam vede volný paprsek, i bez světla. Uvnitř kouzelné tmy (Tma, Temnota) nepomáhá
         // ani zevnitř, ani dovnitř (b5663: „v kouzlem vytvořené tmě mu noční vidění nepomáhá“).
-        $nocDosah = ($mapa['osvetleni'] ?? 'den') === 'noc' ? (int)($d['videni_noc_sahy'] ?? 0) : 0;
+        $nocDosah = (DRACAK_VTT_OSVETLENI[$mapa['osvetleni'] ?? 'den'][2] ?? false) ? (int)($d['videni_noc_sahy'] ?? 0) : 0;
         if ($nocDosah > 0 && !dracak_vtt_videni_v_zone($zony, $dx, $dy, 'tma') && !dracak_vtt_videni_v_zone($zony, $dx, $dy, 'temnota')) {
             $r = $nocDosah * $pxSah;
             foreach (dracak_vtt_mlha_bunky_v_obdelniku($roz, $dx - $r, $dy - $r, $dx + $r, $dy + $r) as $b) {
@@ -457,7 +463,7 @@ function dracak_vtt_videni_tma_volba(PDO $pdo, array $mapa, int $pozorovatelToke
         return null;
     }
     // Lupič s nočním viděním (b5663) bojuje ve tmě s postihem −2 místo −5 a ví, kde protivník stojí — ale jen v „noci“; v absolutní tmě ani v kouzelné tmě mu zrak nepomáhá.
-    if (($plna['osvetleni'] ?? 'den') === 'noc') {
+    if (DRACAK_VTT_OSVETLENI[$plna['osvetleni'] ?? 'den'][2] ?? false) {
         foreach ($v['divaci'] as $d) {
             if ((int)$d['id'] === $pozorovatelTokenId && (int)($d['videni_noc_sahy'] ?? 0) > 0
                 && !dracak_vtt_videni_v_zone($v['zony'], (float)$pozorovatel['x'], (float)$pozorovatel['y'], 'tma')

@@ -91,6 +91,19 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   ok(!(await tokenyHrace()).includes(gob), 'v úplné tmě noční vidění nepomáhá (b5663): nestvůru 5 sáhů daleko hráč nevidí');
   ok(pocet((await mlha()).videne_b64) === 1, 'v úplné tmě vidí jen svou buňku');
 
+  // --- pět stupňů tmy podle knihy (Lektvar sovích očí): noční vidění v husté tmě, tmě i řídké tmě, ne v naprosté; pološero jako den ---
+  await api(pj, 'token_uprava', { token_id: h, zmeny: { noc: 8 } });
+  for (const [stav, vidiNoc] of [['ridka', true], ['noc', true], ['husta', true], ['tma', false]]) {
+    r = await api(pj, 'mapa_osvetleni', { mapa_id: MAPA, osvetleni: stav });
+    ok(r.s === 200, 'PJ nastaví stupeň tmy „' + stav + '“');
+    ok((await tokenyHrace()).includes(gob) === vidiNoc, stav + ': noční vidění ' + (vidiNoc ? 'funguje (nestvůra 5 sáhů daleko je vidět)' : 'nepomáhá (nestvůra není vidět)'));
+  }
+  r = await api(pj, 'mapa_osvetleni', { mapa_id: MAPA, osvetleni: 'polosero' });
+  ok(r.s === 200 && (await tokenyHrace()).includes(gob) && (await mlha()).videni !== true, 'pološero je jako den: hráč vidí bez světla, živé vidění je vypnuté');
+  r = await api(pj, 'mapa_osvetleni', { mapa_id: MAPA, osvetleni: 'soumrak' });
+  ok(r.s === 422, 'neznámý stupeň se odmítne (422)');
+  await api(pj, 'mapa_osvetleni', { mapa_id: MAPA, osvetleni: 'den' });
+
   // --- prohlížeč: PJ nastaví noční vidění v panelu tokenu a stav „Noc“ v popoveru Mlha ---
   await api(pj, 'mapa_osvetleni', { mapa_id: MAPA, osvetleni: 'den' });
   await pj.goto(BASE + '/hra/mapa.php?id=' + MAPA);

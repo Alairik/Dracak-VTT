@@ -521,3 +521,36 @@ function dracak_vtt_iniciativa_auto_bonusy(PDO $pdo, array $postava): array
     return $vysledek;
 }
 
+
+
+// Dosah pohybu postavy mimo boj v SÁZÍCH (h1634 b10867 + tabulky rychlosti, h93008…; míle = 1000 sáhů, b28/b1622; sáh = metr):
+//   chůze (poklus…): tabulka dává body chůze za HODINU; náročnost terénu je počet bodů na MÍLI, tedy míle za hodinu = body ÷ náročnost;
+//   běh: tabulka dává body běhu za KOLO; náročnost „se udává zvlášť pro běh (body / 10 sáhů) — číselně stejná“, tedy sáhů za kolo = body ÷ náročnost × 10.
+// Počítá se s aktuální únavou a naložením postavy (stejně jako deník). Vrací
+//   ['pohyblivost', 'bonus', 'nalozeni' (kód), 'narocnost', 'kolo' => [poklus, beh, sprint v sázích], 'smena' => [prochazka, chuze, spech v sázích za směnu = 10 minut]]
+// nebo ['chyba' => text].
+function dracak_vtt_dosah_pohybu(PDO $pdo, array $postava, float $narocnost): array
+{
+    $poh = dracak_vtt_postava_pohyblivost($pdo, $postava);
+    if ($poh === null || $poh['pohyblivost'] === null || $poh['bonus_pohyblivosti'] === null) {
+        return ['chyba' => 'Pohyblivost postavy se nedá spočítat (chybí rasa, síla nebo obratnost, nebo nese víc než 4× nosnost; při ruční pohyblivosti ji zadej v deníku).'];
+    }
+    $r = dracak_vtt_rychlost_pohybu($pdo, (int)$poh['bonus_pohyblivosti']);
+    if ($r === null) {
+        return ['chyba' => 'Bonus pohyblivosti (' . (int)$poh['bonus_pohyblivosti'] . ') je mimo tabulky rychlosti (pravidla znají −5 až +10).'];
+    }
+    $n = max(1.0, $narocnost);
+    $kolo = [];
+    foreach ($r['beh'] as $k => $body) {
+        $kolo[$k] = round($body / $n * 10, 1);
+    }
+    $smena = [];
+    foreach ($r['chuze'] as $k => $body) {
+        $smena[$k] = (int)round($body / $n * 1000 / 6);
+    }
+    return [
+        'pohyblivost' => (int)$poh['pohyblivost'], 'bonus' => (int)$poh['bonus_pohyblivosti'],
+        'nalozeni' => is_array($poh['nalozeni'] ?? null) ? ($poh['nalozeni']['kod'] ?? null) : null,
+        'narocnost' => $n, 'kolo' => $kolo, 'smena' => $smena,
+    ];
+}

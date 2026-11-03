@@ -3,9 +3,9 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/vtt.php';
 require_once __DIR__ . '/../../includes/vtt_videni.php';
 
-// Osvětlení mapy (jen PJ/admin): „den“ (dosavadní mlha války), „noc“ (nepatrné světlo, např. úplněk: bez světla nevidí nikdo kromě tvorů s nočním viděním)
-// nebo „tma“ (úplná tma: hráči vidí jen to, co osvětlí zdroje světla; viz includes/vtt_videni.php, DRACAK_VTT_OSVETLENI).
-// Tělo: {mapa_id, osvetleni: "den" | "noc" | "tma"}. Událost „mapa_osvetleni“ — klienti si znovu načtou mlhu a tokeny.
+// Osvětlení mapy (jen PJ/admin): „den“ (dosavadní mlha války), „polosero“ (jako den) a čtyři stupně tmy podle knihy — „ridka“ (úplněk), „noc“ (hvězdy), „husta“,
+// „tma“ (naprostá): hráči vidí jen to, co osvětlí zdroje světla, tvorové s nočním viděním do svého dosahu (kromě naprosté tmy); viz DRACAK_VTT_OSVETLENI.
+// Tělo: {mapa_id, osvetleni: klíč stavu}. Událost „mapa_osvetleni“ — klienti si znovu načtou mlhu a tokeny.
 header('Content-Type: application/json; charset=utf-8');
 $user = dracak_require_login();
 
@@ -14,7 +14,7 @@ $mapaId = (int)($data['mapa_id'] ?? 0);
 $osvetleni = dracak_text($data['osvetleni'] ?? '');
 if (!isset(DRACAK_VTT_OSVETLENI[$osvetleni])) {
     http_response_code(422);
-    echo json_encode(['error' => 'Osvětlení je „den“, „noc“ nebo „tma“.']);
+    echo json_encode(['error' => 'Neznámý stav osvětlení (' . implode(', ', array_keys(DRACAK_VTT_OSVETLENI)) . ').']);
     exit;
 }
 

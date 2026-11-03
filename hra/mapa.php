@@ -19,6 +19,7 @@ $isPjOrAdmin = dracak_vtt_je_pj_sveta($user, $svetId);
 
 require_once __DIR__ . '/../includes/vtt_mapa_stav.php';
 require_once __DIR__ . '/../includes/vtt_cas.php';
+require_once __DIR__ . '/../includes/vtt_videni.php';
 // Tokeny, efekty, pořadí tahů a postavy k položení — jediný zdroj pravdy
 // sdílený s hra/api/mapa_stav.php (obnova "na místě" bez přenačtení stránky).
 $stav = dracak_vtt_mapa_stav(dracak_db(), $user, $mapa, $isPjOrAdmin);
@@ -479,11 +480,11 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
     <?php if (dracak_vtt_tokeny_funkce()['videni']): ?>
     <label for="mapaOsvetleni" style="margin-top:10px;">Osvětlení mapy</label>
     <select class="input" id="mapaOsvetleni">
-      <option value="den" <?= ($mapa['osvetleni'] ?? 'den') === 'den' ? 'selected' : '' ?>>Světlo (mlha jako dosud)</option>
-      <option value="noc" <?= ($mapa['osvetleni'] ?? 'den') === 'noc' ? 'selected' : '' ?>>Noc (nepatrné světlo, vidí jen tvorové s nočním viděním)</option>
-      <option value="tma" <?= ($mapa['osvetleni'] ?? 'den') === 'tma' ? 'selected' : '' ?>>Tma (úplná tma, vidí jen osvětlené místo)</option>
+      <?php foreach (DRACAK_VTT_OSVETLENI as $klic => [$nazevOsv]): ?>
+      <option value="<?= $klic ?>" <?= ($mapa['osvetleni'] ?? 'den') === $klic ? 'selected' : '' ?>><?= htmlspecialchars($klic === 'den' ? 'Světlo (mlha jako dosud)' : $nazevOsv) ?></option>
+      <?php endforeach; ?>
     </select>
-    <p class="note" style="margin-top:4px;">V noci i ve tmě hráč vidí jen to, co osvítí pochodeň, lucerna nebo jiný zdroj světla (nastavíš u tokenu). V noci navíc vidí do nastaveného dosahu tvorové s nočním viděním (např. lupič se Zlepšením zraku) — ve tmě ne (absolutní tma jim nepomáhá). Kudy prošel, zůstane ztlumeně; nestvůry mimo dohled nevidí. Funguje při zapnuté mlze a nastaveném gridu.</p>
+    <p class="note" style="margin-top:4px;">Stupnice tmy podle knihy (Lektvar sovích očí): řídká tma (úplněk), tma (hvězdy), hustá tma, naprostá tma; pološero je jako den. Ve tmě hráč vidí jen to, co osvítí pochodeň, lucerna nebo jiný zdroj světla (nastavíš u tokenu). Tvorové s nočním viděním (např. lupič se Zlepšením zraku) vidí navíc do nastaveného dosahu — v naprosté tmě a v kouzelné tmě ne. Kudy prošel, zůstane ztlumeně; nestvůry mimo dohled nevidí. Funguje při zapnuté mlze a nastaveném gridu.</p>
     <?php endif; ?>
     <p class="note" style="margin-top:4px;">Vypnuté = hráči vidí celou mapu bez odhalování, stejně jako ty. Mlha vyžaduje nastavený grid (respektuje jeho buňky/hexy) — bez gridu nejde zapnout.</p>
     <div style="display:flex;gap:6px;margin-top:10px;">
@@ -568,6 +569,16 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
       </div>
     </div>
     <?php endif; ?>
+    <!-- Dosah pohybu postavy mimo boj (PJ a vlastník): sáhy za kolo (poklus/běh/sprint) a za směnu (procházka/chůze/spěch) podle terénu -->
+    <div id="dosahBlok" class="panel-sekce" style="display:none;">
+      <button class="btn btn-ghost" type="button" id="dosahBtn">Dosah pohybu…</button>
+      <div id="dosahObsah" style="display:none;margin-top:6px;">
+        <label for="dosahPovrch">Povrch (náročnost, body na míli / 10 sáhů)</label>
+        <select class="input" id="dosahPovrch"></select>
+        <div id="dosahVysl" class="note" style="margin-top:6px;"></div>
+        <button class="btn btn-secondary" type="button" id="dosahUkazat" style="width:100%;margin-top:6px;">Ukázat dosah na mapě</button>
+      </div>
+    </div>
     <!-- Deník nestvůry (jen PJ, jen u nestvůry): přehled z bestiáře a čísla pro boj — nahoře, ať se nemusí scrollovat -->
     <div id="denikNestvury" class="panel-sekce" style="display:none;"></div>
 

@@ -818,9 +818,9 @@ if (mapaOsvetleniSel) {
       if (d.error) { logLine('Chyba: ' + d.error); mapaOsvetleniSel.value = CFG.osvetleni || 'den'; return; }
       CFG.osvetleni = d.osvetleni;
       posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
-      logLine(d.osvetleni === 'tma' ? 'Mapa je ve tmě — hráči vidí jen osvětlené místo.'
-        : d.osvetleni === 'noc' ? 'Mapa je v noci — hráči vidí jen osvětlené místo, tvorové s nočním viděním do svého dosahu.'
-        : 'Mapa je zase osvětlená — mlha jako dosud.');
+      const nazevStavu = mapaOsvetleniSel.selectedOptions[0] ? mapaOsvetleniSel.selectedOptions[0].textContent : d.osvetleni;
+      logLine(d.osvetleni === 'den' || d.osvetleni === 'polosero' ? 'Mapa je zase osvětlená (' + nazevStavu + ') — mlha jako dosud.'
+        : 'Osvětlení mapy: ' + nazevStavu + ' — hráči vidí jen osvětlené místo' + (d.osvetleni === 'tma' ? '.' : ', tvorové s nočním viděním do svého dosahu.'));
       osvezitMlhu();
     });
   });
@@ -1034,6 +1034,60 @@ if (meritkoUlozitBtn) {
       logLine(MERITKO ? 'Měřítko mapy: 1000 px = ' + String(MERITKO).replace('.', ',') + ' mil.' : 'Měřítko mapy zrušeno.');
     });
   });
+}
+// Dosah pohybu postavy mimo boj (hra/api/dosah_pohybu.php): sáhy za kolo (poklus / běh / sprint) a za směnu (procházka / chůze / spěch).
+let dosahData = null, dosahTimer = null;
+function dosahText(d) {
+  const f = (n) => String(n).replace('.', ',');
+  return 'Pohyblivost ' + d.pohyblivost + ' (bonus ' + (d.bonus > 0 ? '+' : '') + d.bonus + '), náročnost ' + f(d.narocnost) + '. '
+    + 'Za kolo (10 s): poklus ' + f(d.kolo.poklus) + ', běh ' + f(d.kolo.beh) + ', sprint ' + f(d.kolo.sprint) + ' sáhů. '
+    + 'Za směnu (10 min): procházka ' + d.smena.prochazka + ', chůze ' + d.smena.chuze + ', spěch ' + d.smena.spech + ' sáhů.';
+}
+async function nactiDosah() {
+  if (!spravovanyToken) return;
+  const sel = document.getElementById('dosahPovrch');
+  const vysl = document.getElementById('dosahVysl');
+  const narocnost = sel.value || '10';
+  vysl.textContent = 'Počítám…';
+  try {
+    const r = await fetch('api/dosah_pohybu.php?token_id=' + spravovanyToken.tokenId + '&narocnost=' + encodeURIComponent(narocnost), {cache: 'no-store', credentials: 'same-origin'});
+    const d = await r.json();
+    if (!sel.options.length && d.povrchy) {
+      d.povrchy.forEach((p) => sel.append(new Option(p.nazev + ' (' + (p.od === p.do ? p.od : p.od + '–' + p.do) + ')', String(p.narocnost))));
+      sel.value = '10';
+    }
+    if (!r.ok || d.error || d.chyba) { dosahData = null; vysl.textContent = d.error || d.chyba || 'Dosah se nepodařilo spočítat.'; return; }
+    dosahData = d;
+    vysl.textContent = dosahText(d);
+  } catch (e) {
+    vysl.textContent = 'Dosah se nepodařilo načíst (síť).';
+  }
+}
+function ukazDosahNaMape() {
+  const t = spravovanyTokenData();
+  const sah = pxNaSah();
+  if (!t || !dosahData || !(sah > 0) || !rulerSvg) { logLine('Dosah se dá ukázat jen na mapě s mřížkou.'); return; }
+  const k = 1 / kamera.stav.z;
+  const barvy = [['poklus', '#7ad07a'], ['beh', '#ffd166'], ['sprint', '#ff7a5c']];
+  rulerSvg.innerHTML = barvy.map(([klic, barva]) => {
+    const r = dosahData.kolo[klic] * sah;
+    return '<circle cx="' + t.x + '" cy="' + t.y + '" r="' + r + '" fill="' + barva + '" fill-opacity="0.06" stroke="' + barva + '" stroke-width="2" stroke-dasharray="6 4" vector-effect="non-scaling-stroke"/>'
+      + '<text x="' + t.x + '" y="' + (t.y - r - 4 * k) + '" fill="#fff" font-size="' + (13 * k) + '" text-anchor="middle" paint-order="stroke" stroke="#000" stroke-width="' + (3 * k) + '">'
+      + klic + ' ' + String(dosahData.kolo[klic]).replace('.', ',') + ' sáhů</text>';
+  }).join('');
+  clearTimeout(dosahTimer);
+  dosahTimer = setTimeout(() => { if (rulerSvg) rulerSvg.innerHTML = ''; }, 12000);
+}
+const dosahBtn = document.getElementById('dosahBtn');
+if (dosahBtn) {
+  dosahBtn.addEventListener('click', () => {
+    const obsah = document.getElementById('dosahObsah');
+    const otevrit = obsah.style.display === 'none';
+    obsah.style.display = otevrit ? '' : 'none';
+    if (otevrit) nactiDosah();
+  });
+  document.getElementById('dosahPovrch').addEventListener('change', nactiDosah);
+  document.getElementById('dosahUkazat').addEventListener('click', ukazDosahNaMape);
 }
 function clearRulerSoon() {
   rulerClearTimer = setTimeout(() => { if (rulerSvg) rulerSvg.innerHTML = ''; }, 2500);
@@ -1721,6 +1775,12 @@ function otevritSpravovat(t) {
   };
   document.getElementById('spravovatNazev').textContent = t.label;
   if (denikDock && t.typ_entity === 'postava') denikDock.nasleduj(t.entita_id);
+  const dosahBlok = document.getElementById('dosahBlok');
+  if (dosahBlok) {
+    // Dosah pohybu mimo boj: postava a její PJ / vlastník; po výběru jiného tokenu se blok zavře.
+    dosahBlok.style.display = t.typ_entity === 'postava' && (IS_PJ_OR_ADMIN || t.owned) ? '' : 'none';
+    document.getElementById('dosahObsah').style.display = 'none';
+  }
   const denikBlok = document.getElementById('spravovatDenikBlok');
   if (denikBlok) denikBlok.style.display = denikDock && t.typ_entity === 'postava' && denikDock.smi(t.entita_id) ? '' : 'none';
   // Vlastní (obecný) token nemá životy, iniciativu, efekty ani inventář.
