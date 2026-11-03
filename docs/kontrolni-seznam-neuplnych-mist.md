@@ -431,6 +431,12 @@ Sem patří věci, kde jsem **převzal údaj z knihy tak, jak je** (při rozporu
 podle homebrew), nebo si text musel vyložit. Na konci se projdou společně s
 knihou a opraví najednou. Pravidlo je v `CLAUDE.md`.
 
+**Jezdecká zvířata, tabulka h2057 (2026-11-03, migrace 0111)**
+- [ ] Hvězdičky u sloupce Ujede (osel `28*`, mezek `38*`, válečný kůň `38**`) tabulka nevysvětluje; hodnoty ponechány, jak jsou.
+- [ ] **Pegas** a **Gryf**: řádek bez označení má Ujede 57 (Pegas) / 57 (Gryf), řádek „na zemi“ 288 / 360 a vytrvalost 8 / 10. U sovy a skarabea je to naopak (let = vysoké Ujede, „na zemi“ = nízké) — vypadá to, že u Pegase a Gryfa je označení „na zemi“ na špatném řádku. V DB jsou řádky pojmenované přesně podle knihy (`pegas 1`, `pegas 2 (na zemi)`).
+- [ ] Hlavička sloupce Ujede: „číslo : 10“ — význam nevysvětlen (u prvních sedmi zvířat jde o „ujede (mil)“ z h1635); v kalkulačce cesty se nepoužívá.
+- [ ] Mořský kůň (vytrvalost a Ujede „-“) a Draci (pohyblivost „bestiář“) jsou z číselníku vynechaní — chybí číslo, které je potřeba.
+
 **Deník postavy, prototyp v2 (2026-10-27)**
 - [ ] Tabulka **Objevení mechanismů** uvádí násobek 3× Obr, text u ní 2× Obr. Rozpor nechán, jak je; nezjištěno, který údaj platí.
 - [ ] **Elixír Démonní krve** (h1067): „+2 stupeň síly a obratnosti – max 21+5“. Prototyp bere +2 body vlastnosti; pokud je „stupeň“ krok v tabulce

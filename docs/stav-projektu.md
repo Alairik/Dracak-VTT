@@ -41,7 +41,7 @@ na DB postavené od nuly. Co lze dělat **bez** ptaní (vždy s testy, `tests/ru
   - *Blok E — vidění a světlo:* základ je hotový (dveře, světlo, tma, infravidění). Zbývá: **zamčené a tajné dveře** (uživatel je bude potřebovat později), hladký polygonový stín místo buněk, automatická ztráta iniciativy ve tmě, Lovcův Příkrov stínů, hráčem otevíratelné dveře (zatím jen PJ). Hotové: zóny Tma a Temnota, pět stupňů tmy a noční vidění.
   - *Boj:* „obrana a krok“ (kniha neříká, kdy se krok udělá — potřebuje rozhodnutí), útok na kouzlícího tvora (neviditelný tvor hotový, viz níž), čtyřstupňová škála hodu na dovednost (fatální neúspěch / totální úspěch — v přepisu knihy chybí, potřeba foto).
   - *Nestvůry:* deník nestvůry **před bojem** (zadání uživatele 2026-10-20; design navrhne uživatel), kořist, výbava z katalogu s dopočtem ÚČ/OČ ze zbraně a zbroje, inteligence/charisma/pohyblivost/vytrvalost jako hratelná data, kouzla nestvůr, automatický bonus k iniciativě podle „N× za kolo“.
-  - *Cestování:* jezdecká zvířata jen 7 z asi 40 řádků tabulky h2057 (potřebuje rozhodnutí, jak značit letecké a pozemní varianty a co znamená sloupec „Ujede“); povozy bez nehod (hod kočího), dovednosti Kočí, otevřených kočárů a více povozů v jedné cestě; vnořené kontejnery; povoz není trvalá entita.
+  - *Cestování:* jezdecká zvířata **hotová (2026-11-03, migrace 0111: 43 řádků z h2057, DML)** — letecké a pozemní řádky se vedou jako samostatná zvířata se jménem podle knihy, „Ujede“ se nikde nepočítá, kalkulačka bere pohyblivost, nosnost a vytrvalost; zbývá Pegas/Gryf (označení „na zemi“ vypadá na špatném řádku, viz kontrolní seznam) a let jako pohyb; povozy bez nehod (hod kočího), dovednosti Kočí, otevřených kočárů a více povozů v jedné cestě; vnořené kontejnery; povoz není trvalá entita.
   - *Deník:* figurína a sloty, Dovednosti, Společníci, připnutá kouzla, historie změn postavy, deník cizí postavy pro ostatní hráče, přehled únavy a naložení také v panelu tokenu na mapě, ověření zbytku kapitoly Dovednosti na další propojení.
   - *Data z knihy:* v `docs/kontrolni-seznam-neuplnych-mist.md` je 288 nezaškrtnutých položek (chybějící tabulky boje beze zbraně, vícenásobných útoků, bonusů k iniciativě ze str. 78, poškozené pasáže) — potřebují foto nebo korekturu.
 - **Kvalita:** projít poslední větší změny revizí (`/code-review`): omezení přihlášení, chybový log, záloha, kontrola nasazení, fuzzery.
@@ -906,10 +906,15 @@ důvody v `docs/navrh-kontejnery-a-nosice.md`).
   1000 = 4 000 v zápřahu = 3 200 × 1,25), ne jako konečnou nosnost
   zápřahu — moje čtení, kniha to doslova neříká; **uživatel potvrdil 2026-10-14**
   (základ 1000, v zápřahu 4000).
-  Rozšíření na ostatní tvory z h2057 (~40 řádků: válečný kůň, vůl,
-  velbloud, letci s řádky "na zemi", ceny…) čeká na rozhodnutí, jak
-  značit letecké/pozemní varianty a co znamená sloupec "Ujede (číslo :
-  10)" a poznámky `*`/`**`, které tabulka nevysvětluje.
+  Rozšíření na ostatní tvory z h2057 (válečný kůň, vůl, velbloud, letci
+  s řádky "na zemi", ceny…) **hotové 2026-11-03 (migrace 0111, 36 zvířat,
+  jen INSERT IGNORE)**: každý řádek tabulky je samostatné zvíře se jménem
+  podle knihy (`pegas 1`, `pegas 2 (na zemi)`), cena a poznámky jsou v
+  `popis`, `cas_na_10_mil_min` = 0 („kniha neuvádí“, sloupec se nepočítá).
+  Sloupec „Ujede“ se v kalkulačce nepoužívá (cesta jde přes body za hodinu
+  z pohyblivosti), takže jeho nevysvětlený význam a hvězdičky `*`/`**`
+  nic neblokují — zapsáno v kontrolním seznamu. Draci (řídí bestiář) a
+  mořský kůň (bez vytrvalosti) vynechaní. Test: `cesta_zvirata_api.js`.
 - Zatím se z dopravy nic nepočítá (rychlost družiny, únava zvířete,
   váha jezdce v nákladu zvířete) — to je Fáze 4 / 1b.
 
