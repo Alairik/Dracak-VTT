@@ -1641,7 +1641,7 @@ export function initSouboj(ctx) {
       case 'souboj_vysledek':
         logLine((p.zasah ? 'Zásah: ' : 'Minul(a): ') + (p.label || 'někdo') + ' → ' + (p.cil_label || 'někdo') + ' — útok ' + p.utok + ' proti obraně ' + p.obrana
           + (p.zasah ? ', zranění ' + p.zraneni + (p.nasobek > 1 ? ' (' + p.zraneni_zaklad + ' × ' + p.nasobek + ')' : (p.nasobek_duvod ? ' (násobí se úrovní: ' + p.nasobek_duvod + ')' : '')) + (p.tma_bonus ? ' (bez postihu za tmu +' + p.tma_bonus + ')' : '') + (p.hp_nove !== null && p.hp_nove !== undefined ? ' (zbývá ' + p.hp_nove + (p.max_hp ? '/' + p.max_hp : '') + ' životů)' : '') : '')
-          + (p.vyrazen ? ' — VYŘAZEN(A)' : ''));
+          + (p.vyrazen ? ' — VYŘAZEN(A)' : '') + (p.kouzlo_zasazeno ? ' — ZASAŽEN KOUZLÍCÍ: kouzlo se nezdaří a magenergie propadne, pokud ještě nebyla předposlední akce kouzlení (PJ posoudí)' : ''));
         ukazVysledek(p);
         break;
       case 'vyzva_zrusena':
@@ -1660,7 +1660,7 @@ export function initSouboj(ctx) {
       }
       case 'efekt_konci': {
         const t = getTokeny().find((x) => x.typ_entity === p.typ_entity && x.entita_id === p.entita_id);
-        logLine((t ? t.label : 'Tvor') + ': efekt ' + p.efekt_nazev + (p.duvod === 'odebran' ? ' sundán' : ' skončil'));
+        logLine((t ? t.label : 'Tvor') + ': efekt ' + p.efekt_nazev + (p.duvod === 'odebran' ? ' sundán' : (p.duvod === 'kouzleni_prerusene' ? ' — kouzlení přerušeno jinou akcí' : ' skončil')));
         break;
       }
       case 'tah_konec':

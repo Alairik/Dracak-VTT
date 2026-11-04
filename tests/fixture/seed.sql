@@ -57,3 +57,7 @@ INSERT INTO `tokeny` (`id`, `mapa_id`, `typ_entity`, `entita_id`, `x`, `y`, `z_p
 INSERT INTO `tokeny` (`id`, `mapa_id`, `typ_entity`, `entita_id`, `x`, `y`, `z_poradi`, `smer`, `velikost_sahu`, `hexu`, `barva`, `zamceno`, `nazev`, `obrazek_id`, `viditelny_hracum`) VALUES (24,1,'obecny',0,805,455,0,0,2.00,1,'#d9822b',1,'Sud rumu',NULL,1);
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- Testovací účty mají vždycky svoje role: náhodné klikání (monkey_ui) v Správě účtů dokáže admina přeřadit na hráče a všechny administrační sady pak padají na 403.
+UPDATE `ucty` SET `role` = 'admin' WHERE `email` = 'test@local';
+UPDATE `ucty` SET `role` = 'hrac' WHERE `email` = 'hrac@local';

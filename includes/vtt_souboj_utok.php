@@ -670,6 +670,13 @@ function dracak_vtt_utok_vyhodnot(PDO $pdo, array $mapa, array $info, array $uto
     $utId = (int)$utokVyzva['token_id'];
 
     $hp = ['hp_pred' => null, 'hp_nove' => null, 'max_hp' => null, 'vyrazen' => false];
+    // Zasažený kouzlící tvor (b10846): kouzlo se nezdaří a magenergie propadne, pokud ještě nebyla předposlední akce kouzlení
+    // (pak uspěje; kouzla s koncentrací se přeruší) — kolik akcí kouzlo má, boj neví, rozhodne PJ.
+    $kouzloZasazeno = false;
+    if ($zraneni > 0 && in_array($info[$obrId]['typ_entity'], ['postava', 'nestvura_instance'], true)) {
+        require_once __DIR__ . '/vtt_kouzleni.php';
+        $kouzloZasazeno = dracak_vtt_kouzli_aktivni_id($pdo, $info[$obrId]['typ_entity'], (int)$info[$obrId]['entita_id']) !== null;
+    }
     if ($zraneni > 0) {
         $hp = dracak_vtt_souboj_zranit($pdo, $svetId, $mapaId, $info[$obrId], $zraneni, $ucetId);
     }
@@ -702,6 +709,7 @@ function dracak_vtt_utok_vyhodnot(PDO $pdo, array $mapa, array $info, array $uto
         'vyrazen' => $hp['vyrazen'],
         'branil_se' => ($obranaVyzva['data']['volba'] ?? null) === 'branit',
         'obrance_akce_zbyvajici' => $akceObrance,
+        'kouzlo_zasazeno' => $kouzloZasazeno,
     ];
     $utokVyzva['data']['vysledek'] = $vysledek;
     $obranaVyzva['data']['vysledek'] = $vysledek;

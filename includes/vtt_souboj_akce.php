@@ -21,6 +21,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/vtt_souboj_pohyb.php';
 require_once __DIR__ . '/vtt_tokeny.php';
 require_once __DIR__ . '/vtt_zbrane_u_sebe.php';
+require_once __DIR__ . '/vtt_kouzleni.php';
 
 function dracak_vtt_souboj_proved_akci(PDO $pdo, array $mapa, bool $jePj, array $user, array $data, bool $vTransakci = false): array
 {
@@ -239,6 +240,8 @@ function dracak_vtt_souboj_proved_akci(PDO $pdo, array $mapa, bool $jePj, array 
             'unava_nova' => $unavaNova,
             'skryta' => !dracak_vtt_souboj_vidi_hrac($info[$tokenId]),
         ], (int)$user['id']);
+        // Kouzlení (b10842–b10847): akce kouzlení nasadí štítek „Kouzlí“ (pro útočníky nehybný), jiná akce ho sundá.
+        dracak_vtt_kouzli_po_akci($pdo, $svetId, $mapaId, (int)$user['id'], $info[$tokenId], $druh, $pocet);
         // První akce kola nebyla slíbený úkon: příští kolo −3 (před posunem tahu, ať se to započítá do tohoto kola).
         if ($prvniPorusena) {
             dracak_vtt_iniciativa_ztrata_zaloz($pdo, $svetId, $mapaId, (int)$user['id'], $info[$tokenId],
