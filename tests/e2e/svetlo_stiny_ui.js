@@ -96,6 +96,7 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   const prehled = await (await pj.request.get(BASE + '/hra/api/svetlo_pj.php?mapa_id=' + MAPA)).json();
   ok(prehled.videni === true && prehled.geom.bez_divaku === true && prehled.geom.divaci.length === 0 && prehled.geom.svetla.length === 1, 'PJ dostane přehled světla bez diváků: ' + JSON.stringify([prehled.videni, prehled.geom && prehled.geom.svetla.length]));
   ok((await hr.request.get(BASE + '/hra/api/svetlo_pj.php?mapa_id=' + MAPA)).status() === 403, 'hráč přehled světla nedostane (403)');
+  ok(prehled.diagnoza && prehled.diagnoza.problemy.length === 0 && prehled.diagnoza.zdroje === 1 && prehled.diagnoza.zdi >= 1, 'diagnóza bez problémů: ' + JSON.stringify(prehled.diagnoza));
   // přepínač v okně Mlha: PJ uvidí zatemněnou mapu se světlem a stínem za zdí
   await pj.goto(BASE + '/hra/mapa.php?id=' + MAPA);
   await pj.waitForFunction(() => !!document.getElementById('svetloPjChk'), null, { timeout: 15000 });
@@ -104,6 +105,7 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   ok((await alfaPj([[665, 315]]))[0] === 0, 'bez přepínače PJ mlhu ani tmu nevidí (plátno prázdné)');
   await pj.evaluate(() => { const c = document.getElementById('svetloPjChk'); c.checked = true; c.dispatchEvent(new Event('change')); });
   await pj.waitForFunction(() => { const c = document.getElementById('mlhaCanvas'); return c && c.width > 100 && c.getContext('2d').getImageData(1900, 1400, 1, 1).data[3] > 100; }, null, { timeout: 15000 });
+  ok(/běží/.test(await pj.$eval('#svetloPjStav', (x) => (x.hidden ? '' : x.textContent))), 'pod přepínačem je stavový řádek „Světlo a stíny běží“');
   const [pjZdroj, pjPredZdi, pjZaZdi, pjDaleko] = await alfaPj([[665, 315], [850, 315], [980, 315], [1900, 1400]]);
   ok(pjZdroj < 90 && pjPredZdi < 140, 'PJ vidí světlo kolem pochodně (' + pjZdroj + ', před zdí ' + pjPredZdi + ')');
   ok(pjZaZdi > pjPredZdi + 60, 'PJ vidí stín za zdí (' + pjZaZdi + ' proti ' + pjPredZdi + ' před zdí)');
@@ -115,6 +117,8 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
 
   sql(`delete from zdi where mapa_id=${MAPA}`);
   await api(pj, 'mapa_osvetleni', { mapa_id: MAPA, osvetleni: 'den' });
+  const dd = await (await pj.request.get(BASE + '/hra/api/svetlo_pj.php?mapa_id=' + MAPA)).json();
+  ok(dd.videni === false && dd.diagnoza.problemy.some((t) => /Osvětlení mapy je „Světlo“/.test(t)), 'na mapě Světlo diagnóza řekne, že chybí osvětlení Tma: ' + JSON.stringify(dd.diagnoza.problemy));
   await browser.close();
   console.log(chyb ? 'CHYB: ' + chyb : 'VŠE OK');
   process.exit(chyb ? 1 : 0);

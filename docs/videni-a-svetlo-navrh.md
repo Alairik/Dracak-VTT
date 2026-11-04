@@ -88,5 +88,6 @@ Zadání: „zdi vrhají stín; stín od lucerny, aby se pomalu zvyšovala inten
   (`dracak_vtt_svetlo_sila`, pole `sila` v geometrii; mění se po každém posunu času, událost `cas_zmena` obnoví mlhu). **Jen vzhled:** dosah podle pravidel (pochodeň 6 sáhů) a co kdo vidí
   po buňkách se nemění, dokud světlo nedohoří. Světlo bez limitu hoření svítí naplno.
 - **Přepínač „Ukázat světlo a stíny“ (jen PJ)** v okně Mlha: PJ vidí celou mapu zatemněnou a v ní světlo všech zdrojů se stínem za zdmi (`hra/api/svetlo_pj.php`, `dracak_vtt_videni_geometrie_pj`),
+  **Stavový řádek pod přepínačem (2026-11-04):** `svetlo_pj.php` vrací i `diagnoza` (`dracak_vtt_videni_diagnoza`) — co světlu a stínům na mapě brání (osvětlení „Světlo“/pološero, vypnutá mlha, bez mřížky, nic nesvítí) a poznámku, že bez zdí je světlo jen kruh. Důvod: ostrý provoz nejde zvenčí prohlédnout a „stíny nevidím“ bylo poprvé jen špatné nastavení mapy. Ověří to `tests/e2e/svetlo_stiny_ui.js`.
   bez ohledu na to, co vidí hráči; zóny Tma a Temnota se zohlední jen u zdrojů v nich. Při výběru hráče v okně Mlha má přednost jeho pohled. Pamatuje se v prohlížeči po mapách. Hráč endpoint nedostane (403).
 - Testy: `tests/unit/videni_polygon_unit.php` (geometrie), `tests/e2e/svetlo_stiny_ui.js` (geometrie z API a pixely plátna).

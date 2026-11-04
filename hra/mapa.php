@@ -487,6 +487,7 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
     <label style="display:flex;align-items:center;gap:6px;font-weight:400;margin-top:8px;" title="Zatemní tvoji mapu a ukáže světlo všech zdrojů se stínem za zdmi — vidíš jen ty, hráči nic nepoznají. Funguje na mapě Noc a Tma.">
       <input type="checkbox" id="svetloPjChk"> Ukázat světlo a stíny (vidíš jen ty)
     </label>
+    <p class="note" id="svetloPjStav" hidden style="margin-top:4px;"></p>
     <p class="note" style="margin-top:4px;">Stupnice tmy podle knihy (Lektvar sovích očí): řídká tma (úplněk), tma (hvězdy), hustá tma, naprostá tma; pološero je jako den. Ve tmě hráč vidí jen to, co osvítí pochodeň, lucerna nebo jiný zdroj světla (nastavíš u tokenu). Tvorové s nočním viděním (např. lupič se Zlepšením zraku) vidí navíc do nastaveného dosahu — v naprosté tmě a v kouzelné tmě ne. Kudy prošel, zůstane ztlumeně; nestvůry mimo dohled nevidí. Funguje při zapnuté mlze a nastaveném gridu.</p>
     <?php endif; ?>
     <p class="note" style="margin-top:4px;">Vypnuté = hráči vidí celou mapu bez odhalování, stejně jako ty. Mlha vyžaduje nastavený grid (respektuje jeho buňky/hexy) — bez gridu nejde zapnout.</p>
@@ -857,7 +858,7 @@ window.MAPA = <?= json_encode([
     'funkce' => dracak_vtt_tokeny_funkce(),
     'cas' => $casSveta,
     'pravidla' => dracak_vtt_souboj_pravidla(),
-    'verzeModulu' => max((int)@filemtime(__DIR__ . '/../assets/js/souboj.js'), (int)@filemtime(__DIR__ . '/../assets/js/kostky3d.js'), (int)@filemtime(__DIR__ . '/../assets/js/hexy.js'), (int)@filemtime(__DIR__ . '/../assets/js/denik_dock.js'), (int)@filemtime(__DIR__ . '/../assets/js/raid_panel.js')),
+    'verzeModulu' => max((int)@filemtime(__DIR__ . '/../assets/js/souboj.js'), (int)@filemtime(__DIR__ . '/../assets/js/kostky3d.js'), (int)@filemtime(__DIR__ . '/../assets/js/hexy.js'), (int)@filemtime(__DIR__ . '/../assets/js/denik_dock.js'), (int)@filemtime(__DIR__ . '/../assets/js/raid_panel.js'), (int)@filemtime(__DIR__ . '/../assets/js/svetlo_stiny.js')),
     'grid' => [
         'px' => (int)($mapa['grid_velikost_px'] ?? 0),
         'typ' => $mapa['grid_typ'] ?? 'ctverec',

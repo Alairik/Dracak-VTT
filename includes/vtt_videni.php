@@ -406,6 +406,41 @@ function dracak_vtt_videni_geometrie_pj(PDO $pdo, array $mapa): ?array
     return ['px_sah' => $px, 'svetla' => $svetla, 'divaci' => [], 'bez_divaku' => true];
 }
 
+// Proč se na mapě nekreslí světlo a stíny? Lidská řeč pro PJ (stavový řádek pod přepínačem „Ukázat světlo a stíny“): `problemy` = co světlo a stíny úplně vypíná,
+// `poznamky` = co kreslení omezí (bez zdí je světlo jen kruh), plus počty, které hra na mapě opravdu vidí. Ostrý provoz nejde zvenčí prohlédnout, tohle je jediný způsob, jak to PJ vidí.
+function dracak_vtt_videni_diagnoza(PDO $pdo, array $mapa): array
+{
+    $mapaId = (int)$mapa['id'];
+    $klic = (string)($mapa['osvetleni'] ?? 'den');
+    $osv = DRACAK_VTT_OSVETLENI[$klic] ?? DRACAK_VTT_OSVETLENI['den'];
+    $problemy = [];
+    $poznamky = [];
+    $zdi = 0;
+    $zdroje = 0;
+    if (!dracak_vtt_videni_funkce($pdo)) {
+        $problemy[] = 'V databázi chybí sloupce pro světlo a vidění (ruční SQL z dřívějších bloků) — světlo se nekreslí.';
+    } else {
+        $zdi = count(dracak_vtt_videni_zdi($pdo, $mapaId));
+        $zdroje = count(dracak_vtt_videni_zdroje($pdo, $mapaId, 1.0));
+        if (!($osv[1] ?? false)) {
+            $problemy[] = 'Osvětlení mapy je „' . $osv[0] . '“ — světlo a stíny se kreslí jen při osvětlení Řídká tma, Tma, Hustá tma nebo Naprostá tma (okno Mlha → Osvětlení mapy).';
+        }
+        if (empty($mapa['mlha_aktivni'])) {
+            $problemy[] = 'Mlha je na téhle mapě vypnutá — bez ní se ani světlo, ani stíny nekreslí (okno Mlha → Mlha aktivní).';
+        }
+        if ((int)($mapa['grid_velikost_px'] ?? 0) <= 0) {
+            $problemy[] = 'Mapa nemá nastavenou mřížku — vidění se počítá po buňkách mřížky.';
+        }
+        if ($zdroje === 0) {
+            $problemy[] = 'Na mapě nic nesvítí — nastav světlo tokenu v jeho panelu (pochodeň 6 sáhů, lucerna 8 sáhů…); bez zdroje světla je jen tma.';
+        }
+        if ($zdi === 0) {
+            $poznamky[] = 'Na mapě nejsou žádné zdi, které blokují výhled — světlo je jen kruh bez stínů. Stín vrhají zdi z editoru zdí a zavřené dveře.';
+        }
+    }
+    return ['osvetleni' => $klic, 'problemy' => $problemy, 'poznamky' => $poznamky, 'zdi' => $zdi, 'zdroje' => $zdroje];
+}
+
 // Přidá vidět teď do trvalé paměti hráče (mlha_valky) a vrátí výpočet. Volá se při pohybu hráčova tokenu a při načtení mlhy.
 function dracak_vtt_videni_zaznamenej(PDO $pdo, array $mapa, int $ucetId): ?array
 {

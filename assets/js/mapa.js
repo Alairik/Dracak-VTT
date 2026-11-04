@@ -320,6 +320,7 @@ function osvezitSvetloPj() {
     .then(r => r.json())
     .then((d) => {
       if (!svetloPj || mlhaNahledUcetId) return;
+      ukazStavSvetla(d && d.diagnoza);
       const w = mapImgEl.naturalWidth || mapWrap.clientWidth;
       const h = mapImgEl.naturalHeight || mapWrap.clientHeight;
       if (!w || !h) return;
@@ -334,12 +335,24 @@ function osvezitSvetloPj() {
     })
     .catch(() => {});
 }
+// Stavový řádek pod přepínačem: co světlu a stínům na téhle mapě brání (osvětlení „Světlo“, vypnutá mlha, nic nesvítí…), nebo kolik zdrojů a zdí hra vidí.
+function ukazStavSvetla(diag) {
+  const p = document.getElementById('svetloPjStav');
+  if (!p) return;
+  if (!diag) { p.hidden = true; return; }
+  const radky = (diag.problemy || []).concat(diag.poznamky || []);
+  if (!radky.length) radky.push('Světlo a stíny běží: zdrojů světla ' + diag.zdroje + ', zdí ' + diag.zdi + '.');
+  p.textContent = radky.join(' ');
+  p.style.color = (diag.problemy || []).length ? '#e0a050' : '';
+  p.hidden = false;
+}
 const svetloPjChk = document.getElementById('svetloPjChk');
 if (svetloPjChk) {
   svetloPjChk.checked = svetloPj;
   svetloPjChk.addEventListener('change', () => {
     svetloPj = svetloPjChk.checked;
     try { localStorage.setItem(SVETLO_PJ_KLIC, svetloPj ? '1' : '0'); } catch (e) { /* bez paměti prohlížeče */ }
+    if (!svetloPj) ukazStavSvetla(null);
     osvezitMlhu();
   });
 }
