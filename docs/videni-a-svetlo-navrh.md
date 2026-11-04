@@ -71,3 +71,18 @@ Drobnost k proofreadingu: paladin „září jako Lucerna (7 sáhů)“ (h1299 b
 2. **ODPOVĚZENO: jen PJ.** **Kdo smí otevírat a zavírat dveře?** Dnes jen PJ (hráč řekne, PJ klikne). *Doporučení:* začít tak; později můžeme dovolit hráči dveře, u kterých stojí jeho postava.
 3. **ODPOVĚZENO: stav mapy „Noc“ + dosah nočního vidění zadává PJ u tvora; v úplné tmě a v kouzelné tmě noční vidění nepomáhá.** (Původní otázka — uživatel se zeptal, co noční vidění je: lupičova schopnost „Zlepšení zraku“, h630 b5663 — vidí při nepatrném světle, v úplné tmě ne, a není to infravidění).** **Jak daleko vidí lupič s nočním viděním při slabém světle?** Kniha říká jen „potřebuje nepatrně světla“ (číslo v ní není). *Doporučení:* vidí dvakrát dál než ostatní
    kolem každého zdroje světla, v úplné tmě nic — ale to je moje domněnka, rozhodnutí je tvoje. Podobně **dosah svíčky** kniha neuvádí (lze zadat ručně u každého světla).
+
+## 5. Fáze 6 — světlo a stíny (2026-11-04, zadání uživatele)
+
+Zadání: „zdi vrhají stín; stín od lucerny, aby se pomalu zvyšovala intenzita“ — tedy (1) za zdí je skutečný stín s hranou podle zdi, ne kostičky mlhy, (2) světlo slábne plynule od zdroje ke kraji dosahu místo ostrého kruhu.
+
+- **Pravidla se nemění:** kdo co vidí (tokeny, paměť mlhy, dosah 6 sáhů pochodně…) dál rozhoduje server po buňkách (`dracak_vtt_videni_vypocet`). Nové je jen **vykreslení**.
+- **Server** (`includes/vtt_polygon.php`, `dracak_vtt_videni_geometrie` v `includes/vtt_videni.php`): z úseček zdí (zavřené dveře jsou zdi, otevřené ne) spočítá oblast viditelnou z bodu —
+  pro každý zdroj světla, který osvětluje aspoň jednu buňku, kterou hráč právě vidí, a pro každý hráčův token. `hra/api/mlha_stav.php` (a PJ náhled `mlha_nahled.php`) pošle v poli `geom` jen
+  mnohoúhelníky a polohy; **zdi samotné klient nedostane** a zdroj světla, jehož světlo hráč nijak nezahlédne (za zdí, mimo dohled), se neposílá vůbec.
+- **Klient** (`assets/js/svetlo_stiny.js`, `renderMlhaSvetlo` v `mapa.js`): tma po buňkách (neviděné plně, paměť ztlumeně 70 %) se vykreslí v menším rozlišení, ať mají hranice paměti měkký okraj; z ní se
+  vyřízne světlo — radiální přechod od zdroje ke kraji ořezaný mnohoúhelníkem zdroje (stín za zdí) a mnohoúhelníkem diváka (co je mimo jeho zorné pole, neosvětlí nic), s polostínem
+  (hrany stínu přecházejí plynule, ~0,1 sáhu) a jemným teplým nádechem u zdrojů. Divák vidí i své nejbližší okolí a s nočním viděním do dosahu (slabší než světlo).
+- **Zatím jen zdi** (uživatel: „věci, spíše zatím jen zdi“): tokeny a předměty stín nevrhají. Stejné vykreslení se použije u PJ náhledu cizí mlhy.
+- Kdy světlo dohoří, mění se geometrie sama (zdroj zmizí z tokenu → další `mlha_stav`); slábnutí dohořívající pochodně v posledních směnách zatím není (otázka na uživatele).
+- Testy: `tests/unit/videni_polygon_unit.php` (geometrie), `tests/e2e/svetlo_stiny_ui.js` (geometrie z API a pixely plátna).

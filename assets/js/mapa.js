@@ -9,6 +9,7 @@ const {hodit3D, nactiKostky, kostky3DPripraveny} = await import('./kostky3d.js?v
 const hexy = await import('./hexy.js?v=' + VERZE_MODULU);
 const initSouboj = window.MAPA.funkce.souboj ? (await import('./souboj.js?v=' + VERZE_MODULU)).initSouboj : null;
 const initDenikDock = (window.MAPA.denikPostavy || []).length ? (await import('./denik_dock.js?v=' + VERZE_MODULU)).initDenikDock : null;
+const svetloStiny = await import('./svetlo_stiny.js?v=' + VERZE_MODULU);   // světlo a stíny na mapě Noc / Tma (renderMlha)
 const initRaidPanel = document.getElementById('raidPanel') ? (await import('./raid_panel.js?v=' + VERZE_MODULU)).initRaidPanel : null;
 
 // --- Kamera: zoom a posun přes CSS transform na #mapWrap ---
@@ -250,6 +251,11 @@ function renderMlha(stav) {
   // Mapa „Tma“ (includes/vtt_videni.php): „videne_b64“ = buňky, které hráč vidí TEĎ. Co už viděl, ale teď nevidí, je jen ztlumené (paměť),
   // co neviděl nikdy, je zahalené jako dřív.
   const videno = stav.videni && stav.videne_b64 ? atob(stav.videne_b64) : null;
+  // Server pošle i geometrii světla a stínů: plynulé světlo a stín za zdmi místo kostiček (assets/js/svetlo_stiny.js).
+  if (videno !== null && stav.geom) {
+    renderMlhaSvetlo(ctx, w, h, stav, bin);
+    return;
+  }
   ctx.fillStyle = mlhaBarvaSkryte();
   for (let r = 0; r < stav.radku; r++) {
     for (let c = 0; c < stav.sloupcu; c++) {
@@ -269,6 +275,40 @@ function renderMlha(stav) {
       }
     }
   }
+}
+// Mapa „Noc“ / „Tma“ s geometrií světla: základ je tma po buňkách (neviděné plně, paměť ztlumeně), vykreslená v menším rozlišení a roztažená, ať mají hranice paměti
+// měkký okraj; z ní se vyřízne světlo s plynulým přechodem a stínem za zdmi. Co hráč vidí z pohledu pravidel (tokeny, paměť), dál drží server po buňkách.
+function renderMlhaSvetlo(ctx, w, h, stav, bin) {
+  const kb = 0.25;
+  const bw = Math.max(1, Math.round(w * kb)), bh = Math.max(1, Math.round(h * kb));
+  const maska = () => {
+    const c = document.createElement('canvas');
+    c.width = bw; c.height = bh;
+    const x = c.getContext('2d');
+    x.scale(bw / w, bh / h);
+    x.fillStyle = x.strokeStyle = '#08080a';
+    x.lineWidth = 1.5 / kb;   // obrys zakryje spáry mezi sousedními buňkami
+    return x;
+  };
+  const pamet = maska(), neznamo = maska();
+  for (let r = 0; r < stav.radku; r++) {
+    for (let c = 0; c < stav.sloupcu; c++) {
+      const stred = mlhaBunkaStred(r + stav.min_row, c + stav.min_col);
+      const cesta = mlhaBunkaTvarCesta(stred.x, stred.y);
+      const x = bin.charCodeAt(r * stav.sloupcu + c) === 1 ? pamet : neznamo;
+      x.fill(cesta);
+      x.stroke(cesta);
+    }
+  }
+  const A = IS_PJ_OR_ADMIN ? 0.65 : 1;   // PJ si v náhledu cizí mlhy musí prokouknout mapu pod ní
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.globalAlpha = 0.7 * A;   // paměť (už viděné, teď ve tmě) je tmavší než dřív, ať je vidět, jak světlo slábne
+  ctx.drawImage(pamet.canvas, 0, 0, w, h);
+  ctx.globalAlpha = A;
+  ctx.drawImage(neznamo.canvas, 0, 0, w, h);
+  ctx.globalAlpha = 1;
+  svetloStiny.dracakSvetloVyrizni(ctx, w, h, stav.geom);
 }
 function osvezitMlhu() {
   if (!mlhaCanvas) return;

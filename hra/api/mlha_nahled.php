@@ -39,6 +39,8 @@ $videni = dracak_vtt_videni_vypocet($pdo, $mapa, $ucetId);   // náhled nic neza
 echo json_encode([
     'videni' => $videni !== null,
     'videne_b64' => $videni !== null ? base64_encode($videni['videno']) : null,
+    // Světlo a stíny (assets/js/svetlo_stiny.js): jen mnohoúhelníky, které hráč smí znát; bez nich klient kreslí mlhu po buňkách jako dřív.
+    'geom' => $videni !== null ? dracak_vtt_videni_geometrie($mapa, $videni) : null,
     'typ' => $stav['typ'],
     'bunka_px' => $stav['bunka_px'],
     'sloupcu' => $stav['sloupcu'],

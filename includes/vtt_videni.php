@@ -215,6 +215,7 @@ function dracak_vtt_videni_vypocet(PDO $pdo, array $mapa, int $ucetId): ?array
     // 1. osvětlené buňky
     $osvetleno = str_repeat("\x00", $n);
     $osvetleneSeznam = [];
+    $zdrojeGeom = [];   // každý zdroj, který něco osvětluje: x, y, r (po úpravě zónou) a buňky, na které dosvítí (pro geometrii světla, dracak_vtt_videni_geometrie)
     $zony = dracak_vtt_videni_zony($pdo, $mapaId, $pxSah);
     $rTemnota = DRACAK_VTT_TEMNOTA_SVETLO_SAHY * $pxSah;
     foreach (dracak_vtt_videni_zdroje($pdo, $mapaId, $pxSah) as $z) {
@@ -226,9 +227,10 @@ function dracak_vtt_videni_vypocet(PDO $pdo, array $mapa, int $ucetId): ?array
         if ($zony && dracak_vtt_videni_v_zone($zony, $z['x'], $z['y'], 'temnota')) {
             $r = min($r, $rTemnota);
         }
+        $pokryti = [];
         foreach (dracak_vtt_mlha_bunky_v_obdelniku($roz, $z['x'] - $r, $z['y'] - $r, $z['x'] + $r, $z['y'] + $r) as $b) {
             $idx = dracak_vtt_mlha_bunka_idx($roz, $b['row'], $b['col']);
-            if ($idx === null || $osvetleno[$idx] === "\x01") {
+            if ($idx === null) {
                 continue;
             }
             $vzdal = hypot($b['x'] - $z['x'], $b['y'] - $z['y']);
@@ -243,8 +245,15 @@ function dracak_vtt_videni_vypocet(PDO $pdo, array $mapa, int $ucetId): ?array
             if (dracak_vtt_videni_blokovano($zdi, $z['x'], $z['y'], $b['x'], $b['y'])) {
                 continue;
             }
+            $pokryti[] = $idx;
+            if ($osvetleno[$idx] === "\x01") {
+                continue;
+            }
             $osvetleno[$idx] = "\x01";
             $osvetleneSeznam[] = [$idx, $b['x'], $b['y']];
+        }
+        if ($pokryti) {
+            $zdrojeGeom[] = ['x' => $z['x'], 'y' => $z['y'], 'r' => $r, 'pokryti' => $pokryti];
         }
     }
 
@@ -287,7 +296,56 @@ function dracak_vtt_videni_vypocet(PDO $pdo, array $mapa, int $ucetId): ?array
             }
         }
     }
-    return ['rozmery' => $roz, 'osvetleno' => $osvetleno, 'videno' => $videno, 'divaci' => $divaci, 'zdi' => $zdi, 'px_sah' => $pxSah, 'zony' => $zony];
+    return ['rozmery' => $roz, 'osvetleno' => $osvetleno, 'videno' => $videno, 'divaci' => $divaci, 'zdi' => $zdi, 'px_sah' => $pxSah, 'zony' => $zony, 'zdroje_geom' => $zdrojeGeom];
+}
+
+// Geometrie pro vykreslení světla a stínů (assets/js/svetlo_stiny.js): plynulé světlo a stín za zdmi místo kostiček mlhy. Ke klientovi se dostane jen to,
+// co hráč smí vědět, a ne zdi (ani skryté): mnohoúhelníky viditelnosti jeho vlastních tokenů a těch zdrojů světla, které osvětlují aspoň jednu buňku,
+// kterou hráč právě vidí (zdroj, jehož světlo hráč nijak nezahlédne, se vůbec neposílá). Mnohoúhelníky jsou ořezané čtvercem kolem bodu (půlstrana = dosah),
+// klient je použije jen jako ořez kruhového přechodu. Rozhodování o tom, co hráč vidí (tokeny, paměť mlhy), zůstává na buňkách ($v z dracak_vtt_videni_vypocet).
+function dracak_vtt_videni_geometrie(array $mapa, array $v): array
+{
+    require_once __DIR__ . '/vtt_polygon.php';
+    $px = (float)$v['px_sah'];
+    $svetla = [];
+    foreach ($v['zdroje_geom'] ?? [] as $z) {
+        $prispiva = false;
+        foreach ($z['pokryti'] as $idx) {
+            if (($v['videno'][$idx] ?? "\x00") === "\x01") {
+                $prispiva = true;
+                break;
+            }
+        }
+        if (!$prispiva) {
+            continue;
+        }
+        $svetla[] = [
+            'x' => round($z['x'], 1), 'y' => round($z['y'], 1), 'r' => round($z['r'], 1),
+            'poly' => dracak_vtt_videni_polygon($v['zdi'], $z['x'], $z['y'], $z['r'] + 2),
+        ];
+    }
+    $strop = (float)max((int)($mapa['sirka_px'] ?? 0), (int)($mapa['vyska_px'] ?? 0));
+    $zony = $v['zony'] ?? [];
+    $divaci = [];
+    foreach ($v['divaci'] as $d) {
+        $dx = (float)$d['x']; $dy = (float)$d['y'];
+        $nocSahy = (DRACAK_VTT_OSVETLENI[$mapa['osvetleni'] ?? 'den'][2] ?? false) ? (int)($d['videni_noc_sahy'] ?? 0) : 0;
+        if ($nocSahy > 0 && ($zony && (dracak_vtt_videni_v_zone($zony, $dx, $dy, 'tma') || dracak_vtt_videni_v_zone($zony, $dx, $dy, 'temnota')))) {
+            $nocSahy = 0;
+        }
+        $nocR = $nocSahy * $px;
+        // Dohled diváka sahá tak daleko, kam dosáhne některé světlo, které vidí, nebo jeho noční vidění.
+        $dosah = max($nocR, $px * 2);
+        foreach ($svetla as $s) {
+            $dosah = max($dosah, hypot($dx - $s['x'], $dy - $s['y']) + $s['r']);
+        }
+        $dosah = min($dosah, max($strop, $px * 2)) + 2;
+        $divaci[] = [
+            'x' => round($dx, 1), 'y' => round($dy, 1), 'noc_r' => round($nocR, 1),
+            'poly' => dracak_vtt_videni_polygon($v['zdi'], $dx, $dy, $dosah),
+        ];
+    }
+    return ['px_sah' => $px, 'svetla' => $svetla, 'divaci' => $divaci];
 }
 
 // Přidá vidět teď do trvalé paměti hráče (mlha_valky) a vrátí výpočet. Volá se při pohybu hráčova tokenu a při načtení mlhy.
