@@ -3182,7 +3182,7 @@ if (hoditBtn) {
 // Události, po kterých se stav mapy znovu načte celý (token přibyl/zmizel,
 // efekty, pořadí tahů, použitý předmět…). Načte se "na místě" — nic se
 // nepřenačítá a nikomu nezmizí otevřené panely ani zoom.
-const UDALOSTI_OBNOVA_STAVU = ['token_pridan', 'token_smazan', 'efekt_aplikovan', 'efekt_konci', 'iniciativa_hozena', 'kolo_nove', 'tah_zmena', 'predmet_pouzit', 'predmet_loot', 'krok_zpet',
+const UDALOSTI_OBNOVA_STAVU = ['token_pridan', 'token_smazan', 'efekt_aplikovan', 'efekt_konci', 'kouzleni_stav', 'iniciativa_hozena', 'kolo_nove', 'tah_zmena', 'predmet_pouzit', 'predmet_loot', 'krok_zpet',
   'souboj_start', 'souboj_faze', 'souboj_ucastnici', 'umysl_nastaven', 'akce_provedena', 'tah_konec', 'akce_uprava',
   'vyzva_nova', 'vyzva_zmena', 'vyzva_hod', 'vyzva_zrusena', 'souboj_vysledek'];
 let obnovitMlhuPoPollu = false;

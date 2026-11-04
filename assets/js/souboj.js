@@ -368,6 +368,54 @@ export function initSouboj(ctx) {
     return MODY_POHYBU.find((mod) => POHYB[mod] && m <= dosahPohybu(mod, token)) || 'sprint';
   }
 
+  // Akce kouzlení: u postavy se vybírá kouzlo — hra z jeho vyvolání spočítá, kolik akcí kouzlení potřebuje (2 × kola), ohlásí, kdy začne působit, a štítek „Kouzlí“
+  // po poslední akci sama sundá; zásah před předposlední akcí kouzlo zruší. Nestvůra a kouzla, jejichž vyvolání hra nepozná, mají ruční počet akcí (jen PJ);
+  // bez výběru se akce jen odečte a štítek sundá PJ. Vybrané kouzlo se drží, dokud se kouzlení nedokončí nebo nepřeruší.
+  const kouzlaTvora = new Map();   // token_id → {kouzla, pocita} (null = načítá se)
+  const kouzloVolba = new Map();   // token_id → id vybraného kouzla
+  function nactiKouzla(tokenId) {
+    if (kouzlaTvora.has(tokenId)) return kouzlaTvora.get(tokenId);
+    kouzlaTvora.set(tokenId, null);
+    fetch('api/kouzla_tvora.php?token_id=' + tokenId, {cache: 'no-store'})
+      .then((r) => r.json())
+      .then((d) => { kouzlaTvora.set(tokenId, d && Array.isArray(d.kouzla) ? d : {kouzla: [], pocita: false}); kreslit(); })
+      .catch(() => { kouzlaTvora.set(tokenId, {kouzla: [], pocita: false}); });
+    return null;
+  }
+  const akciText = (n) => n + (n === 1 ? ' akce' : (n < 5 ? ' akce' : ' akcí'));
+  function kouzleniBlok() {
+    const tokenId = kolo.aktivni_token_id;
+    const data = nactiKouzla(tokenId);
+    const radek = el('div', 'kouzleni-radek');
+    let vyber = null, pocet = null;
+    if (data && data.pocita && data.kouzla.length) {
+      vyber = document.createElement('select');
+      vyber.className = 'input kouzleni-vyber';
+      vyber.title = 'Které kouzlo se sesílá — hra podle vyvolání spočítá akce kouzlení';
+      vyber.append(new Option('— kouzlo —', ''));
+      data.kouzla.forEach((k) => vyber.append(new Option(k.nazev + (k.akci ? ' (' + akciText(k.akci) + ')' : ' (počet akcí neznámý)'), String(k.id))));
+      vyber.value = kouzloVolba.get(tokenId) || '';
+      vyber.addEventListener('change', () => kouzloVolba.set(tokenId, vyber.value));
+      radek.append(vyber);
+    }
+    if (jePj && data && data.pocita) {
+      pocet = document.createElement('input');
+      pocet.type = 'number'; pocet.min = '1'; pocet.max = '20'; pocet.placeholder = 'akcí';
+      pocet.className = 'input kouzleni-akci';
+      pocet.title = 'Počet akcí kouzla zadá PJ ručně (nestvůra, kouzlo s neznámým vyvoláním); prázdné = hra počítá podle vybraného kouzla';
+      radek.append(pocet);
+    }
+    radek.append(tlacitko('Kouzlení', 'btn-ghost akce-btn', () => {
+      const telo = {token_id: tokenId, druh: 'kouzleni'};
+      if (vyber && vyber.value) telo.kouzlo_id = Number(vyber.value);
+      if (pocet && pocet.value) telo.akci = Number(pocet.value);
+      volat('api/tah_akce.php', telo);
+    }, 'Odečte jednu akci kouzlení'));
+    radek.append(tlacitko('Přerušit', 'btn-ghost akce-btn', () => volat('api/tah_akce.php', {token_id: tokenId, druh: 'kouzleni', preruseni: true}),
+      'Přerušení kouzla stojí jednu akci kouzlení, magenergie propadne'));
+    return radek;
+  }
+
   // Menu „Další akce…“: akce bez mapové části se jen odečtou (čekání, obrana, jiná činnost, kouzlení).
   let dalsiOtevrene = false;
   function kreslitDalsiAkce() {
@@ -377,9 +425,10 @@ export function initSouboj(ctx) {
     d.addEventListener('toggle', () => { dalsiOtevrene = d.open; });
     d.append(el('summary', '', 'Další akce…'));
     const box = el('div', 'akce-lista');
-    [['cekani', 'Čekání'], ['obrana', 'Obrana'], ['jina', 'Jiná činnost'], ['kouzleni', 'Kouzlení']].forEach(([k, text]) => {
+    [['cekani', 'Čekání'], ['obrana', 'Obrana'], ['jina', 'Jiná činnost']].forEach(([k, text]) => {
       box.append(tlacitko(text, 'btn-ghost akce-btn', () => volat('api/tah_akce.php', {token_id: kolo.aktivni_token_id, druh: k}), 'Odečte jednu akci'));
     });
+    box.append(kouzleniBlok());
     if (jeHex()) {
       box.append(tlacitko('Obrana a krok', 'btn-ghost akce-btn mapova', () => zahajitPlan('obrana_krok'), 'Obrana a krok na sousední hex (1 akce) — vybereš na mapě'));
     }
@@ -401,6 +450,7 @@ export function initSouboj(ctx) {
     if (!jeHex()) {
       const box = el('div', 'akce-lista');
       AKCE_PROSTE.forEach((k) => {
+        if (k === 'kouzleni') { box.append(kouzleniBlok()); return; }
         box.append(tlacitko(AKCE_DRUHY[k], 'btn-ghost akce-btn', () => volat('api/tah_akce.php', {token_id: kolo.aktivni_token_id, druh: k}),
           'Odečte ' + popisAkci(1)));
       });
@@ -1641,7 +1691,11 @@ export function initSouboj(ctx) {
       case 'souboj_vysledek':
         logLine((p.zasah ? 'Zásah: ' : 'Minul(a): ') + (p.label || 'někdo') + ' → ' + (p.cil_label || 'někdo') + ' — útok ' + p.utok + ' proti obraně ' + p.obrana
           + (p.zasah ? ', zranění ' + p.zraneni + (p.nasobek > 1 ? ' (' + p.zraneni_zaklad + ' × ' + p.nasobek + ')' : (p.nasobek_duvod ? ' (násobí se úrovní: ' + p.nasobek_duvod + ')' : '')) + (p.tma_bonus ? ' (bez postihu za tmu +' + p.tma_bonus + ')' : '') + (p.hp_nove !== null && p.hp_nove !== undefined ? ' (zbývá ' + p.hp_nove + (p.max_hp ? '/' + p.max_hp : '') + ' životů)' : '') : '')
-          + (p.vyrazen ? ' — VYŘAZEN(A)' : '') + (p.kouzlo_zasazeno ? ' — ZASAŽEN KOUZLÍCÍ: kouzlo se nezdaří a magenergie propadne, pokud ještě nebyla předposlední akce kouzlení (PJ posoudí)' : ''));
+          + (p.vyrazen ? ' — VYŘAZEN(A)' : '') + (p.kouzlo_zasazeno ? (p.kouzlo_stav === 'selhalo'
+            ? ' — ZASAŽEN KOUZLÍCÍ: kouzlo' + (p.kouzlo_nazev ? ' ' + p.kouzlo_nazev : '') + ' se nezdařilo, magenergie propadla' + (p.kouzlo_cena ? ' (' + p.kouzlo_cena + ')' : '')
+            : (p.kouzlo_stav === 'zdarilo'
+              ? ' — zasažen kouzlící po předposlední akci: kouzlo se zdaří, jen se nemohl bránit (kouzlo s koncentrací se přeruší — PJ posoudí)'
+              : ' — ZASAŽEN KOUZLÍCÍ: kouzlo se nezdaří a magenergie propadne, pokud ještě nebyla předposlední akce kouzlení (PJ posoudí)')) : ''));
         ukazVysledek(p);
         break;
       case 'vyzva_zrusena':
@@ -1658,9 +1712,27 @@ export function initSouboj(ctx) {
           + (p.akce ? ' — akce ' + p.akce.pred[1] + ' → ' + p.akce.po[1] : '') + (p.shrnuti && p.shrnuti.length ? ' (' + p.shrnuti.join(', ') + ')' : '') + (p.duvod_text ? ' — ' + p.duvod_text : ''));
         break;
       }
+      case 'kouzleni_stav': {
+        const kdo = p.label || 'Tvor';
+        const co = p.kouzlo ? ' ' + p.kouzlo : '';
+        const postup = p.celkem ? ' (akce ' + p.hotovo + ' z ' + p.celkem + ')' : '';
+        const propadla = p.cena ? ' — magenergie propadla (' + p.cena + ')' : ' — magenergie propadla';
+        const texty = {
+          zahajeno: kdo + ' začíná kouzlit' + co + postup,
+          pokracuje: kdo + ' kouzlí' + co + postup,
+          ucinkuje: kdo + ': kouzlo' + co + ' začíná působit' + postup + ' — účinek nasaďte (kouzlo z deníku); poslední akce je odpočinek, kouzelník se nemůže bránit',
+          dokonceno: kdo + ' dokončil(a) kouzlení' + co + (p.celkem ? ' (' + akciText(p.celkem) + ')' : ''),
+          preruseno: kdo + ' přerušil(a) kouzlení' + co + propadla,
+          prerusene_jinou_akci: kdo + ' přerušil(a) kouzlení' + co + ' jinou akcí' + propadla,
+          selhalo: kdo + ': kouzlo' + co + ' se nezdařilo, byl(a) zasažen(a) před předposlední akcí' + propadla,
+        };
+        logLine(texty[p.stav] || (kdo + ': kouzlení — ' + p.stav));
+        if (['dokonceno', 'preruseno', 'prerusene_jinou_akci', 'selhalo'].includes(p.stav) && p.token_id) kouzloVolba.delete(p.token_id);
+        break;
+      }
       case 'efekt_konci': {
         const t = getTokeny().find((x) => x.typ_entity === p.typ_entity && x.entita_id === p.entita_id);
-        logLine((t ? t.label : 'Tvor') + ': efekt ' + p.efekt_nazev + (p.duvod === 'odebran' ? ' sundán' : (p.duvod === 'kouzleni_prerusene' ? ' — kouzlení přerušeno jinou akcí' : ' skončil')));
+        logLine((t ? t.label : 'Tvor') + ': efekt ' + p.efekt_nazev + (p.duvod === 'odebran' ? ' sundán' : ({kouzleni_prerusene: ' — kouzlení přerušeno jinou akcí', kouzleni_preruseno: ' — kouzlení přerušeno', kouzleni_dokonceno: ' — kouzlení dokončeno', kouzleni_selhalo: ' — kouzlení se nezdařilo'}[p.duvod] || ' skončil')));
         break;
       }
       case 'tah_konec':

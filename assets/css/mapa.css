@@ -510,3 +510,8 @@ body.denik-dock-cela { overflow:hidden; }
   .topbar .topbar-pravidla { order:2; }
   .topbar .svet-cas { order:3; }
 }
+
+/* Akce kouzlení v raid panelu: výběr kouzla, ruční počet akcí (PJ) a přerušení. */
+.kouzleni-radek { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+.kouzleni-radek .kouzleni-vyber { flex:1 1 150px; min-width:0; max-width:100%; font-size:12px; padding:3px 6px; }
+.kouzleni-radek .kouzleni-akci { width:56px; font-size:12px; padding:3px 6px; }

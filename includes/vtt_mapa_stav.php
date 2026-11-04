@@ -72,7 +72,7 @@ function dracak_vtt_ddl_mapa(): array
         foreach ($pdo->query(
             'SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS
              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ("efekty", "aktivni_efekty")
-               AND COLUMN_NAME IN ("mechanika_stav", "trvani_kol", "kolo_se_nepocita", "opakovani", "nasazeno_kolo", "kostky")'
+               AND COLUMN_NAME IN ("mechanika_stav", "trvani_kol", "kolo_se_nepocita", "opakovani", "nasazeno_kolo", "kostky", "kouzlo_id", "akci_celkem", "akci_hotovo")'
         )->fetchAll(PDO::FETCH_NUM) as [$tabulka, $sloupec]) {
             $stav['efekty_sloupce'][$tabulka . '.' . $sloupec] = true;
         }
@@ -138,6 +138,8 @@ function dracak_vtt_tokeny_funkce(): array
         'meritko' => isset($ddl['videni_sloupce']['mapy.mil_na_1000px']),
         'svetlo_zbyva' => isset($ddl['videni_sloupce']['tokeny.svetlo_zbyva']) && isset($ddl['videni_sloupce']['tokeny.svetlo_sahy']),
         'zbrane_ini' => isset($ddl['ini_sloupce']['predmety.chvat'], $ddl['ini_sloupce']['predmety.trida_zbrane'], $ddl['ini_sloupce']['predmety.ini_postih']),
+        // Postup kouzlení na štítku „Kouzlí“ (ruční SQL, migrace 0113: aktivni_efekty.kouzlo_id, akci_celkem, akci_hotovo): hra počítá akce kouzlení podle vyvolání kouzla.
+        'kouzleni_postup' => isset($ddl['efekty_sloupce']['aktivni_efekty.kouzlo_id'], $ddl['efekty_sloupce']['aktivni_efekty.akci_celkem'], $ddl['efekty_sloupce']['aktivni_efekty.akci_hotovo']),
         'efekty_mech' => isset($ddl['tabulky']['efekt_slozky'])
             && isset($ddl['efekty_sloupce']['efekty.mechanika_stav'], $ddl['efekty_sloupce']['efekty.trvani_kol'],
                 $ddl['efekty_sloupce']['efekty.kolo_se_nepocita'], $ddl['efekty_sloupce']['efekty.opakovani'],

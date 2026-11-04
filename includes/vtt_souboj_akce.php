@@ -74,6 +74,13 @@ function dracak_vtt_souboj_proved_akci(PDO $pdo, array $mapa, bool $jePj, array 
                 $konec(422, 'Tvor nemůže jednat (efekt ' . $blok . ').');
             }
         }
+        // Kouzlení s vybraným kouzlem (kouzlo_id, preruseni, akci): vstup se ověří před jakýmkoli zápisem.
+        if ($druh === 'kouzleni') {
+            $chybaKouzleni = dracak_vtt_kouzli_over_vstup($pdo, $info[$tokenId], $data, $jePj);
+            if ($chybaKouzleni !== null) {
+                $konec(422, $chybaKouzleni);
+            }
+        }
         $v2 = dracak_vtt_iniciativa_v2();
         $q = $pdo->prepare('SELECT akce_celkem, akce_zbyvajici' . ($v2 ? ', zavazek, zavazek_akci, zavazek_hotovo, akce_hotovo' : '')
             . ' FROM kolo_iniciativa WHERE mapa_id = ? AND token_id = ? FOR UPDATE');
@@ -241,7 +248,7 @@ function dracak_vtt_souboj_proved_akci(PDO $pdo, array $mapa, bool $jePj, array 
             'skryta' => !dracak_vtt_souboj_vidi_hrac($info[$tokenId]),
         ], (int)$user['id']);
         // Kouzlení (b10842–b10847): akce kouzlení nasadí štítek „Kouzlí“ (pro útočníky nehybný), jiná akce ho sundá.
-        dracak_vtt_kouzli_po_akci($pdo, $svetId, $mapaId, (int)$user['id'], $info[$tokenId], $druh, $pocet);
+        dracak_vtt_kouzli_po_akci($pdo, $svetId, $mapaId, (int)$user['id'], $info[$tokenId], $druh, $pocet, $data);
         // První akce kola nebyla slíbený úkon: příští kolo −3 (před posunem tahu, ať se to započítá do tohoto kola).
         if ($prvniPorusena) {
             dracak_vtt_iniciativa_ztrata_zaloz($pdo, $svetId, $mapaId, (int)$user['id'], $info[$tokenId],
