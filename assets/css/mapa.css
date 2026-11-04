@@ -278,8 +278,8 @@ body { -webkit-tap-highlight-color:transparent; }
 .sb-nepritel { fill:none; stroke:rgba(255,110,90,.6); stroke-width:2; stroke-dasharray:3 3; vector-effect:non-scaling-stroke; }
 .sb-bublina { fill:#4caf6a; stroke:#fff; stroke-width:3; vector-effect:non-scaling-stroke; filter:drop-shadow(0 1px 3px rgba(0,0,0,.6)); }
 .sb-bublina-text { fill:#fff; font-weight:700; text-anchor:middle; dominant-baseline:central; font-family:inherit; }
-.dalsi-akce { margin:8px 0 4px; }
-.dalsi-akce > summary { cursor:pointer; font-size:12.5px; color:#bbb; padding:2px 0; }
+.dalsi-akce, .ihned-menu { margin:8px 0 4px; }
+.dalsi-akce > summary, .ihned-menu > summary { cursor:pointer; font-size:12.5px; color:#bbb; padding:2px 0; }
 .tah-cena { color:#ffd166; font-size:12.5px; }
 .akce-lista { display:grid; grid-template-columns:repeat(2, 1fr); gap:5px; margin:8px 0 6px; }
 .akce-btn { font-size:12.5px; padding:6px 8px; text-align:center; }
@@ -513,7 +513,7 @@ body.denik-dock-cela { overflow:hidden; }
 
 /* Akce kouzlení v raid panelu: výběr kouzla, ruční počet akcí (PJ) a přerušení. */
 .kouzleni-radek { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
-.kouzleni-radek .kouzleni-vyber { flex:1 1 150px; min-width:0; max-width:100%; font-size:12px; padding:3px 6px; }
+.kouzleni-radek .kouzleni-vyber, .kouzleni-radek .kouzleni-cil { flex:1 1 150px; min-width:0; max-width:100%; font-size:12px; padding:3px 6px; }
 .kouzleni-radek .kouzleni-akci { width:56px; font-size:12px; padding:3px 6px; }
 .ihned-blok { display:flex; flex-direction:column; gap:6px; margin-top:6px; }
 .ihned-nadpis { font-size:12px; color:#b9aea0; }

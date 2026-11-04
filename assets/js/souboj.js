@@ -547,7 +547,7 @@ export function initSouboj(ctx) {
     d.append(box);
     akceEl.append(d);
     const ihnedDet = document.createElement('details');
-    ihnedDet.className = 'dalsi-akce';
+    ihnedDet.className = 'ihned-menu';
     ihnedDet.open = ihnedOtevrene;
     ihnedDet.addEventListener('toggle', () => { ihnedOtevrene = ihnedDet.open; });
     ihnedDet.append(el('summary', '', 'Kouzla ihned…'), ihnedBlok(kolo.aktivni_token_id, null));
