@@ -393,7 +393,13 @@ export function initSouboj(ctx) {
       vyber.className = 'input kouzleni-vyber';
       vyber.title = 'Které kouzlo se sesílá — hra podle vyvolání spočítá akce kouzlení';
       vyber.append(new Option('— kouzlo —', ''));
-      data.kouzla.forEach((k) => vyber.append(new Option(k.nazev + (k.akci ? ' (' + akciText(k.akci) + ')' : ' (počet akcí neznámý)'), String(k.id))));
+      data.kouzla.forEach((k) => {
+        // Vyvolání „ihned“ (akci 0) nestojí žádnou akci kouzlení — sesílá se při jiné akci z deníku, tady se nedá vybrat.
+        const popis = k.akci === 0 ? ' (ihned — bez akce, sešli při jiné akci)' : (k.akci ? ' (' + akciText(k.akci) + ')' : ' (počet akcí neznámý)');
+        const o = new Option(k.nazev + popis, String(k.id));
+        if (k.akci === 0) o.disabled = true;
+        vyber.append(o);
+      });
       vyber.value = kouzloVolba.get(tokenId) || '';
       vyber.addEventListener('change', () => kouzloVolba.set(tokenId, vyber.value));
       radek.append(vyber);

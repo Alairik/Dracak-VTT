@@ -203,6 +203,17 @@ const stav = (page) => page.evaluate(async (m) => (await fetch('api/mapa_stav.ph
   d = await api(pj, 'tah_akce', { mapa_id: MAPA, token_id: sindor, druh: 'kouzleni', kouzlo_id: 416 });
   ok(d.ok && stitek() === 0 && Number(udalosti('dokonceno')) >= 1, 'kouzlo na 1 akci (Falešná čepel) je sesláno hned, štítek nevznikne');
 
+  // H) kouzlo s vyvoláním „ihned“ nestojí akci kouzlení (Sestřel šípy): v seznamu má 0 akcí, jako akci kouzlení ho hra odmítne
+  sql("insert ignore into postava_zna_kouzlo (postava_id, kouzlo_id) values (2, 241)");
+  const seznam2 = await hr.evaluate(async (t) => (await fetch('api/kouzla_tvora.php?token_id=' + t)).json(), sindor);
+  ok((seznam2.kouzla.find(k => k.id === 241) || {}).akci === 0, 'kouzlo „ihned“ má v seznamu 0 akcí');
+  await novySouboj(6);
+  const akcePred = sqlVal(`select akce_zbyvajici from kolo_iniciativa where token_id=${sindor}`);
+  d = await api(hr, 'tah_akce', { mapa_id: MAPA, token_id: sindor, druh: 'kouzleni', kouzlo_id: 241 });
+  ok(d.s === 422 && /ihned/.test(d.error || ''), 'akce kouzlení s kouzlem „ihned“ se odmítne: ' + d.error);
+  ok(stitek() === 0 && sqlVal(`select akce_zbyvajici from kolo_iniciativa where token_id=${sindor}`) === akcePred, 'odmítnutá akce nestála nic (akcí zbývá stejně: ' + akcePred + ')');
+  sql("delete from postava_zna_kouzlo where postava_id=2 and kouzlo_id=241");
+
   await api(pj, 'souboj_konec', { mapa_id: MAPA });
   for (const t of (await stav(pj)).tokeny) await api(pj, 'token_smazat', { token_id: t.id, mapa_id: MAPA });
   await browser.close();

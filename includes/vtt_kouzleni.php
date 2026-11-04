@@ -17,14 +17,18 @@ require_once __DIR__ . '/vtt_efekty.php';
 
 const DRACAK_VTT_EFEKT_KOUZLI = 'Kouzlí';
 
-// Počet akcí kouzlení podle údaje „vyvolání“ kouzla: „N kolo/kola/kol“ = 2N akcí, „1 akce“ = 1. Cokoli jiného (směny, „ihned“, vzorce s „za každých…“,
-// prázdné) se nepočítá a vrací null — pravidla pro ně v rozšířeném systému nic neříkají nebo jde o dlouhé obřady mimo boj.
+// Počet akcí kouzlení podle údaje „vyvolání“ kouzla: „N kolo/kola/kol“ = 2N akcí, „1 akce“ = 1, „ihned“ = 0 (rozhodnutí uživatele 2026-11-04: kouzlo s vyvoláním
+// „ihned“ nestojí žádnou akci, sesílá se při jiné akci — pohyb, útok, obrana). Cokoli jiného (směny, vzorce s „za každých…“, prázdné) se nepočítá a vrací null —
+// pravidla pro ně v rozšířeném systému nic neříkají nebo jde o dlouhé obřady mimo boj.
 function dracak_vtt_kouzlo_akce(?string $doba): ?int
 {
     if ($doba === null) {
         return null;
     }
     $d = mb_strtolower(trim($doba));
+    if (preg_match('/^ihned(\s*[-–]\s*1 bod únavy|\s*\(.*\))?$/u', $d)) {
+        return 0;
+    }
     if (preg_match('/^(\d{1,2})\s*(kolo|kola|kol)\s*\.?(\s*,\s*stále)?$/u', $d, $m)) {
         $n = (int)$m[1];
         return $n >= 1 && $n <= 10 ? 2 * $n : null;
@@ -110,8 +114,12 @@ function dracak_vtt_kouzli_over_vstup(PDO $pdo, array $tvor, array $vstup, bool 
 {
     $kouzloId = (int)($vstup['kouzlo_id'] ?? 0);
     if ($kouzloId > 0) {
-        if (dracak_vtt_kouzlo_info($pdo, $kouzloId) === null) {
+        $kouzloInfo = dracak_vtt_kouzlo_info($pdo, $kouzloId);
+        if ($kouzloInfo === null) {
             return 'Kouzlo nenalezeno.';
+        }
+        if ($kouzloInfo['akci'] === 0) {
+            return 'Kouzlo ' . $kouzloInfo['nazev'] . ' má vyvolání „ihned“ — nestojí žádnou akci kouzlení, sesílá se při jiné akci (pohyb, útok, obrana) z deníku.';
         }
         if (!$jePj) {
             $zna = false;
@@ -213,6 +221,9 @@ function dracak_vtt_kouzli_po_akci(PDO $pdo, int $svetId, int $mapaId, int $ucet
     $kouzloId = (int)($vstup['kouzlo_id'] ?? 0);
     $kouzlo = $kouzloId > 0 ? dracak_vtt_kouzlo_info($pdo, $kouzloId) : null;
     $akci = $kouzlo['akci'] ?? null;
+    if ($akci === 0) {
+        $akci = null;   // „ihned“ sem nedojde (vstup se odmítá dřív), pojistka
+    }
     if (isset($vstup['akci']) && $vstup['akci'] !== '' && $vstup['akci'] !== null) {
         $akci = (int)$vstup['akci'];   // ruční počet (PJ), má přednost
     }
