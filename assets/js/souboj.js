@@ -404,6 +404,26 @@ export function initSouboj(ctx) {
       vyber.addEventListener('change', () => kouzloVolba.set(tokenId, vyber.value));
       radek.append(vyber);
     }
+    // Cíl kouzla (hra kouzlo vyhodnotí sama ve chvíli, kdy začne působit), trvání v kolech a dodaná magenergie — jen u kouzla s postupem akcí.
+    let cilSel = null, kola = null, magy = null;
+    if (vyber) {
+      cilSel = document.createElement('select');
+      cilSel.className = 'input kouzleni-cil';
+      cilSel.title = 'Na koho kouzlo míří (výchozí: na sebe)';
+      cilSel.append(new Option('na sebe', ''));
+      getTokeny().filter((t) => jeTvor(t) && t.id !== tokenId).forEach((t) => cilSel.append(new Option(t.label, String(t.id))));
+      radek.append(cilSel);
+      kola = document.createElement('input');
+      kola.type = 'number'; kola.min = '0'; kola.max = '99'; kola.placeholder = 'kol';
+      kola.className = 'input kouzleni-akci';
+      kola.title = 'Na kolik kol kouzlo působí (jen když to kouzlo vyžaduje; 0 = bez limitu)';
+      radek.append(kola);
+      magy = document.createElement('input');
+      magy.type = 'number'; magy.min = '0'; magy.max = '999'; magy.placeholder = 'magy';
+      magy.className = 'input kouzleni-akci';
+      magy.title = 'Kolik magů kouzlo stojí, když to hra nepozná z ceny (prázdné = podle ceny kouzla)';
+      radek.append(magy);
+    }
     if (jePj && data && data.pocita) {
       pocet = document.createElement('input');
       pocet.type = 'number'; pocet.min = '1'; pocet.max = '20'; pocet.placeholder = 'akcí';
@@ -414,6 +434,9 @@ export function initSouboj(ctx) {
     radek.append(tlacitko('Kouzlení', 'btn-ghost akce-btn', () => {
       const telo = {token_id: tokenId, druh: 'kouzleni'};
       if (vyber && vyber.value) telo.kouzlo_id = Number(vyber.value);
+      if (cilSel && cilSel.value) telo.cil_token_id = Number(cilSel.value);
+      if (kola && kola.value !== '') telo.zbyva_kol = Number(kola.value);
+      if (magy && magy.value !== '') telo.magy = Number(magy.value);
       if (pocet && pocet.value) telo.akci = Number(pocet.value);
       volat('api/tah_akce.php', telo);
     }, 'Odečte jednu akci kouzlení'));
@@ -1722,12 +1745,15 @@ export function initSouboj(ctx) {
         const kdo = p.label || 'Tvor';
         const co = p.kouzlo ? ' ' + p.kouzlo : '';
         const postup = p.celkem ? ' (akce ' + p.hotovo + ' z ' + p.celkem + ')' : '';
-        const propadla = p.cena ? ' — magenergie propadla (' + p.cena + ')' : ' — magenergie propadla';
+        // Magenergie: hra ji strhává při zahájení kouzlení (propadne, když se kouzlo přeruší nebo nezdaří); u kouzla, jehož cenu nepozná, ji upraví hráč nebo PJ ručně.
+        const magyText = p.magy ? ' (−' + p.magy + ' magů)' : '';
+        const propadla = p.seslano ? ' — kouzlo už působí' : (p.magy ? ' — magenergie propadla (' + p.magy + ')' : (p.cena ? ' — magenergie propadla (' + p.cena + ')' : ' — magenergie propadla'));
+        const ucinek = p.seslano ? ' — kouzlo seslané, účinek je vyhodnocen' : (p.chyba ? ' — účinek se nepodařilo vyhodnotit: ' + p.chyba : '');
         const texty = {
-          zahajeno: kdo + ' začíná kouzlit' + co + postup,
+          zahajeno: kdo + ' začíná kouzlit' + co + postup + magyText,
           pokracuje: kdo + ' kouzlí' + co + postup,
-          ucinkuje: kdo + ': kouzlo' + co + ' začíná působit' + postup + ' — účinek nasaďte (kouzlo z deníku); poslední akce je odpočinek, kouzelník se nemůže bránit',
-          dokonceno: kdo + ' dokončil(a) kouzlení' + co + (p.celkem ? ' (' + akciText(p.celkem) + ')' : ''),
+          ucinkuje: kdo + ': kouzlo' + co + ' začíná působit' + postup + magyText + (p.seslano ? ' — účinek se vyhodnotil sám' : ' — účinek zadej z deníku') + (p.chyba ? ' (' + p.chyba + ')' : '') + '; poslední akce je odpočinek, kouzelník se nemůže bránit',
+          dokonceno: kdo + ' dokončil(a) kouzlení' + co + (p.celkem ? ' (' + akciText(p.celkem) + ')' : '') + ucinek,
           preruseno: kdo + ' přerušil(a) kouzlení' + co + propadla,
           prerusene_jinou_akci: kdo + ' přerušil(a) kouzlení' + co + ' jinou akcí' + propadla,
           selhalo: kdo + ': kouzlo' + co + ' se nezdařilo, byl(a) zasažen(a) před předposlední akcí' + propadla,

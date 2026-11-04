@@ -45,6 +45,7 @@ $ruckySql = [
     ['aktivni_efekty', 'kouzlo_id', '0113 — kouzlo, které tvor sesílá'],
     ['aktivni_efekty', 'akci_celkem', '0113 — kolik akcí kouzlení kouzlo vyžaduje'],
     ['aktivni_efekty', 'akci_hotovo', '0113 — kolik akcí kouzlení proběhlo'],
+    ['aktivni_efekty', 'kouzleni_data', '0114 — cíl a trvání sesílaného kouzla (automatické seslání)'],
     ['mapy', 'mil_na_1000px', '0110 — měřítko světové mapy'],
     ['tokeny', 'svetlo_zbyva', '0109 — doba hoření světla'],
     ['svet', 'aktualni_smena', '0109 — čas ve světě'],

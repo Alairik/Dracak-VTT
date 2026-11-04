@@ -322,3 +322,134 @@ function dracak_vtt_odecti_magenergii(array $postava, int $cena): array
 {
     return dracak_vtt_magenergie_zmen(dracak_db(), (int)$postava['id'], -$cena) ?? [0, (int)$postava['max_magenergie']];
 }
+
+// Účinek použité položky (lektvar, předmět, kouzlo): kostky z vlastního záznamu položky, poškození / léčení cíle, stavové efekty (nebo seznam čekající na past),
+// odečtení magenergie sesilateli a událost „predmet_pouzit“. Společné pro hra/api/pouzij_predmet.php (ruční použití z deníku) a pro souboj (kouzlení, kouzla „ihned“
+// připojená k akci — includes/vtt_kouzleni.php). Volá se UVNITŘ transakce volajícího; ověření oprávnění, dosahu a dostatku magenergie dělá volající.
+// $c: typEntity, entitaId, entity (sesilatel), typPolozky, polozkaId, katalog, cilTypEntity, cilEntitaId, cilEntity, svetMapa (svet_id, mapa_id), cilSvetMapa,
+// pozadovanaMapaId, zbyvaKolZadano, zbyvaKolVstup, magenergieCena (null = nestrhává se). Vrací ['udalost_id', 'kostka', 'hp', 'efekty', 'ceka_na_past', 'magenergie'].
+function dracak_vtt_polozka_pouzij_ucinek(PDO $pdo, array $user, array $c): array
+{
+    $typEntity = $c['typEntity'];
+    $entitaId = $c['entitaId'];
+    $entity = $c['entity'];
+    $typPolozky = $c['typPolozky'];
+    $polozkaId = $c['polozkaId'];
+    $katalog = $c['katalog'];
+    $cilTypEntity = $c['cilTypEntity'];
+    $cilEntitaId = $c['cilEntitaId'];
+    $cilEntity = $c['cilEntity'];
+    $svetMapa = $c['svetMapa'];
+    $cilSvetMapa = $c['cilSvetMapa'];
+    $pozadovanaMapaId = $c['pozadovanaMapaId'];
+    $zbyvaKolZadano = $c['zbyvaKolZadano'];
+    $zbyvaKolVstup = $c['zbyvaKolVstup'];
+    $magenergieCena = $c['magenergieCena'];
+
+    // Kostky "na jedno použití" bere engine VŽDY z vlastního záznamu
+    // položky (pocet_kostek/typ_kostky/pevny_bonus), ne z efektu — viz
+    // includes/vtt_predmety.php.
+    $kostka = null;
+    if (!empty($katalog['pocet_kostek']) && !empty($katalog['typ_kostky'])) {
+        $typKostkyInt = dracak_vtt_typ_kostky_na_int($katalog['typ_kostky']);
+        $kostka = dracak_vtt_hod_kostkou((int)$katalog['pocet_kostek'], $typKostkyInt, (int)($katalog['pevny_bonus'] ?? 0));
+    }
+
+    $efekty = dracak_vtt_polozka_efekty($typPolozky, $polozkaId);
+    $hpVysledek = null;
+    $aplikovaneEfekty = [];
+    $cekajiNaPast = [];
+    $efektMapaId = $pozadovanaMapaId ?? $svetMapa['mapa_id'] ?? $cilSvetMapa['mapa_id'];
+    // Kouzlo s hodem proti pasti (cíl si hází): stavový efekt se sám nenasadí, dokud PJ nerozhodne podle hodu cíle.
+    $pastKouzla = $typPolozky === 'kouzlo' ? dracak_vtt_kouzlo_past_text($katalog) : null;
+    // Kostky položky (lektvar Regenerace „1k6+5 za kolo“) si nasazený efekt pamatuje pro tik každé kolo.
+    $kostkyZdroje = null;
+    if (!empty($katalog['pocet_kostek']) && !empty($katalog['typ_kostky'])) {
+        $kostkyZdroje = dracak_vtt_kostky_text((int)$katalog['pocet_kostek'], (string)$katalog['typ_kostky'], (int)($katalog['pevny_bonus'] ?? 0));
+    }
+    $akceZmenenyUcastnik = false;
+    foreach ($efekty as $efekt) {
+        $znamenko = dracak_vtt_hp_znamenko($efekt);
+        if ($znamenko !== null) {
+            // Poškození/Léčení: jednorázový přímý zásah do života, žádný
+            // trvalý záznam v aktivni_efekty (mechanika_aplikace je
+            // 'jednorazove', trvani 'okamžité' — není co odpočítávat).
+            if ($kostka === null) {
+                // Efekt existuje, ale položka nemá definované kostky — není
+                // z čeho spočítat kolik životů strhnout/přidat. Nehádat,
+                // efekt se přeskočí (viz CLAUDE.md o nehádání mechaniky).
+                continue;
+            }
+            $delta = $znamenko * $kostka['celkem'];
+            [$noveHp, $maxHp] = dracak_vtt_aplikuj_hp_deltu($cilTypEntity, $cilEntity, $delta);
+            $cilEntity['aktualni_hp'] = $noveHp;
+            $hpVysledek = ['delta' => $delta, 'nove_hp' => $noveHp, 'max_hp' => $maxHp];
+            $aplikovaneEfekty[] = ['efekt_id' => (int)$efekt['id'], 'nazev' => $efekt['nazev'], 'hp_delta' => $delta];
+        } elseif ($pastKouzla !== null) {
+            $cekajiNaPast[] = ['efekt_id' => (int)$efekt['id'], 'nazev' => $efekt['nazev'], 'past' => $pastKouzla];
+        } else {
+            // Běžný stavový efekt (buff/debuff/dot/hot/modifikator/imunita/
+            // zranitelnost/odolnost jiný než Poškození/Léčení) — nasadí se
+            // společnou funkcí (includes/vtt_efekty.php): výchozí trvání
+            // efektu nebo trvání ze sesílání, okamžité změny akcí, obnovení
+            // trvání, když efekt na cíli už je.
+            $volby = ['kostky' => $kostkyZdroje];
+            if ($zbyvaKolZadano) {
+                $volby['zbyva_kol'] = $zbyvaKolVstup;
+            }
+            $v = dracak_vtt_efekt_aplikuj($pdo, $efektMapaId !== null ? (int)$efektMapaId : null, $cilTypEntity, $cilEntitaId, (int)$efekt['id'], $volby);
+            $aplikovaneEfekty[] = [
+                'efekt_id' => (int)$efekt['id'],
+                'nazev' => $efekt['nazev'],
+                'aktivni_efekt_id' => $v['aktivni_efekt_id'],
+                'zbyva_kol' => $v['zbyva_kol'],
+                'zbyva_pred' => $v['zbyva_pred'],
+                'obnoveno' => $v['obnoveno'],
+                'stav' => $v['stav'],
+                'shrnuti' => $v['shrnuti'],
+                'akce' => $v['akce'],
+                'upozorneni' => $v['upozorneni'],
+            ];
+            if ($v['akce'] !== null) {
+                $akceZmenenyUcastnik = true;
+            }
+        }
+    }
+    if ($akceZmenenyUcastnik && $efektMapaId !== null) {
+        dracak_vtt_efekt_posun_po_nasazeni($pdo, (int)$svetMapa['svet_id'], (int)$efektMapaId, (int)$user['id']);
+    }
+
+    // Magenergie se strhává seslateli ($entity/$typEntity), ne cíli kouzla
+    // — platí ten, kdo kouzlo seslal, bez ohledu na to, na koho dopadá.
+    $magenergieVysledek = null;
+    if ($magenergieCena !== null) {
+        [$novaMagenergie, $maxMagenergie] = dracak_vtt_odecti_magenergii($entity, $magenergieCena);
+        $magenergieVysledek = ['cena' => $magenergieCena, 'nova_magenergie' => $novaMagenergie, 'max_magenergie' => $maxMagenergie];
+    }
+
+    $logMapaId = $pozadovanaMapaId ?? $svetMapa['mapa_id'] ?? $cilSvetMapa['mapa_id'];
+    $eventId = dracak_vtt_log_event($svetMapa['svet_id'], $logMapaId, 'predmet_pouzit', [
+        'typ_entity' => $typEntity,
+        'entita_id' => $entitaId,
+        'typ_polozky' => $typPolozky,
+        'polozka_id' => $polozkaId,
+        'polozka_nazev' => $katalog['nazev'],
+        'cil_typ_entity' => $cilTypEntity,
+        'cil_entita_id' => $cilEntitaId,
+        'kostka' => $kostka,
+        'hp' => $hpVysledek,
+        'efekty' => $aplikovaneEfekty,
+        'ceka_na_past' => $cekajiNaPast,
+        'magenergie' => $magenergieVysledek,
+        'pouzil' => $user['jmeno'],
+    ], (int)$user['id']);
+
+    return [
+        'udalost_id' => $eventId,
+        'kostka' => $kostka,
+        'hp' => $hpVysledek,
+        'efekty' => $aplikovaneEfekty,
+        'ceka_na_past' => $cekajiNaPast,
+        'magenergie' => $magenergieVysledek,
+    ];
+}

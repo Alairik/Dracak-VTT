@@ -203,7 +203,66 @@ const stav = (page) => page.evaluate(async (m) => (await fetch('api/mapa_stav.ph
   d = await api(pj, 'tah_akce', { mapa_id: MAPA, token_id: sindor, druh: 'kouzleni', kouzlo_id: 416 });
   ok(d.ok && stitek() === 0 && Number(udalosti('dokonceno')) >= 1, 'kouzlo na 1 akci (Falešná čepel) je sesláno hned, štítek nevznikne');
 
-  // H) kouzlo s vyvoláním „ihned“ nestojí akci kouzlení (Sestřel šípy): v seznamu má 0 akcí, jako akci kouzlení ho hra odmítne
+  // =============== I) hra kouzlo sama sešle ve chvíli, kdy začíná působit (migrace 0114) ===============
+  const gobInst = sqlVal(`select entita_id from tokeny where id=${gob}`);
+  const hpGob = () => Number(sqlVal(`select aktualni_hp from nestvura_instance where id=${gobInst}`));
+  const magySindor = () => Number(sqlVal('select aktualni_magenergie from postavy where id=2'));
+  const udalostiPouzit = (nazev) => Number(sqlVal(`select count(*) from svet_udalosti where mapa_id=${MAPA} and typ='predmet_pouzit' and payload like '%${nazev}%'`));
+  const efektNa = (nazev) => Number(sqlVal(`select count(*) from aktivni_efekty ae join efekty e on e.id=ae.efekt_id where e.nazev='${nazev}' and ae.typ_entity='postava' and ae.entita_id=2`));
+  const priprav = async () => {
+    sql(`update postavy set max_magenergie=30, aktualni_magenergie=30 where id=2; update nestvura_instance set aktualni_hp=20, max_hp=20 where id=${gobInst}; delete from svet_udalosti where typ='predmet_pouzit'`);
+    await novySouboj(6);
+  };
+
+  // A) Modré blesky na goblina: 2 akce → účinek hned po první (předposlední), magy 3 strženy při zahájení, druhá akce nic nezdvojí
+  await priprav();
+  d = await api(hr, 'tah_akce', { mapa_id: MAPA, token_id: sindor, druh: 'kouzleni', kouzlo_id: MODRE, cil_token_id: gob });
+  ok(d.ok === true, 'Modré blesky na goblina: akce 1 projde: ' + (d.error || ''));
+  const hpPo1 = hpGob();
+  ok(hpPo1 < 20 && hpPo1 >= 14, 'goblin dostal zranění hned po první ze dvou akcí (kostka 1k6): 20 → ' + hpPo1);
+  ok(magySindor() === 27, 'magenergie Sindora: 30 − 3 (cena kouzla) = ' + magySindor());
+  ok(stavKouzleni() === '10|1|2' && udalostiPouzit('Modré blesky') === 1, 'štítek 1/2 a v logu je „použito kouzlo“ (' + udalostiPouzit('Modré blesky') + '×)');
+  d = await api(hr, 'tah_akce', { mapa_id: MAPA, token_id: sindor, druh: 'kouzleni', kouzlo_id: MODRE, cil_token_id: gob });
+  ok(d.ok && stitek() === 0 && hpGob() === hpPo1 && magySindor() === 27 && udalostiPouzit('Modré blesky') === 1, 'druhá akce kouzlo jen dokončí: zranění ani magy se nezdvojí, štítek zmizí');
+
+  // B) Rychlost: trvání je nutné zadat (hra se zeptá dřív, než utratí magy); pak se efekt nasadí hned a stojí 2 magy
+  await priprav();
+  d = await api(hr, 'tah_akce', { mapa_id: MAPA, token_id: sindor, druh: 'kouzleni', kouzlo_id: 18 });
+  ok(d.s === 422 && /trvání/.test(d.error || '') && magySindor() === 30 && stitek() === 0, 'Rychlost bez počtu kol: hra se zeptá, nic neutratí: ' + d.error);
+  d = await api(hr, 'tah_akce', { mapa_id: MAPA, token_id: sindor, druh: 'kouzleni', kouzlo_id: 18, zbyva_kol: 3 });
+  ok(d.ok === true && efektNa('Rychlost (kouzlo)') === 1 && magySindor() === 28, 'Rychlost na 3 kola: efekt je nasazen hned po první akci, magy 30 → ' + magySindor());
+  ok(sqlVal("select zbyva_kol from aktivni_efekty ae join efekty e on e.id=ae.efekt_id where e.nazev='Rychlost (kouzlo)' and ae.entita_id=2 and ae.typ_entity='postava'") === '3', 'trvání efektu je 3 kola podle zadání');
+
+  // C) Protoplazma (4 akce, má past): účinek (seznam čekající na past) až po 3. akci, ne dřív
+  await priprav();
+  for (let i = 1; i <= 2; i++) await api(hr, 'tah_akce', { mapa_id: MAPA, token_id: sindor, druh: 'kouzleni', kouzlo_id: PROTOPLAZMA, cil_token_id: gob, zbyva_kol: 3 });
+  ok(udalostiPouzit('Protoplazma') === 0 && stavKouzleni() === '17|2|4', 'Protoplazma: po 2 ze 4 akcí kouzlo ještě nepůsobí');
+  await api(hr, 'tah_akce', { mapa_id: MAPA, token_id: sindor, druh: 'kouzleni', kouzlo_id: PROTOPLAZMA, cil_token_id: gob, zbyva_kol: 3 });
+  ok(udalostiPouzit('Protoplazma') === 1 && stavKouzleni() === '17|3|4', 'po 3. (předposlední) akci se kouzlo sešle, štítek drží do 4. akce');
+  await api(hr, 'tah_akce', { mapa_id: MAPA, token_id: sindor, druh: 'kouzleni', kouzlo_id: PROTOPLAZMA });
+  ok(udalostiPouzit('Protoplazma') === 1 && stitek() === 0, '4. akce kouzlo jen dokončí (nesešle se podruhé)');
+
+  // D) nedostatek magenergie, cíl mimo dosah, neexistující cíl: odmítnuto před jakýmkoli zápisem
+  await priprav();
+  sql('update postavy set aktualni_magenergie=1 where id=2');
+  d = await api(hr, 'tah_akce', { mapa_id: MAPA, token_id: sindor, druh: 'kouzleni', kouzlo_id: MODRE, cil_token_id: gob });
+  ok(d.s === 422 && /magenergie/i.test(d.error || '') && stitek() === 0 && hpGob() === 20, 'málo magenergie: ' + d.error);
+  sql('update postavy set aktualni_magenergie=30 where id=2');
+  d = await api(hr, 'tah_akce', { mapa_id: MAPA, token_id: sindor, druh: 'kouzleni', kouzlo_id: MODRE, cil_token_id: 999999 });
+  ok(d.s === 422 && /Cíl/.test(d.error || ''), 'neexistující cíl: ' + d.error);
+  await api(pj, 'token_presun', { token_id: gob, x: stred(35, 10).x, y: stred(35, 10).y });
+  d = await api(hr, 'tah_akce', { mapa_id: MAPA, token_id: sindor, druh: 'kouzleni', kouzlo_id: MODRE, cil_token_id: gob });
+  ok(d.s === 422 && /dosah/.test(d.error || '') && magySindor() === 30, 'cíl mimo dosah (10 sáhů): ' + d.error);
+  await api(pj, 'token_presun', { token_id: gob, x: stred(14, 10).x, y: stred(14, 10).y });
+
+  // E) přerušení před účinkem: magy propadly (už jsou zaplacené), kouzlo se nesešle
+  await priprav();
+  await api(hr, 'tah_akce', { mapa_id: MAPA, token_id: sindor, druh: 'kouzleni', kouzlo_id: PROTOPLAZMA, cil_token_id: gob, zbyva_kol: 3 });
+  const magyPoStartu = magySindor();
+  d = await api(hr, 'tah_akce', { mapa_id: MAPA, token_id: sindor, druh: 'kouzleni', preruseni: true });
+  ok(d.ok && stitek() === 0 && udalostiPouzit('Protoplazma') === 0 && magySindor() === magyPoStartu, 'přerušení před účinkem: kouzlo se nesešle, magy zůstávají utracené (' + magyPoStartu + ')');
+
+  // J) kouzlo s vyvoláním „ihned“ nestojí akci kouzlení (Sestřel šípy): v seznamu má 0 akcí, jako akci kouzlení ho hra odmítne
   sql("insert ignore into postava_zna_kouzlo (postava_id, kouzlo_id) values (2, 241)");
   const seznam2 = await hr.evaluate(async (t) => (await fetch('api/kouzla_tvora.php?token_id=' + t)).json(), sindor);
   ok((seznam2.kouzla.find(k => k.id === 241) || {}).akci === 0, 'kouzlo „ihned“ má v seznamu 0 akcí');
