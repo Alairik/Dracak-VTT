@@ -273,6 +273,60 @@ const stav = (page) => page.evaluate(async (m) => (await fetch('api/mapa_stav.ph
   ok(stitek() === 0 && sqlVal(`select akce_zbyvajici from kolo_iniciativa where token_id=${sindor}`) === akcePred, 'odmítnutá akce nestála nic (akcí zbývá stejně: ' + akcePred + ')');
   sql("delete from postava_zna_kouzlo where postava_id=2 and kouzlo_id=241");
 
+  // =============== K) kouzla „ihned“ se vážou k jiné akci (0 akcí), jedna akce jich unese víc ===============
+  sql("insert ignore into postava_zna_kouzlo (postava_id, kouzlo_id) values (2, 674), (2, 242), (2, 245)");
+  const DUSIVY = 674, OBRANA_K = 242, SMRTICI = 245;
+  const akcePred2 = () => Number(sqlVal(`select akce_zbyvajici from kolo_iniciativa where token_id=${sindor}`));
+  const stavKouzel = (typ) => Number(sqlVal(`select count(*) from svet_udalosti where mapa_id=${MAPA} and typ='kouzleni_stav' and payload like '%${typ}%'`));
+  await priprav();
+  let a0 = akcePred2();
+  d = await api(hr, 'tah_akce', { mapa_id: MAPA, token_id: sindor, druh: 'cekani', ihned: [{ kouzlo_id: DUSIVY, cil_token_id: gob }, { kouzlo_id: OBRANA_K }] });
+  ok(d.ok === true, 'čekání s dvěma kouzly ihned projde: ' + (d.error || ''));
+  ok(akcePred2() === a0 - 1, 'akce stála jednu akci, kouzla ihned žádnou (' + a0 + ' → ' + akcePred2() + ')');
+  ok(hpGob() < 20 && hpGob() >= 10, 'Dusivý stín zranil goblina (1k10): 20 → ' + hpGob());
+  ok(magySindor() === 23, 'magy: 30 − 4 (Dusivý stín) − 3 (Obrana) = ' + magySindor());
+  ok(udalostiPouzit('Dusivý stín') === 1 && udalostiPouzit('Obrana') === 1 && stavKouzel('ihned') === 2, 'v logu jsou dvě použitá kouzla a dvě události „ihned“');
+  ok(stitek() === 0, 'kouzla ihned nevytváří štítek „Kouzlí“ (žádná fáze sesílání)');
+
+  // ověření celého seznamu před zápisem: nic se neprovede, nic neutratí
+  await priprav();
+  sql('update postavy set aktualni_magenergie=5 where id=2');
+  a0 = akcePred2();
+  d = await api(hr, 'tah_akce', { mapa_id: MAPA, token_id: sindor, druh: 'cekani', ihned: [{ kouzlo_id: DUSIVY, cil_token_id: gob }, { kouzlo_id: OBRANA_K }] });
+  ok(d.s === 422 && /magenergie/i.test(d.error || '') && akcePred2() === a0 && hpGob() === 20 && magySindor() === 5, 'dvě kouzla dohromady za 7 magů při 5: odmítnuto, nic neproběhlo: ' + d.error);
+  sql('update postavy set aktualni_magenergie=30 where id=2');
+  d = await api(hr, 'tah_akce', { mapa_id: MAPA, token_id: sindor, druh: 'cekani', ihned: [{ kouzlo_id: MODRE, cil_token_id: gob }] });
+  ok(d.s === 422 && /nemá vyvolání „ihned“/.test(d.error || ''), 'kouzlo s vyvoláním na kola se k akci připojit nedá: ' + d.error);
+  d = await api(hr, 'tah_akce', { mapa_id: MAPA, token_id: sindor, druh: 'kouzleni', kouzlo_id: MODRE, ihned: [{ kouzlo_id: OBRANA_K }] });
+  ok(d.s === 422 && /jiné akci než kouzlení/.test(d.error || ''), 'k akci kouzlení se kouzla ihned nepřipojují: ' + d.error);
+  d = await api(hr, 'tah_akce', { mapa_id: MAPA, token_id: sindor, druh: 'cekani', ihned: [{ kouzlo_id: 3 }] });
+  ok(d.s === 422, 'cizí kouzlo (Hyperprostor) hráč připojit nesmí: ' + d.error);
+  d = await api(hr, 'tah_akce', { mapa_id: MAPA, token_id: sindor, druh: 'cekani', ihned: Array(6).fill({ kouzlo_id: OBRANA_K }) });
+  ok(d.s === 422 && /nejvýš 5/.test(d.error || ''), 'víc než 5 kouzel k jedné akci se odmítne: ' + d.error);
+
+  // obrana: kouzla ihned se sešlou před hodem a přepočítají opravy obrany (efekty, nehybnost)
+  await priprav();
+  await api(pj, 'token_uprava', { token_id: gob, zmeny: { smer: 180 } });
+  let kolo2 = (await stav(pj)).kolo;
+  for (let i = 0; i < 6 && kolo2.aktivni_token_id !== gob; i++) { await api(pj, 'tah_konec', { mapa_id: MAPA }); kolo2 = (await stav(pj)).kolo; }
+  await api(pj, 'tah_akce', { mapa_id: MAPA, token_id: gob, druh: 'utok', cil_token_id: sindor });
+  let vyU = (await stav(pj)).vyzvy;
+  sql(`update souboj_vyzva set data = json_set(data, '$.zaklad', 3) where id=${vyU[0].id}`);
+  await api(pj, 'vyzva_hod', { mapa_id: MAPA, vyzva_id: vyU[0].id, hody: [4] });
+  let obr2 = (await stav(pj)).vyzvy.find(x => x.druh === 'obrana');
+  ok(obr2 && obr2.nehybny === false && !obr2.duvod_nebrani, 'obrana před kouzlem: Sindor není nehybný');
+  sql("insert into aktivni_efekty (typ_entity, entita_id, efekt_id, zbyva_kol) values ('postava', 2, 28, 3)");   // Spánek přibyl mezitím
+  d = await api(hr, 'vyzva_uprava', { mapa_id: MAPA, vyzva_id: obr2.id, ihned: [{ kouzlo_id: OBRANA_K }] });
+  ok(d.ok === true && magySindor() === 27, 'kouzlo ihned k obraně se sešle hned a zaplatí magy: ' + (d.error || magySindor()));
+  obr2 = (await stav(pj)).vyzvy.find(x => x.druh === 'obrana');
+  ok(obr2 && obr2.nehybny === true && obr2.duvod_nebrani === 'Spánek', 'opravy obrany se po kouzle přepočítaly (nehybný od efektu Spánek): ' + (obr2 && (obr2.nehybny + '/' + obr2.duvod_nebrani)));
+  d = await api(pj, 'vyzva_uprava', { mapa_id: MAPA, vyzva_id: obr2.id, ihned: [{ kouzlo_id: OBRANA_K }] });
+  ok(d.ok === true, 'PJ smí sesílat ihned i za jiného tvora (nestvůru či postavu): ' + (d.error || ''));
+  sql("delete from aktivni_efekty where typ_entity='postava' and entita_id=2");
+  d = await api(hr, 'vyzva_uprava', { mapa_id: MAPA, vyzva_id: (await stav(pj)).vyzvy.find(x => x.druh === 'obrana').id, ihned: [{ kouzlo_id: MODRE }] });
+  ok(d.s === 422, 'k obraně jen kouzla ihned: ' + d.error);
+  sql("delete from postava_zna_kouzlo where postava_id=2 and kouzlo_id in (674, 242, 245)");
+
   await api(pj, 'souboj_konec', { mapa_id: MAPA });
   for (const t of (await stav(pj)).tokeny) await api(pj, 'token_smazat', { token_id: t.id, mapa_id: MAPA });
   await browser.close();

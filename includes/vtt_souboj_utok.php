@@ -626,6 +626,22 @@ function dracak_vtt_obrana_zaloz(PDO $pdo, array $mapa, array $info, array $utok
     return $id;
 }
 
+// Přepočítá z aktivních efektů obránce to, co se mohlo změnit, když si mezi útokem a hodem na obranu seslal kouzlo „ihned“: opravy obranného čísla od efektů, nehybnost
+// a důvod, proč se nemůže bránit. Ostatní složky obrany (OČ, štít, OZ, strana, volba) zůstávají. Vrací upravená data výzvy.
+function dracak_vtt_obrana_obnov_efekty(PDO $pdo, array $info, array $obranaVyzva, array $d): array
+{
+    $obr = dracak_vtt_souboj_bojovnik($pdo, $info[(int)$obranaVyzva['token_id']]);
+    $ef = $obr['efekty'];
+    $d['efekt_opravy'] = $ef['opravy_oc'];
+    $nehybny = $ef['nehybny'] ?? (!empty($obr['bojeschopnost']['vyrazena']) ? 'vyřazený' : null);
+    $d['nehybny'] = $nehybny;
+    if ($nehybny !== null) {
+        $d['stit'] = false;
+    }
+    $d['duvod_nebrani'] = $nehybny ?? $ef['nemuze_branit'] ?? $ef['nemuze_jednat'];
+    return $d;
+}
+
 // Odečte životy (nejníž na 0, jako hp_uprava.php) a zapíše hp_zmena. Vrací
 // ['hp_pred', 'hp_nove', 'max_hp', 'vyrazen'].
 function dracak_vtt_souboj_zranit(PDO $pdo, int $svetId, int $mapaId, array $infoTokenu, int $zraneni, int $ucetId): array

@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/../../includes/vtt_souboj.php';
+require_once __DIR__ . '/../../includes/vtt_kouzleni.php';
 
 // Úprava výzvy k hodu PŘED hodem (includes/vtt_souboj_utok.php):
 //  - modifikator   (PJ)  oprava čísla, obtížnosti (−30..30), vidí ji všichni
@@ -10,6 +11,7 @@ require_once __DIR__ . '/../../includes/vtt_souboj.php';
 //  - zbran_id      (kdo ovládá útočníka) jiná zbraň / jiný útok nestvůry
 //  - nasobek       (PJ)  násobek zranění u obrany spícího / vyřazeného tvora (1–99)
 //  - volba         (kdo ovládá obránce) 'branit' (zbraní, stojí akci) / 'nebranit' (jen brněním, −3)
+//  - ihned         (kdo ovládá obránce) seznam kouzel „ihned“ k obraně (vyvolání ihned = 0 akcí): vyhodnotí se hned a opravy obrany se přepočtou
 // Po hodu už se výzva nemění.
 // Tělo: {mapa_id, vyzva_id, ...pole výše}
 $data = dracak_vtt_souboj_vstup();
@@ -154,6 +156,27 @@ try {
         }
         $d['volba'] = $volba;
         $zmeneno[] = 'volba';
+    }
+
+    // Kouzla „ihned“ k obraně: obránce je sešle ve chvíli obrany; efekty se projeví v opravách obranného čísla dřív, než se hází.
+    if (!empty($data['ihned'])) {
+        if ($v['druh'] !== 'obrana') {
+            $pdo->rollBack();
+            dracak_vtt_souboj_chyba(422, 'Kouzla „ihned“ se k výzvě připojují jen u obrany (u útoku a pohybu při akci).');
+        }
+        if (!$ovlada) {
+            $pdo->rollBack();
+            dracak_vtt_souboj_chyba(403, 'Za tohohle tvora kouzlit nesmíš.');
+        }
+        $tvorObrany = $info[$v['token_id']] + ['mapa_id' => $mapaId];
+        $chybaIhned = dracak_vtt_kouzli_ihned_over($pdo, $tvorObrany, $data['ihned'], $jePj);
+        if ($chybaIhned !== null) {
+            $pdo->rollBack();
+            dracak_vtt_souboj_chyba(422, $chybaIhned);
+        }
+        dracak_vtt_kouzli_ihned_proved($pdo, $user, $svetId, $mapaId, $tvorObrany, $data['ihned'], $info);
+        $d = dracak_vtt_obrana_obnov_efekty($pdo, $info, $v, $d);
+        $zmeneno[] = 'ihned';
     }
 
     if (!$zmeneno) {

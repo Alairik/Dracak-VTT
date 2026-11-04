@@ -231,16 +231,12 @@ function dracak_vtt_kouzli_over_vstup(PDO $pdo, array $tvor, array $vstup, bool 
     return null;
 }
 
-// Ověření zahájení kouzlení, které hra vyhodnotí sama: cíl, dosah a výhled, trvání, magenergie.
-function dracak_vtt_kouzli_over_zahajeni(PDO $pdo, array $tvor, array $vstup, array $kouzloInfo): ?string
+// Cíl, dosah a výhled, trvání: společné ověření zahájeného kouzlení i kouzla „ihned“. Chybová zpráva, nebo null.
+function dracak_vtt_kouzli_over_cil_trvani(PDO $pdo, array $tvor, array $vstup, array $kouzloInfo, array $katalog): ?string
 {
     $cil = dracak_vtt_kouzli_cil($pdo, $tvor, $vstup);
     if ($cil === null) {
         return 'Cíl kouzla nenalezen (musí to být tvor na téhle mapě).';
-    }
-    $katalog = dracak_vtt_polozka_katalog('kouzlo', $kouzloInfo['id']);
-    if (!$katalog) {
-        return 'Kouzlo nenalezeno v katalogu.';
     }
     $mapaId = (int)$tvor['mapa_id'];
     if (!$cil['sam']) {
@@ -259,12 +255,110 @@ function dracak_vtt_kouzli_over_zahajeni(PDO $pdo, array $tvor, array $vstup, ar
     if (!$kolaZadano && dracak_vtt_kouzlo_potrebuje_trvani($pdo, $katalog, $kouzloInfo['id']) !== null) {
         return 'Kouzlo ' . $kouzloInfo['nazev'] . ' potřebuje trvání — zadej počet kol (0 = bez limitu).';
     }
+    return null;
+}
+
+// Ověření zahájení kouzlení, které hra vyhodnotí sama: cíl, dosah a výhled, trvání, magenergie.
+function dracak_vtt_kouzli_over_zahajeni(PDO $pdo, array $tvor, array $vstup, array $kouzloInfo): ?string
+{
+    $katalog = dracak_vtt_polozka_katalog('kouzlo', $kouzloInfo['id']);
+    if (!$katalog) {
+        return 'Kouzlo nenalezeno v katalogu.';
+    }
+    $chyba = dracak_vtt_kouzli_over_cil_trvani($pdo, $tvor, $vstup, $kouzloInfo, $katalog);
+    if ($chyba !== null) {
+        return $chyba;
+    }
     $entity = dracak_vtt_entity_row($tvor['typ_entity'], (int)$tvor['entita_id']);
     $cena = dracak_vtt_kouzli_cena($tvor, $entity, $katalog, $vstup);
     if ($cena !== null && (int)$entity['aktualni_magenergie'] < $cena) {
         return 'Nedostatek magenergie (máš ' . (int)$entity['aktualni_magenergie'] . ', kouzlo stojí ' . $cena . ').';
     }
     return null;
+}
+
+// Kouzla „ihned“ připojená k jiné akci (pohyb, útok, obrana…): vyvolání „ihned“ = 0 akcí (rozhodnutí uživatele 2026-11-04), kouzlo se vyhodnotí ve chvíli té akce.
+// Jedna akce jich unese víc (nejvýš DRACAK_VTT_IHNED_MAX). Seznam: [['kouzlo_id', 'cil_token_id'?, 'zbyva_kol'?, 'magy'?], …].
+const DRACAK_VTT_IHNED_MAX = 5;
+
+// Ověření celého seznamu před jakýmkoli zápisem: kouzlo „ihned“ (ne s akcemi kouzlení), které postava zná, cíl, dosah, trvání a dost magenergie na všechna dohromady.
+function dracak_vtt_kouzli_ihned_over(PDO $pdo, array $tvor, $seznam, bool $jePj): ?string
+{
+    if ($seznam === null || $seznam === [] || $seznam === '') {
+        return null;
+    }
+    if (!is_array($seznam) || !array_is_list($seznam)) {
+        return 'Kouzla ihned mají být seznam.';
+    }
+    if (count($seznam) > DRACAK_VTT_IHNED_MAX) {
+        return 'K jedné akci jde připojit nejvýš ' . DRACAK_VTT_IHNED_MAX . ' kouzel „ihned“.';
+    }
+    if (!in_array($tvor['typ_entity'], ['postava', 'nestvura_instance'], true)) {
+        return 'Kouzlit smí jen postava nebo nestvůra.';
+    }
+    $entity = dracak_vtt_entity_row($tvor['typ_entity'], (int)$tvor['entita_id']);
+    $celkemMagu = 0;
+    foreach ($seznam as $k) {
+        if (!is_array($k)) {
+            return 'Neplatné kouzlo „ihned“.';
+        }
+        $id = (int)($k['kouzlo_id'] ?? 0);
+        $info = $id > 0 ? dracak_vtt_kouzlo_info($pdo, $id) : null;
+        if ($info === null) {
+            return 'Kouzlo nenalezeno.';
+        }
+        if ($info['akci'] !== 0) {
+            return 'Kouzlo ' . $info['nazev'] . ' nemá vyvolání „ihned“ — sesílá se akcemi kouzlení, ne připojené k jiné akci.';
+        }
+        if (!$jePj) {
+            $q = $pdo->prepare('SELECT 1 FROM postava_zna_kouzlo WHERE postava_id = ? AND kouzlo_id = ?');
+            $q->execute([(int)$tvor['entita_id'], $id]);
+            if ($tvor['typ_entity'] !== 'postava' || !$q->fetchColumn()) {
+                return 'Tohle kouzlo postava nezná.';
+            }
+        }
+        $katalog = dracak_vtt_polozka_katalog('kouzlo', $id);
+        if (!$katalog) {
+            return 'Kouzlo nenalezeno v katalogu.';
+        }
+        $chyba = dracak_vtt_kouzli_over_cil_trvani($pdo, $tvor, $k, $info, $katalog);
+        if ($chyba !== null) {
+            return $chyba;
+        }
+        $celkemMagu += (int)dracak_vtt_kouzli_cena($tvor, $entity, $katalog, $k);
+    }
+    if ($celkemMagu > 0 && $entity !== null && dracak_vtt_ma_magenergii($entity) && (int)$entity['aktualni_magenergie'] < $celkemMagu) {
+        return 'Nedostatek magenergie na všechna kouzla „ihned“ (máš ' . (int)$entity['aktualni_magenergie'] . ', stojí dohromady ' . $celkemMagu . ').';
+    }
+    return null;
+}
+
+// Vyhodnotí kouzla „ihned“ ve chvíli akce (uvnitř transakce): každé zaplatí magy, hodí kostky, zraní nebo uzdraví cíl a nasadí efekty (stejně jako „Použít“ v deníku).
+// $info = tvorové na mapě (pro jména cílů v logu). Vrací [['kouzlo', 'cil_label', 'hp', 'ceka_na_past']].
+function dracak_vtt_kouzli_ihned_proved(PDO $pdo, array $user, int $svetId, int $mapaId, array $tvor, $seznam, array $info = []): array
+{
+    $vysledky = [];
+    if (!is_array($seznam)) {
+        return $vysledky;
+    }
+    foreach ($seznam as $k) {
+        $id = (int)$k['kouzlo_id'];
+        $kouzlo = dracak_vtt_kouzlo_info($pdo, $id);
+        $cil = dracak_vtt_kouzli_cil($pdo, $tvor, $k);
+        $katalog = dracak_vtt_polozka_katalog('kouzlo', $id);
+        if ($kouzlo === null || $cil === null || !$katalog) {
+            continue;
+        }
+        $entity = dracak_vtt_entity_row($tvor['typ_entity'], (int)$tvor['entita_id']);
+        $cena = dracak_vtt_kouzli_cena($tvor, $entity, $katalog, $k);
+        $kolaZadano = array_key_exists('zbyva_kol', $k) && $k['zbyva_kol'] !== '' && $k['zbyva_kol'] !== null;
+        $v = dracak_vtt_kouzli_seslat($pdo, $user, $svetId, $mapaId, $tvor, $id, $cil, ['zbyva_kol' => $kolaZadano ? (int)$k['zbyva_kol'] : null, 'cena' => $cena]);
+        $cilLabel = isset($info[$cil['token_id']]) ? (string)$info[$cil['token_id']]['label'] : null;
+        dracak_vtt_kouzli_udalost($svetId, $mapaId, (int)$user['id'], $tvor, 'ihned', $kouzlo, null, null,
+            ['magy' => $cena, 'cil_label' => $cilLabel, 'cil_sam' => $cil['sam'], 'hp' => $v['hp'], 'ceka_na_past' => count($v['ceka_na_past']) > 0]);
+        $vysledky[] = ['kouzlo' => $kouzlo['nazev'], 'cil_label' => $cilLabel, 'hp' => $v['hp'], 'ceka_na_past' => $v['ceka_na_past']];
+    }
+    return $vysledky;
 }
 
 // Událost „kouzleni_stav“ do logu (klient ji vypíše; skrytým tvorům patří mezi tajné události).
