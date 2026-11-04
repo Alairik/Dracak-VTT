@@ -38,6 +38,32 @@ $stav = dracak_migrace_stav($pdo);
 $cekajici = array_values(array_filter($stav['soubory'], static fn(array $s): bool => !$s['pouzito']));
 $hotove = array_values(array_filter($stav['soubory'], static fn(array $s): bool => $s['pouzito']));
 $e = static fn($v): string => htmlspecialchars((string)$v, ENT_QUOTES);
+
+// Co aplikace ve své databázi opravdu vidí: název databáze a sloupce, které přidává ruční SQL (docs/sql-k-rucnimu-spusteni.sql). Slouží ke kontrole po spuštění
+// ručního SQL — číslo z phpMyAdminu může být z jiné databáze, než jakou používá web; tahle tabulka je z pohledu webu.
+$ruckySql = [
+    ['aktivni_efekty', 'kouzlo_id', '0113 — kouzlo, které tvor sesílá'],
+    ['aktivni_efekty', 'akci_celkem', '0113 — kolik akcí kouzlení kouzlo vyžaduje'],
+    ['aktivni_efekty', 'akci_hotovo', '0113 — kolik akcí kouzlení proběhlo'],
+    ['mapy', 'mil_na_1000px', '0110 — měřítko světové mapy'],
+    ['tokeny', 'svetlo_zbyva', '0109 — doba hoření světla'],
+    ['svet', 'aktualni_smena', '0109 — čas ve světě'],
+    ['tokeny', 'videni_noc_sahy', '0108 — noční vidění'],
+    ['mapy', 'osvetleni', '0107 — osvětlení mapy'],
+];
+$databaze = '';
+$sloupceDb = [];
+try {
+    $databaze = (string)$pdo->query('SELECT DATABASE()')->fetchColumn();
+    foreach ($pdo->query(
+        'SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME IN ("aktivni_efekty", "mapy", "tokeny", "svet")'
+    )->fetchAll(PDO::FETCH_NUM) as [$t, $c]) {
+        $sloupceDb[$t . '.' . $c] = true;
+    }
+} catch (Throwable $ex) {
+    // information_schema nedostupné — tabulka se jen neukáže
+}
 ?>
 <!doctype html>
 <html lang="cs">
@@ -108,6 +134,21 @@ $e = static fn($v): string => htmlspecialchars((string)$v, ENT_QUOTES);
           <tbody>
             <?php foreach (array_reverse($hotove) as $s): ?>
               <tr><td><code><?= $e($s['soubor']) ?></code></td><td><?= $e($s['kdy']) ?></td></tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table></div>
+      </details>
+    <?php endif; ?>
+
+    <?php if ($sloupceDb): ?>
+      <details style="max-width:760px; margin:16px 0;" id="rucniSqlStav">
+        <summary>Co aplikace v databázi vidí (kontrola ručního SQL)</summary>
+        <p class="note" style="margin-top:8px;">Databáze, kterou web používá: <code><?= $e($databaze) ?></code>. Když tu u sloupce chybí ✓, ruční SQL pro něj ještě neproběhlo v téhle databázi.</p>
+        <div class="table-wrap"><table class="table" style="margin-top:8px;">
+          <thead><tr><th style="text-align:left;">Sloupec</th><th style="text-align:left;">K čemu</th><th>Je tu</th></tr></thead>
+          <tbody>
+            <?php foreach ($ruckySql as [$t, $c, $popis]): $je = isset($sloupceDb[$t . '.' . $c]); ?>
+              <tr><td><code><?= $e($t . '.' . $c) ?></code></td><td><?= $e($popis) ?></td><td data-sloupec="<?= $e($t . '.' . $c) ?>"><?= $je ? '✓' : '✗ chybí' ?></td></tr>
             <?php endforeach; ?>
           </tbody>
         </table></div>
