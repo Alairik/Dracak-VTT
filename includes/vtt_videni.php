@@ -83,6 +83,23 @@ function dracak_vtt_videni_funkce(PDO $pdo): bool
     return $cache[$klic];
 }
 
+// Je v DB sloupec doby hoření světla (migrace 0109)? Bez něj se slábnutí dohořívajícího světla nepočítá.
+function dracak_vtt_videni_zbyva_funkce(PDO $pdo): bool
+{
+    static $cache = [];
+    $klic = spl_object_id($pdo);
+    if (!isset($cache[$klic])) {
+        try {
+            $cache[$klic] = (int)$pdo->query(
+                'SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = "tokeny" AND COLUMN_NAME = "svetlo_zbyva"'
+            )->fetchColumn() === 1;
+        } catch (Throwable $e) {
+            $cache[$klic] = false;
+        }
+    }
+    return $cache[$klic];
+}
+
 // Je v DB sloupec nočního vidění (migrace 0108)? Bez něj stav „noc“ funguje jako „tma“ a noční vidění tvorů se nepočítá.
 function dracak_vtt_videni_noc_funkce(PDO $pdo): bool
 {
@@ -150,12 +167,16 @@ function dracak_vtt_videni_blokovano(array $zdi, float $ax, float $ay, float $bx
 // Zdroje světla na mapě: [x, y, r (px)]. Svítí i skrytý token (např. pochodeň na zdi, kterou hráči nemají vidět jako předmět).
 function dracak_vtt_videni_zdroje(PDO $pdo, int $mapaId, float $pxSah): array
 {
-    $q = $pdo->prepare('SELECT x, y, svetlo_sahy FROM tokeny WHERE mapa_id = ? AND svetlo_sahy IS NOT NULL AND svetlo_sahy > 0
+    $zbyva = dracak_vtt_videni_zbyva_funkce($pdo);
+    $q = $pdo->prepare('SELECT x, y, svetlo_sahy' . ($zbyva ? ', svetlo_zbyva' : '') . ' FROM tokeny WHERE mapa_id = ? AND svetlo_sahy IS NOT NULL AND svetlo_sahy > 0
                           AND (svetlo_typ IS NULL OR svetlo_typ NOT IN ("tma", "temnota"))');
     $q->execute([$mapaId]);
     $zdroje = [];
     foreach ($q->fetchAll() as $r) {
-        $zdroje[] = ['x' => (float)$r['x'], 'y' => (float)$r['y'], 'r' => (float)$r['svetlo_sahy'] * $pxSah];
+        $zdroje[] = [
+            'x' => (float)$r['x'], 'y' => (float)$r['y'], 'r' => (float)$r['svetlo_sahy'] * $pxSah,
+            'zbyva' => isset($r['svetlo_zbyva']) && $r['svetlo_zbyva'] !== null ? (int)$r['svetlo_zbyva'] : null,
+        ];
     }
     return $zdroje;
 }
@@ -253,7 +274,7 @@ function dracak_vtt_videni_vypocet(PDO $pdo, array $mapa, int $ucetId): ?array
             $osvetleneSeznam[] = [$idx, $b['x'], $b['y']];
         }
         if ($pokryti) {
-            $zdrojeGeom[] = ['x' => $z['x'], 'y' => $z['y'], 'r' => $r, 'pokryti' => $pokryti];
+            $zdrojeGeom[] = ['x' => $z['x'], 'y' => $z['y'], 'r' => $r, 'zbyva' => $z['zbyva'] ?? null, 'pokryti' => $pokryti];
         }
     }
 
@@ -299,6 +320,13 @@ function dracak_vtt_videni_vypocet(PDO $pdo, array $mapa, int $ucetId): ?array
     return ['rozmery' => $roz, 'osvetleno' => $osvetleno, 'videno' => $videno, 'divaci' => $divaci, 'zdi' => $zdi, 'px_sah' => $pxSah, 'zony' => $zony, 'zdroje_geom' => $zdrojeGeom];
 }
 
+// Dohořívající světlo jen slábne na pohled (rozhodnutí uživatele 2026-11-04): v posledních třech směnách hoření (zbývá 3 → 2 → 1) klesá „síla“ z 1 na ⅓. Dosah podle
+// pravidel (pochodeň 6 sáhů) se tím nemění, vidí se stejně daleko, jen je světlo pohledem slabší a menší. Světlo bez limitu hoření má sílu 1.
+function dracak_vtt_svetlo_sila(?int $zbyva): float
+{
+    return $zbyva === null ? 1.0 : round(max(0.1, min(1.0, $zbyva / 3)), 2);
+}
+
 // Geometrie pro vykreslení světla a stínů (assets/js/svetlo_stiny.js): plynulé světlo a stín za zdmi místo kostiček mlhy. Ke klientovi se dostane jen to,
 // co hráč smí vědět, a ne zdi (ani skryté): mnohoúhelníky viditelnosti jeho vlastních tokenů a těch zdrojů světla, které osvětlují aspoň jednu buňku,
 // kterou hráč právě vidí (zdroj, jehož světlo hráč nijak nezahlédne, se vůbec neposílá). Mnohoúhelníky jsou ořezané čtvercem kolem bodu (půlstrana = dosah),
@@ -320,7 +348,7 @@ function dracak_vtt_videni_geometrie(array $mapa, array $v): array
             continue;
         }
         $svetla[] = [
-            'x' => round($z['x'], 1), 'y' => round($z['y'], 1), 'r' => round($z['r'], 1),
+            'x' => round($z['x'], 1), 'y' => round($z['y'], 1), 'r' => round($z['r'], 1), 'sila' => dracak_vtt_svetlo_sila($z['zbyva'] ?? null),
             'poly' => dracak_vtt_videni_polygon($v['zdi'], $z['x'], $z['y'], $z['r'] + 2),
         ];
     }
@@ -346,6 +374,36 @@ function dracak_vtt_videni_geometrie(array $mapa, array $v): array
         ];
     }
     return ['px_sah' => $px, 'svetla' => $svetla, 'divaci' => $divaci];
+}
+
+// Přehled světla pro PJ (přepínač „Ukázat světlo“): všechny zdroje světla na mapě se stínem za zdmi, bez diváků a bez paměti mlhy — PJ vidí, jak vypadá osvětlení mapy.
+// Zdroj v zóně Tma nesvítí, v zóně Temnota svítí nejdál 0,3 sáhu (stejně jako ve výpočtu vidění). Vrací null, když na mapě vidění neplatí.
+function dracak_vtt_videni_geometrie_pj(PDO $pdo, array $mapa): ?array
+{
+    if (!dracak_vtt_videni_aktivni($pdo, $mapa)) {
+        return null;
+    }
+    require_once __DIR__ . '/vtt_polygon.php';
+    $mapaId = (int)$mapa['id'];
+    $roz = dracak_vtt_mlha_rozmery($mapa);
+    $px = dracak_vtt_px_na_sah($mapa) ?? (float)$roz['bunka_px'];
+    $zdi = dracak_vtt_videni_zdi($pdo, $mapaId);
+    $zony = dracak_vtt_videni_zony($pdo, $mapaId, $px);
+    $svetla = [];
+    foreach (dracak_vtt_videni_zdroje($pdo, $mapaId, $px) as $z) {
+        $r = $z['r'];
+        if ($zony && dracak_vtt_videni_v_zone($zony, $z['x'], $z['y'], 'tma')) {
+            continue;
+        }
+        if ($zony && dracak_vtt_videni_v_zone($zony, $z['x'], $z['y'], 'temnota')) {
+            $r = min($r, DRACAK_VTT_TEMNOTA_SVETLO_SAHY * $px);
+        }
+        $svetla[] = [
+            'x' => round($z['x'], 1), 'y' => round($z['y'], 1), 'r' => round($r, 1), 'sila' => dracak_vtt_svetlo_sila($z['zbyva'] ?? null),
+            'poly' => dracak_vtt_videni_polygon($zdi, $z['x'], $z['y'], $r + 2),
+        ];
+    }
+    return ['px_sah' => $px, 'svetla' => $svetla, 'divaci' => [], 'bez_divaku' => true];
 }
 
 // Přidá vidět teď do trvalé paměti hráče (mlha_valky) a vrátí výpočet. Volá se při pohybu hráčova tokenu a při načtení mlhy.

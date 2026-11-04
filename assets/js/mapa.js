@@ -310,10 +310,47 @@ function renderMlhaSvetlo(ctx, w, h, stav, bin) {
   ctx.globalAlpha = 1;
   svetloStiny.dracakSvetloVyrizni(ctx, w, h, stav.geom);
 }
+// Přepínač „Ukázat světlo a stíny“ (jen PJ, okno Mlha): PJ vidí celou mapu zatemněnou a v ní světlo všech zdrojů se stínem za zdmi, bez ohledu na to, co vidí hráči.
+// Ve výběru hráče v okně Mlha má přednost jeho pohled. Pamatuje se v prohlížeči po mapách.
+const SVETLO_PJ_KLIC = 'dracak_svetlo_pj_' + MAPA_ID;
+let svetloPj = false;
+try { svetloPj = localStorage.getItem(SVETLO_PJ_KLIC) === '1'; } catch (e) { /* bez paměti prohlížeče */ }
+function osvezitSvetloPj() {
+  fetch('api/svetlo_pj.php?mapa_id=' + MAPA_ID, {cache: 'no-store'})
+    .then(r => r.json())
+    .then((d) => {
+      if (!svetloPj || mlhaNahledUcetId) return;
+      const w = mapImgEl.naturalWidth || mapWrap.clientWidth;
+      const h = mapImgEl.naturalHeight || mapWrap.clientHeight;
+      if (!w || !h) return;
+      mlhaCanvas.width = w;
+      mlhaCanvas.height = h;
+      const ctx = mlhaCanvas.getContext('2d');
+      ctx.clearRect(0, 0, w, h);
+      if (!d || !d.videni || !d.geom) return;   // na mapě „Světlo“ není co ukazovat
+      ctx.fillStyle = 'rgba(8,8,10,0.62)';
+      ctx.fillRect(0, 0, w, h);
+      svetloStiny.dracakSvetloVyrizni(ctx, w, h, d.geom);
+    })
+    .catch(() => {});
+}
+const svetloPjChk = document.getElementById('svetloPjChk');
+if (svetloPjChk) {
+  svetloPjChk.checked = svetloPj;
+  svetloPjChk.addEventListener('change', () => {
+    svetloPj = svetloPjChk.checked;
+    try { localStorage.setItem(SVETLO_PJ_KLIC, svetloPj ? '1' : '0'); } catch (e) { /* bez paměti prohlížeče */ }
+    osvezitMlhu();
+  });
+}
 function osvezitMlhu() {
   if (!mlhaCanvas) return;
   if (IS_PJ_OR_ADMIN) {
-    if (!mlhaNahledUcetId) { renderMlha(null); return; }
+    if (!mlhaNahledUcetId) {
+      if (svetloPj) { osvezitSvetloPj(); return; }
+      renderMlha(null);
+      return;
+    }
     fetch('api/mlha_nahled.php?mapa_id=' + MAPA_ID + '&ucet_id=' + mlhaNahledUcetId)
       .then(r => r.json())
       .then(renderMlha)
@@ -3237,6 +3274,7 @@ function applyEvent(u) {
     if (naTeteMape && ('svetlo' in zm || 'svetlo_typ' in zm || 'infra' in zm || 'noc' in zm || 'studeny' in zm)) { obnovitMlhuPoPollu = true; renderSvetla(); }
   } else if (u.typ === 'cas_zmena') {
     zobrazitCasSveta(u.payload);
+    if (naTeteMape) obnovitMlhuPoPollu = true;   // dohořívající světlo slábne (mapa Noc / Tma)
     if (u.payload.zhasla && u.payload.zhasla.length) logLine('Čas ' + (u.payload.text || '') + ' — ' + u.payload.zhasla.length + ' světl' + (u.payload.zhasla.length === 1 ? 'o dohořelo' : 'a dohořela') + '.');
   } else if (u.typ === 'kostka_hod') {
     logLine((u.payload.hodil || '?') + ' hodil ' + u.payload.notace + ': [' + u.payload.hody.join(', ') + ']'

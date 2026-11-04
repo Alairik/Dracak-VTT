@@ -74,6 +74,45 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   // PJ otevře dveře — tady jen kontrola, že přepnutí na jiné osvětlení mapy nic nerozbije
   ok(hr.chybyJs.length === 0, 'žádná chyba JavaScriptu u hráče: ' + hr.chybyJs.join('|'));
 
+  // --- dohořívající světlo slábne (sila = zbývající směny / 3, nejvýš 1), dosah podle pravidel se nemění ---
+  await api(pj, 'token_uprava', { token_id: h, zmeny: { zbyva: 3 } });
+  g = await geomHrace();
+  ok(g.svetla[0].sila === 1 && g.svetla[0].r === 420, 'pochodeň se 3 směnami zbývá hoří naplno (síla 1, dosah 420 px)');
+  await api(pj, 'token_uprava', { token_id: h, zmeny: { zbyva: 1 } });
+  g = await geomHrace();
+  ok(g.svetla[0].sila === 0.33 && g.svetla[0].r === 420, 'poslední směna: síla 0,33, dosah podle pravidel beze změny: ' + JSON.stringify([g.svetla[0].sila, g.svetla[0].r]));
+  await hr.reload();
+  await hr.waitForFunction(() => { const c = document.getElementById('mlhaCanvas'); return c && c.width > 100; }, null, { timeout: 15000 });
+  await hr.waitForTimeout(1500);
+  const [slabyStred, slabyKraj] = await alfa([[665, 470], [665, 640]]);
+  ok(slabyStred > uStred + 20, 'dohořívající světlo je v téže vzdálenosti tmavší než plné (' + slabyStred + ' > ' + uStred + ')');
+  await api(pj, 'token_uprava', { token_id: h, zmeny: { zbyva: 3 } });
+  await api(pj, 'cas_posun', { svet_id: 1, smeny: 1 });
+  g = await geomHrace();
+  ok(g.svetla[0].sila === 0.67, 'po posunu času o směnu zbývají 2 → síla 0,67: ' + g.svetla[0].sila);
+  await api(pj, 'token_uprava', { token_id: h, zmeny: { zbyva: 3 } });
+
+  // --- přehled světla pro PJ: všechna světla, bez diváků; hráč ho nedostane ---
+  const prehled = await (await pj.request.get(BASE + '/hra/api/svetlo_pj.php?mapa_id=' + MAPA)).json();
+  ok(prehled.videni === true && prehled.geom.bez_divaku === true && prehled.geom.divaci.length === 0 && prehled.geom.svetla.length === 1, 'PJ dostane přehled světla bez diváků: ' + JSON.stringify([prehled.videni, prehled.geom && prehled.geom.svetla.length]));
+  ok((await hr.request.get(BASE + '/hra/api/svetlo_pj.php?mapa_id=' + MAPA)).status() === 403, 'hráč přehled světla nedostane (403)');
+  // přepínač v okně Mlha: PJ uvidí zatemněnou mapu se světlem a stínem za zdí
+  await pj.goto(BASE + '/hra/mapa.php?id=' + MAPA);
+  await pj.waitForFunction(() => !!document.getElementById('svetloPjChk'), null, { timeout: 15000 });
+  const alfaPj = (body) => pj.evaluate((b) => { const c = document.getElementById('mlhaCanvas'); const x = c.getContext('2d'); return b.map(([px, py]) => x.getImageData(px, py, 1, 1).data[3]); }, body);
+  await pj.waitForTimeout(800);
+  ok((await alfaPj([[665, 315]]))[0] === 0, 'bez přepínače PJ mlhu ani tmu nevidí (plátno prázdné)');
+  await pj.evaluate(() => { const c = document.getElementById('svetloPjChk'); c.checked = true; c.dispatchEvent(new Event('change')); });
+  await pj.waitForFunction(() => { const c = document.getElementById('mlhaCanvas'); return c && c.width > 100 && c.getContext('2d').getImageData(1900, 1400, 1, 1).data[3] > 100; }, null, { timeout: 15000 });
+  const [pjZdroj, pjPredZdi, pjZaZdi, pjDaleko] = await alfaPj([[665, 315], [850, 315], [980, 315], [1900, 1400]]);
+  ok(pjZdroj < 90 && pjPredZdi < 140, 'PJ vidí světlo kolem pochodně (' + pjZdroj + ', před zdí ' + pjPredZdi + ')');
+  ok(pjZaZdi > pjPredZdi + 60, 'PJ vidí stín za zdí (' + pjZaZdi + ' proti ' + pjPredZdi + ' před zdí)');
+  ok(pjDaleko > 130 && pjDaleko < 180, 'daleko od světla je mapa zatemněná, ne zcela zhasnutá (' + pjDaleko + ')');
+  await pj.evaluate(() => { const c = document.getElementById('svetloPjChk'); c.checked = false; c.dispatchEvent(new Event('change')); });
+  await pj.waitForTimeout(800);
+  ok((await alfaPj([[1900, 1400]]))[0] === 0, 'po vypnutí přepínače je plátno zase prázdné');
+  ok(pj.chybyJs.length === 0, 'žádná chyba JavaScriptu u PJ: ' + pj.chybyJs.join('|'));
+
   sql(`delete from zdi where mapa_id=${MAPA}`);
   await api(pj, 'mapa_osvetleni', { mapa_id: MAPA, osvetleni: 'den' });
   await browser.close();

@@ -484,6 +484,9 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
       <option value="<?= $klic ?>" <?= ($mapa['osvetleni'] ?? 'den') === $klic ? 'selected' : '' ?>><?= htmlspecialchars($klic === 'den' ? 'Světlo (mlha jako dosud)' : $nazevOsv) ?></option>
       <?php endforeach; ?>
     </select>
+    <label style="display:flex;align-items:center;gap:6px;font-weight:400;margin-top:8px;" title="Zatemní tvoji mapu a ukáže světlo všech zdrojů se stínem za zdmi — vidíš jen ty, hráči nic nepoznají. Funguje na mapě Noc a Tma.">
+      <input type="checkbox" id="svetloPjChk"> Ukázat světlo a stíny (vidíš jen ty)
+    </label>
     <p class="note" style="margin-top:4px;">Stupnice tmy podle knihy (Lektvar sovích očí): řídká tma (úplněk), tma (hvězdy), hustá tma, naprostá tma; pološero je jako den. Ve tmě hráč vidí jen to, co osvítí pochodeň, lucerna nebo jiný zdroj světla (nastavíš u tokenu). Tvorové s nočním viděním (např. lupič se Zlepšením zraku) vidí navíc do nastaveného dosahu — v naprosté tmě a v kouzelné tmě ne. Kudy prošel, zůstane ztlumeně; nestvůry mimo dohled nevidí. Funguje při zapnuté mlze a nastaveném gridu.</p>
     <?php endif; ?>
     <p class="note" style="margin-top:4px;">Vypnuté = hráči vidí celou mapu bez odhalování, stejně jako ty. Mlha vyžaduje nastavený grid (respektuje jeho buňky/hexy) — bez gridu nejde zapnout.</p>

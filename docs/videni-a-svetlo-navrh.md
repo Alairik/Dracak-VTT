@@ -84,5 +84,9 @@ Zadání: „zdi vrhají stín; stín od lucerny, aby se pomalu zvyšovala inten
   vyřízne světlo — radiální přechod od zdroje ke kraji ořezaný mnohoúhelníkem zdroje (stín za zdí) a mnohoúhelníkem diváka (co je mimo jeho zorné pole, neosvětlí nic), s polostínem
   (hrany stínu přecházejí plynule, ~0,1 sáhu) a jemným teplým nádechem u zdrojů. Divák vidí i své nejbližší okolí a s nočním viděním do dosahu (slabší než světlo).
 - **Zatím jen zdi** (uživatel: „věci, spíše zatím jen zdi“): tokeny a předměty stín nevrhají. Stejné vykreslení se použije u PJ náhledu cizí mlhy.
-- Kdy světlo dohoří, mění se geometrie sama (zdroj zmizí z tokenu → další `mlha_stav`); slábnutí dohořívající pochodně v posledních směnách zatím není (otázka na uživatele).
+- **Dohořívající světlo slábne** (rozhodnutí uživatele 2026-11-04): v posledních třech směnách hoření (zbývá 3 → 2 → 1) klesá „síla“ světla z 1 na ⅓ — na pohled je menší a slabší
+  (`dracak_vtt_svetlo_sila`, pole `sila` v geometrii; mění se po každém posunu času, událost `cas_zmena` obnoví mlhu). **Jen vzhled:** dosah podle pravidel (pochodeň 6 sáhů) a co kdo vidí
+  po buňkách se nemění, dokud světlo nedohoří. Světlo bez limitu hoření svítí naplno.
+- **Přepínač „Ukázat světlo a stíny“ (jen PJ)** v okně Mlha: PJ vidí celou mapu zatemněnou a v ní světlo všech zdrojů se stínem za zdmi (`hra/api/svetlo_pj.php`, `dracak_vtt_videni_geometrie_pj`),
+  bez ohledu na to, co vidí hráči; zóny Tma a Temnota se zohlední jen u zdrojů v nich. Při výběru hráče v okně Mlha má přednost jeho pohled. Pamatuje se v prohlížeči po mapách. Hráč endpoint nedostane (403).
 - Testy: `tests/unit/videni_polygon_unit.php` (geometrie), `tests/e2e/svetlo_stiny_ui.js` (geometrie z API a pixely plátna).

@@ -62,13 +62,16 @@ export function dracakSvetloVyrizni(ctx, w, h, geom) {
   c.scale(lw / w, lh / h);
   c.globalCompositeOperation = 'lighter';
 
-  // Zdroje světla: přechod ořezaný mnohoúhelníkem, kam zdroj dosvítí (za zdí je stín).
+  // Zdroje světla: přechod ořezaný mnohoúhelníkem, kam zdroj dosvítí (za zdí je stín). Dohořívající světlo (sila < 1) je na pohled menší a slabší,
+  // dosah podle pravidel se tím nemění.
   for (const s of geom.svetla || []) {
+    const sila = typeof s.sila === 'number' ? Math.max(0.1, Math.min(1, s.sila)) : 1;
+    const rKresli = s.r * (0.5 + 0.5 * sila);
     c.save();
     svetloCestaMnohouhelniku(c, s.poly);
     c.clip();
-    c.fillStyle = svetloPrechod(c, s.x, s.y, s.r, 1);
-    c.fillRect(s.x - s.r, s.y - s.r, s.r * 2, s.r * 2);
+    c.fillStyle = svetloPrechod(c, s.x, s.y, rKresli, 0.35 + 0.65 * sila);
+    c.fillRect(s.x - rKresli, s.y - rKresli, rKresli * 2, rKresli * 2);
     c.restore();
   }
   // Divák: pár kroků kolem sebe vidí vždycky (vlastní políčko ani ve tmě nezmizí) a s nočním viděním do jeho dosahu (slabší než světlo, plynule slábne).
@@ -85,17 +88,19 @@ export function dracakSvetloVyrizni(ctx, w, h, geom) {
     }
     c.restore();
   }
-  // Vidět je jen to, co leží v zorném poli některého diváka (světlo za jeho zády za zdí nic neosvětlí).
-  c.globalCompositeOperation = 'destination-in';
-  c.fillStyle = '#000';
-  c.beginPath();
-  for (const d of geom.divaci || []) {
-    for (let i = 0; i < d.poly.length; i++) {
-      if (i === 0) c.moveTo(d.poly[i][0], d.poly[i][1]); else c.lineTo(d.poly[i][0], d.poly[i][1]);
+  // Vidět je jen to, co leží v zorném poli některého diváka (světlo za jeho zády za zdí nic neosvětlí). Přehled světla pro PJ divaky nemá (bez_divaku).
+  if (!geom.bez_divaku) {
+    c.globalCompositeOperation = 'destination-in';
+    c.fillStyle = '#000';
+    c.beginPath();
+    for (const d of geom.divaci || []) {
+      for (let i = 0; i < d.poly.length; i++) {
+        if (i === 0) c.moveTo(d.poly[i][0], d.poly[i][1]); else c.lineTo(d.poly[i][0], d.poly[i][1]);
+      }
+      c.closePath();
     }
-    c.closePath();
+    c.fill('nonzero');
   }
-  c.fill('nonzero');
 
   // Polostín: hrany stínu se změkčí (ctx.filter je v Safari nedostupný — tam se světlo zmenší a zase zvětší, což rozmaže podobně).
   const polomer = Math.max(1, (geom.px_sah || 50) * SVETLO_POLOSTIN_SAHY * (lw / w));
