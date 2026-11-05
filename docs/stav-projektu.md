@@ -20,7 +20,7 @@ neodhadování mechaniky). **Fáze 1 a 2 ze sekce "Rozpracováno:
 cestování..." jsou v kódu hotové**; **Fáze 1b (váha/kontejnery) je
 hotová v kódu, stejně jako Fáze 2–5 (zvířata, povozy, kalkulačka cesty,
 přepínače) — celé "cestování, naložení, únava" je tím hotové a nasazené,
-ruční SQL nečeká nic (poslední blok I — automatické seslání kouzla, migrace `0114` — uživatel provedl 2026-11-04, kontrola vyšla 1; zbývá jen kliknout na Změny databáze → Spustit čekající změny).** Další velký cíl je sekce "Plán: náhrada Owlbear
+ruční SQL nečeká nic (poslední blok I — automatické seslání kouzla, migrace `0114` — uživatel provedl 2026-11-04, kontrola vyšla 1; Změny databáze → Spustit čekající změny uživatel spustil 2026-11-05).** Další velký cíl je sekce "Plán: náhrada Owlbear
 Rodeo" níž. Stav předchozí
 konverzace je zapsaný přesně proto, aby ses nemusel/a ptát na věci, co
 už byly rozhodnuté (viz "Architektonická rozhodnutí" a celá sekce
@@ -51,7 +51,7 @@ na DB postavené od nuly. Co lze dělat **bez** ptaní (vždy s testy, `tests/ru
 **Čeká na rozhodnutí uživatele (neřešit samo; 2026-11-04 řekl „zbylé body jen zatím zapiš“):** (1) ostatní značky Zlatého tetování mimo Dikobraza (mechanika?) — doporučení: začít Gepardem (dvojnásobná rychlost pohybu a rozběhu) a Kobrou (2 okamžité akce, smí přerušit cizí kolo); Pegas/Gryf: označení „na zemi“ vypadá na špatném řádku (ověřit v tištěné knize, viz kontrolní seznam); (2) druh zbraně u 13 položek
 (`docs/kontrolni-seznam-neuplnych-mist.md`: Fuuma shuriken, Atlatl, Řetězový meč, Khakkhara, Hůl „Minami no mori“, Rachejtle); (3) které kroky deníku v2 (figurína, Dovednosti, Společníci) a s jakými pravidly;
 (4) nastavení subdomény `vtt` u WEDOSu na složku `vtt` (hezká adresa bez `/vtt/`);
-(5) ~~kouzlení v souboji~~ — **rozhodnuto 2026-11-04, hotovo včetně počítání akcí podle vyvolání (viz „Kouzlení v souboji“ níž)**; kouzlo se sesílá samo (etapa 1) a kouzla „ihned“ se vyhodnocují při jiné akci nebo v obraně (etapa 2) — hotovo, jen čeká na ruční SQL blok I.
+(5) ~~kouzlení v souboji~~ — **rozhodnuto 2026-11-04, hotovo včetně počítání akcí podle vyvolání (viz „Kouzlení v souboji“ níž)**; kouzlo se sesílá samo (etapa 1) a kouzla „ihned“ se vyhodnocují při jiné akci nebo v obraně (etapa 2) — hotovo a nasazené, ruční SQL blok I i Změny databáze uživatel provedl 2026-11-05.
 (6) **boj ve tmě — automatická ztráta iniciativy** (h1613 b10738: útočník bez zpráv o protivníkovi vždy ztrácí iniciativu a nemůže útočit v kole, kdy na něj protivník nezaútočí) — dnes se řeší jen postih −5 / −4 / −2; kniha mluví o dvojici útočník–konkrétní protivník, engine pořadí tahů po dvojicích nezná;
 (7) **Lovcův Příkrov stínů** (h1003 b7357–b7359): zóna, kde zdroje světla zhasnou a Lovec vidí „jako by tam tma nebyla“ — kniha říká „přirozená tma“, ale nerozlišuje, jestli v ní funguje infravidění ostatních a jestli ji vidí i spolubojovníci; nejbližší hotový stavební kámen je zóna Temnota.
 
