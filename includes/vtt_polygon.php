@@ -61,13 +61,67 @@ function dracak_vtt_videni_polygon(array $zdi, float $ox, float $oy, float $dosa
         }
     }
     sort($uhly);
+    // Sdílené rohy (město: každý roh domu patří dvěma až čtyřem zdem) dávají stejný úhel víckrát; stačí jednou.
+    $unikatni = [];
+    foreach ($uhly as $a) {
+        if ($unikatni === [] || $a - $unikatni[count($unikatni) - 1] > 1e-12) {
+            $unikatni[] = $a;
+        }
+    }
+    $uhly = $unikatni;
+    $pocet = count($uhly);
+
+    // Ke každému paprsku jen úsečky, jejichž úhlový rozsah (z bodu pohledu) paprsek zasahuje — nejbližší zásah se pak hledá mezi pár kandidáty místo mezi všemi zdmi.
+    // Úsečka, která nesvírá z bodu pohledu žádný úhel (leží na přímce přes bod, nebo končí v něm), se bere pro všechny paprsky.
+    $kandidati = array_fill(0, $pocet, []);
+    $vsechny = [];
+    $dvaPi = 2 * M_PI;
+    $okraj = 1e-6;
+    foreach ($vse as $idx => $u) {
+        $ax = $u[0] - $ox; $ay = $u[1] - $oy; $bx = $u[2] - $ox; $by = $u[3] - $oy;
+        $krizovy = $ax * $by - $ay * $bx;
+        if (abs($krizovy) < 1e-9 || ($ax * $ax + $ay * $ay) < 1e-18 || ($bx * $bx + $by * $by) < 1e-18) {
+            $vsechny[] = $idx;
+            continue;
+        }
+        // Rozsah proti směru hodinových ručiček: od a1 po a1 + rozdíl (úsečka z bodu pohledu svírá méně než půl kruhu).
+        $a1 = atan2($ay, $ax);
+        $a2 = atan2($by, $bx);
+        if ($krizovy < 0) {
+            [$a1, $a2] = [$a2, $a1];
+        }
+        $konec = $a1 + fmod(fmod($a2 - $a1, $dvaPi) + $dvaPi, $dvaPi);
+        foreach ([0.0, -$dvaPi, $dvaPi] as $posun) {
+            $od = $a1 + $posun - $okraj;
+            $do = $konec + $posun + $okraj;
+            if ($do < $uhly[0] || $od > $uhly[$pocet - 1]) {
+                continue;
+            }
+            $lo = 0; $hi = $pocet;   // první paprsek s úhlem >= $od
+            while ($lo < $hi) {
+                $mid = ($lo + $hi) >> 1;
+                if ($uhly[$mid] < $od) { $lo = $mid + 1; } else { $hi = $mid; }
+            }
+            for ($r = $lo; $r < $pocet && $uhly[$r] <= $do; $r++) {
+                $kandidati[$r][] = $idx;
+            }
+        }
+    }
 
     $body = [];
-    foreach ($uhly as $a) {
+    foreach ($uhly as $r => $a) {
         $dx = cos($a);
         $dy = sin($a);
         $nej = null;
-        foreach ($vse as $u) {
+        foreach ($kandidati[$r] as $idx) {
+            $u = $vse[$idx];
+            $t = dracak_vtt_paprsek_usecka($ox, $oy, $dx, $dy, $u[0], $u[1], $u[2], $u[3]);
+            if ($t !== null && ($nej === null || $t < $nej)) {
+                $nej = $t;
+            }
+        }
+        foreach ($vsechny as $idx) {
+            $u = $vse[$idx];
             $t = dracak_vtt_paprsek_usecka($ox, $oy, $dx, $dy, $u[0], $u[1], $u[2], $u[3]);
             if ($t !== null && ($nej === null || $t < $nej)) {
                 $nej = $t;

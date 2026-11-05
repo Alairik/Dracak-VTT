@@ -306,6 +306,14 @@ const stav = (page) => page.evaluate(async (m) => (await fetch('api/mapa_stav.ph
   d = await api(hr, 'tah_akce', { mapa_id: MAPA, token_id: sindor, druh: 'cekani', ihned: [{ kouzlo_id: OBRANA_K, magy: 0 }] });
   ok(d.ok === true && magySindor() === 27, 'hráč si cenu kouzla zadáním magy:0 nesníží (30 → ' + magySindor() + ')');
 
+  const bezMagu = () => Number(sqlVal(`select count(*) from svet_udalosti where mapa_id=${MAPA} and typ='kouzleni_stav' and json_extract(payload, '$.bez_magenergie') = true`));
+  // postava bez nastavené magenergie: kouzlí zdarma, ale log na to upozorní; s magenergií upozornění není
+  ok(bezMagu() === 0, 'postava s magenergií: žádné upozornění v logu');
+  await priprav();
+  sql('update postavy set max_magenergie=NULL, aktualni_magenergie=NULL where id=2');
+  d = await api(hr, 'tah_akce', { mapa_id: MAPA, token_id: sindor, druh: 'cekani', ihned: [{ kouzlo_id: OBRANA_K }] });
+  ok(d.ok === true && bezMagu() === 1, 'postava bez magenergie: kouzlo se sešle zdarma a v logu je upozornění: ' + (d.error || bezMagu()));
+
   // obrana: kouzla ihned se sešlou před hodem a přepočítají opravy obrany (efekty, nehybnost)
   await priprav();
   await api(pj, 'token_uprava', { token_id: gob, zmeny: { smer: 180 } });

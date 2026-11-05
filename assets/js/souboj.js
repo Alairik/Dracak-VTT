@@ -1841,15 +1841,17 @@ export function initSouboj(ctx) {
         const magyText = p.magy ? ' (−' + p.magy + ' magů)' : '';
         const propadla = p.seslano ? ' — kouzlo už působí' : (p.magy ? ' — magenergie propadla (' + p.magy + ')' : (p.cena ? ' — magenergie propadla (' + p.cena + ')' : ' — magenergie propadla'));
         const ucinek = p.seslano ? ' — kouzlo seslané, účinek je vyhodnocen' : (p.chyba ? ' — účinek se nepodařilo vyhodnotit: ' + p.chyba : '');
+        // Postava bez nastavené magenergie kouzlí zdarma — upozornění v logu, ať PJ doplní maximum magenergie v deníku postavy.
+        const upozMagy = p.bez_magenergie ? ' ⚠ postava nemá nastavenou magenergii, magy se nestrhly (doplň ji v deníku postavy)' : '';
         const texty = {
-          zahajeno: kdo + ' začíná kouzlit' + co + postup + magyText,
+          zahajeno: kdo + ' začíná kouzlit' + co + postup + magyText + upozMagy,
           pokracuje: kdo + ' kouzlí' + co + postup,
-          ucinkuje: kdo + ': kouzlo' + co + ' začíná působit' + postup + magyText + (p.seslano ? ' — účinek se vyhodnotil sám' : ' — účinek zadej z deníku') + (p.chyba ? ' (' + p.chyba + ')' : '') + '; poslední akce je odpočinek, kouzelník se nemůže bránit',
-          dokonceno: kdo + ' dokončil(a) kouzlení' + co + (p.celkem ? ' (' + akciText(p.celkem) + ')' : '') + ucinek,
+          ucinkuje: kdo + ': kouzlo' + co + ' začíná působit' + postup + magyText + (p.seslano ? ' — účinek se vyhodnotil sám' : ' — účinek zadej z deníku') + (p.chyba ? ' (' + p.chyba + ')' : '') + upozMagy + '; poslední akce je odpočinek, kouzelník se nemůže bránit',
+          dokonceno: kdo + ' dokončil(a) kouzlení' + co + (p.celkem ? ' (' + akciText(p.celkem) + ')' : '') + ucinek + upozMagy,
           preruseno: kdo + ' přerušil(a) kouzlení' + co + propadla,
           prerusene_jinou_akci: kdo + ' přerušil(a) kouzlení' + co + ' jinou akcí' + propadla,
           selhalo: kdo + ': kouzlo' + co + ' se nezdařilo, byl(a) zasažen(a) před předposlední akcí' + propadla,
-          ihned: kdo + ' sesílá ihned' + co + (p.cil_sam ? ' na sebe' : (p.cil_label ? ' na ' + p.cil_label : '')) + magyText + (p.ceka_na_past ? ' — čeká na hod proti pasti (PJ)' : ''),
+          ihned: kdo + ' sesílá ihned' + co + (p.cil_sam ? ' na sebe' : (p.cil_label ? ' na ' + p.cil_label : '')) + magyText + (p.ceka_na_past ? ' — čeká na hod proti pasti (PJ)' : '') + upozMagy,
         };
         logLine(texty[p.stav] || (kdo + ': kouzlení — ' + p.stav));
         if (['dokonceno', 'preruseno', 'prerusene_jinou_akci', 'selhalo'].includes(p.stav) && p.token_id) kouzloVolba.delete(p.token_id);

@@ -56,5 +56,64 @@ for ($i = 0; $i < 10; $i++) { $p = dracak_vtt_videni_polygon($zdi, 1500 + $i * 1
 $ms = (microtime(true) - $t) / 10 * 1000;
 ok($ms < 150, sprintf('divák s dosahem 30 sáhů na mapě s 300 zdmi: %.1f ms, %d vrcholů', $ms, count($p)));
 
+// 7) shoda s původním (pomalým) postupem „každý paprsek proti všem zdem“ na náhodných scénách, včetně města se sdílenými rohy a zdí přes bod pohledu
+function polygon_pomaly(array $zdi, float $ox, float $oy, float $dosah): array
+{
+    $dosah = max(1.0, $dosah);
+    $levy = $ox - $dosah; $pravy = $ox + $dosah; $horni = $oy - $dosah; $dolni = $oy + $dosah;
+    $vse = [];
+    foreach ($zdi as $z) {
+        if (max($z[0], $z[2]) < $levy || min($z[0], $z[2]) > $pravy || max($z[1], $z[3]) < $horni || min($z[1], $z[3]) > $dolni) { continue; }
+        $vse[] = [(float)$z[0], (float)$z[1], (float)$z[2], (float)$z[3]];
+    }
+    $vse = array_merge($vse, [[$levy, $horni, $pravy, $horni], [$pravy, $horni, $pravy, $dolni], [$pravy, $dolni, $levy, $dolni], [$levy, $dolni, $levy, $horni]]);
+    $uhly = [];
+    foreach ($vse as $u) {
+        foreach ([[$u[0], $u[1]], [$u[2], $u[3]]] as [$px, $py]) {
+            if (abs($px - $ox) < 1e-9 && abs($py - $oy) < 1e-9) { continue; }
+            $a = atan2($py - $oy, $px - $ox);
+            array_push($uhly, $a - 1e-5, $a, $a + 1e-5);
+        }
+    }
+    sort($uhly);
+    $body = [];
+    foreach ($uhly as $a) {
+        $nej = null;
+        foreach ($vse as $u) {
+            $t = dracak_vtt_paprsek_usecka($ox, $oy, cos($a), sin($a), $u[0], $u[1], $u[2], $u[3]);
+            if ($t !== null && ($nej === null || $t < $nej)) { $nej = $t; }
+        }
+        if ($nej === null) { continue; }
+        $x = round($ox + cos($a) * $nej, 1); $y = round($oy + sin($a) * $nej, 1);
+        if ($body && $body[count($body) - 1][0] === $x && $body[count($body) - 1][1] === $y) { continue; }
+        $body[] = [$x, $y];
+    }
+    return $body;
+}
+mt_srand(11);
+$shoda = 0; $scen = 0;
+for ($k = 0; $k < 40; $k++) {
+    $zdi = [];
+    $n = mt_rand(0, 60);
+    for ($i = 0; $i < $n; $i++) { $x = mt_rand(0, 1000); $y = mt_rand(0, 1000); $zdi[] = [$x, $y, $x + mt_rand(-250, 250), $y + mt_rand(-250, 250)]; }
+    if ($k % 4 === 0) { $zdi[] = [400, 500, 600, 500]; $zdi[] = [500, 500, 500, 700]; }   // zdi přes bod pohledu a končící v něm
+    $ox = (float)(($k % 4 === 0) ? 500 : mt_rand(100, 900)); $oy = (float)(($k % 4 === 0) ? 500 : mt_rand(100, 900));
+    $scen++;
+    if (dracak_vtt_videni_polygon($zdi, $ox, $oy, 400) === polygon_pomaly($zdi, $ox, $oy, 400)) { $shoda++; }
+}
+// město: domy 210 px s ulicemi 70 px (sdílené rohy a rovnoběžné zdi)
+$mesto = [];
+for ($i = 0; $i < 6; $i++) for ($j = 0; $j < 5; $j++) { $x = 200 + $i * 280; $y = 200 + $j * 280; $s = 210; array_push($mesto, [$x, $y, $x + $s, $y], [$x + $s, $y, $x + $s, $y + $s], [$x + $s, $y + $s, $x, $y + $s], [$x, $y + $s, $x, $y]); }
+foreach ([[375, 345, 420], [340, 175, 700], [655, 655, 500]] as [$ox, $oy, $d]) { $scen++; if (dracak_vtt_videni_polygon($mesto, (float)$ox, (float)$oy, (float)$d) === polygon_pomaly($mesto, (float)$ox, (float)$oy, (float)$d)) { $shoda++; } }
+ok($shoda === $scen, "rychlý polygon dává stejný výsledek jako původní postup ($shoda z $scen náhodných scén a měst)");
+
+// 8) výkon ve městě: 480 zdí (12 × 10 domů po čtyřech zdech), divák s dohledem 30 sáhů
+$mesto = [];
+for ($i = 0; $i < 12; $i++) for ($j = 0; $j < 10; $j++) { $x = 200 + $i * 280; $y = 200 + $j * 280; $s = 210; array_push($mesto, [$x, $y, $x + $s, $y], [$x + $s, $y, $x + $s, $y + $s], [$x + $s, $y + $s, $x, $y + $s], [$x, $y + $s, $x, $y]); }
+$t = microtime(true);
+for ($i = 0; $i < 10; $i++) { $p = dracak_vtt_videni_polygon($mesto, 375.0 + $i * 280, 345.0, 1500.0); }
+$ms = (microtime(true) - $t) / 10 * 1000;
+ok($ms < 60, sprintf('divák s dosahem 30 sáhů ve městě s %d zdmi: %.1f ms, %d vrcholů', count($mesto), $ms, count($p)));
+
 echo $chyb ? "CHYB: $chyb\n" : "VŠE OK\n";
 exit($chyb ? 1 : 0);

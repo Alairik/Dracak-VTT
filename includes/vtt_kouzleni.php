@@ -148,6 +148,14 @@ function dracak_vtt_kouzlo_potrebuje_trvani(PDO $pdo, array $katalog, int $kouzl
 
 // Cena kouzla v magech pro sesilatele-postavu se zásobou: ruční číslo z požadavku („dodaná magenergie“) má přednost, jinak první číslo z ceny kouzla; null = nestrhává se
 // (nestvůra, povolání bez magenergie, cena je vzorec — pak magy upraví hráč nebo PJ ručně).
+// Má postava kouzlit za magy, ale nemá nastavenou magenergii (max_magenergie prázdná)? Hra pak žádné magy nestrhne — log na to upozorní, ať se nastavení doplní.
+// Nestvůry magenergii nemají (viz dracak_vtt_ma_magenergii), tam se neupozorňuje.
+function dracak_vtt_kouzli_bez_magenergie(array $tvor, ?array $entity, array $katalog): bool
+{
+    return $tvor['typ_entity'] === 'postava' && $entity !== null && !dracak_vtt_ma_magenergii($entity)
+        && trim((string)($katalog['cena_magenergie'] ?? '')) !== '';
+}
+
 function dracak_vtt_kouzli_cena(array $tvor, ?array $entity, array $katalog, array $vstup): ?int
 {
     if ($tvor['typ_entity'] !== 'postava' || $entity === null || !dracak_vtt_ma_magenergii($entity)) {
@@ -357,7 +365,8 @@ function dracak_vtt_kouzli_ihned_proved(PDO $pdo, array $user, int $svetId, int 
         $v = dracak_vtt_kouzli_seslat($pdo, $user, $svetId, $mapaId, $tvor, $id, $cil, ['zbyva_kol' => $kolaZadano ? (int)$k['zbyva_kol'] : null, 'cena' => $cena]);
         $cilLabel = isset($info[$cil['token_id']]) ? (string)$info[$cil['token_id']]['label'] : null;
         dracak_vtt_kouzli_udalost($svetId, $mapaId, (int)$user['id'], $tvor, 'ihned', $kouzlo, null, null,
-            ['magy' => $cena, 'cil_label' => $cilLabel, 'cil_sam' => $cil['sam'], 'hp' => $v['hp'], 'ceka_na_past' => count($v['ceka_na_past']) > 0]);
+            ['magy' => $cena, 'cil_label' => $cilLabel, 'cil_sam' => $cil['sam'], 'hp' => $v['hp'], 'ceka_na_past' => count($v['ceka_na_past']) > 0,
+                'bez_magenergie' => dracak_vtt_kouzli_bez_magenergie($tvor, $entity, $katalog)]);
         $vysledky[] = ['kouzlo' => $kouzlo['nazev'], 'cil_label' => $cilLabel, 'hp' => $v['hp'], 'ceka_na_past' => $v['ceka_na_past']];
     }
     return $vysledky;
@@ -501,7 +510,7 @@ function dracak_vtt_kouzli_po_akci(PDO $pdo, array $user, int $svetId, int $mapa
         $extra = [];
         if ($automaticky) {
             $v = dracak_vtt_kouzli_seslat($pdo, $user, $svetId, $mapaId, $tvor, $kouzlo['id'], $cil, ['zbyva_kol' => $kola, 'cena' => $cena]);
-            $extra = ['seslano' => true, 'hp' => $v['hp'], 'magy' => $cena];
+            $extra = ['seslano' => true, 'hp' => $v['hp'], 'magy' => $cena, 'bez_magenergie' => dracak_vtt_kouzli_bez_magenergie($tvor, $entity, $katalog ?: [])];
         }
         dracak_vtt_kouzli_udalost($svetId, $mapaId, $ucetId, $tvor, 'dokonceno', $kouzlo, $akci, $akci, $extra);
         return 'dokonceno';
@@ -535,7 +544,7 @@ function dracak_vtt_kouzli_po_akci(PDO $pdo, array $user, int $svetId, int $mapa
             dracak_vtt_odecti_magenergii($entity, $cena);
         }
         $data = ['ct' => $cil['typ'], 'ci' => $cil['id'], 'ti' => $cil['token_id'], 'kola' => $kola, 'cena' => $cena, 'ap' => 0];
-        $extra = ['magy' => $cena, 'seslano' => false];
+        $extra = ['magy' => $cena, 'seslano' => false, 'bez_magenergie' => dracak_vtt_kouzli_bez_magenergie($tvor, $entity, $katalog ?: [])];
         if ($hotovo >= $akci - 1) {
             try {
                 $vs = dracak_vtt_kouzli_seslat($pdo, $user, $svetId, $mapaId, $tvor, $kouzlo['id'], $cil, ['zbyva_kol' => $kola, 'cena' => null]);
