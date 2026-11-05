@@ -153,10 +153,12 @@ function dracak_vtt_kouzli_cena(array $tvor, ?array $entity, array $katalog, arr
     if ($tvor['typ_entity'] !== 'postava' || $entity === null || !dracak_vtt_ma_magenergii($entity)) {
         return null;
     }
+    $katalogova = dracak_vtt_kouzlo_cena_magenergie($katalog['cena_magenergie'] ?? null);
     if (isset($vstup['magy']) && $vstup['magy'] !== '' && $vstup['magy'] !== null) {
-        return max(0, (int)$vstup['magy']);
+        // Zadané magy slouží u vzorců, které hra z ceny nepozná; cenu, kterou katalog zná, nejde zadáním snížit (magy:0 = kouzlo zdarma).
+        return max(0, (int)$vstup['magy'], $katalogova ?? 0);
     }
-    return dracak_vtt_kouzlo_cena_magenergie($katalog['cena_magenergie'] ?? null);
+    return $katalogova;
 }
 
 // Podklady pro dracak_vtt_polozka_pouzij_ucinek: sesilatel, cíl a kouzlo. $volby: zbyva_kol (null = nezadáno, 0 = bez limitu), cena (magy, které se mají odečíst, nebo null).

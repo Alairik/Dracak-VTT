@@ -303,6 +303,8 @@ const stav = (page) => page.evaluate(async (m) => (await fetch('api/mapa_stav.ph
   ok(d.s === 422, 'cizí kouzlo (Hyperprostor) hráč připojit nesmí: ' + d.error);
   d = await api(hr, 'tah_akce', { mapa_id: MAPA, token_id: sindor, druh: 'cekani', ihned: Array(6).fill({ kouzlo_id: OBRANA_K }) });
   ok(d.s === 422 && /nejvýš 5/.test(d.error || ''), 'víc než 5 kouzel k jedné akci se odmítne: ' + d.error);
+  d = await api(hr, 'tah_akce', { mapa_id: MAPA, token_id: sindor, druh: 'cekani', ihned: [{ kouzlo_id: OBRANA_K, magy: 0 }] });
+  ok(d.ok === true && magySindor() === 27, 'hráč si cenu kouzla zadáním magy:0 nesníží (30 → ' + magySindor() + ')');
 
   // obrana: kouzla ihned se sešlou před hodem a přepočítají opravy obrany (efekty, nehybnost)
   await priprav();

@@ -131,19 +131,25 @@ export function initSouboj(ctx) {
     if (d && d.error) { logLine('Chyba: ' + d.error); return true; }
     return false;
   }
-  function volat(url, telo) {
-    // Kouzla „ihned“ ve frontě tvora se připojí k jeho další akci (pohyb, útok, obrana…) a po úspěchu se fronta vyprázdní.
-    let ihned = null;
-    if (url.endsWith('tah_akce.php') && telo && telo.druh !== 'kouzleni' && telo.token_id) {
+  // Kouzla „ihned“ ve frontě tvora se připojí k jeho další akci (pohyb, útok, obrana…) a po úspěchu se fronta vyprázdní.
+  // Společné pro tlačítka akcí (volat) i pro potvrzení naplánovaného tahu na mapě (odeslatPlan).
+  function sIhned(telo) {
+    if (telo && telo.druh !== 'kouzleni' && telo.token_id) {
       const f = ihnedFronta.get(telo.token_id);
       if (f && f.length) {
-        ihned = f.map((k) => ({kouzlo_id: k.kouzlo_id, cil_token_id: k.cil_token_id, zbyva_kol: k.zbyva_kol, magy: k.magy}));
-        telo = Object.assign({}, telo, {ihned});
+        return Object.assign({}, telo, {ihned: f.map((k) => ({kouzlo_id: k.kouzlo_id, cil_token_id: k.cil_token_id, zbyva_kol: k.zbyva_kol, magy: k.magy}))});
       }
     }
+    return telo;
+  }
+  function vyprazdniIhned(telo) {
+    if (telo && telo.ihned) { ihnedFronta.set(telo.token_id, []); kreslit(); }
+  }
+  function volat(url, telo) {
+    if (url.endsWith('tah_akce.php')) telo = sIhned(telo);
     return postJson(url, Object.assign({mapa_id: mapaId}, telo)).then((d) => {
       if (!chyba(d)) {
-        if (ihned) { ihnedFronta.set(telo.token_id, []); kreslit(); }
+        vyprazdniIhned(telo);
         obnovitStav();
       }
       return d;
@@ -913,8 +919,10 @@ export function initSouboj(ctx) {
     if (plan.cesta.length) telo.cesta = plan.cesta.map((p) => ({col: p.col, row: p.row, smer: hexy.smerZOrientace(plan.tvar, p.o)}));
     if (plan.orient !== null || druh === 'otocka' || druh === 'otocka_utok') telo.smer = hexy.smerZOrientace(plan.tvar, duchOrient());
     if (plan.cil) telo.cil_token_id = plan.cil;
-    postJson('api/tah_akce.php', Object.assign({mapa_id: mapaId}, telo)).then((d) => {
+    const poslano = sIhned(telo);   // kouzla „ihned“ z fronty se připojí i k naplánovanému pohybu a útoku
+    postJson('api/tah_akce.php', Object.assign({mapa_id: mapaId}, poslano)).then((d) => {
       if (d.error) { logLine('Chyba: ' + d.error); return; }
+      vyprazdniIhned(poslano);
       plan = null;
       if (d.ceka_na_hod) logLine('Čtvrtý hex sprintu: nejdřív se hází na dovednost Běh na krátké vzdálenosti.');
       obnovitStav();

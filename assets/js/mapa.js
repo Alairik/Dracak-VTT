@@ -445,11 +445,24 @@ function renderSvetla() {
       if (!t.svetlo) return;
       // Zóna tmy (Tma, Temnota) se kreslí fialově a tmavě, světlo žlutě.
       const zona = t.svetlo_typ === 'tma' || t.svetlo_typ === 'temnota';
-      html += '<circle cx="' + t.x + '" cy="' + t.y + '" r="' + (t.svetlo * sah) + '" fill="' + (zona ? 'rgba(40,20,70,0.28)' : 'rgba(255,196,80,0.10)')
+      html += '<circle data-token-id="' + t.id + '" cx="' + t.x + '" cy="' + t.y + '" r="' + (t.svetlo * sah) + '" fill="' + (zona ? 'rgba(40,20,70,0.28)' : 'rgba(255,196,80,0.10)')
         + '" stroke="' + (zona ? '#8a6bd1' : '#e8a838') + '" stroke-width="2" stroke-dasharray="6 5" vector-effect="non-scaling-stroke"/>';
     });
   }
   svg.innerHTML = html;
+}
+// Při tažení tokenu se kruh jeho světla (nebo zóny tmy) hýbe s ním v reálném čase; stíny se přepočítají až po položení (server).
+function posunSvetloTokenu(tokenId, x, y) {
+  const svg = document.getElementById('svetlaSvg');
+  const kruh = svg ? svg.querySelector('circle[data-token-id="' + tokenId + '"]') : null;
+  if (!kruh) return;
+  kruh.setAttribute('cx', String(x));
+  kruh.setAttribute('cy', String(y));
+}
+// Po položení (nebo zrušeném tažení): kruhy zpět na skutečné polohy tokenů a stíny hned znovu podle nové polohy, ať se nečeká na další dotaz na změny.
+function poPresunuTokenu(tokeny) {
+  if ((tokeny || []).some((t) => t && t.svetlo)) renderSvetla();
+  osvezitMlhu();
 }
 function renderZdi() {
   const svg = document.getElementById('zdiSvg');
@@ -2269,6 +2282,7 @@ function zrusitAkci() {
       if (el) { el.style.left = m.x + 'px'; el.style.top = m.y + 'px'; el.classList.remove('tahnuty'); }
       drzeneTokeny.delete(m.id);
     });
+    renderSvetla();
   }
   if (a.typ === 'ruler' || a.typ === 'kresleni') { rulerStart = null; rulerTrasa = []; rulerPosledni = null; if (rulerSvg) rulerSvg.innerHTML = ''; }
   if (a.typ === 'mlha') { mlhaKreslim = false; mlhaObdelnikStart = null; if (rulerSvg) rulerSvg.innerHTML = ''; }
@@ -2383,6 +2397,7 @@ viewport.addEventListener('pointermove', (e) => {
         drzeneTokeny.add(c.id);
         const el = tokenEl.get(c.id);
         if (el) { el.style.left = (c.x + dx) + 'px'; el.style.top = (c.y + dy) + 'px'; el.classList.add('tahnuty'); }
+        if (c.svetlo) posunSvetloTokenu(c.id, c.x + dx, c.y + dy);
       });
       aktualizujRotacniUchyt();
       break;
@@ -2404,6 +2419,7 @@ function ulozPresunTokenu(t, x, y) {
       drzeneTokeny.delete(t.id);
       const el = tokenEl.get(t.id);
       if (el) el.classList.remove('tahnuty');
+      poPresunuTokenu([t]);
     });
 }
 
@@ -2412,11 +2428,14 @@ function ulozPresunTokenu(t, x, y) {
 function ulozPresunSkupiny(skupina, dx, dy) {
   if (skupina.length === 1) { ulozPresunTokenu(skupina[0], skupina[0].x + dx, skupina[0].y + dy); return; }
   const presuny = skupina.map((c) => ({token_id: c.id, x: c.x + dx, y: c.y + dy}));
-  const hotovo = () => skupina.forEach((c) => {
-    drzeneTokeny.delete(c.id);
-    const el = tokenEl.get(c.id);
-    if (el) el.classList.remove('tahnuty');
-  });
+  const hotovo = () => {
+    skupina.forEach((c) => {
+      drzeneTokeny.delete(c.id);
+      const el = tokenEl.get(c.id);
+      if (el) el.classList.remove('tahnuty');
+    });
+    poPresunuTokenu(skupina);
+  };
   if (!FUNKCE.udalosti) {
     presuny.forEach((p, i) => ulozPresunTokenu(skupina[i], p.x, p.y));
     return;
@@ -3274,6 +3293,7 @@ function applyEvent(u) {
       t.y = pr.y_po;
       if (!drzeneTokeny.has(t.id)) nakreslitToken(t);
     });
+    if ((u.payload.presuny || []).some((pr) => { const t = tokenData(pr.token_id); return t && t.svetlo; })) renderSvetla();
     aktualizujRotacniUchyt();
     if (naTeteMape) obnovitMlhuPoPollu = true;
   } else if (u.typ === 'token_zmena') {
