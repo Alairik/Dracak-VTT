@@ -14,7 +14,7 @@ mění) se sem zapíše update ve stejném kroku, ne až "až bude čas".
 
 ## Pro novou session, co začíná tady
 
-Přečti celý tenhle soubor, pak `CLAUDE.md` (hlavně pravidla o tom, že
+**Nejdřív si přečti `docs/zadani-pro-novy-chat.md` (předávací dokument z 2026-11-06: pravidla komunikace s uživatelem, pasti lokálního prostředí, co se udělalo, co čeká).** Přečti celý tenhle soubor, pak `CLAUDE.md` (hlavně pravidla o tom, že
 zdroj pravdy o hře jsou pravidla v `content/`, ne repo/DB, a o
 neodhadování mechaniky). **Fáze 1 a 2 ze sekce "Rozpracováno:
 cestování..." jsou v kódu hotové**; **Fáze 1b (váha/kontejnery) je
