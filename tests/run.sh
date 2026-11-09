@@ -16,6 +16,26 @@ DOCROOT=${DOCROOT:-$ROOT}
 mkdir -p "$OUT"
 PORT=${BASE##*:}
 
+# Chromium a Playwright: cesty se mezi kontejnery liší (verze v názvu složky), a když se netrefí, spadnou VŠECHNY
+# e2e sady na "executable doesn't exist" — vypadá to jako rozbitý kód, přitom jen chybí prohlížeč. Proto se hledá,
+# ne natvrdo zadává. Vlastní cestu lze pořád vnutit přes CHROMIUM / PLAYWRIGHT.
+if [ -z "${CHROMIUM:-}" ] || [ ! -x "${CHROMIUM:-}" ]; then
+  for c in /opt/pw-browsers/*/chrome-linux64/chrome /opt/pw-browsers/*/chrome-linux/chrome \
+           /usr/bin/chromium /usr/bin/chromium-browser /usr/bin/google-chrome; do
+    [ -x "$c" ] && export CHROMIUM="$c" && break
+  done
+fi
+if [ -z "${PLAYWRIGHT:-}" ] || [ ! -d "${PLAYWRIGHT:-}" ]; then
+  for pw in /opt/node22/lib/node_modules/playwright "$ROOT/node_modules/playwright"; do
+    [ -d "$pw" ] && export PLAYWRIGHT="$pw" && break
+  done
+fi
+if [ -z "${CHROMIUM:-}" ]; then
+  echo "CHYBA Chromium se nenašel (hledáno v /opt/pw-browsers/*/chrome-linux*/chrome a /usr/bin). Nastav CHROMIUM=cesta." >&2
+  exit 2
+fi
+echo "prohlížeč: $CHROMIUM"
+
 E2E_VYCHOZI="ini_v2_api souboj_api efekty_api efekty_kolo efekty_kouzla efekty_ui tasit_zdarma_api zbrane_api zbrane_ini_api zbrane_ui zbrane_mapa hex_api hex_multi_api review2_api dalsi_tah_api vyzva_api denik_v2 denik_dock inv_ui e2e_hra druzina_hrac druzina_pj log_ui login_ui xss_ui upload_api zaloha_ui souboj_ui hex_tah_ui editor_ui csp_api soubehy_api ini_prenos_api poznamky_ui dvere_api videni_api boj_ve_tme_api zony_tmy_api noc_videni_api hodiny_sveta_api pin_vstoupit_api raid_panel_ui pochod_cesta_ui cesta_zvirata_api rizeni_povozu_ui mobil_lista_ui dotyk_ui npc_zasoba_api token_bar_ui kouzleni_api kouzleni_ui kouzleni_plan_ui svetlo_stiny_ui svetlo_tazeni_ui admin_migrace_ui neviditelnost_api dosah_pohybu_ui"
 UNIT_VYCHOZI="log_unit migrace_unit zaloha_test nasazeni_unit login_unit videni_polygon_unit kouzleni_unit"
 

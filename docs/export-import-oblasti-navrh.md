@@ -103,6 +103,28 @@ kdy se cizí quest „napojuje“ na můj svět — a je dobře, že to dělá �
 **d) Poznámky navázané na postavu.** `svet_poznamky.postava_id` ukazuje na cizí postavu, která se neexportuje → takovou poznámku buď
 vynechat, nebo vazbu zahodit. Návrh: vynechat, poznámka o cizí postavě je v cizím světě k ničemu.
 
+## 5b. „Stačí dát každé zóně a NPC unikátní kód a vyexportovat to do CSV?“ (otázka uživatele 2026-11-09)
+
+Napůl ano. Unikátní kód je potřeba, ale **sám o sobě problém nevyřeší**, a CSV je na to špatný nosič.
+
+**Co unikátní kód (např. UUID) vyřeší:** poznání, že „tohle NPC už jsem jednou importoval“. Díky tomu jde import spustit dvakrát,
+aniž by se obsah zdvojil, a jde poslat opravenou verzi oblasti („aktualizuj, co se změnilo“). To je užitečné a do formátu patří.
+
+**Co nevyřeší:** databáze uvnitř sebe neodkazuje kódy, ale **čísly** (`tokeny.mapa_id` = 7, `nestvura_instance.lokace_mapa_id` = 7).
+Těch čísel se zbavit nejde — jsou to primární klíče. Takže i s unikátními kódy musí import pořád **každému záznamu přidělit nové číslo
+a přepsat všechny odkazy na něj** (sekce 5a). Kód to nenahradí, jen k tomu přidá stabilní jméno. Jinak řečeno: ta práce, kvůli které je
+to na dny a ne na odpoledne, je přečíslování, a to zůstává tak jako tak.
+
+**K „podmapám“:** mapy v databázi vnořené nejsou. Strom míst, který ukazuje „Mapa míst“ v liště, se skládá až za běhu z pinů
+(`dracak_vtt_mapa_strom()` v `includes/vtt_mapa_body.php` čte `mapa_body.cilova_mapa_id`). Hierarchie je tedy jen síť odkazů mezi mapami —
+což je přesně důvod, proč musí export řešit odkazy vedoucí ven z oblasti (5c), a proč se nedá vyvézt „mapa s podmapami“ jako jeden celek.
+
+**Proč ne CSV:** oblast není jedna tabulka, ale zhruba deset provázaných (mapy, zdi, kresby, piny, tokeny, NPC, výbava NPC, čísla druhů,
+obrázky, poznámky). CSV neumí vazby ani vnoření, takže by z toho byl zip deseti CSV souborů plus obrázky — tedy nemotornější JSON.
+Navíc CSV nemá kam dát binární obrázky map a u českých textů s čárkami, uvozovkami a středníky se escapování pravidelně rozbíjí.
+JSON tohle všechno řeší zadarmo a kód na něj už v projektu je. Jeden CSV export by dával smysl leda jako **přehled pro člověka**
+(„vypiš mi všechna NPC ve světě do tabulky“) — ale to je jiná funkce než import a dá se udělat kdykoli samostatně.
+
 ## 6. Chybějící katalog u importu
 
 Když soubor odkazuje na nestvůru/předmět/kouzlo, které u sebe nemám:

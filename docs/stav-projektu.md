@@ -67,10 +67,14 @@ jako přípravu na mapy, které ještě nevznikly; výroba **dávkou** („10× 
   a `token_bar_ui.js` (28 kontrol: záložky, výroba, filtry, tažení myší i prstem na tabletu, klepnutí, mazání, hráč lištu nemá).
   Ověřeno i **bez ručního SQL** (lišta se nezobrazí, `npc_vyrobit` vrací 409, starý způsob přidání nestvůry funguje).
 
-**Ruční SQL blok J uživatel spustil 2026-11-09** (`docs/sql-k-rucnimu-spusteni.sql` je prázdný). Nasazení commitu `9b3a650` na hosting proběhlo
-(FTP Deploy běh 280, úspěch). Ověření sloupců na produkci je na uživateli: Změny databáze → „Co aplikace v databázi vidí“ (stránka tam nově
-vypisuje všechny čtyři sloupce z 0115) — z cloud session na produkční web ani do jeho databáze nevidím (proxy blokuje `vtt.zvelebil.online`,
-WEDOS nepouští MySQL zvenčí).
+**POZOR — ruční SQL blok J zatím NENÍ v produkční databázi.** Uživatel ho 2026-11-09 spustil, ale na stránce Změny databáze →
+„Co aplikace v databázi vidí“ jsou u všech čtyř sloupců ✗. Blok se tedy provedl jinde, než kam se dívá web — **skoro jistě v jiné
+databázi vybrané v phpMyAdminu** (totéž se stalo už dvakrát u dřívějších bloků, viz pravidlo v `CLAUDE.md`). Nasazení kódu proběhlo
+v pořádku (FTP Deploy běh 280, commit `9b3a650`) — chybí jen ty sloupce, takže se lišta na produkci nezobrazí.
+**Blok J byl proto přepsaný tak, aby to nešlo udělat potichu:** začíná kontrolou J0, která vypíše, v jaké databázi uživatel je a jestli
+v ní tabulka `nestvura_instance` vůbec existuje; když ne, všechny další kroky se samy přeskočí a nic nespadne. Ověřeno lokálně ve čtyřech
+stavech: čistá DB, podruhé, částečně provedené, a ve špatné databázi (varuje a nezmění nic).
+Z cloud session na produkční web ani do jeho databáze nevidím (proxy blokuje `vtt.zvelebil.online`, WEDOS nepouští MySQL zvenčí).
 
 **Nice to have (zadání uživatele 2026-11-09, nestavět teď):** základní interagovatelné tokeny — truhla, mrtvola apod. Dnes existují „vlastní
 tokeny“ (typ `obecny`: NPC bez statistik, překážka, sud), ale jsou to jen značky bez obsahu a bez interakce. Truhla s obsahem by se dala

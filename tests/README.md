@@ -6,8 +6,10 @@ se nenasazují (`tests/**` je v `exclude` v `.github/workflows/deploy.yml`) a ne
 
 ## Předpoklady
 
-- MariaDB / MySQL s uživatelem `root` bez hesla přes socket (`mysql` v příkazové řádce), PHP 8.x, Node a Playwright s Chromiem
-  (výchozí cesty `/opt/node22/lib/node_modules/playwright` a `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`; jiné přes `PLAYWRIGHT`, `CHROMIUM`).
+- MariaDB / MySQL s uživatelem `root` bez hesla přes socket (`mysql` v příkazové řádce), PHP 8.x, Node a Playwright s Chromiem.
+  **Cesty k prohlížeči a Playwrightu si `run.sh` najde sám** (prohledá `/opt/pw-browsers/*/chrome-linux*/chrome`, pak `/usr/bin`)
+  a vypíše, co našel; natvrdo se nikde nepíšou, protože verze v názvu složky se mezi kontejnery mění. Vnutit vlastní jde přes
+  `CHROMIUM` a `PLAYWRIGHT`. Když se prohlížeč nenajde, `run.sh` to řekne a skončí — ne že spadne 55 sad na „executable doesn't exist“.
 - Postup instalace MariaDB v cloud session: `docs/stav-projektu.md`, „Lokální ověření na skutečné DB“.
 
 ## Postavení testovací databáze

@@ -92,6 +92,21 @@
      bez chyby.
   5. Po potvrzení, že ho provedl, soubor přepiš na aktuální stav
      (prázdný, nebo jen nové příkazy od té doby).
+  **6. „Spustil jsem to“ NENÍ potvrzení — potvrzení je ✓ na stránce Změny
+     databáze → „Co aplikace v databázi vidí“.** Blok se už TŘIKRÁT provedl
+     do jiné databáze, než kterou používá web (naposledy blok J, 2026-11-09:
+     uživatel ho spustil a všechny čtyři sloupce hlásily ✗). Soubor
+     `docs/sql-k-rucnimu-spusteni.sql` proto nikdy nevyprazdňuj na základě
+     slov — až podle ✓ u všech sloupců. Do té doby ho posílej dál.
+  **7. Každý blok musí začínat kontrolou, ve KTERÉ databázi běží**, a když
+     je špatná, musí se všechny jeho kroky samy přeskočit (vzor: blok J —
+     `SELECT DATABASE()` + `COUNT(*)` nad `information_schema.TABLES`,
+     výsledek do `@je_tu` a každý `SET @s = IF(@je_tu = 0, 'DO 0', …)`).
+     Bez toho blok ve špatné databázi buď potichu nic neudělá, nebo spadne
+     uprostřed — a kontrolní SELECT na konci vyjde 0, což se dá snadno
+     přehlédnout jako „asi se to nepovedlo“ místo „jsem jinde“.
+     Ověř to lokálně ve čtyřech stavech: čistá DB, podruhé, částečně
+     provedené, a ve špatné databázi (musí varovat a nic nezměnit).
 - **Otázky uživateli piš lidsky, česky, bez databázové a programátorské
   mluvy.** Uživatel je account manager, ne vývojář: nerozumí slovům jako
   DROP, index, tabulka, sloupec, migrace, ENUM, "varianta A/B" podle
@@ -118,6 +133,28 @@
   jen ručně. `deploy-manifest.json` je v `.htaccess` zavřený zvenčí.
   FTP-Deploy nahrává jen změněné soubory, takže chybějící soubor další
   deploy sám nedoplní — oprava = drobná změna v tom souboru, nebo ruční FTP.
+- **V testech nikdy nepiš absolutní cesty ani verze v cestách.** Cestu k repu
+  ber z `__DIR__` / `dirname(__DIR__)`, prohlížeč a Playwright si `tests/run.sh`
+  najde sám (`CHROMIUM` / `PLAYWRIGHT` jen přebíjí). Důvod: `log_unit` měl
+  natvrdo `/home/user/Dracak-VTT/` a padal, jakmile se složka jmenovala jinak;
+  `tests/README.md` měl `chromium-1194`, a když kontejner přišel s 1243,
+  spadlo 55 z 61 sad na „executable doesn't exist“ — vypadalo to jako rozbitý
+  kód, přitom šlo jen o cestu. Když padá naráz skoro všechno, hledej nejdřív
+  prostředí, ne kód.
+- **Test, který kontroluje konkrétní záznam, si ho musí sám určit** — ne
+  „první ze seznamu“. Pořadí dává server (nejnovější první) a změní se, jakmile
+  se do něj něco přidá; takový test pak padá na špatném očekávání, ne na chybě
+  v kódu (stalo se u `npc_zasoba_api`). Stav, se kterým porovnáváš, si přečti
+  před akcí a porovnávej proti němu.
+- **Nový ovládací prvek v UI zapoj ve stejném kroku, v jakém ho přidáš do HTML.**
+  Filtry v liště správy tokenů se vykreslily, ale neměly obsluhu — nic nedělaly
+  a odhalil to až test. Když přidáváš tlačítko, přidej i jeho `addEventListener`
+  a do testu kontrolu, že na kliknutí opravdu něco udělá.
+- **Když migrace používá jiný tvar DDL než `ADD COLUMN`** (např. `MODIFY … NULL`,
+  `ADD INDEX`), ověř, že ho `includes/migrace.php` umí poznat jako „už hotovo“ —
+  jinak se stránka Změny databáze na téhle migraci zastaví napořád i poté, co se
+  ručně provede, a všechny další migrace čekají za ní. Ověřuje se to proti
+  skutečné DB přes `dracak_migrace_alter_uz_hotovo()`.
 - **Regresní testy jsou v `tests/`** (postavení DB: `tests/build-fixture.sh`,
   spuštění: `tests/run.sh`, popis: `tests/README.md`). Před pushem změny v
   souboji, iniciativě, efektech, zbraních nebo deníku pusť příslušné sady,
