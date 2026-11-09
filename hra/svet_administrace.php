@@ -178,5 +178,20 @@ dracak_vtt_page_start('Administrace — ' . $svet['nazev'], $user);
       <button class="btn btn-primary" type="submit">Uložit</button>
     </form>
     <?php endif; ?>
+    <!-- Oblasti: kus světa (mapa a všechno pod ní) se dá vyvézt do souboru a přidat do jiného světa.
+         Vyváží se z mapy — v informaci o pinu je „Vyvézt oblast…“. Sem patří jen přidání cizí oblasti. -->
+    <h2 class="page-title" style="font-size:20px;margin-top:28px;">Oblasti ze souboru</h2>
+    <p class="note" style="max-width:520px;margin-top:0;">Přidá do tohohle světa kus jiného světa — mapu a všechno pod ní
+      (mapy, na které z ní vedou piny), i s nestvůrami, zdmi a podklady. Postavy a hráči se nepřenášejí.
+      Nejdřív se ukáže, co balíček obsahuje, a teprve pak se přidá.</p>
+    <div class="card elev-sm" style="max-width:520px;">
+      <input class="input" type="file" id="oblastSoubor" accept=".zip,application/zip" style="width:100%;">
+      <div style="display:flex;gap:6px;margin-top:10px;">
+        <button class="btn btn-secondary" type="button" id="oblastKontrolaBtn" style="flex:1;">Co je v souboru?</button>
+        <button class="btn btn-primary" type="button" id="oblastPridatBtn" style="flex:1;" disabled>Přidat do světa</button>
+      </div>
+      <div id="oblastVysledek" class="note" style="margin-top:10px;"></div>
+    </div>
   </main>
+<script nonce="<?= dracak_csp_nonce() ?>" type="module" src="../assets/js/oblast_import.js?v=<?= filemtime(__DIR__ . '/../assets/js/oblast_import.js') ?>"></script>
 <?php dracak_vtt_page_end(); ?>

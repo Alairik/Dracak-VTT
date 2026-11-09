@@ -62,7 +62,39 @@ nemá odkládat mechanika (uživatel 2026-11-09: *„nesmysl neimplementovat mec
 (kompaktní deník místo „deníku lite“) a vrstvu PJ uvnitř něj (zámek, efekty i mimo iniciativu, ±životy, kořist); světlo přesunout
 k předmětu v inventáři („Zapálit / zhasnout“); deník nestvůry doplnit o životy, efekty a výbavu.
 
-### Export a import oblasti — jen návrh, odloženo (2026-11-09)
+### Export a import oblasti — HOTOVO (2026-11-09)
+
+Zadání uživatele: *„vytvoř export import pro nové části mapy. Mělo by to vzít PIN/mapu a vše úrovňové pod ní.“*
+Postaveno podle návrhu `docs/export-import-oblasti-navrh.md` (ten zůstává jako popis rozhodnutí a pastí).
+
+**Co to umí:**
+- **Oblast = mapa a všechno pod ní.** Hierarchie map v databázi není — skládá se z pinů (`mapa_body.cilova_mapa_id`),
+  stejně jako „Mapa míst“ v liště. Sestup proto jde po pinech dopředu; mapa, kterou už máme, se nepřidá znovu,
+  takže zpáteční pin oblast nerozšíří. Strop 200 map jako pojistka proti zacyklení.
+- **Vyváží se** z informace o pinu („Vyvézt oblast…“, jen PJ) nebo přímo `oblast_export.php?mapa_id=`.
+  Výsledek je **ZIP**: `manifest.json`, `data.json` a podklady map i obrázky tokenů v `uploads/`.
+  `?nahled=1` vrátí jen souhrn, nic nestahuje.
+- **Veze:** mapy, zdi, kresby, piny, tokeny nestvůr a vlastní tokeny, NPC i s výbavou, vlastními čísly a místem,
+  čísla druhů nestvůr pro ten svět, obrázky a poznámky PJ navázané na ty mapy.
+  **Neveze:** katalog pravidel (odkazuje se **jménem** — je všude stejný), postavy a hráče (oblast je místo, ne družina),
+  provozní stav (mlha, log událostí, rozehraný souboj).
+- **Import je dvoufázový** (`hra/svet_administrace.php` → „Oblasti ze souboru“): nejdřív **„Co je v souboru?“** ukáže,
+  co přibude, co **v katalogu chybí** a která místa vedla pryč z oblasti; teprve pak jde **„Přidat do světa“**.
+  Výměna souboru po kontrole povolení zase shodí. Bez téhle kontroly by import tiše vyrobil NPC bez pravidel
+  a projevilo by se to až v boji.
+- **Přečíslování:** soubor nese dočasná id (`mapa:1`, `npc:3`), zápis jde v pořadí závislostí a překladová tabulka
+  drží staré → nové; celý zápis je v jedné transakci. Druhý import téhož souboru přidá **další kopii**, nic nepřepíše.
+- **Bezpečnost:** ze ZIPu se berou jen cesty `uploads/mapy/…` a `uploads/obrazky/…` (žádné `../`), soubor musí projít
+  jako obrázek (`getimagesize`), strop 16 MB na soubor; ukládá se pod novým náhodným jménem (`import_*.png`).
+- Kód: `includes/vtt_oblast.php`, `hra/api/oblast_export.php`, `hra/api/oblast_import.php`,
+  `assets/js/oblast_import.js`. Test `tests/e2e/oblast_api.js` (export z mapy i z pinu, práva, ZIP, kontrola,
+  zápis, přečíslování pinů, přeskočení NPC s chybějícím druhem, druhý import, celý tok v rozhraní).
+- **Žádná změna databáze** — import i export jedou nad tím, co už je.
+
+**Zbývá, až na to přijde řada:** dopojení visících přechodů kliknutím (dnes se jen vypíšou a PJ pin upraví ručně),
+export více oblastí naráz a výběr, co se má vzít (dnes vždy všechno pod mapou).
+
+### Export a import oblasti — původní návrh (2026-11-09, teď už postavené výš)
 
 Uživatel chce do budoucna: loď/přístav/portál do jiné dimenze, předatelný svět a možnost vzít **kus cizí tvorby** (quest pro novou oblast)
 a napojit ho na svůj svět. **Rozhodl 2026-11-09, že se světy nenapojují — jeden svět to pojme** (souhlas i technicky: dimenze je jen

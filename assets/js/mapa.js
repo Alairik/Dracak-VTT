@@ -2776,15 +2776,22 @@ function otevriPinInfo(bod) {
   const cestovatBtn = document.getElementById('pinInfoCestovatBtn');
   const upravitBtn = document.getElementById('pinInfoUpravitBtn');
   const smazatBtn = document.getElementById('pinInfoSmazatBtn');
+  // Export oblasti (jen PJ a jen u pinu, který někam vede): mapa pod pinem a všechno pod ní do ZIPu.
+  const exportBtn = document.getElementById('pinInfoExportBtn');
   if (bod.cilova_mapa_id) {
     otevritBtn.style.display = '';
     otevritBtn.href = 'mapa.php?id=' + bod.cilova_mapa_id;
     aktivniBtn.style.display = IS_PJ_OR_ADMIN ? '' : 'none';
     if (vstoupitBtn) vstoupitBtn.style.display = IS_PJ_OR_ADMIN ? '' : 'none';
+    if (exportBtn) {
+      exportBtn.style.display = IS_PJ_OR_ADMIN ? '' : 'none';
+      exportBtn.href = 'api/oblast_export.php?bod_id=' + bod.id;
+    }
   } else {
     otevritBtn.style.display = 'none';
     aktivniBtn.style.display = 'none';
     if (vstoupitBtn) vstoupitBtn.style.display = 'none';
+    if (exportBtn) exportBtn.style.display = 'none';
   }
   cestovatBtn.style.display = IS_PJ_OR_ADMIN ? '' : 'none';
   upravitBtn.style.display = IS_PJ_OR_ADMIN ? '' : 'none';

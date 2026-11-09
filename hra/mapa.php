@@ -491,6 +491,10 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
     <button class="btn btn-primary" type="button" id="pinInfoVstoupitBtn" style="width:100%;margin-top:8px;display:none;" title="Přenese postavy družiny na vstupní bod cílové mapy, přepne aktivní mapu a hráče za ní přepne taky">Vstoupit s družinou</button>
     <button class="btn btn-secondary" type="button" id="pinInfoCestovatBtn" style="width:100%;margin-top:8px;display:none;">Cestovat sem</button>
     <button class="btn btn-secondary" type="button" id="pinInfoUpravitBtn" style="width:100%;margin-top:8px;display:none;">Upravit pin</button>
+    <!-- Export oblasti: vezme mapu, na kterou pin vede, a všechno pod ní (mapy, na které z ní vedou další piny).
+         Stáhne se ZIP, který jde přidat do jiného světa (hra/svet_administrace.php). -->
+    <a class="btn btn-ghost" id="pinInfoExportBtn" href="#" style="width:100%;margin-top:8px;display:none;box-sizing:border-box;"
+       title="Stáhne tuhle oblast (mapu a všechno pod ní) jako soubor, který jde přidat do jiného světa">Vyvézt oblast…</a>
     <button class="btn btn-ghost" type="button" id="pinInfoSmazatBtn" style="width:100%;margin-top:8px;display:none;">Smazat pin</button>
   </div>
 
