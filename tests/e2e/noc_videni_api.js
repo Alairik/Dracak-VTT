@@ -116,7 +116,10 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   ok(sqlVal(`select osvetleni from mapy where id=${MAPA}`) === 'noc', 'PJ přepne mapu na Noc v rozhraní');
   await pj.locator('.vtt-token[data-id="' + h + '"] .puck').click();
   await pj.waitForTimeout(600);
-  ok(await pj.locator('#vzhledNoc').isVisible(), 'v panelu postavy je řádek Noční vidění');
+  // „Vzhled a smysly“ je od 2026-11-09 sbalená sekce (velikost i hexy se odvodí z tvora, infravidění nestvůry
+  // z bestiáře), takže se musí nejdřív rozbalit; světlo zůstalo mimo ni.
+  await pj.locator('#vzhledSekce > summary').click();
+  ok(await pj.locator('#vzhledNoc').isVisible(), 'v rozbalené sekci je řádek Noční vidění');
   await pj.fill('#vzhledNoc', '12');
   await pj.locator('#vzhledNoc').dispatchEvent('change');
   await pj.waitForTimeout(800);

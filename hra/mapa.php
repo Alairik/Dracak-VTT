@@ -643,8 +643,33 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
     <!-- Vzhled a poloha tokenu: otočení, velikost, barva, zámek, obrázek.
          Co z toho se zobrazí, řídí JS podle oprávnění (PJ vs. vlastník) a
          podle toho, jestli je v DB hotové ruční SQL (window.MAPA.funkce). -->
-    <div id="vzhledSekce" class="panel-sekce" style="display:none;">
-      <h4 class="panel-h4">Vzhled</h4>
+    <!-- Světlo je nejčastější úkon PJ na tmavé mapě, proto zůstává mimo sbalenou sekci. -->
+      <div id="vzhledSvetloRadek" class="vz-radek" style="display:none;">
+        <label for="vzhledSvetlo">Světlo</label>
+        <select class="input" id="vzhledSvetlo">
+          <option value="">Nesvítí</option>
+          <option value="pochoden:6">Pochodeň (6 sáhů)</option>
+          <option value="lucerna:8">Lucerna (8 sáhů)</option>
+          <option value="lucerna:4">Lucerna, poloviční spotřeba (4 sáhy)</option>
+          <option value="lucerna:2">Lucerna, čtvrtinová spotřeba (2 sáhy)</option>
+          <option value="hul:6">Čarodějova hůl jako pochodeň (6 sáhů)</option>
+          <option value="hul:8">Čarodějova hůl jako lucerna (8 sáhů)</option>
+          <option value="vlastni">Vlastní dosah…</option>
+          <optgroup label="Zóna tmy (kouzlo, tma potlačí světlo i infravidění)">
+            <option value="tma:vlastni">Tma / Obscurum (4 magy za sáh poloměru)…</option>
+            <option value="temnota:300">Temnota druida (300 sáhů)</option>
+          </optgroup>
+        </select>
+        <input class="input" type="number" id="vzhledSvetloSahy" min="0.5" max="300" step="0.5" placeholder="sáhů" style="display:none;width:6rem;">
+      </div>
+      <div id="vzhledZbyvaRadek" class="vz-radek" style="display:none;">
+        <label for="vzhledZbyva">Vydrží ještě (směn; prázdné = bez limitu)</label>
+        <input class="input" type="number" id="vzhledZbyva" min="1" max="9999" step="1" placeholder="např. 3" style="width:6rem;">
+      </div>
+    <!-- Vzhled je sbalený: u postavy se do něj běžně nesahá (velikost i počet hexů se odvodí z tvora,
+         infravidění nestvůry z bestiáře), nejčastější je světlo — to zůstává i ve sbaleném stavu v souhrnu. -->
+    <details id="vzhledSekce" class="panel-sekce vzhled-sekce" style="display:none;">
+      <summary class="panel-h4 vzhled-summary">Vzhled a smysly <span id="vzhledSouhrn" class="vzhled-souhrn"></span></summary>
       <div id="vzhledNazevRadek" class="vz-radek" style="display:none;">
         <input class="input" type="text" id="vzhledNazev" maxlength="100" placeholder="Název tokenu">
         <button class="btn btn-ghost" type="button" id="vzhledNazevUlozit">Uložit</button>
@@ -676,28 +701,6 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
       </div>
       <label id="vzhledZamcenoRadek" class="vz-check" style="display:none;"><input type="checkbox" id="vzhledZamceno"> Zamknout polohu</label>
       <label id="vzhledSkrytyRadek" class="vz-check" style="display:none;"><input type="checkbox" id="vzhledSkryty"> Skrýt před hráči</label>
-      <div id="vzhledSvetloRadek" class="vz-radek" style="display:none;">
-        <label for="vzhledSvetlo">Světlo</label>
-        <select class="input" id="vzhledSvetlo">
-          <option value="">Nesvítí</option>
-          <option value="pochoden:6">Pochodeň (6 sáhů)</option>
-          <option value="lucerna:8">Lucerna (8 sáhů)</option>
-          <option value="lucerna:4">Lucerna, poloviční spotřeba (4 sáhy)</option>
-          <option value="lucerna:2">Lucerna, čtvrtinová spotřeba (2 sáhy)</option>
-          <option value="hul:6">Čarodějova hůl jako pochodeň (6 sáhů)</option>
-          <option value="hul:8">Čarodějova hůl jako lucerna (8 sáhů)</option>
-          <option value="vlastni">Vlastní dosah…</option>
-          <optgroup label="Zóna tmy (kouzlo, tma potlačí světlo i infravidění)">
-            <option value="tma:vlastni">Tma / Obscurum (4 magy za sáh poloměru)…</option>
-            <option value="temnota:300">Temnota druida (300 sáhů)</option>
-          </optgroup>
-        </select>
-        <input class="input" type="number" id="vzhledSvetloSahy" min="0.5" max="300" step="0.5" placeholder="sáhů" style="display:none;width:6rem;">
-      </div>
-      <div id="vzhledZbyvaRadek" class="vz-radek" style="display:none;">
-        <label for="vzhledZbyva">Vydrží ještě (směn; prázdné = bez limitu)</label>
-        <input class="input" type="number" id="vzhledZbyva" min="1" max="9999" step="1" placeholder="např. 3" style="width:6rem;">
-      </div>
       <div id="vzhledInfraRadek" class="vz-radek" style="display:none;">
         <label for="vzhledInfra">Infravidění (sáhů; prázdné = nemá)</label>
         <input class="input" type="number" id="vzhledInfra" min="1" max="200" step="1" placeholder="např. 20" style="width:6rem;">
@@ -707,7 +710,7 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
         <label for="vzhledNoc">Noční vidění (sáhů; prázdné = nemá)</label>
         <input class="input" type="number" id="vzhledNoc" min="1" max="200" step="1" placeholder="dosah" style="width:6rem;">
       </div>
-    </div>
+    </details>
 
     <div id="sekceEntita">
     <div id="spravovatPjStav" class="pj-stav" style="display:none;"></div>

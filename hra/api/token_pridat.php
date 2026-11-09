@@ -196,6 +196,9 @@ if ($dbTypEntity === 'obecny') {
         }
     }
 }
+// Zdědila-li se velikost od posledního kusu téhož druhu, neplete se do ní odvození z třídy velikosti níž
+// (PJ si ji u toho druhu už jednou nastavil a chce ji mít stejnou).
+$vzhledZdedenaVelikost = array_key_exists('velikost_sahu', $vzhled);
 if ($vzhled) {
     $sety = implode(', ', array_map(fn($c) => "`$c` = ?", array_keys($vzhled)));
     $pdo->prepare("UPDATE tokeny SET $sety WHERE id = ?")->execute([...array_values($vzhled), $tokenId]);
@@ -214,20 +217,53 @@ if ($dbTypEntity === 'nestvura_instance' && $funkceVzhled['hexy']) {
     );
     $q->execute([$nestvuraId, (int)$mapa['svet_id'], $tokenId]);
     $predchoziHexu = $q->fetchColumn();
+    // Třída velikosti z bestiáře (A0 až E) — potřebná i pro velikost tokenu níž, proto se zjišťuje vždy.
+    $radekDruhu = $nestvura ?? null;
+    if ($radekDruhu === null) {
+        $qd = $pdo->prepare('SELECT velikost FROM nestvury WHERE id = ?');
+        $qd->execute([$nestvuraId]);
+        $radekDruhu = $qd->fetch(PDO::FETCH_ASSOC) ?: [];
+    }
+    $trida = preg_match('/^\s*(A0|A|B|C|D|E)(?![A-Za-z0-9])/u', (string)($radekDruhu['velikost'] ?? ''), $m) ? $m[1] : '';
     if ($predchoziHexu !== false) {
         $hexu = max(1, (int)$predchoziHexu);
     } else {
-        $trida = preg_match('/^\s*(A0|A|B|C|D|E)(?![A-Za-z0-9])/u', (string)($nestvura['velikost'] ?? ''), $m) ? $m[1] : '';
         $hexu = ['D' => 3, 'E' => 5][$trida] ?? 1;
     }
+    $sety = [];
+    $hodnoty = [];
     if ($hexu > 1) {
         $tvar = dracak_vtt_souboj_tvar($hexu);
-        $sety = ['hexu = ?'];
-        $hodnoty = [$hexu];
+        $sety[] = 'hexu = ?';
+        $hodnoty[] = $hexu;
         if (dracak_vtt_tokeny_ma_sloupec('smer')) {
             $sety[] = 'smer = ?';
             $hodnoty[] = dracak_vtt_hex_smer_z_orientace($tvar, 0);
         }
+    }
+    // Velikost tokenu na mapě se neodhaduje ani nezadává ručně: jeden hex odpovídá jednomu sáhu (h1622 b10798),
+    // takže tvor zabírající N hexů je N sáhů široký. Výjimka je třída A0 („Drobný tvor, na jeden hex se vejde víc
+    // tvorů této velikosti“ — tabulka velikostí), ta se kreslí na půl sáhu. PJ to pak může na tokenu přepsat.
+    if ($funkceVzhled['velikost'] && !$vzhledZdedenaVelikost) {
+        $sety[] = 'velikost_sahu = ?';
+        $hodnoty[] = $trida === 'A0' ? 0.5 : (float)$hexu;
+    }
+    if ($sety) {
+        $hodnoty[] = $tokenId;
+        $pdo->prepare('UPDATE tokeny SET ' . implode(', ', $sety) . ' WHERE id = ?')->execute($hodnoty);
+    }
+}
+
+// Smysly nestvůry z bestiáře (migrace 0116): infravidění a „infravidění ho nerozezná“ se nezadávají ručně,
+// když je kniha uvádí. PJ je pak na tokenu může přepsat (třeba u tvora, kterému kniha dosah neříká).
+if ($dbTypEntity === 'nestvura_instance' && $funkceVzhled['videni']) {
+    require_once __DIR__ . '/../../includes/vtt_nestvury.php';
+    $smysly = dracak_vtt_nestvura_smysly($pdo, $nestvuraId);
+    $sety = [];
+    $hodnoty = [];
+    if ($smysly['infra'] !== null) { $sety[] = 'videni_infra_sahy = ?'; $hodnoty[] = $smysly['infra']; }
+    if ($smysly['studeny']) { $sety[] = 'studeny = 1'; }
+    if ($sety) {
         $hodnoty[] = $tokenId;
         $pdo->prepare('UPDATE tokeny SET ' . implode(', ', $sety) . ' WHERE id = ?')->execute($hodnoty);
     }

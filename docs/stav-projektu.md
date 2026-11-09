@@ -27,6 +27,35 @@ už byly rozhodnuté (viz "Architektonická rozhodnutí" a celá sekce
 "Rozpracováno" níže — všechno v ní je buď přímo citovaný text pravidel,
 nebo odsouhlasené uživatelem, ne můj odhad).
 
+### Panel tokenu: co se odvozuje z pravidel místo ručního zadávání (2026-11-09)
+
+Zadání uživatele: *„pokud bestiář nemá infravidění, pak by tady být nemusel… pokud to potvora má, aplikuje se automaticky“*
+a *„velikost by měla být automatická podle vlastnosti tokenu“* (+ potvrzeno, že velikost je navázaná na tvar a počet hexů).
+Širší princip, který k tomu uživatel řekl: **zdroj pravdy jsou pravidla, DB je jen jejich přepis — když v DB něco chybí, je to chyba dat,
+ne důvod nechávat ruční pole.**
+
+**Hotovo:**
+- **Infravidění nestvůr je v datech** (migrace `0116`, ruční SQL blok K): nový sloupec `nestvura_schopnosti.hodnota` (obecný — deník
+  nestvůry na něm postaví i další schopnosti) a vazby podle bestiáře **s citací u každého řádku**: Zmije rohatá 10 sáhů (b18526),
+  Haterie 30 (b18603), Vážka jeskynní 30 (b18710), nemrtví 30 (b19754, celá skupina Kostlivec–Upír); Bazilišek (b17822),
+  Krysodlak zvířecí (b19305) a Skřet (b20514) infravidění mají, ale **kniha dosah neuvádí — nic se nevymýšlí**, dosah doplní PJ.
+  Nová schopnost „Nerozezná ho infravidění“ pro Haterii, Hlen zelený (b18616), Mloka (b19690), Nevidění (b19921) a oživlé sochy (b95001).
+- **Nový token nestvůry si to vezme sám** (`dracak_vtt_nestvura_smysly()` ve `vtt_nestvury.php`, volá `token_pridat.php`); PJ to může přepsat.
+- **Velikost tokenu se odvodí z počtu hexů**: jeden hex = jeden sáh (h1622 b10798), takže tvor na N hexech je N sáhů široký;
+  třída A0 („na jeden hex se vejde víc tvorů“) se kreslí na půl sáhu. Ručně nastavená velikost se dědí dál a odvození ji nepřebije.
+- **„Vzhled a smysly“ je v panelu sbalený** (`<details>`), v hlavičce nese souhrn (svítí / zamčený / skrytý / hexy).
+  **Světlo zůstalo mimo sbalenou sekci** — je to nejčastější úkon PJ na tmavé mapě.
+- Test `tests/e2e/nestvura_smysly_api.js`.
+
+**Vědomě NEuděláno — infravidění postav se z rasy nepředvyplňuje.** Přepis pravidel u trpaslíka **žádný dosah neuvádí** (hrac b790, b11186);
+hodnota „20 sáhů“ v popisu schopnosti v DB **nemá v přepisu oporu** a může být vymyšlená (stejný případ jako pohyblivost ras v 0007).
+Kouzlo Lovce přitom mluví o „infravidění jako trpaslík **na 50 sáhů**“ (b7318). Zapsáno v `docs/kontrolni-seznam-neuplnych-mist.md`,
+**potřebuje foto stránky s rasou Trpaslík.**
+
+**Zbývá** (návrh v `docs/panel-tokenu-navrh.md`, schváleno uživatelem): rozpad panelu na vrstvu tokenu (nástroj PJ), vrstvu tvora
+(kompaktní deník místo „deníku lite“) a vrstvu PJ uvnitř něj (zámek, efekty i mimo iniciativu, ±životy, kořist); světlo přesunout
+k předmětu v inventáři („Zapálit / zhasnout“); deník nestvůry doplnit o životy, efekty a výbavu.
+
 ### Export a import oblasti — jen návrh, odloženo (2026-11-09)
 
 Uživatel chce do budoucna: loď/přístav/portál do jiné dimenze, předatelný svět a možnost vzít **kus cizí tvorby** (quest pro novou oblast)

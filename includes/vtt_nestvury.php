@@ -206,3 +206,33 @@ function dracak_vtt_nestvura_vrat_instanci(PDO $pdo, int $instanceId): void
 {
     $pdo->prepare('UPDATE nestvura_instance SET jedinecny = 0, data = NULL WHERE id = ?')->execute([$instanceId]);
 }
+
+// Smysly nestvůry podle bestiáře (migrace 0116): dosah infravidění v sázích a jestli ji infravidění naopak nerozezná.
+// Zdroj jsou pravidla, ne ruční zadání na tokenu — proto se tím předvyplňuje nový token (hra/api/token_pridat.php).
+// ['infra' => ?int, 'infra_ma' => bool, 'studeny' => bool]; 'infra_ma' bez 'infra' = kniha říká, že tvor infravidění má,
+// ale dosah neuvádí (Bazilišek, Krysodlak, Skřet) — dosah doplní PJ.
+function dracak_vtt_nestvura_smysly(PDO $pdo, int $nestvuraId): array
+{
+    $out = ['infra' => null, 'infra_ma' => false, 'studeny' => false];
+    try {
+        $q = $pdo->prepare(
+            'SELECT z.nazev, ns.hodnota FROM nestvura_schopnosti ns
+             JOIN zvlastni_schopnosti z ON z.id = ns.schopnost_id
+             WHERE ns.nestvura_id = ? AND z.nazev IN ("Infravidění", "Nerozezná ho infravidění")'
+        );
+        $q->execute([$nestvuraId]);
+        foreach ($q->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            if ($r['nazev'] === 'Infravidění') {
+                $out['infra_ma'] = true;
+                if ($r['hodnota'] !== null && preg_match('/^\d+$/', trim((string)$r['hodnota']))) {
+                    $out['infra'] = (int)$r['hodnota'];
+                }
+            } else {
+                $out['studeny'] = true;
+            }
+        }
+    } catch (Throwable $e) {
+        // sloupec hodnota ještě není (ruční SQL nespuštěné) — token se nepředvyplní, zadá se ručně jako dřív
+    }
+    return $out;
+}

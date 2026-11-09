@@ -567,3 +567,11 @@ body.denik-dock-cela { overflow:hidden; }
   .tb-chipy { max-height:30vh; }
   .tb-hledat, .tb-druh { width:auto; flex:1 1 110px; min-width:0; }
 }
+
+/* Sbalený „Vzhled a smysly“ v panelu tokenu: u postavy se do něj běžně nesahá (velikost i hexy se odvodí z tvora,
+   infravidění nestvůry z bestiáře), proto je zavřený a v hlavičce nese souhrn toho, co je nastavené. */
+.vzhled-sekce > .vzhled-summary { cursor:pointer; list-style:none; display:flex; align-items:center; gap:6px; }
+.vzhled-sekce > .vzhled-summary::-webkit-details-marker { display:none; }
+.vzhled-sekce > .vzhled-summary::before { content:'▸'; font-size:11px; color:#9a9088; transition:transform .12s; }
+.vzhled-sekce[open] > .vzhled-summary::before { transform:rotate(90deg); }
+.vzhled-souhrn { font-weight:400; font-size:11px; color:#9a9088; }

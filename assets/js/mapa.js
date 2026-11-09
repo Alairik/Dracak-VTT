@@ -1559,7 +1559,20 @@ function obnovVzhledSekci() {
     [vzhledEl.zbyvaRadek, pj && FUNKCE.videni && FUNKCE.svetlo_zbyva && !!t.svetlo],
   ];
   radky.forEach(([el, zobrazit]) => { if (el) el.style.display = zobrazit ? '' : 'none'; });
-  vzhledEl.sekce.style.display = radky.some(([, z]) => z) ? '' : 'none';
+  // Světlo a doba hoření jsou mimo sbalenou sekci (nejčastější úkon PJ), takže se do jejího zobrazení nepočítají —
+  // jinak by se otevírala prázdná hlavička jen kvůli světlu.
+  const mimoSekci = new Set([vzhledEl.svetloRadek, vzhledEl.zbyvaRadek]);
+  vzhledEl.sekce.style.display = radky.some(([el, z]) => z && !mimoSekci.has(el)) ? '' : 'none';
+  // Souhrn ve sbalené hlavičce: co je na tokenu doopravdy nastavené, ať se kvůli kontrole nemusí rozbalovat.
+  const souhrnEl = document.getElementById('vzhledSouhrn');
+  if (souhrnEl) {
+    const casti = [];
+    if (t.svetlo) casti.push('svítí ' + t.svetlo + ' sáhů');
+    if (t.zamceno) casti.push('zamčený');
+    if (t.viditelny === false) casti.push('skrytý');
+    if (t.hexu > 1) casti.push(t.hexu + ' hexy');
+    souhrnEl.textContent = casti.length ? '· ' + casti.join(' · ') : '';
+  }
   if (vzhledEl.nazev && document.activeElement !== vzhledEl.nazev) vzhledEl.nazev.value = t.typ_entity === 'obecny' ? t.label : (t.label || '');
   vzhledEl.barvy.querySelectorAll('.vz-barva').forEach((b) => b.classList.toggle('aktivni', (b.dataset.barva || '') === (t.barva || '')));
   vzhledEl.velikost.querySelectorAll('button').forEach((b) => b.classList.toggle('aktivni', parseFloat(b.dataset.velikost) === (t.velikost || 1)));

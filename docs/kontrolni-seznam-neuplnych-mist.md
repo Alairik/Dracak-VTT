@@ -425,7 +425,18 @@ začne hrát často, přidá se mu složka (nový řádek v `efekt_slozky`, bez 
 - [x] Výsledek hodu na iniciativu 0 a méně (h1623 b10805, b10810): rozhodnuto uživatelem 2026-11-01 — v dalším kole nový hod 1k6 a místo obvyklých
   postihů se použije výsledek z minulého kola (≤ 0); hotovo v kódu (migrace 0104, čeká na ruční SQL), viz `docs/stav-projektu.md`.
 
-## Na kontrolu při proofreadingu (stav 2026-10-14)
+## Na kontrolu při proofreadingu
+
+- [ ] **Dosah trpasličího infravidění chybí.** Přepis říká jen „Trpaslík má infravidění“ (hrac b790) a „Trpaslíci
+  (infravidění — vidí teplo…)“ (b11186), **žádné číslo**. Kouzlo Lovce přitom udává „infravidění jako trpaslík
+  **na vzdálenost 50 sáhů**“ (b7318), což vlastní dosah trpaslíka nepřímo odlišuje. V databázi má schopnost
+  Infravidění v popisu „s dosahem 20 sáhů“ — **tohle číslo nemá v přepisu oporu** a může být vymyšlené
+  (stejný případ jako pohyblivost ras v 0007). Proto se infravidění postavám **nepředvyplňuje** z rasy;
+  u nestvůr ano, tam bestiář čísla uvádí (migrace 0116). **Potřebuju foto stránky s rasou Trpaslík.**
+- [ ] **Oživlá socha a infravidění — výjimka s lávou.** Bestiář (b95001) říká „trpaslík je zpravidla neuvidí
+  infraviděním (výjimkou je například kamenná socha, stříkající lávu)“. Migrace 0116 označí všechny tři sochy
+  jako „infravidění je nerozezná“; stav „socha právě stříká lávu“ engine nezná a PJ ho na tokenu přepne ručně.
+ (stav 2026-10-14)
 
 Sem patří věci, kde jsem **převzal údaj z knihy tak, jak je** (při rozporu
 podle homebrew), nebo si text musel vyložit. Na konci se projdou společně s
