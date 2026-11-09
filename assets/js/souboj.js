@@ -1406,8 +1406,30 @@ export function initSouboj(ctx) {
       mSeznam.append(radek);
     });
     if (!tokeny.length) mSeznam.append(el('p', 'note', 'Na mapě nejsou žádné postavy ani nestvůry.'));
+    prepocitatVybrane();
     mSouboj.style.display = '';
   }
+  // Kolik je zaškrtnuto z kolika — u dlouhého seznamu je jinak nevidět, co vlastně do iniciativy půjde.
+  function prepocitatVybrane() {
+    const el2 = document.getElementById('soubojPocet');
+    if (!el2 || !mSeznam) return;
+    const vsechny = mSeznam.querySelectorAll('.souboj-radek input[type=checkbox]');
+    const zaskrtnuto = mSeznam.querySelectorAll('.souboj-radek input[type=checkbox]:checked').length;
+    el2.textContent = vsechny.length ? 'do iniciativy půjde ' + zaskrtnuto + ' z ' + vsechny.length : '';
+  }
+  if (mSeznam) mSeznam.addEventListener('change', prepocitatVybrane);
+  // Rychlý výběr (jen družina / vše / nikoho): na mapě s desítkami tvorů se po jednom klikat nedá.
+  // Kdo zaškrtnutý není, do pořadí tahů nevstoupí a PJ ho řídí ručně, kdy uzná za vhodné.
+  document.querySelectorAll('[data-souboj-vyber]').forEach((b) => b.addEventListener('click', () => {
+    const co = b.dataset.soubojVyber;
+    mSeznam.querySelectorAll('.souboj-radek').forEach((r) => {
+      const cb = r.querySelector('input[type=checkbox]');
+      const jeDruzina = r.querySelector('select').value === 'druzina';
+      cb.checked = co === 'vse' ? true : (co === 'nic' ? false : jeDruzina);
+    });
+    prepocitatVybrane();
+  }));
+
   function zavritZahajeni() { if (mSouboj) mSouboj.style.display = 'none'; }
   if (mSouboj) {
     mUlozit.addEventListener('click', async () => {

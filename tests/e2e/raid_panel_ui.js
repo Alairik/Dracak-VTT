@@ -49,9 +49,10 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   await pj.waitForTimeout(500);
   ok(await pj.locator('#raidPanel').isVisible(), 'tlačítko v liště otevře panel');
   let p = await poradi();
-  ok(p.length === 3 && p[0] === g1 && p[1] === g2 && p[2] === h, 'nejdřív nestvůry, pak postava hráče: ' + p.join(','));
+  // Mimo boj je nahoře družina (rozhodnutí uživatele 2026-11-09) — na mapě s hodně tvory PJ nejdřív potřebuje vidět partu.
+  ok(p.length === 3 && p[0] === h && p[1] === g1 && p[2] === g2, 'nejdřív družina, pak nestvůry: ' + p.join(','));
   const skupiny = await pj.$$eval('#raidSeznam .raid-skupina', e => e.map(x => x.textContent));
-  ok(skupiny.length === 2 && /^Nestvůry a NPC · 2/.test(skupiny[0]) && /^Družina · 1/.test(skupiny[1]), 'dvě skupiny s počty: ' + skupiny.join(' | '));
+  ok(skupiny.length === 2 && /^Družina · 1/.test(skupiny[0]) && /^Nestvůry a NPC · 2/.test(skupiny[1]), 'dvě skupiny s počty, družina první: ' + skupiny.join(' | '));
   const podtitul = await pj.textContent('#raidSeznam .raid-box[data-token-id="' + h + '"] .raid-podtitul');
   ok(/hráč/.test(podtitul), 'pod jménem postavy je povolání a jméno hráče: ' + podtitul);
   ok(/^Nestvůra/.test(await pj.textContent('#raidSeznam .raid-box[data-token-id="' + g1 + '"] .raid-podtitul')), 'pod jménem nestvůry je druh');
@@ -84,15 +85,16 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   await pj.dragAndDrop('#raidSeznam .raid-box[data-token-id="' + g2 + '"] .raid-grip', '#raidSeznam .raid-box[data-token-id="' + g1 + '"]', { targetPosition: { x: 100, y: 4 } });
   await pj.waitForTimeout(400);
   p = await poradi();
-  ok(p[0] === g2 && p[1] === g1, 'přetažením se goblin 2 dostal před goblina 1: ' + p.join(','));
+  ok(p.indexOf(g2) < p.indexOf(g1), 'přetažením se goblin 2 dostal před goblina 1: ' + p.join(','));
   ok(await pj.locator('#raidReset').isVisible(), 'po ručním přeřazení je vidět „↺ pořadí“');
   await pj.reload(); await pj.waitForTimeout(1500);
   p = await poradi();
-  ok(await pj.locator('#raidPanel').isVisible() && p[0] === g2, 'otevřený panel i ruční pořadí přežijí obnovení stránky');
+  ok(await pj.locator('#raidPanel').isVisible() && p.indexOf(g2) < p.indexOf(g1), 'otevřený panel i ruční pořadí přežijí obnovení stránky: ' + p.join(','));
   await pj.click('#raidReset');
   await pj.waitForTimeout(300);
   p = await poradi();
-  ok(p[0] === g1 && !(await pj.locator('#raidReset').isVisible()), 'tlačítko vrátí výchozí pořadí');
+  ok(p[0] === h && p.indexOf(g1) < p.indexOf(g2) && !(await pj.locator('#raidReset').isVisible()),
+    'tlačítko vrátí výchozí pořadí (družina nahoře, goblini v původním pořadí): ' + p.join(','));
 
   // --- kompaktní řádky a přesun okna ---
   await pj.click('#raidRezim');

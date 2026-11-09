@@ -41,6 +41,23 @@ const txt = (page, sel) => page.$eval(sel, e => e.innerText).catch(() => '(nenal
   await pj.screenshot({ path: SHOTS + '/01_zahajeni.png' });
   const rad = await pj.$$eval('#soubojUcastnici .souboj-radek', r => r.map(x => x.innerText.trim().replace(/\s+/g, ' ')));
   console.log('účastníci v okně:', rad.join(' | '));
+
+  // Rychlý výběr, kdo vstoupí do iniciativy (na mapě s hodně tvory se po jednom klikat nedá; kdo zaškrtnutý není,
+  // do pořadí tahů nevstoupí a PJ ho řídí ručně). Rozhodnutí uživatele 2026-11-09.
+  const zaskrtnuto = () => pj.locator('#soubojUcastnici input[type=checkbox]:checked').count();
+  const vsech = await pj.locator('#soubojUcastnici input[type=checkbox]').count();
+  ok((await txt(pj, '#soubojPocet')).includes('z ' + vsech), 'okno píše, kolik tvorů půjde do iniciativy: ' + (await txt(pj, '#soubojPocet')));
+  await pj.click('[data-souboj-vyber="nic"]'); await pj.waitForTimeout(150);
+  ok(await zaskrtnuto() === 0, '„Nikoho“ odškrtne všechny');
+  await pj.click('[data-souboj-vyber="vse"]'); await pj.waitForTimeout(150);
+  ok(await zaskrtnuto() === vsech, '„Vše“ zaškrtne všechny: ' + vsech);
+  await pj.click('[data-souboj-vyber="druzina"]'); await pj.waitForTimeout(150);
+  const jenDruzina = await zaskrtnuto();
+  const druzinaRadku = await pj.locator('#soubojUcastnici .souboj-radek select option[value="druzina"]:checked').count();
+  ok(jenDruzina > 0 && jenDruzina === druzinaRadku, '„Jen družina“ nechá zaškrtnuté jen tvory na straně družiny: ' + jenDruzina + ' z ' + vsech);
+  ok((await txt(pj, '#soubojPocet')).includes('půjde ' + jenDruzina), 'počítadlo sedí po rychlém výběru: ' + (await txt(pj, '#soubojPocet')));
+  await pj.click('[data-souboj-vyber="vse"]'); await pj.waitForTimeout(150);
+
   await pj.click('#soubojUlozit');
   await pj.waitForSelector('#raidPanel', { state: 'visible' });
   await pj.waitForTimeout(600);

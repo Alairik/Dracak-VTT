@@ -2,7 +2,7 @@
 // PJ vidí všechny tvory a v boxu avatar, jméno, druh, životy s číslem, magenergii, efekty, únavu a iniciativu. Hráč vidí jen to, co smí:
 // bez souboje družinu, v souboji účastníky, které mu server prozradil (nestvůry a postavy PJ jsou v iniciativě skryté), a u každého jen avatar, jméno
 // a pruh životů (bez čísel a dalších údajů) plus iniciativu tam, kde ji smí znát.
-// Řazení: bez souboje nejdřív nestvůry a postavy PJ, potom postavy hráčů; v souboji podle iniciativy (pořadí z mapa_stav.php), kdo ještě
+// Řazení: bez souboje nejdřív DRUŽINA, potom nestvůry a postavy PJ; v souboji podle iniciativy (pořadí z mapa_stav.php), kdo ještě
 // nemá výsledek, jde za nimi (nestvůry, pak hráči), vyřazení na konec skupiny. Boxy jdou přetahovat za úchyt (ruční pořadí se pamatuje; po novém kole
 // iniciativy nebo při jiné skupině tvorů se zahodí), okno jde přesunout za hlavičku, sbalit a přepnout na kompaktní řádky.
 // Ovládání souboje (úmysl, hod, akce) vyrábí assets/js/souboj.js a vkládá se do boxu tvora (radekExtra); nadpis, fáze, nápověda a tlačítka jsou ve stejném okně.
@@ -123,7 +123,9 @@ export function initRaidPanel(ctx) {
       tvorove = tvorove.filter((t) => (kolo ? vidi.has(t.id) : t.strana === 'hrac'));
     }
     const poId = new Map(tvorove.map((t) => [t.id, t]));
-    const strana = (t) => (t.strana === 'hrac' ? 1 : 0);
+    // Mimo boj je nahoře DRUŽINA (rozhodnutí uživatele 2026-11-09: na mapě s hodně tvory PJ nejdřív potřebuje vidět partu,
+    // nestvůry a NPC jsou pod ní). V souboji o pořadí rozhoduje iniciativa, takže se tohle neuplatní.
+    const strana = (t) => (t.strana === 'hrac' ? 0 : 1);
     const posledni = (a, b) => (vyrazen(a) ? 1 : 0) - (vyrazen(b) ? 1 : 0);
     const bezIni = (arr) => arr.slice().sort((a, b) => strana(a) - strana(b) || posledni(a, b));
     let radky, klic;
@@ -134,7 +136,7 @@ export function initRaidPanel(ctx) {
       radky = podleIni.concat(bezIni(tvorove.filter((t) => !mamIni.has(t.id))));
       klic = 'souboj:' + kolo.cislo_kola + ':' + radky.map((t) => t.id).join(',');
     } else {
-      // Nestvůry a postavy PJ nahoře, pak postavy hráčů; vyřazení vždy na konec své skupiny.
+      // Družina nahoře, pak nestvůry a postavy PJ; vyřazení vždy na konec své skupiny.
       radky = bezIni(tvorove);
       klic = 'priprava';
     }

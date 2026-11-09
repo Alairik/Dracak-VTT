@@ -794,6 +794,15 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
           <option value="obe">Obě strany jsou překvapeny</option>
         </select>
       </label>
+      <!-- Rychlý výběr: na mapě s desítkami tvorů je zaškrtávání po jednom nepoužitelné. „Jen družina“ je nejčastější případ —
+           PJ si pak nestvůry, které mají vstoupit do iniciativy, doklikne. Zbytek NPC řídí ručně mimo pořadí tahů. -->
+      <div class="vz-radek" style="gap:6px;margin:8px 0 4px;flex-wrap:wrap;align-items:center;">
+        <span class="note" style="margin:0;">Rychle:</span>
+        <button class="btn btn-ghost" type="button" data-souboj-vyber="druzina" style="font-size:12px;padding:3px 8px;">Jen družina</button>
+        <button class="btn btn-ghost" type="button" data-souboj-vyber="vse" style="font-size:12px;padding:3px 8px;">Vše</button>
+        <button class="btn btn-ghost" type="button" data-souboj-vyber="nic" style="font-size:12px;padding:3px 8px;">Nikoho</button>
+        <span class="note" id="soubojPocet" style="margin:0 0 0 auto;"></span>
+      </div>
       <div id="soubojUcastnici" class="souboj-seznam"></div>
       <div class="vz-radek" style="margin-top:10px;">
         <button class="btn btn-secondary" type="button" id="soubojUlozit" style="flex:1;">Zahájit souboj</button>
