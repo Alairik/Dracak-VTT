@@ -27,6 +27,20 @@ už byly rozhodnuté (viz "Architektonická rozhodnutí" a celá sekce
 "Rozpracováno" níže — všechno v ní je buď přímo citovaný text pravidel,
 nebo odsouhlasené uživatelem, ne můj odhad).
 
+### Export a import oblasti — jen návrh, odloženo (2026-11-09)
+
+Uživatel chce do budoucna: loď/přístav/portál do jiné dimenze, předatelný svět a možnost vzít **kus cizí tvorby** (quest pro novou oblast)
+a napojit ho na svůj svět. **Rozhodl 2026-11-09, že se světy nenapojují — jeden svět to pojme** (souhlas i technicky: dimenze je jen
+oblast, na kterou vede přechod). Pak se rozhodl, že je to velká úprava, která počká, a chtěl jen dokument.
+
+**Návrh je v `docs/export-import-oblasti-navrh.md`** (co do oblasti patří a co ne — katalog pravidel se nevyváží, postavy a hráči taky ne,
+provozní stav se zahodí; formát ZIP s obrázky; čtyři těžká místa — přečíslování, polymorfní `tokeny.entita_id`, odkazy ven z oblasti,
+chybějící katalog u importu; pět kroků realizace, odhad několik dní).
+
+**Do databáze se kvůli tomu záměrně nesáhlo** — dnes nic nechybí, odkazy jsou cizí klíče a sloupec přidaný „do zásoby“ by se skoro jistě
+trefil vedle. Poznámka na později: `nestvura_instance.svet_id` a `lokace_mapa_id` (0115) jsou bez cizího klíče; dnes to nevadí, protože
+aplikace mapy mazat neumí (`DELETE FROM mapy` není nikde v repu), ale s mazáním map by to bylo potřeba ošetřit.
+
 ### NPC jako bytost světa a správa tokenů — HOTOVO v kódu (2026-11-09, čeká na ruční SQL blok J)
 
 Rozhodnutí uživatele 2026-11-09: **dvě úrovně NPC** (jedinečné s vlastními čísly × běžný kus se čísly druhu) a **postav to hned**.
@@ -53,7 +67,10 @@ jako přípravu na mapy, které ještě nevznikly; výroba **dávkou** („10× 
   a `token_bar_ui.js` (28 kontrol: záložky, výroba, filtry, tažení myší i prstem na tabletu, klepnutí, mazání, hráč lištu nemá).
   Ověřeno i **bez ručního SQL** (lišta se nezobrazí, `npc_vyrobit` vrací 409, starý způsob přidání nestvůry funguje).
 
-**Zbývá uživateli:** spustit ruční SQL blok J v phpMyAdminu a pak v administraci Změny databáze → Spustit čekající změny.
+**Ruční SQL blok J uživatel spustil 2026-11-09** (`docs/sql-k-rucnimu-spusteni.sql` je prázdný). Nasazení commitu `9b3a650` na hosting proběhlo
+(FTP Deploy běh 280, úspěch). Ověření sloupců na produkci je na uživateli: Změny databáze → „Co aplikace v databázi vidí“ (stránka tam nově
+vypisuje všechny čtyři sloupce z 0115) — z cloud session na produkční web ani do jeho databáze nevidím (proxy blokuje `vtt.zvelebil.online`,
+WEDOS nepouští MySQL zvenčí).
 
 **Nice to have (zadání uživatele 2026-11-09, nestavět teď):** základní interagovatelné tokeny — truhla, mrtvola apod. Dnes existují „vlastní
 tokeny“ (typ `obecny`: NPC bez statistik, překážka, sud), ale jsou to jen značky bez obsahu a bez interakce. Truhla s obsahem by se dala
