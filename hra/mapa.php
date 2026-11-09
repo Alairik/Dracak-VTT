@@ -226,6 +226,9 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
     <?php if ($isPjOrAdmin): ?>
       <button class="tbtn" type="button" id="tb-pin" title="Přidat pin (místo)"><?php dracak_icon('map-pin'); ?></button>
     <?php endif; ?>
+    <?php if ($isPjOrAdmin && dracak_vtt_tokeny_funkce()['npc_zasoba']): ?>
+      <button class="tbtn" type="button" id="tb-tokeny" title="Správa tokenů — výroba NPC do zásoby a pokládání tažením (lišta dole uprostřed)"><?php dracak_icon('layers'); ?></button>
+    <?php endif; ?>
     <button class="tbtn" type="button" id="tb-raid" title="<?= $isPjOrAdmin ? 'Panel tvorů a souboje — nestvůry, družina, pořadí tahů (plovoucí okno)' : 'Družina a pořadí tahů (plovoucí okno)' ?>"><?php dracak_icon('users'); ?></button>
     <button class="tbtn" type="button" id="tb-kostky" title="Hodit kostkou"><?php dracak_icon('dices'); ?></button>
     <button class="tbtn" type="button" id="tb-log" title="Log"><?php dracak_icon('scroll-text'); ?></button>
@@ -245,6 +248,57 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
 
   <?php if ($isPjOrAdmin): ?>
   <a id="meridloCesta" class="meridlo-cesta" href="#" style="display:none;" title="Otevře kalkulačku cesty s touto vzdáleností"></a>
+  <?php endif; ?>
+
+  <?php if ($isPjOrAdmin && dracak_vtt_tokeny_funkce()['npc_zasoba']): ?>
+  <!-- Správa tokenů (jen PJ; assets/js/token_bar.js): lišta dole uprostřed — výroba NPC do zásoby, zásoba
+       nepoložených, NPC téhle lokace a naposledy použité druhy. Pokládá se tažením na mapu (prst i myš). -->
+  <div id="tokenBar" class="token-bar" style="display:none;" role="region" aria-label="Správa tokenů">
+    <div class="tb-zalozky">
+      <button class="tb-zal aktivni" type="button" data-tb-zal="novy">Nový token</button>
+      <button class="tb-zal" type="button" data-tb-zal="zasoba">Nevyužité <span class="tb-pocet" id="tbPocetZasoba">0</span></button>
+      <button class="tb-zal" type="button" data-tb-zal="lokace">Tato lokace <span class="tb-pocet" id="tbPocetLokace">0</span></button>
+      <button class="tb-zal" type="button" data-tb-zal="naposledy">Naposledy</button>
+      <button class="tb-zavrit" type="button" id="tbZavrit" title="Zavřít lištu"><?php dracak_icon('x', 14); ?></button>
+    </div>
+    <div class="tb-telo">
+      <div class="tb-panel" data-tb-panel="novy">
+        <div class="tb-radek">
+          <input class="input tb-hledat" type="text" id="tbHledat" placeholder="hledat druh…" autocomplete="off">
+          <select class="input tb-druh" id="tbDruh" size="1"></select>
+          <label class="tb-pole" title="Kolik kusů vyrobit do zásoby">počet
+            <input class="input tb-pocet-input" type="number" id="tbPocet" min="1" max="50" value="1">
+          </label>
+          <label class="tb-pole" title="Kam NPC patří — ve správě se ukáže u tohohle místa">místo
+            <select class="input" id="tbLokace">
+              <option value="tady">tady (<?= htmlspecialchars(mb_strimwidth((string)$mapa['nazev'], 0, 18, '…')) ?>)</option>
+              <option value="">bez místa (do zásoby)</option>
+            </select>
+          </label>
+          <label class="tb-chk" title="Každý kus dostane vlastní čísla pro boj (hostinský se jménem). Bez zaškrtnutí berou všichni čísla svého druhu.">
+            <input type="checkbox" id="tbJedinecny"> každý jedinečný
+          </label>
+          <button class="btn btn-primary tb-vyrobit" type="button" id="tbVyrobit">Vyrobit do zásoby</button>
+        </div>
+        <p class="tb-note" id="tbNovyNote">Vyrob si zásobu dopředu (třeba 10× Goblin) a pak je jen přetáhni z „Nevyužité“ na mapu.</p>
+      </div>
+      <div class="tb-panel" data-tb-panel="zasoba" hidden>
+        <div class="tb-radek tb-filtr">
+          <span class="tb-filtr-popis">Ukázat:</span>
+          <button class="tb-f aktivni" type="button" data-tb-filtr="vse">vše</button>
+          <button class="tb-f" type="button" data-tb-filtr="tady">z téhle lokace</button>
+          <button class="tb-f" type="button" data-tb-filtr="bez">bez místa</button>
+        </div>
+        <div class="tb-chipy" id="tbZasoba"></div>
+      </div>
+      <div class="tb-panel" data-tb-panel="lokace" hidden>
+        <div class="tb-chipy" id="tbLokaceSeznam"></div>
+      </div>
+      <div class="tb-panel" data-tb-panel="naposledy" hidden>
+        <div class="tb-chipy" id="tbNaposledy"></div>
+      </div>
+    </div>
+  </div>
   <?php endif; ?>
 
   <div id="zoomCtl">
@@ -858,7 +912,7 @@ window.MAPA = <?= json_encode([
     'funkce' => dracak_vtt_tokeny_funkce(),
     'cas' => $casSveta,
     'pravidla' => dracak_vtt_souboj_pravidla(),
-    'verzeModulu' => max((int)@filemtime(__DIR__ . '/../assets/js/souboj.js'), (int)@filemtime(__DIR__ . '/../assets/js/kostky3d.js'), (int)@filemtime(__DIR__ . '/../assets/js/hexy.js'), (int)@filemtime(__DIR__ . '/../assets/js/denik_dock.js'), (int)@filemtime(__DIR__ . '/../assets/js/raid_panel.js'), (int)@filemtime(__DIR__ . '/../assets/js/svetlo_stiny.js')),
+    'verzeModulu' => max((int)@filemtime(__DIR__ . '/../assets/js/souboj.js'), (int)@filemtime(__DIR__ . '/../assets/js/kostky3d.js'), (int)@filemtime(__DIR__ . '/../assets/js/hexy.js'), (int)@filemtime(__DIR__ . '/../assets/js/denik_dock.js'), (int)@filemtime(__DIR__ . '/../assets/js/raid_panel.js'), (int)@filemtime(__DIR__ . '/../assets/js/svetlo_stiny.js'), (int)@filemtime(__DIR__ . '/../assets/js/token_bar.js')),
     'grid' => [
         'px' => (int)($mapa['grid_velikost_px'] ?? 0),
         'typ' => $mapa['grid_typ'] ?? 'ctverec',

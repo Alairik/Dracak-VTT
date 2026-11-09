@@ -42,6 +42,10 @@ $e = static fn($v): string => htmlspecialchars((string)$v, ENT_QUOTES);
 // Co aplikace ve své databázi opravdu vidí: název databáze a sloupce, které přidává ruční SQL (docs/sql-k-rucnimu-spusteni.sql). Slouží ke kontrole po spuštění
 // ručního SQL — číslo z phpMyAdminu může být z jiné databáze, než jakou používá web; tahle tabulka je z pohledu webu.
 $ruckySql = [
+    ['nestvura_instance', 'svet_id', '0115 — NPC patří do světa (zásoba tokenů)'],
+    ['nestvura_instance', 'lokace_mapa_id', '0115 — místo, kam NPC patří'],
+    ['nestvura_instance', 'jedinecny', '0115 — jedinečné NPC s vlastními čísly'],
+    ['nestvura_instance', 'data', '0115 — vlastní čísla jedinečného NPC'],
     ['aktivni_efekty', 'kouzlo_id', '0113 — kouzlo, které tvor sesílá'],
     ['aktivni_efekty', 'akci_celkem', '0113 — kolik akcí kouzlení kouzlo vyžaduje'],
     ['aktivni_efekty', 'akci_hotovo', '0113 — kolik akcí kouzlení proběhlo'],

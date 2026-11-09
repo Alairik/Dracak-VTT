@@ -24,7 +24,7 @@ function dracak_vtt_ddl_mapa(): array
     if ($stav !== null) {
         return $stav;
     }
-    $stav = ['sloupce' => [], 'typ_entity' => '', 'udalosti_varchar' => false, 'tabulky' => [], 'kolo_sloupce' => [], 'efekty_sloupce' => [], 'ini_sloupce' => [], 'videni_sloupce' => []];
+    $stav = ['sloupce' => [], 'typ_entity' => '', 'udalosti_varchar' => false, 'tabulky' => [], 'kolo_sloupce' => [], 'efekty_sloupce' => [], 'ini_sloupce' => [], 'videni_sloupce' => [], 'npc_sloupce' => []];
     try {
         $pdo = dracak_db();
         foreach ($pdo->query(
@@ -75,6 +75,14 @@ function dracak_vtt_ddl_mapa(): array
                AND COLUMN_NAME IN ("mechanika_stav", "trvani_kol", "kolo_se_nepocita", "opakovani", "nasazeno_kolo", "kostky", "kouzlo_id", "akci_celkem", "akci_hotovo", "kouzleni_data")'
         )->fetchAll(PDO::FETCH_NUM) as [$tabulka, $sloupec]) {
             $stav['efekty_sloupce'][$tabulka . '.' . $sloupec] = true;
+        }
+        // NPC jako bytost světa (migrace 0115): sloupce zásoby a jedinečnosti + jestli mapa smí být prázdná.
+        foreach ($pdo->query(
+            'SELECT COLUMN_NAME, IS_NULLABLE FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = "nestvura_instance"
+               AND COLUMN_NAME IN ("svet_id", "jedinecny", "data", "mapa_id", "lokace_mapa_id")'
+        )->fetchAll(PDO::FETCH_NUM) as [$sloupec, $nullable]) {
+            $stav['npc_sloupce'][$sloupec] = strtoupper((string)$nullable) === 'YES';
         }
     } catch (Throwable $e) {
         // information_schema nedostupné — nové funkce zůstanou vypnuté
@@ -142,6 +150,11 @@ function dracak_vtt_tokeny_funkce(): array
         'kouzleni_postup' => isset($ddl['efekty_sloupce']['aktivni_efekty.kouzlo_id'], $ddl['efekty_sloupce']['aktivni_efekty.akci_celkem'], $ddl['efekty_sloupce']['aktivni_efekty.akci_hotovo']),
         // Automatické seslání kouzla po předposlední akci kouzlení (ruční SQL, migrace 0114: aktivni_efekty.kouzleni_data): bez sloupce se účinek zadává z deníku.
         'kouzleni_ucinek' => isset($ddl['efekty_sloupce']['aktivni_efekty.kouzleni_data']) && isset($ddl['efekty_sloupce']['aktivni_efekty.akci_celkem']),
+        // NPC jako bytost světa a zásoba tokenů (ruční SQL, migrace 0115: nestvura_instance.svet_id, jedinecny, data + mapa_id smí být prázdné):
+        // lišta dole uprostřed s výrobou NPC do zásoby a pokládáním tažením. Bez sloupců se lišta nezobrazí a tokeny se přidávají jako dřív.
+        'npc_zasoba' => !empty($ddl['npc_sloupce']['mapa_id'])
+            && isset($ddl['npc_sloupce']['svet_id'], $ddl['npc_sloupce']['jedinecny'], $ddl['npc_sloupce']['data'],
+                $ddl['npc_sloupce']['lokace_mapa_id']),
         'efekty_mech' => isset($ddl['tabulky']['efekt_slozky'])
             && isset($ddl['efekty_sloupce']['efekty.mechanika_stav'], $ddl['efekty_sloupce']['efekty.trvani_kol'],
                 $ddl['efekty_sloupce']['efekty.kolo_se_nepocita'], $ddl['efekty_sloupce']['efekty.opakovani'],

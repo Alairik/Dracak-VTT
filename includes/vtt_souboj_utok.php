@@ -247,7 +247,8 @@ function dracak_vtt_souboj_bojovnik(PDO $pdo, array $infoTokenu): array
     }
     // Čísla pro boj: uložená v deníku nestvůry (PJ je doplnil jednou za druh), jinak z textu bestiáře.
     require_once __DIR__ . '/vtt_nestvury.php';
-    $s = dracak_vtt_nestvura_staty($pdo, (int)$infoTokenu['svet_id'], (int)$n['nestvura_id'], $n);
+    // Jedinečné NPC (migrace 0115) má vlastní čísla — proto se posílá i id instance.
+    $s = dracak_vtt_nestvura_staty($pdo, (int)$infoTokenu['svet_id'], (int)$n['nestvura_id'], $n, (int)$infoTokenu['entita_id']);
     $st = $s['staty'];
     $velikostText = trim(dracak_vtt_text_cisla((string)$n['velikost']));
     $b['velikost'] = $st['velikost'];

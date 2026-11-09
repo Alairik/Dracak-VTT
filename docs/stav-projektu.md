@@ -27,6 +27,38 @@ už byly rozhodnuté (viz "Architektonická rozhodnutí" a celá sekce
 "Rozpracováno" níže — všechno v ní je buď přímo citovaný text pravidel,
 nebo odsouhlasené uživatelem, ne můj odhad).
 
+### NPC jako bytost světa a správa tokenů — HOTOVO v kódu (2026-11-09, čeká na ruční SQL blok J)
+
+Rozhodnutí uživatele 2026-11-09: **dvě úrovně NPC** (jedinečné s vlastními čísly × běžný kus se čísly druhu) a **postav to hned**.
+Zadání ke správě tokenů (jeho slova): lišta **dole uprostřed** jako v Owlbear Rodeo, ne vlevo („tam je nástrojů až až“), se záložkami
+„nový token | nevyužité | naposledy použité“; NPC se dá **navázat na místo** (pak se ukáže ve správě u té lokace) nebo vytvořit **bez místa**
+jako přípravu na mapy, které ještě nevznikly; výroba **dávkou** („10× goblin“) se zaškrtávátkem „každý jedinečný“ a pak **drag and drop** na mapu;
+**vyplněný deník dělá z kusu unikát**.
+
+**Hotovo a otestované (migrace `0115`, ruční SQL blok J — bez něj se lišta nezobrazí a tokeny se přidávají jako dřív):**
+- `nestvura_instance` má `svet_id` (NPC žije ve světě), `mapa_id` smí být prázdné (= v zásobě), `lokace_mapa_id` (místo, kam patří),
+  `jedinecny` a `data` (vlastní čísla). Pozor na rozdíl: `mapa_id` = kde token **právě stojí**, `lokace_mapa_id` = kam NPC **patří**.
+- `includes/vtt_npc.php` + `hra/api/npc_zasoba.php`, `npc_vyrobit.php`, `npc_smazat.php`, `npc_lokace.php`; strop dávky 50 kusů.
+- Lišta `assets/js/token_bar.js` + `#tokenBar` v `hra/mapa.php` + CSS `.token-bar` (jen PJ). Čtyři záložky: Nový token / Nevyužité (filtr
+  vše – z téhle lokace – bez místa) / Tato lokace (i to, co tam stojí) / Naposledy. Pokládá se **tažením prstem i myší** (Pointer Events,
+  ne HTML5 drag&drop, ten na dotyku nefunguje), klepnutí chip „nabije“ a položí ho klepnutí do mapy.
+- **Sundání tokenu NPC nemaže** — vrátí ho do zásoby i s jménem, čísly a výbavou (smazat nadobro jde křížkem v liště).
+- NPC bez místa položené na mapu k té lokaci **přibude**; NPC navázané jinam si svoje místo nechá (je na návštěvě).
+- Číslování kusů (Goblin, Goblin 2…) je nově **v rámci světa**, dřív v rámci mapy — zásoba je světová, jinak by na mapě skončili dva „Goblin 2“.
+- Deník nestvůry: `jen_tento` uloží čísla jen tomu kusu a tím ho udělá jedinečným; u kusu, který už jedinečný je, se vždy ukládá jen jemu
+  (jinak by úprava jeho čísel přepsala celý druh). Souboj bere u jedinečného NPC jeho vlastní čísla.
+- `includes/migrace.php` nově pozná `MODIFY … NULL` (uvolnění sloupce) jako hotovou klauzuli — bez toho by se stránka Změny databáze
+  na 0115 zastavila i po ručním provedení. ENUM/SET se dál řeší podle hodnot výčtu.
+- Testy: `tests/e2e/npc_zasoba_api.js` (44 kontrol: práva, meze, místo, pokládání ze zásoby, návrat do zásoby, dvě úrovně NPC)
+  a `token_bar_ui.js` (28 kontrol: záložky, výroba, filtry, tažení myší i prstem na tabletu, klepnutí, mazání, hráč lištu nemá).
+  Ověřeno i **bez ručního SQL** (lišta se nezobrazí, `npc_vyrobit` vrací 409, starý způsob přidání nestvůry funguje).
+
+**Zbývá uživateli:** spustit ruční SQL blok J v phpMyAdminu a pak v administraci Změny databáze → Spustit čekající změny.
+
+**Nice to have (zadání uživatele 2026-11-09, nestavět teď):** základní interagovatelné tokeny — truhla, mrtvola apod. Dnes existují „vlastní
+tokeny“ (typ `obecny`: NPC bez statistik, překážka, sud), ale jsou to jen značky bez obsahu a bez interakce. Truhla s obsahem by se dala
+postavit nad už existující `kontejner_obsah` / `loot.php`.
+
 ### NPC ve světě, zátěž dat a loading — zjištění a návrh (2026-11-09, čeká na rozhodnutí uživatele)
 
 Uživatel se ptal (2026-11-09), kam ukládat NPC a „deník bestií“, jestli stovky NPC na desítkách map nebudou problém na data a loading, a chtěl **tabulku všech NPC
@@ -50,14 +82,14 @@ jen změněné tokeny) — ne teď.
 2. **Deník nestvůry je na druh, ne na jedince.** `nestvura_staty_sveta` má klíč `(svet_id, nestvura_id)` — úprava čísel Goblina platí pro všechny gobliny ve světě.
    Jedinečné NPC s vlastními čísly (hostinský se jménem) dnes nejde udělat.
 
-**Navržená cesta (nejmenší, která dá obojí; čeká na rozhodnutí uživatele):** NPC se stane bytostí **světa**, ne mapy — `nestvura_instance` dostane `svet_id` a
+**Navržená cesta — uživatel ji 2026-11-09 schválil a je postavená, viz sekce výš:** NPC se stane bytostí **světa**, ne mapy — `nestvura_instance` dostane `svet_id` a
 `mapa_id` smí být prázdné („existuje ve světě, není nikde postavený“); token na mapě na instanci jen ukazuje. Tím vznikne tabulka všech NPC ve světě, NPC jde
 připravit dopředu bez mapy, jedinec může mít vlastní čísla (deník na instanci místo na druh), „NPC zůstane na mapě, když družina odejde“ platí dál (to funguje už
 dnes — tokeny jsou vázané na `mapa_id`) a existující výbava (`nestvura_instance_vybava`), životy i loot fungují bez úprav. Je to zároveň předpoklad pro budoucí
 generátor výbavy — ten musí mít kam generovaného NPC uložit. Cena: ruční SQL (`ALTER ADD svet_id` + `MODIFY mapa_id` na nullable, tedy phpMyAdmin pod admin účtem)
 a úpravy asi na 23 místech v kódu, která dnes instanci dohledávají přes `mapa_id`.
 
-**Nerozhodnuté, protože je to otázka na hru, ne na kód:** jestli mají být NPC dvě úrovně (jedineční se jménem a vlastními čísly × bezejmenná masa „Městan“ sdílející
+**Rozhodnuto uživatelem 2026-11-09: dvě úrovně NPC.** (Otázka zněla:) jestli mají být NPC dvě úrovně (jedineční se jménem a vlastními čísly × bezejmenná masa „Městan“ sdílející
 čísla druhu), nebo jedna. Doporučení: dvě úrovně, protože město s 50 měšťany nemá cenu ladit po jednom.
 
 **Vyřazeno ze plánu (rozhodnutí uživatele 2026-11-09):** duplikace map („knihovna map“, blok C bod 16) — každá mapa a zóna má být unikátní, kopírování je k ničemu.

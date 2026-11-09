@@ -11,6 +11,8 @@ const initSouboj = window.MAPA.funkce.souboj ? (await import('./souboj.js?v=' + 
 const initDenikDock = (window.MAPA.denikPostavy || []).length ? (await import('./denik_dock.js?v=' + VERZE_MODULU)).initDenikDock : null;
 const svetloStiny = await import('./svetlo_stiny.js?v=' + VERZE_MODULU);   // světlo a stíny na mapě Noc / Tma (renderMlha)
 const initRaidPanel = document.getElementById('raidPanel') ? (await import('./raid_panel.js?v=' + VERZE_MODULU)).initRaidPanel : null;
+// Správa tokenů (jen PJ, až po ručním SQL migrace 0115): lišta dole uprostřed se zásobou NPC.
+const initTokenBar = document.getElementById('tokenBar') ? (await import('./token_bar.js?v=' + VERZE_MODULU)).initTokenBar : null;
 
 // --- Kamera: zoom a posun přes CSS transform na #mapWrap ---
 // Souřadnice mapy (pixely původního obrázku) se na obrazovku převádějí jen
@@ -1743,6 +1745,7 @@ if (modalObrazky) {
 // --- Pořadí tahů a souboj: jedno plovoucí okno (raid panel) ---
 // Souboj s fázemi (assets/js/souboj.js) — jen když je na serveru zapnutý
 // (ruční SQL 0085); jinak zůstává dnešní jednoduchá iniciativa.
+let tokenBar = null;   // lišta správy tokenů (assets/js/token_bar.js) — jen PJ a jen po ručním SQL 0115
 let raid = null;   // raid panel (assets/js/raid_panel.js) — vznikne hned za soubojem, který do něj vkládá ovládání tvorů
 const souboj = initSouboj ? initSouboj({
   mapaId: MAPA_ID,
@@ -1780,6 +1783,21 @@ const denikDock = initDenikDock ? initDenikDock({
 // Otevře deník vybrané postavy (volitelně rovnou na sekci: boj, schopnosti, vybaveni). Používá se z tlačítek v detailu tokenu.
 // Raid panel (assets/js/raid_panel.js): plovoucí okno s boxy tvorů a ovládáním souboje; myš nad boxem zvýrazní token a naopak.
 // PJ vidí všechny tvory a všechny údaje, hráč družinu / účastníky souboje a jen pruh životů.
+// Správa tokenů (assets/js/token_bar.js): zásoba NPC, výroba dávkou, pokládání tažením.
+tokenBar = initTokenBar ? initTokenBar({
+  svetId: SVET_ID,
+  mapaId: MAPA_ID,
+  postJson,
+  getJson: (url) => fetch(url).then((r) => r.json()).catch(() => null),
+  naMapu: (cx, cy) => kamera.naMapu(cx, cy),
+  gridStred: (m) => (GRID_PX > 0 ? gridCellCenter(m.x, m.y) : m),
+  obnovitStav,
+  logLine,
+  viewport,
+}) : null;
+const tbTokeny = document.getElementById('tb-tokeny');
+if (tbTokeny && tokenBar) tbTokeny.addEventListener('click', () => tokenBar.prepnout());
+
 raid = initRaidPanel ? initRaidPanel({
   mapaId: MAPA_ID,
   jePj: IS_PJ_OR_ADMIN,
@@ -2159,6 +2177,7 @@ let mezernikDrzen = false;
 let polozitVic = false;
 
 function bodMapy(e) { return kamera.naMapu(e.clientX, e.clientY); }
+let posledniKlik = {x: 0, y: 0};   // klientské souřadnice posledního kliku do mapy (pro lištu správy tokenů)
 function jeVstupniPole(el) {
   return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
 }
@@ -2461,6 +2480,8 @@ function prepniDvere(z) {
 }
 
 function klikNaMapu(m) {
+  // Nabitý chip z lišty správy tokenů (klepnutí místo tažení) položí token sem a klik se dál neřeší.
+  if (tokenBar && tokenBar.maNabito() && tokenBar.klikDoMapy(posledniKlik.x, posledniKlik.y)) return;
   if (CFG.jePj && CFG.dvere && currentTool === 'select') {
     const zed = najdiZedBlizkoBodu(m.x, m.y);
     if (zed && zed.dvere) { prepniDvere(zed); return; }
@@ -2646,7 +2667,7 @@ function dokoncitAkci(a, e) {
       break;
     case 'klik':
     case 'prazdno':
-      if (!a.posunuto && !a.kontextOtevren) klikNaMapu(bodMapy(e));
+      if (!a.posunuto && !a.kontextOtevren) { posledniKlik = {x: e.clientX, y: e.clientY}; klikNaMapu(bodMapy(e)); }
       break;
     default:
       break;

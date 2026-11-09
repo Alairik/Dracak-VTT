@@ -520,3 +520,50 @@ body.denik-dock-cela { overflow:hidden; }
 .ihned-chipy { display:flex; flex-wrap:wrap; gap:4px; }
 .ihned-chip { display:inline-flex; align-items:center; gap:2px; font-size:12px; padding:2px 4px 2px 8px; border-radius:999px; background:rgba(255,209,102,.14); border:1px solid rgba(255,209,102,.35); }
 .ihned-x { padding:0 6px; min-width:0; font-size:11px; }
+
+/* ---------- Správa tokenů (jen PJ; assets/js/token_bar.js): lišta dole uprostřed ---------- */
+.token-bar { position:fixed; left:50%; transform:translateX(-50%); bottom:14px; z-index:202; width:min(760px, calc(100vw - 24px));
+             box-sizing:border-box; background:rgba(24,22,20,.96); color:#f3ece2; border:1px solid rgba(255,255,255,.14);
+             border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.5); display:flex; flex-direction:column; }
+.token-bar.tahne { user-select:none; }
+.tb-zalozky { display:flex; align-items:center; gap:2px; padding:6px 6px 0 6px; border-bottom:1px solid rgba(255,255,255,.1); }
+.tb-zal { background:none; border:none; color:#bbb; font:inherit; font-size:12.5px; padding:6px 10px; border-radius:8px 8px 0 0; cursor:pointer; }
+.tb-zal:hover { background:rgba(255,255,255,.08); color:#eee; }
+.tb-zal.aktivni { background:rgba(255,255,255,.12); color:#fff; font-weight:600; }
+.tb-pocet { display:inline-block; min-width:16px; padding:0 4px; margin-left:4px; border-radius:999px; background:rgba(255,255,255,.16); font-size:11px; }
+.tb-zavrit { margin-left:auto; background:none; border:none; color:#9a9088; cursor:pointer; padding:6px; line-height:0; }
+.tb-zavrit:hover { color:#fff; }
+.tb-telo { padding:8px 10px 10px; }
+.tb-radek { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.tb-radek .input { background:rgba(255,255,255,.08); color:#f3ece2; border-color:rgba(255,255,255,.2); font-size:12.5px; padding:4px 6px; }
+.tb-hledat { width:120px; }
+.tb-druh { min-width:150px; max-width:220px; }
+.tb-pocet-input { width:56px; }
+.tb-pole { display:flex; align-items:center; gap:4px; font-size:11.5px; color:#bbb; }
+.tb-chk { display:flex; align-items:center; gap:5px; font-size:11.5px; color:#bbb; }
+.tb-vyrobit { font-size:12.5px; padding:5px 10px; }
+.tb-note { font-size:11.5px; color:#9a9088; margin:6px 0 0; }
+.tb-filtr { margin-bottom:6px; }
+.tb-filtr-popis { font-size:11.5px; color:#9a9088; }
+.tb-f { background:none; border:1px solid rgba(255,255,255,.18); color:#bbb; font:inherit; font-size:11.5px; padding:2px 8px; border-radius:999px; cursor:pointer; }
+.tb-f.aktivni { background:rgba(255,255,255,.14); color:#fff; }
+.tb-chipy { display:flex; flex-wrap:wrap; gap:5px; max-height:22vh; overflow-y:auto; }
+.tb-chip { display:inline-flex; align-items:center; gap:5px; background:rgba(255,255,255,.08); color:#f3ece2; border:1px solid rgba(255,255,255,.16);
+           border-radius:999px; padding:4px 9px; font:inherit; font-size:12px; cursor:grab; touch-action:none; }
+.tb-chip:hover { background:rgba(255,255,255,.16); }
+.tb-chip.nabito { outline:2px solid var(--color-accent-600, #7a3b2e); background:rgba(122,59,46,.3); }
+.tb-chip.jedinecny { border-color:rgba(255,209,102,.5); }
+.tb-chip.na-mape { opacity:.55; }
+.tb-hvezda { color:#ffd166; font-size:11px; }
+.tb-chip-vedle { color:#9a9088; font-size:11px; }
+.tb-chip-x { color:#9a9088; font-size:13px; padding:0 2px; }
+.tb-chip-x:hover { color:#ff8f7a; }
+.tb-duch { position:fixed; z-index:9999; pointer-events:none; transform:translate(-50%, -50%); background:rgba(122,59,46,.9); color:#fff;
+           border-radius:999px; padding:4px 10px; font-size:12px; box-shadow:0 6px 18px rgba(0,0,0,.5); }
+/* Telefon a nízká okna: lišta přes celou šířku, menší písmo, nižší seznam. */
+@media (max-width: 760px), (max-height: 560px) {
+  .token-bar { left:6px; right:6px; transform:none; width:auto; bottom:8px; font-size:12px; }
+  .tb-zal { padding:5px 7px; font-size:11.5px; }
+  .tb-chipy { max-height:30vh; }
+  .tb-hledat, .tb-druh { width:auto; flex:1 1 110px; min-width:0; }
+}

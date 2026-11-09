@@ -259,6 +259,24 @@ function dracak_migrace_klauzule_hotova(PDO $pdo, string $tabulka, string $klauz
         return false;
     }
 
+    // MODIFY ... NULL: uvolnění sloupce na "smí být prázdný" (migrace 0115 — NPC bez mapy). Hotovo, když sloupec
+    // už prázdnou hodnotu dovoluje A má požadovaný základní typ (jinak by se přeskočila i změna typu, kterou jsme neověřili).
+    // Záměrně jen směr NOT NULL → NULL; zpřísnění (MODIFY ... NOT NULL) se nepozná, protože může selhat na datech.
+    if (preg_match('/^MODIFY\s+(?:COLUMN\s+)?`?(\w+)`?\s+(\w+)[^,]*?\bNULL\b/i', $zbytek, $mm)
+        && !preg_match('/\bNOT\s+NULL\b/i', $zbytek)
+        // ENUM / SET se řeší níž podle hodnot výčtu — tady by se přeskočilo rozšíření výčtu, které jsme neověřili.
+        && !preg_match('/\b(ENUM|SET)\s*\(/i', $zbytek)) {
+        $q = $pdo->prepare('SELECT DATA_TYPE, IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?');
+        $q->execute([$tabulka, $mm[1]]);
+        $radek = $q->fetch(PDO::FETCH_ASSOC);
+        if ($radek && strtoupper((string)$radek['IS_NULLABLE']) === 'YES'
+            && strtolower((string)$radek['DATA_TYPE']) === strtolower($mm[2])) {
+            $popis = "$tabulka.{$mm[1]} už smí být prázdný";
+            return true;
+        }
+        return false;
+    }
+
     // MODIFY ... ENUM(...): bezpečně se dá ověřit jen rozšíření výčtu — hotovo, když tam všechny požadované hodnoty už jsou.
     if (preg_match('/^MODIFY\s+(?:COLUMN\s+)?`?(\w+)`?.*?ENUM\s*\((.*?)\)/is', $zbytek, $mm)) {
         preg_match_all("/'((?:[^'\\\\]|\\\\.)*)'/", $mm[2], $pozadovane);

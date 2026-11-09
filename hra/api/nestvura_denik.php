@@ -3,12 +3,17 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/vtt.php';
 require_once __DIR__ . '/../../includes/vtt_souboj.php';
 require_once __DIR__ . '/../../includes/vtt_nestvury.php';
+require_once __DIR__ . '/../../includes/vtt_npc.php';
 
 // Malý deník nestvůry (jen PJ — bestiář je tajný): přehled z bestiáře + čísla pro boj, která PJ jednou doplní
 // a uloží pro všechny nestvůry stejného druhu v tomhle světě (includes/vtt_nestvury.php).
 //   GET  ?mapa_id=&token_id=                          -> přehled a čísla
-//   POST {mapa_id, token_id, akce: "uloz", staty}     -> uloží čísla (utoky [{nazev, uc, utocnost}], oc, oz, velikost, odolnost)
-//   POST {mapa_id, token_id, akce: "vrat"}            -> zahodí uložená čísla (zase platí text bestiáře)
+//   POST {mapa_id, token_id, akce: "uloz", staty, jen_tento}  -> uloží čísla (utoky [{nazev, uc, utocnost}], oc, oz, velikost, odolnost)
+//   POST {mapa_id, token_id, akce: "vrat"}                    -> zahodí uložená čísla (zase platí text bestiáře)
+//
+// jen_tento (migrace 0115): čísla platí jen pro TENHLE kus a tím se z něj stane jedinečné NPC — vyplněný deník
+// dělá z tokenu unikát (zadání uživatele 2026-11-09). Bez něj se ukládají pro celý druh ve světě jako dosud.
+// U kusu, který už jedinečný je, se vždy ukládá jen jemu (jinak by úprava jeho čísel přepsala celý druh).
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 $user = dracak_current_user();
@@ -51,6 +56,7 @@ if (!$t) {
     nestvura_denik_chyba(404, 'Tohle není nestvůra na téhle mapě.');
 }
 $nestvuraId = (int)$t['nestvura_id'];
+$instanceId = (int)$t['instance_id'];
 $n = dracak_vtt_nestvura_radek($pdo, $nestvuraId);
 if (!$n) {
     nestvura_denik_chyba(404, 'Nestvůra v bestiáři nenalezena.');
@@ -62,21 +68,31 @@ if ($metoda === 'POST') {
         nestvura_denik_chyba(409, 'Ukládání čísel ještě není na serveru zapnuté (chybí ruční SQL).');
     }
     $akce = (string)($vstup['akce'] ?? '');
+    $vlastni = dracak_vtt_nestvura_instance_vlastni($pdo, $instanceId);
+    $jenTento = $vlastni !== null && (!empty($vstup['jen_tento']) || $vlastni['jedinecny']);
     if ($akce === 'uloz') {
         [$staty, $chyba] = dracak_vtt_nestvura_over_staty($vstup['staty'] ?? null);
         if ($staty === null) {
             nestvura_denik_chyba(422, (string)$chyba);
         }
-        dracak_vtt_nestvura_uloz($pdo, $svetId, $nestvuraId, $staty);
+        if ($jenTento) {
+            dracak_vtt_nestvura_uloz_instanci($pdo, $instanceId, $staty);
+        } else {
+            dracak_vtt_nestvura_uloz($pdo, $svetId, $nestvuraId, $staty);
+        }
     } elseif ($akce === 'vrat') {
-        dracak_vtt_nestvura_vrat($pdo, $svetId, $nestvuraId);
+        if ($jenTento) {
+            dracak_vtt_nestvura_vrat_instanci($pdo, $instanceId);
+        } else {
+            dracak_vtt_nestvura_vrat($pdo, $svetId, $nestvuraId);
+        }
     } else {
         nestvura_denik_chyba(422, 'Neznámá akce.');
     }
     $ulozeno = true;
 }
 
-$s = dracak_vtt_nestvura_staty($pdo, $svetId, $nestvuraId, $n);
+$s = dracak_vtt_nestvura_staty($pdo, $svetId, $nestvuraId, $n, $instanceId);
 $mez = null;
 if ($s['staty']['odolnost'] !== null && (int)$t['max_hp'] > 0) {
     $mez = dracak_vtt_bojeschopnost((int)$s['staty']['odolnost'], (int)$t['max_hp'], (int)$t['aktualni_hp'])['mez_vyrazeni'];
@@ -100,6 +116,9 @@ echo json_encode([
     'vychozi' => $s['vychozi'],
     'ulozeno' => $s['ulozeno'],
     'nespocteno' => $s['nespocteno'],
+    // true = tenhle kus má vlastní čísla (jedinečné NPC); UI podle toho píše „jen tento kus“ místo „celý druh“
+    'jedinecny' => $s['jedinecny'],
+    'lze_jen_tento' => dracak_vtt_npc_funkce(),
     'hp' => ['aktualni' => (int)$t['aktualni_hp'], 'max' => (int)$t['max_hp']],
     'mez_vyrazeni' => $mez,
     'schopnosti' => $schopnosti,

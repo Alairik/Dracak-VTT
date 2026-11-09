@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../includes/vtt.php';
 require_once __DIR__ . '/../../includes/vtt_mlha.php';
 require_once __DIR__ . '/../../includes/vtt_mapa_stav.php';
 require_once __DIR__ . '/../../includes/vtt_tokeny.php';
+require_once __DIR__ . '/../../includes/vtt_npc.php';
 
 header('Content-Type: application/json; charset=utf-8');
 $user = dracak_require_login();
@@ -59,26 +60,75 @@ if ($typEntity === 'obecny') {
         echo json_encode(['error' => 'Jen PJ/admin může přidat nestvůru.']);
         exit;
     }
-    $nestvuraId = (int)($data['nestvura_id'] ?? 0);
-    $stmt = $pdo->prepare('SELECT * FROM nestvury WHERE id = ?');
-    $stmt->execute([$nestvuraId]);
-    $nestvura = $stmt->fetch();
-    if (!$nestvura) {
-        http_response_code(404);
-        echo json_encode(['error' => 'Nestvůra nenalezena.']);
-        exit;
+    $instanceId = (int)($data['instance_id'] ?? 0);
+    if ($instanceId > 0) {
+        // Položení NPC ze zásoby (migrace 0115): instance už existuje ve světě, jen dostane mapu.
+        // Jméno, čísla a výbava zůstávají, takže se připravené NPC dá pokládat a sundávat dokola.
+        if (!dracak_vtt_npc_funkce()) {
+            http_response_code(409);
+            echo json_encode(['error' => 'Zásoba NPC se zapne po jednorázovém kroku správce (ruční SQL).']);
+            exit;
+        }
+        $q = $pdo->prepare(
+            'SELECT ni.*, (SELECT COUNT(*) FROM tokeny t WHERE t.typ_entity = "nestvura_instance" AND t.entita_id = ni.id) AS tokenu
+             FROM nestvura_instance ni WHERE ni.id = ?'
+        );
+        $q->execute([$instanceId]);
+        $npc = $q->fetch(PDO::FETCH_ASSOC);
+        if (!$npc || (int)$npc['svet_id'] !== (int)$mapa['svet_id']) {
+            http_response_code(404);
+            echo json_encode(['error' => 'NPC ze zásoby nenalezeno.']);
+            exit;
+        }
+        if ($npc['mapa_id'] !== null || (int)$npc['tokenu'] > 0) {
+            http_response_code(409);
+            echo json_encode(['error' => 'Tohle NPC už na mapě stojí.']);
+            exit;
+        }
+        // NPC, které zatím nikam nepatřilo, patří od teď sem (ve správě se ukáže u téhle lokace).
+        // NPC navázané na jiné místo si svoje místo nechá — je tu jen na návštěvě.
+        if ($npc['lokace_mapa_id'] === null) {
+            $pdo->prepare('UPDATE nestvura_instance SET mapa_id = ?, lokace_mapa_id = ? WHERE id = ?')->execute([$mapaId, $mapaId, $instanceId]);
+        } else {
+            $pdo->prepare('UPDATE nestvura_instance SET mapa_id = ? WHERE id = ?')->execute([$mapaId, $instanceId]);
+        }
+        $nestvuraId = (int)$npc['nestvura_id'];
+        $entitaId = $instanceId;
+        $nazev = (string)$npc['nazev_instance'];
+    } else {
+        $nestvuraId = (int)($data['nestvura_id'] ?? 0);
+        $stmt = $pdo->prepare('SELECT * FROM nestvury WHERE id = ?');
+        $stmt->execute([$nestvuraId]);
+        $nestvura = $stmt->fetch();
+        if (!$nestvura) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Nestvůra nenalezena.']);
+            exit;
+        }
+        // Životaschopnost je v katalogu volný text ("20", "20-25", "viz text"...) —
+        // vezmi první číslo, PJ si HP hned poté může ručně opravit.
+        $hp = dracak_vtt_prvni_cislo($nestvura['zivotaschopnost']);
+        // Víc kusů téhož druhu se číslují (Goblin, Goblin 2, Goblin 3…), ať jdou
+        // na mapě i v pořadí tahů rozeznat. Od 0115 se čísluje v rámci světa (zásoba je světová),
+        // dřív v rámci mapy.
+        if (dracak_vtt_npc_funkce()) {
+            $nazev = dracak_vtt_npc_dalsi_nazev($pdo, (int)$mapa['svet_id'], $nestvuraId, (string)$nestvura['nazev']);
+            // Nestvůra položená přímo na mapu patří k téhle lokaci (lokace_mapa_id) — ve správě tokenů
+            // se pak ukáže u tohohle místa, i když ji PJ později z mapy sundá.
+            $ins = $pdo->prepare(
+                'INSERT INTO nestvura_instance (svet_id, mapa_id, lokace_mapa_id, nestvura_id, nazev_instance, aktualni_hp, max_hp)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)'
+            );
+            $ins->execute([(int)$mapa['svet_id'], $mapaId, $mapaId, $nestvuraId, $nazev, $hp, $hp]);
+        } else {
+            $nazev = dracak_vtt_dalsi_nazev_instance($pdo, $mapaId, $nestvuraId, (string)$nestvura['nazev']);
+            $ins = $pdo->prepare(
+                'INSERT INTO nestvura_instance (mapa_id, nestvura_id, nazev_instance, aktualni_hp, max_hp) VALUES (?, ?, ?, ?, ?)'
+            );
+            $ins->execute([$mapaId, $nestvuraId, $nazev, $hp, $hp]);
+        }
+        $entitaId = (int)$pdo->lastInsertId();
     }
-    // Životaschopnost je v katalogu volný text ("20", "20-25", "viz text"...) —
-    // vezmi první číslo, PJ si HP hned poté může ručně opravit.
-    $hp = dracak_vtt_prvni_cislo($nestvura['zivotaschopnost']);
-    // Víc kusů téhož druhu se číslují (Goblin, Goblin 2, Goblin 3…), ať jdou
-    // na mapě i v pořadí tahů rozeznat.
-    $nazev = dracak_vtt_dalsi_nazev_instance($pdo, $mapaId, $nestvuraId, (string)$nestvura['nazev']);
-    $ins = $pdo->prepare(
-        'INSERT INTO nestvura_instance (mapa_id, nestvura_id, nazev_instance, aktualni_hp, max_hp) VALUES (?, ?, ?, ?, ?)'
-    );
-    $ins->execute([$mapaId, $nestvuraId, $nazev, $hp, $hp]);
-    $entitaId = (int)$pdo->lastInsertId();
 } else {
     $postavaId = (int)($data['postava_id'] ?? 0);
     $stmt = $pdo->prepare('SELECT * FROM postavy WHERE id = ? AND svet_id = ?');

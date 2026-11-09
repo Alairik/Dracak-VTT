@@ -65,13 +65,33 @@ function dracak_vtt_nestvura_ulozene(PDO $pdo, int $svetId, int $nestvuraId): ?a
     return is_array($d) ? $d : null;
 }
 
+// Jedinečné NPC (migrace 0115): vlastní čísla jen pro tenhle kus (hostinský se jménem), místo čísel druhu.
+// Vrací ['jedinecny' => bool, 'data' => ?array]; null, když zásoba NPC ještě není v DB nebo instance neexistuje.
+function dracak_vtt_nestvura_instance_vlastni(PDO $pdo, int $instanceId): ?array
+{
+    if ($instanceId <= 0 || !dracak_vtt_tokeny_funkce()['npc_zasoba']) {
+        return null;
+    }
+    $q = $pdo->prepare('SELECT jedinecny, data FROM nestvura_instance WHERE id = ?');
+    $q->execute([$instanceId]);
+    $r = $q->fetch(PDO::FETCH_ASSOC);
+    if (!$r) {
+        return null;
+    }
+    $d = $r['data'] !== null ? json_decode((string)$r['data'], true) : null;
+    return ['jedinecny' => (bool)$r['jedinecny'], 'data' => is_array($d) ? $d : null];
+}
+
 // Čísla pro boj: uložená PJ mají přednost před textem bestiáře (po polích). Vrací
 // ['staty' => …, 'ulozeno' => bool, 'nespocteno' => [pole, která zůstala prázdná], 'vychozi' => staty z textu].
-function dracak_vtt_nestvura_staty(PDO $pdo, int $svetId, int $nestvuraId, array $radekNestvury): array
+// $instanceId: u jedinečného NPC (migrace 0115) se místo čísel druhu vezmou jeho vlastní.
+function dracak_vtt_nestvura_staty(PDO $pdo, int $svetId, int $nestvuraId, array $radekNestvury, ?int $instanceId = null): array
 {
     $vychozi = dracak_vtt_nestvura_vychozi($radekNestvury);
     $staty = $vychozi['staty'];
-    $ulozene = dracak_vtt_nestvura_ulozene($pdo, $svetId, $nestvuraId);
+    $vlastni = $instanceId !== null ? dracak_vtt_nestvura_instance_vlastni($pdo, $instanceId) : null;
+    $jedinecny = $vlastni !== null && $vlastni['jedinecny'];
+    $ulozene = $jedinecny ? $vlastni['data'] : dracak_vtt_nestvura_ulozene($pdo, $svetId, $nestvuraId);
     if ($ulozene !== null) {
         foreach (['utoky', 'oc', 'oz', 'velikost', 'odolnost'] as $k) {
             if (array_key_exists($k, $ulozene)) {
@@ -88,7 +108,14 @@ function dracak_vtt_nestvura_staty(PDO $pdo, int $svetId, int $nestvuraId, array
             $nespocteno[] = $k;
         }
     }
-    return ['staty' => $staty, 'ulozeno' => $ulozene !== null, 'nespocteno' => $nespocteno, 'vychozi' => $vychozi['staty']];
+    return [
+        'staty' => $staty,
+        'ulozeno' => $ulozene !== null,
+        'nespocteno' => $nespocteno,
+        'vychozi' => $vychozi['staty'],
+        // true = čísla platí jen pro tenhle kus (jedinečné NPC), false = pro celý druh ve světě
+        'jedinecny' => $jedinecny,
+    ];
 }
 
 function dracak_vtt_nestvura_radek(PDO $pdo, int $nestvuraId): ?array
@@ -164,4 +191,18 @@ function dracak_vtt_nestvura_uloz(PDO $pdo, int $svetId, int $nestvuraId, array 
 function dracak_vtt_nestvura_vrat(PDO $pdo, int $svetId, int $nestvuraId): void
 {
     $pdo->prepare('DELETE FROM nestvura_staty_sveta WHERE svet_id = ? AND nestvura_id = ?')->execute([$svetId, $nestvuraId]);
+}
+
+// Uloží čísla jen pro JEDEN kus (migrace 0115) a tím ho udělá jedinečným: vyplněný deník = jedinečné NPC
+// (zadání uživatele 2026-11-09). Ostatní kusy téhož druhu zůstanou na číslech druhu.
+function dracak_vtt_nestvura_uloz_instanci(PDO $pdo, int $instanceId, array $staty): void
+{
+    $pdo->prepare('UPDATE nestvura_instance SET jedinecny = 1, data = ? WHERE id = ?')
+        ->execute([json_encode($staty, JSON_UNESCAPED_UNICODE), $instanceId]);
+}
+
+// Zahodí vlastní čísla kusu — zase platí čísla druhu.
+function dracak_vtt_nestvura_vrat_instanci(PDO $pdo, int $instanceId): void
+{
+    $pdo->prepare('UPDATE nestvura_instance SET jedinecny = 0, data = NULL WHERE id = ?')->execute([$instanceId]);
 }

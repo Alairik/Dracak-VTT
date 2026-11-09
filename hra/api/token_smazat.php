@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/../../includes/vtt.php';
+require_once __DIR__ . '/../../includes/vtt_npc.php';
 
 header('Content-Type: application/json; charset=utf-8');
 $user = dracak_require_login();
@@ -25,6 +26,12 @@ if (!dracak_vtt_can_move_token($user, $token)) {
 
 $del = $pdo->prepare('DELETE FROM tokeny WHERE id = ?');
 $del->execute([$tokenId]);
+
+// Sejmutí tokenu NPC z mapy ho nemaže — vrátí ho do zásoby světa (migrace 0115), aby PJ nepřišel o jméno,
+// doplněná čísla a výbavu a mohl ho položit znovu. Smazat NPC nadobro jde v liště zásoby.
+if ($token['typ_entity'] === 'nestvura_instance') {
+    dracak_vtt_npc_do_zasoby($pdo, (int)$token['entita_id']);
+}
 
 $eventId = dracak_vtt_log_event((int)$token['svet_id'], (int)$token['mapa_id'], 'token_smazan', [
     'token_id' => $tokenId,
