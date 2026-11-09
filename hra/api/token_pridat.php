@@ -269,6 +269,15 @@ if ($dbTypEntity === 'nestvura_instance' && $funkceVzhled['videni']) {
     }
 }
 
+// Smysly postavy z rasy (migrace 0117): trpaslíkovo infravidění (20 sáhů, hrac b790) se nezadává ručně.
+if ($dbTypEntity === 'postava' && $funkceVzhled['videni']) {
+    require_once __DIR__ . '/../../includes/vtt_nestvury.php';
+    $smyslyRasy = dracak_vtt_rasa_smysly($pdo, (int)($postava['rasa_id'] ?? 0));
+    if ($smyslyRasy['infra'] !== null) {
+        $pdo->prepare('UPDATE tokeny SET videni_infra_sahy = ? WHERE id = ?')->execute([$smyslyRasy['infra'], $tokenId]);
+    }
+}
+
 // Mlha se odhaluje jen pro postavy (viz dracak_vtt_mlha_odhal_kolem_bodu)
 // — nestvůra hráčům vidění nepřidává.
 if ($dbTypEntity === 'postava') {

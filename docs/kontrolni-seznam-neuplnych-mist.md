@@ -427,12 +427,11 @@ začne hrát často, přidá se mu složka (nový řádek v `efekt_slozky`, bez 
 
 ## Na kontrolu při proofreadingu
 
-- [ ] **Dosah trpasličího infravidění chybí.** Přepis říká jen „Trpaslík má infravidění“ (hrac b790) a „Trpaslíci
-  (infravidění — vidí teplo…)“ (b11186), **žádné číslo**. Kouzlo Lovce přitom udává „infravidění jako trpaslík
-  **na vzdálenost 50 sáhů**“ (b7318), což vlastní dosah trpaslíka nepřímo odlišuje. V databázi má schopnost
-  Infravidění v popisu „s dosahem 20 sáhů“ — **tohle číslo nemá v přepisu oporu** a může být vymyšlené
-  (stejný případ jako pohyblivost ras v 0007). Proto se infravidění postavám **nepředvyplňuje** z rasy;
-  u nestvůr ano, tam bestiář čísla uvádí (migrace 0116). **Potřebuju foto stránky s rasou Trpaslík.**
+- [x] ~~**Dosah trpasličího infravidění chybí.**~~ **Omyl z 2026-11-09 — v pravidlech JE:** „Trpaslík má infravidění
+  s dosahem 20 sáhů; neproniká materiálem, kterým neproniká obyčejné světlo.“ (hrac **b790**). Moje první hledání
+  větu utnulo v půlce (chyba ve vytahování textu) a vyvodilo z toho, že číslo v knize není. Hodnota 20 v databázi
+  je tedy správná a je v datech (migrace 0117). Foto není potřeba. **Poučení je v `CLAUDE.md`:** „nenašel jsem to“
+  se netvrdí po jednom hledání — a když to vypadá, že v pravidlech něco chybí, ověř to ještě jednou jinak.
 - [ ] **Oživlá socha a infravidění — výjimka s lávou.** Bestiář (b95001) říká „trpaslík je zpravidla neuvidí
   infraviděním (výjimkou je například kamenná socha, stříkající lávu)“. Migrace 0116 označí všechny tři sochy
   jako „infravidění je nerozezná“; stav „socha právě stříká lávu“ engine nezná a PJ ho na tokenu přepne ručně.

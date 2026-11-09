@@ -47,10 +47,16 @@ ne důvod nechávat ruční pole.**
   **Světlo zůstalo mimo sbalenou sekci** — je to nejčastější úkon PJ na tmavé mapě.
 - Test `tests/e2e/nestvura_smysly_api.js`.
 
-**Vědomě NEuděláno — infravidění postav se z rasy nepředvyplňuje.** Přepis pravidel u trpaslíka **žádný dosah neuvádí** (hrac b790, b11186);
-hodnota „20 sáhů“ v popisu schopnosti v DB **nemá v přepisu oporu** a může být vymyšlená (stejný případ jako pohyblivost ras v 0007).
-Kouzlo Lovce přitom mluví o „infravidění jako trpaslík **na 50 sáhů**“ (b7318). Zapsáno v `docs/kontrolni-seznam-neuplnych-mist.md`,
-**potřebuje foto stránky s rasou Trpaslík.**
+- **Infravidění postav z rasy** (migrace `0117`, stejný ruční blok K): `rasa_schopnosti.hodnota`, trpaslík 20 sáhů.
+  Citace: *„Trpaslík má infravidění s dosahem 20 sáhů; neproniká materiálem, kterým neproniká obyčejné světlo.“* (hrac **b790**).
+  Prohledány všechny rasy proti textu pravidel — infravidění má z hratelných ras **jen trpaslík** (kroll má ultrasluch, hobit čich).
+  Kouzlo Lovce „infravidění jako trpaslík na 50 sáhů“ (b7318) je dočasný účinek kouzla, ne dosah rasy.
+
+**Moje chyba, ze které plyne poučení:** nejdřív jsem tvrdil, že dosah trpaslíkova infravidění v přepisu **chybí**, a zapsal to
+do kontrolního seznamu jako „potřebuje foto“. Ve skutečnosti je přímo v b790 — moje první hledání větu utnulo v půlce
+(špatný regulární výraz při vytahování textu z HTML). Oprava zapsaná i v `docs/kontrolni-seznam-neuplnych-mist.md`.
+Platí tedy pravidlo z `CLAUDE.md` i naopak: **„v pravidlech to není“ se netvrdí po jednom hledání** — a hlavně se kvůli tomu
+nemá odkládat mechanika (uživatel 2026-11-09: *„nesmysl neimplementovat mechaniku jen na neshodě čísel“*).
 
 **Zbývá** (návrh v `docs/panel-tokenu-navrh.md`, schváleno uživatelem): rozpad panelu na vrstvu tokenu (nástroj PJ), vrstvu tvora
 (kompaktní deník místo „deníku lite“) a vrstvu PJ uvnitř něj (zámek, efekty i mimo iniciativu, ±životy, kořist); světlo přesunout

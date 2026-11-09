@@ -92,6 +92,10 @@
      bez chyby.
   5. Po potvrzení, že ho provedl, soubor přepiš na aktuální stav
      (prázdný, nebo jen nové příkazy od té doby).
+  **5b. Hotový blok POSÍLEJ V ODPOVĚDI, neptej se, jestli ho uživatel chce.**
+     Má to v pravidlech od začátku a 2026-11-09 to musel připomínat: místo bloku
+     dostal otázku „mám ho sem vypsat?“. Blok patří do odpovědi vždy — celý,
+     v code blocku, i když se od minule nezměnil a i když ho posílám poněkolikáté.
   **6. Když kontrolní stránka hlásí „chybí“, podezírej NEJDŘÍV tu stránku.**
      2026-11-09 poslala uživatele dvakrát zbytečně spouštět blok J, který už
      dávno proběhl: `admin_migrace.php` si seznam sloupců tahal z pevného
@@ -260,6 +264,14 @@
   najít odpovídající pasáž v těchhle souborech. Nejde o jednorázovou
   volbu "odhad, nebo přesně" — odhad není rovnocenná možnost k nabídnutí,
   je to jediná cesta, co nikdy nejde vzít.
+  - **Když v pravidlech něco "chybí", ověř to jiným hledáním, než to prohlásíš —
+    a hlavně kvůli tomu neodkládej mechaniku.** 2026-11-09 jsem tvrdil, že dosah
+    trpaslíkova infravidění v přepisu není, a zapsal to jako "potřebuje foto";
+    ve skutečnosti je přímo v b790 ("infravidění s dosahem 20 sáhů") a moje
+    hledání větu utnulo v půlce špatným regulárním výrazem. Pravidlo uživatele
+    k tomu: **"nesmysl neimplementovat mechaniku jen na neshodě čísel"** — když
+    chybí jen číslo, postav mechaniku s tím, co je, hodnotu označ jako
+    prozatímní a dohledej ji; nestav kvůli tomu práci na pauzu.
   - **"Nenašel jsem to" / "to tu není" se netvrdí po jednom hledání nebo
     jedné naražené větě.** Narazit v textu na "viz kapitola X — mimo
     rozsah tohoto dokumentu" znamená, že mimo rozsah je TA KONKRÉTNÍ

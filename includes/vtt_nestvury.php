@@ -236,3 +236,28 @@ function dracak_vtt_nestvura_smysly(PDO $pdo, int $nestvuraId): array
     }
     return $out;
 }
+
+// Smysly rasy podle pravidel (migrace 0117): dosah infravidění v sázích. Trpaslík 20 sáhů (hrac b790);
+// ostatní hratelné rasy infravidění nemají. Předvyplňuje nový token postavy (hra/api/token_pridat.php).
+function dracak_vtt_rasa_smysly(PDO $pdo, int $rasaId): array
+{
+    $out = ['infra' => null];
+    if ($rasaId <= 0) {
+        return $out;
+    }
+    try {
+        $q = $pdo->prepare(
+            'SELECT rs.hodnota FROM rasa_schopnosti rs
+             JOIN zvlastni_schopnosti z ON z.id = rs.schopnost_id
+             WHERE rs.rasa_id = ? AND z.nazev = "Infravidění" LIMIT 1'
+        );
+        $q->execute([$rasaId]);
+        $h = $q->fetchColumn();
+        if ($h !== false && $h !== null && preg_match('/^\d+$/', trim((string)$h))) {
+            $out['infra'] = (int)$h;
+        }
+    } catch (Throwable $e) {
+        // sloupec hodnota ještě není (ruční SQL nespuštěné) — token se nepředvyplní, zadá se ručně jako dřív
+    }
+    return $out;
+}

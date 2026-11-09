@@ -66,6 +66,20 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   t = await polozit('Bílý drak');
   ok(t[3] === '3.00', 'další drak zdědí ručně nastavenou velikost, odvození ji nepřebije: ' + t[3]);
 
+  // --- infravidění postavy z rasy (migrace 0117): trpaslík 20 sáhů (hrac b790), ostatní rasy nic ---
+  const trpaslik = parseInt(sqlVal("select id from rasy where nazev='Trpaslík'"), 10);
+  const puvodni = sqlVal('select rasa_id from postavy where id=1');
+  sql(`update postavy set rasa_id=${trpaslik} where id=1`);
+  sql(`delete from tokeny where mapa_id=${MAPA} and typ_entity='postava' and entita_id=1`);
+  let j = await (await p.request.post(BASE + '/hra/api/token_pridat.php', { data: { mapa_id: MAPA, typ_entity: 'postava', postava_id: 1, x: 700, y: 700 } })).json();
+  ok(sqlVal(`select ifnull(videni_infra_sahy,'-') from tokeny where id=${j.token_id}`) === '20',
+    'token trpaslíka dostane infravidění 20 sáhů z pravidel');
+  sql(`update postavy set rasa_id=${puvodni} where id=1`);
+  sql(`delete from tokeny where mapa_id=${MAPA} and typ_entity='postava' and entita_id=1`);
+  j = await (await p.request.post(BASE + '/hra/api/token_pridat.php', { data: { mapa_id: MAPA, typ_entity: 'postava', postava_id: 1, x: 700, y: 700 } })).json();
+  ok(sqlVal(`select ifnull(videni_infra_sahy,'-') from tokeny where id=${j.token_id}`) === '-',
+    'token jiné rasy infravidění nedostane (pravidla ho mají jen u trpaslíka)');
+
   await browser.close();
   console.log(chyb ? 'CHYB: ' + chyb : 'VŠE OK');
   process.exit(chyb ? 1 : 0);
