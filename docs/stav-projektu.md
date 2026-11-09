@@ -38,6 +38,8 @@ Základ: plná regrese 2026-11-09 na čerstvě postavené DB prošla 60 z 61 sad
 v `/home/user/dracak-vtt`), kód je v pořádku. Značení: **(a)** funguje a má test, **(b)** funguje, ale neověřeno v reálné hře / na telefonu či tabletu, **(c)** chybí.
 Zařazení vychází z kódu, testů a scénáře, ne z ověření na zařízení — to jsem v cloudu udělat nemohl.
 
+**Doplněno 2026-11-09:** `log_unit` opraven (cesta z `__DIR__`). Nový test `dotyk_ui` (tažení tokenu, posun a pinch skutečnými dotykovými událostmi, telefon i tablet) prošel — zmenšuje (b) u mapy, ale skutečný tablet nenahrazuje. Měření `poll_zatez.js` (6 současných přihlášení, 40 s, PJ přesouvá token a mění životy): `udalosti.php` 165× a `mlha_stav.php` 136×, medián 4–5 ms, p95 ≤ 9 ms, žádné 5xx. Je to lokální PHP bez sítě a bez hostingových limitů, takže říká jen, že server s 6 hráči nezahlcuje; skutečná odezva WEDOSu se ukáže až na zkušebním večeru.
+
 | Fronta | (a) funguje, pokryto testem | (b) neověřeno v reálné hře | (c) chybí |
 |---|---|---|---|
 | **Mapa a tokeny** | kamera, tokeny (vzhled, otáčení, výběr, kontextové menu), mlha, zdi, dveře, světlo a tma, piny, ping, kresby, raid panel, nahrávání obrázků (`hex_*`, `dvere_api`, `videni_api`, `svetlo_*_ui`, `raid_panel_ui`, `upload_api`, `xss_ui`) | tažení prstem, pinch, spodní lišta na skutečném tabletu / telefonu (test jen emuluje okno), polling při 6 hráčích, stíny na velké mapě v ostré hře | nic, co by blokovalo. Mimo MVP: zamčené a tajné dveře, hráč otevírá dveře, ikony efektů na tokenu |

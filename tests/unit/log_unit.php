@@ -13,7 +13,7 @@ $cesta = dracak_log_cesta();
 
 over('čtení bez souboru', dracak_log_nacti() === ['existuje' => false, 'velikost' => 0, 'zaznamy' => [], 'poskozenych' => 0]);
 
-dracak_log_zapis('vyjimka', "Řádek 1\nřádek 2 s \x07 řídicím znakem", ['soubor' => '/home/user/Dracak-VTT/hra/api/x.php', 'radek' => 12, 'stopa' => ['a.php:1 f', 'b.php:2 g']]);
+dracak_log_zapis('vyjimka', "Řádek 1\nřádek 2 s \x07 řídicím znakem", ['soubor' => dirname(__DIR__, 2) . '/hra/api/x.php', 'radek' => 12, 'stopa' => ['a.php:1 f', 'b.php:2 g']]);
 over('složka a .htaccess vznikly', is_file(dirname($cesta) . '/.htaccess'));
 $text = file_get_contents($cesta);
 over('záznam je jeden řádek', substr_count($text, "\n") === 1, json_encode($text, JSON_UNESCAPED_UNICODE));
