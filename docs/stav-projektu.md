@@ -27,6 +27,39 @@ už byly rozhodnuté (viz "Architektonická rozhodnutí" a celá sekce
 "Rozpracováno" níže — všechno v ní je buď přímo citovaný text pravidel,
 nebo odsouhlasené uživatelem, ne můj odhad).
 
+### MVP před zkušebním večerem — přehled po frontách (2026-11-09)
+
+**Zadání uživatele (2026-11-09):** nejdřív funkční MVP na všech frontách, teprve potom jemné ladění. Do dokončení MVP se nestaví leštění stínů, výkonové
+optimalizace, drobné nálezy z revize ani kosmetika. **Definice MVP** = cíl ze sekce „Plán: náhrada Owlbear Rodeo“: VTT, které jde nasadit do ostré hry
+(mapy, tokeny, souboj, deník, svět/cesta) — „začít testovat v živé hře, ne dokonalost“. MVP je hotové, až proběhne zkušební večer (`docs/zkusebni-scenar-prvni-hra.md`)
+a nic z toho, co na něm drhne, nebrání hře.
+
+Základ: plná regrese 2026-11-09 na čerstvě postavené DB prošla 60 z 61 sad; `unit/log_unit` padá jen kvůli pevné cestě `/home/user/Dracak-VTT/` v testu (repo je teď
+v `/home/user/dracak-vtt`), kód je v pořádku. Značení: **(a)** funguje a má test, **(b)** funguje, ale neověřeno v reálné hře / na telefonu či tabletu, **(c)** chybí.
+Zařazení vychází z kódu, testů a scénáře, ne z ověření na zařízení — to jsem v cloudu udělat nemohl.
+
+| Fronta | (a) funguje, pokryto testem | (b) neověřeno v reálné hře | (c) chybí |
+|---|---|---|---|
+| **Mapa a tokeny** | kamera, tokeny (vzhled, otáčení, výběr, kontextové menu), mlha, zdi, dveře, světlo a tma, piny, ping, kresby, raid panel, nahrávání obrázků (`hex_*`, `dvere_api`, `videni_api`, `svetlo_*_ui`, `raid_panel_ui`, `upload_api`, `xss_ui`) | tažení prstem, pinch, spodní lišta na skutečném tabletu / telefonu (test jen emuluje okno), polling při 6 hráčích, stíny na velké mapě v ostré hře | nic, co by blokovalo. Mimo MVP: zamčené a tajné dveře, hráč otevírá dveře, ikony efektů na tokenu |
+| **Souboj** | iniciativa v2, akce a pohyb, útok a obrana, zbraně a vytasení, efekty, kouzlení (včetně „ihned“), boj ve tmě s postihy, souběhy (`souboj_api`, `ini_*`, `vyzva_api`, `zbrane_*`, `efekty_*`, `kouzleni_*`, `soubehy_api`) | celý souboj s živou družinou a hráčem na druhém zařízení; kouzlení je z 4.–6. 11., ještě nikdy ne v reálné hře | Boj beze zbraně: tabulky (str. 68–70) se v přepisu nedochovaly. **Neblokuje** — bez držené zbraně hra vezme první zbraň s ÚČ, jinak číslo doplní PJ; viz kontrolní seznam. Ztráta iniciativy ve tmě je jen postih (rozhodnutí čeká) |
+| **Deník postavy** | založení postavy, inventář z katalogu, zbroj a štít, přepočet OČ / ÚČ / naložení, lektvary, kouzla, odpočinek a únava, dock na mapě (`denik_v2`, `denik_dock`, `inv_ui`) | deník na telefonu, doba načtení při velkém inventáři | figurína a sloty, Dovednosti, Společníci, připnutá kouzla (čekají na rozhodnutí uživatele). Deník nestvůry **před bojem** (čeká na jeho design); za boje funguje malý deník v panelu tokenu. Nic z toho první večer neblokuje |
+| **Svět a cesta** | světy, pozvání a oprávnění, poznámky, piny, přechod mezi lokacemi, hodiny světa, pochod po mapě světa, kalkulačka cesty, povozy, jezdecká zvířata (`e2e_hra`, `druzina_*`, `poznamky_ui`, `pin_vstoupit_api`, `hodiny_sveta_api`, `pochod_cesta_ui`, `cesta_*`) | cesta s kočárem v ostré hře, propojení cesty s časem světa | automatické přenesení družiny po trase (jde ručně); odpočinek a spánek neposouvají čas světa. Neblokuje |
+| **Administrace a provoz** | účty a role, Změny databáze, Kontrola nasazení, chybový log, záloha, kontrola zabezpečení, fuzzery (`admin_migrace_ui`, `log_ui`, `zaloha_ui`, `csp_api`, `fuzz_*`) | **obnova zálohy do prázdné DB na hostingu** (lokálně testovaná, na WEDOSu ne), Content-Security-Policy je zatím jen v režimu hlášení | nic. Subdoména `vtt` je kosmetika |
+
+**Co blokuje MVP a čeká na uživatele** (jen věci, které jde udělat jedině jeho rukou):
+1. **Zkušební večer** — PJ na počítači, hráč na tabletu / telefonu, zhruba hodina podle scénáře. Bez toho není u žádné fronty (b) ověřeno a nevíme, co ve skutečnosti drhne.
+2. **Maximální magenergie u kouzlících postav** — v deníku postavy (PJ). Dokud není nastavená, postava kouzlí zadarmo, hra to jen hlásí do logu. Na zkušebním večeru by kouzlení bez magů nic neukázalo.
+3. **Obnova zálohy** na hostingu (`docs/zalohy.md`) — jednou vyzkoušet, než se do hry vloží data, o která by byla škoda přijít.
+4. *(Neblokuje první večer, ale potřebuji to později)* **foto stran 68–70 z knihy** (boj beze zbraně: citlivá místa, posun podle velikosti, tabulky boje beze zbraně a vícenásobných útoků), **design deníku nestvůry před bojem**, **rozhodnutí o ztrátě iniciativy ve tmě**.
+
+**Nejmenší sada kroků k zkušebnímu večeru:**
+1. (Claude) opravit pevnou cestu v `tests/unit/log_unit.php`, aby regrese byla celá zelená.
+2. (Uživatel) v administraci zkontrolovat Změny databáze (má být „Všechno je aplikované“) a Kontrolu nasazení (všechny soubory sedí).
+3. (Uživatel) nastavit maximální magenergii postavám, které budou kouzlit; vymazat chybový log.
+4. (Uživatel) projít scénář kroky 1–20 a ke každému zapsat prošlo / drhne / nejde; krok 20 (kouzlení) je od 2026-11-09 ve scénáři.
+5. (Uživatel) po hře poslat Claudovi nejnovější záznamy z chybového logu a seznam „drhne / nejde“.
+6. (Claude) opravit jen to, co ve hře skutečně drhlo; až potom se vrátit k leštění (stíny, výkon, nálezy z revize).
+
 ### Další kroky bez rozhodnutí uživatele (kandidáty pro další sezení)
 
 Stav k 2026-10-31: vše z dosavadního plánu (bod A–D, deník v2 kroky 1–3a, deploy, migrace z administrace, log, záloha, testy, fuzzery) je hotové a nasazené; 31 sad v `tests/` prochází

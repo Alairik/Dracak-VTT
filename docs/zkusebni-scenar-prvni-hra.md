@@ -34,6 +34,7 @@ testem toku pozvání, viz konec).
 | 17 | PJ | Na světové mapě nastav **Měřítko mapy** (míle na 1000 px), vezmi nástroj **Měřit**, změř trasu; **Shift** naváže další úsek. Klikni na **Spočítat cestu**. | Odkaz ukáže součet mil, kalkulačka cesty ho převezme. Zápis cesty zapíše postavám únavu a (po zaškrtnutí) posune čas světa. |
 | 18 | PJ | V kalkulačce cesty zapni **povoz**, tempo spěch (klus), zvol Kočího. Klikni na **Hodit řízení za celou cestu**. | Ukáže šanci řízení, počet hodů a šanci na cestu bez nehody; hod vypíše nehodu (směna, hod, o kolik nad hranicí), nebo že cesta proběhla. |
 | 19 | PJ nebo hráč | V panelu tokenu postavy otevři **Dosah pohybu…** a zvol povrch. | Kolik sáhů postava uběhne za kolo (poklus / běh / sprint) a ujde za směnu; tlačítko to ukáže jako kruh na mapě. |
+| 20 | PJ + hráč | Postavě s nastavenou max. magenergií v souboji zvol akci **Kouzlit** a kouzlo, které má víc akcí vyvolání (ne „ihned“). Zkus i kouzlo „ihned“ přes **Kouzla ihned…** u jiné akce. | Postava dostane štítek „Kouzlí“ (útočníci proti ní nemají bonus za obratnost), magy se strhnou při zahájení, kouzlo začne působit po předposlední akci. Zásah před tím kouzlo zruší a magy propadnou. |
 
 ## Po hře
 
