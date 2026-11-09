@@ -180,7 +180,13 @@ dracak_vtt_page_start('Administrace — ' . $svet['nazev'], $user);
     <?php endif; ?>
     <!-- Oblasti: kus světa (mapa a všechno pod ní) se dá vyvézt do souboru a přidat do jiného světa.
          Vyváží se z mapy — v informaci o pinu je „Vyvézt oblast…“. Sem patří jen přidání cizí oblasti. -->
-    <h2 class="page-title" style="font-size:20px;margin-top:28px;">Oblasti ze souboru</h2>
+    <h2 class="page-title" style="font-size:20px;margin-top:28px;">Oblasti</h2>
+    <p class="note" style="max-width:520px;margin-top:0;">Vyvézt kus světa můžeš i na mapě — v informaci o pinu je
+      „Vyvézt oblast…“ a vezme mapu pod pinem a všechno pod ní. Tady se vyváží celý svět najednou.</p>
+    <a class="btn btn-secondary" href="api/oblast_export.php?cely_svet=1&amp;svet_id=<?= (int)$svetId ?>"
+       style="margin-bottom:18px;display:inline-block;">Vyvézt celý svět…</a>
+
+    <h3 class="page-title" style="font-size:17px;margin-top:10px;">Přidat oblast ze souboru</h3>
     <p class="note" style="max-width:520px;margin-top:0;">Přidá do tohohle světa kus jiného světa — mapu a všechno pod ní
       (mapy, na které z ní vedou piny), i s nestvůrami, zdmi a podklady. Postavy a hráči se nepřenášejí.
       Nejdřív se ukáže, co balíček obsahuje, a teprve pak se přidá.</p>

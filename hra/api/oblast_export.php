@@ -11,6 +11,14 @@ $pdo = dracak_db();
 
 $mapaId = (int)($_GET['mapa_id'] ?? 0);
 $bodId = (int)($_GET['bod_id'] ?? 0);
+// Celý svět = všechny jeho mapy, i ty, na které z žádné jiné pin nevede (jinak by vypadly).
+$celySvet = !empty($_GET['cely_svet']);
+if ($celySvet) {
+    $svetIdParam = (int)($_GET['svet_id'] ?? 0);
+    $q = $pdo->prepare('SELECT id FROM mapy WHERE svet_id = ? ORDER BY (typ_mapy = "svet") DESC, id LIMIT 1');
+    $q->execute([$svetIdParam]);
+    $mapaId = (int)($q->fetchColumn() ?: 0);
+}
 if ($bodId > 0) {
     $q = $pdo->prepare('SELECT cilova_mapa_id FROM mapa_body WHERE id = ?');
     $q->execute([$bodId]);
@@ -35,7 +43,7 @@ if (!dracak_vtt_je_pj_sveta($user, $svetId)) {
     echo json_encode(['error' => 'Oblast vyváží jen PJ.']);
     exit;
 }
-$v = dracak_vtt_oblast_export($pdo, $svetId, $mapaId);
+$v = dracak_vtt_oblast_export($pdo, $svetId, $mapaId, $celySvet);
 if (isset($v['chyba'])) {
     http_response_code(422);
     echo json_encode(['error' => $v['chyba']]);
@@ -53,7 +61,7 @@ if (!class_exists('ZipArchive')) {
 }
 $manifest = [
     'format' => DRACAK_OBLAST_FORMAT,
-    'nazev' => $v['nazev'],
+    'nazev' => $celySvet ? (string)($pdo->query('SELECT nazev FROM svet WHERE id = ' . $svetId)->fetchColumn() ?: $v['nazev']) : $v['nazev'],
     'vyvezeno' => date('c'),
     'souhrn' => $v['souhrn'],
 ];
@@ -74,7 +82,7 @@ $zip->close();
 
 // Název mapy bývá s diakritikou; prohlížeč rozumí UTF-8 jen přes filename* (RFC 5987), prosté filename
 // musí zůstat v ASCII, jinak se jméno souboru rozsype („TestovacÃ­-mapa“).
-$cisty = preg_replace('/[^\p{L}\p{N}_-]+/u', '-', (string)$v['nazev']);
+$cisty = preg_replace('/[^\p{L}\p{N}_-]+/u', '-', (string)$manifest['nazev']);
 $cisty = trim((string)$cisty, '-') ?: 'oblast';
 $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT', $cisty);
 $ascii = preg_replace('/[^A-Za-z0-9_-]+/', '-', $ascii === false ? 'oblast' : $ascii);

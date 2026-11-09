@@ -91,8 +91,20 @@ Postaveno podle návrhu `docs/export-import-oblasti-navrh.md` (ten zůstává ja
   zápis, přečíslování pinů, přeskočení NPC s chybějícím druhem, druhý import, celý tok v rozhraní).
 - **Žádná změna databáze** — import i export jedou nad tím, co už je.
 
+**Doplněno po dotazech uživatele (2026-11-09):**
+- **NPC postavená jako POSTAVA se vezou** (hostinský s plnou kartou, kapitán stráže). Poznají se stejně jako všude
+  jinde v aplikaci: vlastníkem je **PJ světa** (nebo nikdo) → `strana = 'pj'` ve `vtt_mapa_stav.php`. Postavy hráčů
+  se nevezou — družina patří hráčům, ne místu. Veze se karta (vlastnosti, životy, magy, peníze, zbroj/štít/zbraň
+  jménem z katalogu), inventář, lektvary, kouzla i kontejnery s obsahem. Po importu je vlastníkem **PJ cílového
+  světa** (sloupec `postavy.vlastnik_ucet_id` je NOT NULL, prázdný být nemůže).
+- **Vývoz celého světa**: `hra/svet_administrace.php` → „Vyvézt celý svět…“ (`oblast_export.php?cely_svet=1&svet_id=`).
+  Vezme **všechny** mapy světa, i ty, na které žádný pin nevede — ty by sestup po pinech vynechal.
+- **„Svět -1“ za portálem funguje bez další práce**: mapa typu „světová mapa“ může být ve světě víc než jedna
+  (`dracak_vtt_mapa_strom` bere jako kořen každou) a pin z ní nebo na ni je obyčejný přechod. Jiná dimenze je tedy
+  jen další mapa — vyveze se jako každá jiná oblast a dá se přidat jinam.
+
 **Zbývá, až na to přijde řada:** dopojení visících přechodů kliknutím (dnes se jen vypíšou a PJ pin upraví ručně),
-export více oblastí naráz a výběr, co se má vzít (dnes vždy všechno pod mapou).
+výběr, co se má vzít (dnes vždy všechno pod mapou, nebo celý svět).
 
 ### Export a import oblasti — původní návrh (2026-11-09, teď už postavené výš)
 

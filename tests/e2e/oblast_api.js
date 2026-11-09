@@ -32,6 +32,12 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   await api(pj, 'token_pridat', { mapa_id: 2, typ_entity: 'obecny', nazev: 'Sud', x: 420, y: 300 });
   await api(pj, 'zed_pridat', { mapa_id: 2, x1: 100, y1: 100, x2: 300, y2: 100, sirka_px: 6, blokuje_pohyb: true, blokuje_vystrel: true, viditelna_hracum: true });
 
+  // NPC postavené jako postava (hostinský s kartou) = postava, kterou na mapě vlastní PJ. Patří k místu.
+  // Postava hráče (Sindor) patří družině a vyvézt se nesmí.
+  sql("insert into postava_predmety (postava_id, predmet_id, mnozstvi, u_sebe) select 1, id, 2, 1 from predmety order by id limit 1");
+  await api(pj, 'token_pridat', { mapa_id: 2, typ_entity: 'postava', postava_id: 1, x: 500, y: 300 });   // Hrun = postava PJ
+  await api(pj, 'token_pridat', { mapa_id: 2, typ_entity: 'postava', postava_id: 2, x: 560, y: 300 });   // Sindor = postava hráče
+
   // --- práva ---
   let r = await hrac.request.get(BASE + '/hra/api/oblast_export.php?mapa_id=1&nahled=1');
   ok(r.status() === 403, 'hráč oblast nevyveze (403): ' + r.status());
@@ -43,9 +49,14 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   let n = await r.json();
   ok(r.status() === 200 && n.souhrn.map === 2, 'oblast z mapy 1 bere i mapu pod pinem: ' + n.souhrn.map + ' mapy');
   // Počty se berou ze zdroje, ne natvrdo — seed má vlastní tokeny a zeď a jejich počet se může změnit.
-  const tokenuZdroj = parseInt(sqlVal("select count(*) from tokeny where mapa_id in (1,2) and typ_entity<>'postava'"), 10);
+  // Tokeny v oblasti = všechno kromě postav hráčů (NPC-postavy PJ se vezou).
+  // Kolik výbavy a kolik tokenů NPC-postav je ve zdroji — porovnává se s tím, ne s pevným číslem.
+  const vybavaZdroj = sqlVal("select count(*) from postava_predmety where postava_id=1");
+  const postavTokenuZdroj = sqlVal("select count(*) from tokeny t join postavy p on p.id=t.entita_id and t.typ_entity='postava' where t.mapa_id in (1,2) and p.vlastnik_ucet_id=(select pj_ucet_id from svet where id=1)");
+  const tokenuZdroj = parseInt(sqlVal("select count(*) from tokeny t left join postavy p on p.id=t.entita_id and t.typ_entity='postava' where t.mapa_id in (1,2) and (t.typ_entity<>'postava' or p.vlastnik_ucet_id is null or p.vlastnik_ucet_id=(select pj_ucet_id from svet where id=1))"), 10);
   const zdiZdroj = parseInt(sqlVal('select count(*) from zdi where mapa_id in (1,2)'), 10);
-  ok(n.souhrn.npc === 2 && n.souhrn.tokeny === tokenuZdroj, 'veze nestvůry i vlastní tokeny: ' + n.souhrn.npc + ' NPC / ' + n.souhrn.tokeny + ' tokenů');
+  ok(n.souhrn.npc === 2, 'veze nestvůry: ' + n.souhrn.npc);
+  ok(n.souhrn.postavy === 1, 'veze NPC postavené jako postava (PJ), ne postavu hráče: ' + n.souhrn.postavy);
 
   // export z pinu dá tu samou oblast jako export z mapy pod ním (bez výchozí mapy)
   r = await pj.request.get(BASE + '/hra/api/oblast_export.php?bod_id=' + bod.id + '&nahled=1');
@@ -80,8 +91,18 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   ok(sqlVal(`select count(*) from nestvura_instance where svet_id=${svet2}`) === '2', 'nestvůry taky');
   ok(sqlVal(`select count(*) from tokeny t join mapy m on m.id=t.mapa_id where m.svet_id=${svet2}`) === String(tokenuZdroj), 'tokeny taky: ' + tokenuZdroj);
   ok(sqlVal(`select count(*) from zdi z join mapy m on m.id=z.mapa_id where m.svet_id=${svet2}`) === String(zdiZdroj), 'zdi taky: ' + zdiZdroj);
-  ok(sqlVal(`select count(*) from tokeny t join mapy m on m.id=t.mapa_id where m.svet_id=${svet2} and t.typ_entity='postava'`) === '0',
-    'postavy se NEpřenesly (oblast je místo, ne družina)');
+  ok(sqlVal(`select count(*) from postavy p join tokeny t on t.entita_id=p.id and t.typ_entity='postava' join mapy m on m.id=t.mapa_id where m.svet_id=${svet2} and p.nazev='Sindor'`) === '0',
+    'postava hráče se NEpřenesla (družina patří hráčům, ne místu)');
+
+  // NPC-postava se založila bez vlastníka (je to PJ, ne postava hráče) a nese svoji výbavu
+  ok(sqlVal(`select count(*) from postavy where svet_id=${svet2}`) === '1', 'přidala se jedna NPC-postava');
+  ok(sqlVal(`select vlastnik_ucet_id from postavy where svet_id=${svet2}`) === sqlVal(`select pj_ucet_id from svet where id=${svet2}`),
+    'NPC-postava patří PJ cílového světa — tak aplikace pozná NPC od postavy hráče');
+  ok(sqlVal(`select nazev from postavy where svet_id=${svet2}`) === 'Hrun', 'je to ta správná postava (Hrun, ne Sindor)');
+  ok(sqlVal(`select count(*) from postava_predmety pp join postavy p on p.id=pp.postava_id where p.svet_id=${svet2}`) === vybavaZdroj,
+    'NPC-postava si nese celou svoji výbavu: ' + vybavaZdroj + ' položek');
+  ok(sqlVal(`select count(*) from tokeny t join mapy m on m.id=t.mapa_id where m.svet_id=${svet2} and t.typ_entity='postava'`) === postavTokenuZdroj,
+    'tokeny NPC-postav sedí se zdrojem: ' + postavTokenuZdroj);
 
   // přečíslování: pin v novém světě ukazuje na novou mapu, ne na původní
   const cil = sqlVal(`select b.cilova_mapa_id from mapa_body b join mapy m on m.id=b.mapa_id where m.svet_id=${svet2} limit 1`);
@@ -130,10 +151,21 @@ w.close()
   ok(parseInt(sqlVal(`select count(*) from mapy where svet_id=${svet2}`), 10) === mapPred + 2, 'mapy se přesto přidaly');
   ok(parseInt(sqlVal(`select count(*) from nestvura_instance where svet_id=${svet2}`), 10) === npcPred, 'NPC bez druhu v katalogu nevznikla');
 
+  // --- vývoz celého světa: vezme i mapy, na které žádný pin nevede ---
+  sql("insert into mapy (svet_id, nazev, typ_mapy, grid_typ) values (1, 'Osamělá mapa bez pinu', 'zona', 'ctverec')");
+  r = await pj.request.get(BASE + '/hra/api/oblast_export.php?mapa_id=1&nahled=1');
+  const bezOsamele = (await r.json()).souhrn.map;
+  r = await pj.request.get(BASE + '/hra/api/oblast_export.php?cely_svet=1&svet_id=1&nahled=1');
+  const celySvet = await r.json();
+  ok(celySvet.souhrn.map === bezOsamele + 1,
+    'celý svět vezme i mapu, na kterou pin nevede: ' + bezOsamele + ' → ' + celySvet.souhrn.map);
+  sql("delete from mapy where nazev='Osamělá mapa bez pinu'");
+
   // --- rozhraní: správa světa, nahrání souboru, kontrola a přidání ---
   sql("delete from mapy where svet_id=" + svet2);
   sql("delete from nestvura_instance where svet_id=" + svet2);
   await pj.goto(BASE + '/hra/svet_administrace.php?id=' + svet2);
+  ok(await pj.locator('a[href*="cely_svet=1"]').count() === 1, 've správě světa je odkaz „Vyvézt celý svět“');
   ok(await pj.locator('#oblastSoubor').count() === 1, 've správě světa je pole pro soubor s oblastí');
   ok(await pj.locator('#oblastPridatBtn').isDisabled(), 'tlačítko „Přidat do světa“ je na začátku zakázané');
   await pj.locator('#oblastSoubor').setInputFiles({ name: 'oblast.zip', mimeType: 'application/zip', buffer: zip });

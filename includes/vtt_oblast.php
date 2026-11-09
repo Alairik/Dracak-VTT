@@ -24,6 +24,15 @@ require_once __DIR__ . '/vtt_mapa_stav.php';   // dracak_vtt_tokeny_ma_sloupec()
 const DRACAK_OBLAST_FORMAT = 1;          // verze formátu souboru
 const DRACAK_OBLAST_MAX_MAP = 200;       // strop map v jedné oblasti (pojistka proti zacyklení přes piny)
 
+// Všechny mapy světa (vývoz celého světa) — i ty, na které z žádné mapy pin nevede.
+function dracak_vtt_oblast_mapy_sveta(PDO $pdo, int $svetId): array
+{
+    // Světové mapy první, ať je první v balíčku ta nejvyšší úroveň (import pak nabídne otevřít ji).
+    $q = $pdo->prepare('SELECT * FROM mapy WHERE svet_id = ? ORDER BY (typ_mapy = "svet") DESC, id');
+    $q->execute([$svetId]);
+    return $q->fetchAll(PDO::FETCH_ASSOC);
+}
+
 // Mapy pod výchozí mapou včetně jí samé, v pořadí, v jakém se na ně narazilo.
 function dracak_vtt_oblast_mapy(PDO $pdo, int $svetId, int $startMapaId): array
 {
@@ -66,11 +75,13 @@ function dracak_vtt_oblast_vyber(PDO $pdo, string $sql, array $param): array
 }
 
 // Sestaví obsah oblasti. Vrací ['data' => …, 'soubory' => [cesta_v_zipu => absolutní cesta], 'souhrn' => […]].
-function dracak_vtt_oblast_export(PDO $pdo, int $svetId, int $startMapaId): array
+function dracak_vtt_oblast_export(PDO $pdo, int $svetId, int $startMapaId, bool $celySvet = false): array
 {
-    $mapy = dracak_vtt_oblast_mapy($pdo, $svetId, $startMapaId);
+    $mapy = $celySvet
+        ? dracak_vtt_oblast_mapy_sveta($pdo, $svetId)
+        : dracak_vtt_oblast_mapy($pdo, $svetId, $startMapaId);
     if (!$mapy) {
-        return ['chyba' => 'Mapa nenalezena v tomhle světě.'];
+        return ['chyba' => $celySvet ? 'Svět nemá žádné mapy.' : 'Mapa nenalezena v tomhle světě.'];
     }
     $mapaIds = array_map(fn($m) => (int)$m['id'], $mapy);
     $in = implode(',', array_fill(0, count($mapaIds), '?'));
@@ -78,7 +89,8 @@ function dracak_vtt_oblast_export(PDO $pdo, int $svetId, int $startMapaId): arra
     $soubory = [];
 
     $data = ['mapy' => [], 'zdi' => [], 'kresby' => [], 'piny' => [], 'tokeny' => [],
-             'npc' => [], 'npc_vybava' => [], 'staty_druhu' => [], 'obrazky' => [], 'poznamky' => []];
+             'npc' => [], 'npc_vybava' => [], 'staty_druhu' => [], 'obrazky' => [], 'poznamky' => [],
+             'postavy' => [], 'postava_vybava' => [], 'postava_kouzla' => [], 'kontejnery' => []];
 
     foreach ($mapy as $m) {
         $obrazek = null;
@@ -187,10 +199,80 @@ function dracak_vtt_oblast_export(PDO $pdo, int $svetId, int $startMapaId): arra
         }
     }
 
-    // Tokeny: nestvůry a vlastní tokeny. Postavy ne — oblast je místo, ne družina.
+    // NPC postavené jako POSTAVA (hostinský s plnou kartou, kapitán stráže…) do oblasti patří — jsou to obyvatelé
+    // toho místa. Poznají se podle vlastníka: nikdo, nebo účet PJ. Postavy hráčů se nevezou (oblast je místo, ne družina).
+    $pjUcetId = (int)($pdo->query('SELECT pj_ucet_id FROM svet WHERE id = ' . $svetId)->fetchColumn() ?: 0);
+    $postavyVOblasti = [];   // postava_id => true
+    foreach (dracak_vtt_oblast_vyber($pdo,
+        "SELECT p.*, r.nazev AS rasa, po.nazev AS povolani, zb.nazev AS zbroj, st.nazev AS stit, zn.nazev AS zbran,
+                dz.nazev AS zvire
+         FROM tokeny t
+         JOIN postavy p ON p.id = t.entita_id AND t.typ_entity = 'postava'
+         LEFT JOIN rasy r ON r.id = p.rasa_id
+         LEFT JOIN povolani po ON po.id = p.povolani_id
+         LEFT JOIN predmety zb ON zb.id = p.zbroj_id
+         LEFT JOIN predmety st ON st.id = p.stit_id
+         LEFT JOIN predmety zn ON zn.id = p.drzena_zbran_id
+         LEFT JOIN jizdni_zvirata dz ON dz.id = p.doprava_zvire_id
+         WHERE t.mapa_id IN ($in) AND (p.vlastnik_ucet_id IS NULL OR p.vlastnik_ucet_id = ?)
+         GROUP BY p.id", array_merge($mapaIds, [$pjUcetId])) as $p) {
+        $postavyVOblasti[(int)$p['id']] = true;
+        $data['postavy'][] = [
+            'ref' => dracak_vtt_oblast_ref('postava', $p['id']),
+            'nazev' => $p['nazev'], 'rasa' => $p['rasa'], 'povolani' => $p['povolani'],   // katalog odkazem jménem
+            'uroven' => $p['uroven'], 'sila' => $p['sila'], 'obratnost' => $p['obratnost'], 'odolnost' => $p['odolnost'],
+            'inteligence' => $p['inteligence'], 'charisma' => $p['charisma'],
+            'aktualni_hp' => $p['aktualni_hp'], 'max_hp' => $p['max_hp'],
+            'aktualni_magenergie' => $p['aktualni_magenergie'], 'max_magenergie' => $p['max_magenergie'],
+            'unava' => $p['unava'], 'poznamky' => $p['poznamky'], 'zkusenost' => $p['zkusenost'],
+            'penize_zl' => $p['penize_zl'], 'penize_st' => $p['penize_st'], 'penize_md' => $p['penize_md'],
+            'velikost' => $p['velikost'] ?? null, 'puvod' => $p['puvod'] ?? null, 'osobnost' => $p['osobnost'] ?? null,
+            'zbroj' => $p['zbroj'], 'stit' => $p['stit'], 'zbran' => $p['zbran'],
+            'doprava_typ' => $p['doprava_typ'] ?? null, 'doprava_zvire' => $p['zvire'] ?? null,
+            'pohyblivost_rucne' => $p['pohyblivost_rucne'] ?? null,
+        ];
+    }
+    if ($postavyVOblasti) {
+        $inP = implode(',', array_fill(0, count($postavyVOblasti), '?'));
+        $ids = array_keys($postavyVOblasti);
+        foreach (dracak_vtt_oblast_vyber($pdo,
+            "SELECT pp.postava_id, pp.mnozstvi, pp.u_sebe, pr.nazev FROM postava_predmety pp
+             JOIN predmety pr ON pr.id = pp.predmet_id WHERE pp.postava_id IN ($inP)", $ids) as $v) {
+            $data['postava_vybava'][] = ['postava' => dracak_vtt_oblast_ref('postava', $v['postava_id']),
+                'typ_polozky' => 'predmet', 'polozka' => $v['nazev'], 'mnozstvi' => $v['mnozstvi'], 'u_sebe' => $v['u_sebe']];
+        }
+        foreach (dracak_vtt_oblast_vyber($pdo,
+            "SELECT pl.postava_id, pl.mnozstvi, l.nazev FROM postava_lektvary pl
+             JOIN lektvary l ON l.id = pl.lektvar_id WHERE pl.postava_id IN ($inP)", $ids) as $v) {
+            $data['postava_vybava'][] = ['postava' => dracak_vtt_oblast_ref('postava', $v['postava_id']),
+                'typ_polozky' => 'lektvar', 'polozka' => $v['nazev'], 'mnozstvi' => $v['mnozstvi'], 'u_sebe' => 0];
+        }
+        foreach (dracak_vtt_oblast_vyber($pdo,
+            "SELECT pk.postava_id, k.nazev FROM postava_zna_kouzlo pk
+             JOIN kouzla k ON k.id = pk.kouzlo_id WHERE pk.postava_id IN ($inP)", $ids) as $v) {
+            $data['postava_kouzla'][] = ['postava' => dracak_vtt_oblast_ref('postava', $v['postava_id']), 'kouzlo' => $v['nazev']];
+        }
+        foreach (dracak_vtt_oblast_vyber($pdo,
+            "SELECT k.id, k.postava_id, k.nazev, k.nosic, pr.nazev AS predmet FROM postava_kontejnery k
+             LEFT JOIN predmety pr ON pr.id = k.predmet_id WHERE k.postava_id IN ($inP)", $ids) as $k) {
+            $obsah = [];
+            foreach (dracak_vtt_oblast_vyber($pdo,
+                'SELECT o.mnozstvi, pr.nazev FROM kontejner_obsah o JOIN predmety pr ON pr.id = o.predmet_id WHERE o.kontejner_id = ?',
+                [(int)$k['id']]) as $o) {
+                $obsah[] = ['polozka' => $o['nazev'], 'mnozstvi' => $o['mnozstvi']];
+            }
+            $data['kontejnery'][] = ['postava' => dracak_vtt_oblast_ref('postava', $k['postava_id']),
+                'nazev' => $k['nazev'], 'nosic' => $k['nosic'], 'predmet' => $k['predmet'], 'obsah' => $obsah];
+        }
+    }
+
+    // Tokeny: nestvůry, vlastní tokeny a NPC-postavy. Tokeny postav HRÁČŮ ne.
     $obrazkyIds = [];
     foreach (dracak_vtt_oblast_vyber($pdo,
-        "SELECT * FROM tokeny WHERE mapa_id IN ($in) AND typ_entity <> 'postava'", $mapaIds) as $t) {
+        "SELECT * FROM tokeny WHERE mapa_id IN ($in)", $mapaIds) as $t) {
+        if ($t['typ_entity'] === 'postava' && !isset($postavyVOblasti[(int)$t['entita_id']])) {
+            continue;   // postava hráče — ta patří družině, ne místu
+        }
         if (!empty($t['obrazek_id'])) {
             $obrazkyIds[(int)$t['obrazek_id']] = true;
         }
@@ -198,6 +280,7 @@ function dracak_vtt_oblast_export(PDO $pdo, int $svetId, int $startMapaId): arra
             'mapa' => dracak_vtt_oblast_ref('mapa', $t['mapa_id']),
             'typ_entity' => $t['typ_entity'],
             'npc' => $t['typ_entity'] === 'nestvura_instance' ? dracak_vtt_oblast_ref('npc', $t['entita_id']) : null,
+            'postava' => $t['typ_entity'] === 'postava' ? dracak_vtt_oblast_ref('postava', $t['entita_id']) : null,
             'x' => $t['x'], 'y' => $t['y'], 'z_poradi' => $t['z_poradi'],
             'smer' => $t['smer'] ?? 0, 'velikost_sahu' => $t['velikost_sahu'] ?? 1, 'hexu' => $t['hexu'] ?? 1,
             'barva' => $t['barva'] ?? null, 'zamceno' => $t['zamceno'] ?? 0, 'nazev' => $t['nazev'] ?? null,
@@ -239,6 +322,7 @@ function dracak_vtt_oblast_export(PDO $pdo, int $svetId, int $startMapaId): arra
         'map' => count($data['mapy']), 'zdi' => count($data['zdi']), 'piny' => count($data['piny']),
         'tokeny' => count($data['tokeny']), 'npc' => count($data['npc']), 'obrazky' => count($data['obrazky']),
         'poznamky' => count($data['poznamky']), 'kresby' => count($data['kresby']),
+        'postavy' => count($data['postavy']),
         'visici_prechody' => $visici,
     ];
     return ['data' => $data, 'soubory' => $soubory, 'souhrn' => $souhrn, 'nazev' => (string)$mapy[0]['nazev']];
@@ -269,8 +353,18 @@ function dracak_vtt_oblast_chybejici(PDO $pdo, array $data): array
     foreach ($jmena('nestvury', $druhy) as $d) {
         $chybi[] = 'Nestvůra „' . $d . '“ — není v bestiáři';
     }
+    // NPC postavené jako postava: bez rasy nebo povolání z katalogu je nejde založit.
+    foreach ($jmena('rasy', array_values(array_unique(array_filter(array_column($data['postavy'] ?? [], 'rasa'))))) as $r) {
+        $chybi[] = 'Rasa „' . $r . '“ — není v pravidlech';
+    }
+    foreach ($jmena('povolani', array_values(array_unique(array_filter(array_column($data['postavy'] ?? [], 'povolani'))))) as $po) {
+        $chybi[] = 'Povolání „' . $po . '“ — není v pravidlech';
+    }
+    foreach ($jmena('kouzla', array_values(array_unique(array_filter(array_column($data['postava_kouzla'] ?? [], 'kouzlo'))))) as $k) {
+        $chybi[] = 'Kouzlo „' . $k . '“ — není v katalogu';
+    }
     $predmety = $lektvary = [];
-    foreach ($data['npc_vybava'] ?? [] as $v) {
+    foreach (array_merge($data['npc_vybava'] ?? [], $data['postava_vybava'] ?? []) as $v) {
         if (($v['polozka'] ?? null) === null) {
             continue;
         }
@@ -297,6 +391,7 @@ function dracak_vtt_oblast_kontrola(PDO $pdo, array $data): array
         'pribude' => [
             'map' => count($data['mapy'] ?? []), 'tokenu' => count($data['tokeny'] ?? []),
             'npc' => count($data['npc'] ?? []), 'pinu' => count($data['piny'] ?? []),
+            'postav' => count($data['postavy'] ?? []),
             'zdi' => count($data['zdi'] ?? []), 'poznamek' => count($data['poznamky'] ?? []),
         ],
         'chybi_v_katalogu' => dracak_vtt_oblast_chybejici($pdo, $data),
@@ -310,7 +405,8 @@ function dracak_vtt_oblast_import(PDO $pdo, int $svetId, array $data, array $sou
 {
     $koren = dirname(__DIR__);
     $preskoceno = [];
-    $id = ['mapa' => [], 'npc' => [], 'obrazek' => []];        // dočasné ref → nové id
+    $pjUcetId = (int)($pdo->query('SELECT pj_ucet_id FROM svet WHERE id = ' . $svetId)->fetchColumn() ?: 0);
+    $id = ['mapa' => [], 'npc' => [], 'obrazek' => [], 'postava' => []];   // dočasné ref → nové id
     $prelozId = static function (?string $ref) use (&$id): ?int {
         if ($ref === null || strpos($ref, ':') === false) {
             return null;
@@ -445,7 +541,84 @@ function dracak_vtt_oblast_import(PDO $pdo, int $svetId, array $data, array $sou
         } catch (Throwable $e) { /* tabulka tu není */ }
     }
 
-    // 5) tokeny
+    // 5) NPC postavené jako postava (hostinský s plnou kartou). Vlastníkem je **PJ cílového světa** — přesně tak
+    // aplikace pozná NPC od postavy hráče (`strana` ve vtt_mapa_stav.php: vlastník = PJ → strana „pj“).
+    // Prázdný vlastník by nešel, sloupec `postavy.vlastnik_ucet_id` je NOT NULL.
+    // Rasa, povolání, předměty, lektvary a kouzla se dohledají v katalogu podle jména.
+    foreach ($data['postavy'] ?? [] as $po) {
+        $rasaId = $katalog('rasy', $po['rasa'] ?? null);
+        $povolaniId = $katalog('povolani', $po['povolani'] ?? null);
+        if ($rasaId === null || $povolaniId === null) {
+            $preskoceno[] = 'NPC „' . ($po['nazev'] ?? '?') . '“ — ' .
+                ($rasaId === null ? 'rasa „' . ($po['rasa'] ?? '?') . '“' : 'povolání „' . ($po['povolani'] ?? '?') . '“') . ' není v pravidlech';
+            continue;
+        }
+        $q = $pdo->prepare(
+            'INSERT INTO postavy (svet_id, vlastnik_ucet_id, nazev, rasa_id, povolani_id, uroven, sila, obratnost, odolnost,
+                                  inteligence, charisma, aktualni_hp, max_hp, aktualni_magenergie, max_magenergie, unava,
+                                  poznamky, zkusenost, penize_zl, penize_st, penize_md)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        );
+        $q->execute([$svetId, $pjUcetId, $po['nazev'], $rasaId, $povolaniId, $po['uroven'], $po['sila'], $po['obratnost'], $po['odolnost'],
+            $po['inteligence'], $po['charisma'], $po['aktualni_hp'], $po['max_hp'], $po['aktualni_magenergie'],
+            $po['max_magenergie'], $po['unava'], $po['poznamky'], $po['zkusenost'],
+            $po['penize_zl'], $po['penize_st'], $po['penize_md']]);
+        $novaPostava = (int)$pdo->lastInsertId();
+        $id['postava'][$po['ref']] = $novaPostava;
+        // Sloupce z pozdějších migrací a vazby na katalog zvlášť — import projde i tam, kde ještě nejsou.
+        foreach ([['velikost', $po['velikost'] ?? null], ['puvod', $po['puvod'] ?? null], ['osobnost', $po['osobnost'] ?? null],
+                  ['doprava_typ', $po['doprava_typ'] ?? null], ['pohyblivost_rucne', $po['pohyblivost_rucne'] ?? null],
+                  ['zbroj_id', $katalog('predmety', $po['zbroj'] ?? null)], ['stit_id', $katalog('predmety', $po['stit'] ?? null)],
+                  ['drzena_zbran_id', $katalog('predmety', $po['zbran'] ?? null)],
+                  ['doprava_zvire_id', $katalog('jizdni_zvirata', $po['doprava_zvire'] ?? null)]] as [$sl, $hod]) {
+            if ($hod === null) { continue; }
+            try { $pdo->prepare("UPDATE postavy SET `$sl` = ? WHERE id = ?")->execute([$hod, $novaPostava]); }
+            catch (Throwable $e) { /* sloupec v téhle instalaci není */ }
+        }
+    }
+    $insPP = $pdo->prepare('INSERT INTO postava_predmety (postava_id, predmet_id, mnozstvi, u_sebe) VALUES (?, ?, ?, ?)');
+    $insPL = $pdo->prepare('INSERT INTO postava_lektvary (postava_id, lektvar_id, mnozstvi) VALUES (?, ?, ?)');
+    foreach ($data['postava_vybava'] ?? [] as $v) {
+        $postava = $prelozId($v['postava']);
+        if ($postava === null) { continue; }
+        if (($v['typ_polozky'] ?? '') === 'lektvar') {
+            $lid = $katalog('lektvary', $v['polozka'] ?? null);
+            if ($lid === null) { $preskoceno[] = 'Lektvar „' . ($v['polozka'] ?? '?') . '“ — není v katalogu'; continue; }
+            $insPL->execute([$postava, $lid, $v['mnozstvi']]);
+        } else {
+            $pid = $katalog('predmety', $v['polozka'] ?? null);
+            if ($pid === null) { $preskoceno[] = 'Předmět „' . ($v['polozka'] ?? '?') . '“ — není v katalogu'; continue; }
+            $insPP->execute([$postava, $pid, $v['mnozstvi'], (int)($v['u_sebe'] ?? 0)]);
+        }
+    }
+    $insPK = $pdo->prepare('INSERT IGNORE INTO postava_zna_kouzlo (postava_id, kouzlo_id) VALUES (?, ?)');
+    foreach ($data['postava_kouzla'] ?? [] as $v) {
+        $postava = $prelozId($v['postava']);
+        $kid = $katalog('kouzla', $v['kouzlo'] ?? null);
+        if ($postava === null || $kid === null) {
+            if ($postava !== null) { $preskoceno[] = 'Kouzlo „' . ($v['kouzlo'] ?? '?') . '“ — není v katalogu'; }
+            continue;
+        }
+        $insPK->execute([$postava, $kid]);
+    }
+    foreach ($data['kontejnery'] ?? [] as $k) {
+        $postava = $prelozId($k['postava']);
+        if ($postava === null) { continue; }
+        try {
+            $q = $pdo->prepare('INSERT INTO postava_kontejnery (postava_id, predmet_id, nazev, nosic) VALUES (?, ?, ?, ?)');
+            $q->execute([$postava, $katalog('predmety', $k['predmet'] ?? null), $k['nazev'], (int)($k['nosic'] ?? 0)]);
+            $kid = (int)$pdo->lastInsertId();
+            $insKO = $pdo->prepare('INSERT INTO kontejner_obsah (kontejner_id, predmet_id, mnozstvi) VALUES (?, ?, ?)');
+            foreach ($k['obsah'] ?? [] as $o) {
+                $pid = $katalog('predmety', $o['polozka'] ?? null);
+                if ($pid !== null) { $insKO->execute([$kid, $pid, $o['mnozstvi']]); }
+            }
+        } catch (Throwable $e) {
+            $preskoceno[] = 'Kontejner „' . ($k['nazev'] ?? '?') . '“ — tahle instalace kontejnery zatím neumí';
+        }
+    }
+
+    // 6) tokeny
     $zakladni = ['mapa_id', 'typ_entity', 'entita_id', 'x', 'y', 'z_poradi', 'viditelny_hracum'];
     $volitelne = ['smer', 'velikost_sahu', 'hexu', 'barva', 'zamceno', 'nazev', 'obrazek_id',
                   'svetlo_sahy', 'svetlo_typ', 'videni_infra_sahy', 'studeny', 'videni_noc_sahy', 'svetlo_zbyva'];
@@ -460,6 +633,9 @@ function dracak_vtt_oblast_import(PDO $pdo, int $svetId, array $data, array $sou
         if ($t['typ_entity'] === 'nestvura_instance') {
             $entita = $prelozId($t['npc'] ?? null);
             if ($entita === null) { continue; }      // NPC se neimportovalo (chybí druh)
+        } elseif ($t['typ_entity'] === 'postava') {
+            $entita = $prelozId($t['postava'] ?? null);
+            if ($entita === null) { continue; }      // NPC-postava se neimportovala (chybí rasa/povolání)
         }
         $sloupce = $zakladni;
         $hodnoty = [$mapa, $t['typ_entity'], $entita, $t['x'], $t['y'], $t['z_poradi'], $t['viditelny_hracum']];
@@ -475,8 +651,8 @@ function dracak_vtt_oblast_import(PDO $pdo, int $svetId, array $data, array $sou
         $pdo->prepare('INSERT INTO tokeny (`' . implode('`, `', $sloupce) . "`) VALUES ($otazniky)")->execute($hodnoty);
     }
 
-    // 6) poznámky PJ
-    $pjId = (int)($pdo->query('SELECT pj_ucet_id FROM svet WHERE id = ' . $svetId)->fetchColumn() ?: 0);
+    // 7) poznámky PJ
+    $pjId = $pjUcetId;
     if ($pjId > 0) {
         $insPo = $pdo->prepare('INSERT INTO svet_poznamky (svet_id, autor_ucet_id, text, den_pri_vytvoreni, mapa_id, stitek) VALUES (?, ?, ?, ?, ?, ?)');
         foreach ($data['poznamky'] ?? [] as $p) {
@@ -487,6 +663,7 @@ function dracak_vtt_oblast_import(PDO $pdo, int $svetId, array $data, array $sou
     }
 
     return [
+        'postavy' => count($id['postava']),
         'mapy' => array_values($id['mapa']),
         'prvni_mapa' => $id['mapa'][$data['mapy'][0]['ref'] ?? ''] ?? null,
         'preskoceno' => $preskoceno,
