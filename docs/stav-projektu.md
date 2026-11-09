@@ -67,13 +67,15 @@ jako přípravu na mapy, které ještě nevznikly; výroba **dávkou** („10× 
   a `token_bar_ui.js` (28 kontrol: záložky, výroba, filtry, tažení myší i prstem na tabletu, klepnutí, mazání, hráč lištu nemá).
   Ověřeno i **bez ručního SQL** (lišta se nezobrazí, `npc_vyrobit` vrací 409, starý způsob přidání nestvůry funguje).
 
-**POZOR — ruční SQL blok J zatím NENÍ v produkční databázi.** Uživatel ho 2026-11-09 spustil, ale na stránce Změny databáze →
-„Co aplikace v databázi vidí“ jsou u všech čtyř sloupců ✗. Blok se tedy provedl jinde, než kam se dívá web — **skoro jistě v jiné
-databázi vybrané v phpMyAdminu** (totéž se stalo už dvakrát u dřívějších bloků, viz pravidlo v `CLAUDE.md`). Nasazení kódu proběhlo
-v pořádku (FTP Deploy běh 280, commit `9b3a650`) — chybí jen ty sloupce, takže se lišta na produkci nezobrazí.
-**Blok J byl proto přepsaný tak, aby to nešlo udělat potichu:** začíná kontrolou J0, která vypíše, v jaké databázi uživatel je a jestli
-v ní tabulka `nestvura_instance` vůbec existuje; když ne, všechny další kroky se samy přeskočí a nic nespadne. Ověřeno lokálně ve čtyřech
-stavech: čistá DB, podruhé, částečně provedené, a ve špatné databázi (varuje a nezmění nic).
+**Ruční SQL blok J uživatel spustil 2026-11-09.** Stránka Změny databáze → „Co aplikace v databázi vidí“ u všech čtyř sloupců
+hlásila ✗, ale **byla to chyba té stránky, ne databáze**: `admin_migrace.php` si seznam sloupců tahal z pevného výčtu tabulek
+(`aktivni_efekty, mapy, tokeny, svet`), takže řádky pro `nestvura_instance` (0115) nemohly nikdy vyjít jinak než „chybí“.
+Opraveno — seznam tabulek se bere přímo z `$ruckySql`, takže se to při přidání dalšího řádku nemůže znovu rozejít.
+**Poučení (zapsáno i v `CLAUDE.md`): než se znovu podezírá uživatel nebo phpMyAdmin, ověř nejdřív kontrolní stránku samotnou** —
+tady poslala uživatele dvakrát zbytečně spouštět SQL, které už dávno proběhlo.
+Blok J je tím pádem proveden a `docs/sql-k-rucnimu-spusteni.sql` je prázdný. Nasazení kódu proběhlo (FTP Deploy běh 280, `9b3a650`).
+Blok byl při té příležitosti přepsaný tak, aby začínal kontrolou J0 (v jaké databázi běžím, je tu ta tabulka) a ve špatné databázi
+se sám přeskočil — to zůstává jako vzor pro další bloky.
 Z cloud session na produkční web ani do jeho databáze nevidím (proxy blokuje `vtt.zvelebil.online`, WEDOS nepouští MySQL zvenčí).
 
 **Nice to have (zadání uživatele 2026-11-09, nestavět teď):** základní interagovatelné tokeny — truhla, mrtvola apod. Dnes existují „vlastní

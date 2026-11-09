@@ -60,10 +60,17 @@ $databaze = '';
 $sloupceDb = [];
 try {
     $databaze = (string)$pdo->query('SELECT DATABASE()')->fetchColumn();
-    foreach ($pdo->query(
+    // Seznam tabulek se bere ZE $ruckySql, ne natvrdo. Dřív tu byl pevný výčet čtyř tabulek, takže po přidání
+    // řádku pro jinou tabulku (nestvura_instance, migrace 0115) stránka hlásila „✗ chybí“, i když sloupce
+    // v databázi byly — a vypadalo to, že ruční SQL neproběhlo. Takhle se to nemůže rozejít.
+    $tabulky = array_values(array_unique(array_column($ruckySql, 0)));
+    $otazniky = implode(', ', array_fill(0, count($tabulky), '?'));
+    $q = $pdo->prepare(
         'SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE()
-           AND TABLE_NAME IN ("aktivni_efekty", "mapy", "tokeny", "svet")'
-    )->fetchAll(PDO::FETCH_NUM) as [$t, $c]) {
+           AND TABLE_NAME IN (' . $otazniky . ')'
+    );
+    $q->execute($tabulky);
+    foreach ($q->fetchAll(PDO::FETCH_NUM) as [$t, $c]) {
         $sloupceDb[$t . '.' . $c] = true;
     }
 } catch (Throwable $ex) {

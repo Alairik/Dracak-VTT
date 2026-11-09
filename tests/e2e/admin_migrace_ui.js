@@ -22,6 +22,22 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   sql('alter table aktivni_efekty add column akci_hotovo tinyint unsigned null');
   await p.reload();
   ok(await text('aktivni_efekty.akci_hotovo') === '✓', 'po vrácení sloupce je zase ✓');
+  // KAŽDÝ řádek přehledu se porovná se skutečnou databází. Dřív se kontroloval jen jeden sloupec z tabulky
+  // aktivni_efekty, takže prošlo, že si stránka tahala sloupce z pevného výčtu tabulek — řádky pro
+  // nestvura_instance (0115) pak hlásily „✗ chybí“, i když sloupce v databázi byly, a vypadalo to, že ruční
+  // SQL neproběhlo (uživatel ho kvůli tomu 2026-11-09 spouštěl dvakrát zbytečně).
+  const radky = await p.locator('[data-sloupec]').evaluateAll((els) => els.map((e) => [e.dataset.sloupec, e.textContent.trim()]));
+  ok(radky.length >= 4, 'přehled má řádky: ' + radky.length);
+  const sqlVal = (q) => require('child_process').execSync(`mysql ${DB} -N -e "${q}"`).toString().trim();
+  let nesedi = [];
+  for (const [sloupec, zobrazeno] of radky) {
+    const [t, c] = sloupec.split('.');
+    const vDb = sqlVal(`select count(*) from information_schema.columns where table_schema=database() and table_name='${t}' and column_name='${c}'`) === '1';
+    const stranka = zobrazeno === '✓';
+    if (vDb !== stranka) nesedi.push(sloupec + ' (v DB: ' + vDb + ', stránka: ' + zobrazeno + ')');
+  }
+  ok(nesedi.length === 0, 'každý řádek přehledu sedí se skutečnou databází' + (nesedi.length ? ': ' + nesedi.join(', ') : ' (' + radky.length + ' řádků)'));
+
   ok(p.chybyJs.length === 0, 'žádná chyba JavaScriptu');
   await browser.close();
   console.log(chyb ? 'CHYB: ' + chyb : 'VŠE OK');

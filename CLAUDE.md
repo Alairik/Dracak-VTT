@@ -92,13 +92,22 @@
      bez chyby.
   5. Po potvrzení, že ho provedl, soubor přepiš na aktuální stav
      (prázdný, nebo jen nové příkazy od té doby).
-  **6. „Spustil jsem to“ NENÍ potvrzení — potvrzení je ✓ na stránce Změny
+  **6. Když kontrolní stránka hlásí „chybí“, podezírej NEJDŘÍV tu stránku.**
+     2026-11-09 poslala uživatele dvakrát zbytečně spouštět blok J, který už
+     dávno proběhl: `admin_migrace.php` si seznam sloupců tahal z pevného
+     výčtu tabulek, ve kterém `nestvura_instance` nebyla, takže nové řádky
+     nemohly vyjít jinak než „✗ chybí“. Pořadí ověřování je: (a) umí ta
+     stránka vůbec tu tabulku přečíst? (b) je sloupec v databázi? (c) teprve
+     pak jestli uživatel spustil SQL jinde. Když přidáváš řádek do kontroly,
+     ověř, že kontrola tu tabulku opravdu čte (seznam tabulek se musí odvodit
+     z dat, ne psát natvrdo podruhé).
+  **7. „Spustil jsem to“ NENÍ potvrzení — potvrzení je ✓ na stránce Změny
      databáze → „Co aplikace v databázi vidí“.** Blok se už TŘIKRÁT provedl
      do jiné databáze, než kterou používá web (naposledy blok J, 2026-11-09:
      uživatel ho spustil a všechny čtyři sloupce hlásily ✗). Soubor
      `docs/sql-k-rucnimu-spusteni.sql` proto nikdy nevyprazdňuj na základě
      slov — až podle ✓ u všech sloupců. Do té doby ho posílej dál.
-  **7. Každý blok musí začínat kontrolou, ve KTERÉ databázi běží**, a když
+  **8. Každý blok musí začínat kontrolou, ve KTERÉ databázi běží**, a když
      je špatná, musí se všechny jeho kroky samy přeskočit (vzor: blok J —
      `SELECT DATABASE()` + `COUNT(*)` nad `information_schema.TABLES`,
      výsledek do `@je_tu` a každý `SET @s = IF(@je_tu = 0, 'DO 0', …)`).
@@ -146,6 +155,13 @@
   se do něj něco přidá; takový test pak padá na špatném očekávání, ne na chybě
   v kódu (stalo se u `npc_zasoba_api`). Stav, se kterým porovnáváš, si přečti
   před akcí a porovnávej proti němu.
+- **Kontrolní stránka musí být sama pokrytá testem, a to na VŠECH datech, co
+  ukazuje — ne na jednom vzorku.** `admin_migrace_ui` kontroloval jediný sloupec
+  z jediné tabulky, takže prošlo, že si stránka tahá data z pevného výčtu tabulek
+  a nové řádky hlásí „chybí“ pořád. Test teď porovnává každý řádek přehledu se
+  skutečnou databází. Obecně: u věci, která má hlídat něco jiného, testuj, že
+  hlásí správně OBĚ odpovědi (je / není) na KAŽDÉM řádku — jinak hlídač tiše lže
+  a posílá uživatele dělat práci, která už je hotová.
 - **Nový ovládací prvek v UI zapoj ve stejném kroku, v jakém ho přidáš do HTML.**
   Filtry v liště správy tokenů se vykreslily, ale neměly obsluhu — nic nedělaly
   a odhalil to až test. Když přidáváš tlačítko, přidej i jeho `addEventListener`
