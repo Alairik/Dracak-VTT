@@ -27,6 +27,45 @@ už byly rozhodnuté (viz "Architektonická rozhodnutí" a celá sekce
 "Rozpracováno" níže — všechno v ní je buď přímo citovaný text pravidel,
 nebo odsouhlasené uživatelem, ne můj odhad).
 
+### NPC ve světě, zátěž dat a loading — zjištění a návrh (2026-11-09, čeká na rozhodnutí uživatele)
+
+Uživatel se ptal (2026-11-09), kam ukládat NPC a „deník bestií“, jestli stovky NPC na desítkách map nebudou problém na data a loading, a chtěl **tabulku všech NPC
+ve světě** (včetně nepoužitých) v okně pro PJ vedle poznámek a měst. Dál do budoucna: svět reagující na akce hráčů a generátor výbavy/dovedností NPC podle druhu,
+úrovně a bohatosti (sám to řadí až za MVP).
+
+**Změřeno na lokální DB (ne na hostingu), 100 NPC na jedné mapě 2400×1800 s gridem 70 px:**
+- `mapa_stav.php`: medián 13 ms, max 23 ms, odpověď **48 kB** (PJ) / 44 kB (hráč) — proti 3 tokenům je to hlavně nárůst objemu odpovědi, ne času.
+- Tmavá mapa s mlhou a pochodní (scénář „město v noci“): `mlha_stav.php` medián 7 ms, max 9 ms pro hráče. Vidění po buňkách tedy při 100 tokenech **není** úzké hrdlo.
+- Velikost dat: řádek tokenu i instance nestvůry jsou desítky bajtů. 50 map × 100 NPC ≈ 5 000 řádků, tedy **pod 1 MB** — zanedbatelné proti obrázkům map.
+- Polling (`udalosti.php`) má index `(svet_id, id)`, takže ho velikost tabulky událostí nezpomaluje.
+
+**Závěr k zátěži:** počet map nehraje roli — `mapa_stav.php` i `mlha_stav.php` čtou tokeny vždy jen pro jednu mapu (`WHERE mapa_id = ?`), neaktivní mapy se nenačítají
+vůbec. Limit není počet map ani celkový počet NPC, ale **počet tokenů na jedné otevřené mapě**. Jediné číslo, které stojí za pozdější hlídání: těch 48 kB se stahuje
+po každé události (pohyb tokenu), takže v městě se stovkou NPC a šesti hráči to na mobilních datech bude znát. Řešit až kdyby to v reálné hře drhlo (např. posílat
+jen změněné tokeny) — ne teď.
+
+**Dvě skutečné mezery, které se přitom našly:**
+1. **NPC nemůže existovat bez mapy.** `nestvura_instance.mapa_id` je NOT NULL s cizím klíčem na `mapy`, takže NPC vznikne až položením tokenu na mapu. Požadovaná
+   „tabulka všech NPC ve světě včetně nepoužitých“ dnes nemá kam.
+2. **Deník nestvůry je na druh, ne na jedince.** `nestvura_staty_sveta` má klíč `(svet_id, nestvura_id)` — úprava čísel Goblina platí pro všechny gobliny ve světě.
+   Jedinečné NPC s vlastními čísly (hostinský se jménem) dnes nejde udělat.
+
+**Navržená cesta (nejmenší, která dá obojí; čeká na rozhodnutí uživatele):** NPC se stane bytostí **světa**, ne mapy — `nestvura_instance` dostane `svet_id` a
+`mapa_id` smí být prázdné („existuje ve světě, není nikde postavený“); token na mapě na instanci jen ukazuje. Tím vznikne tabulka všech NPC ve světě, NPC jde
+připravit dopředu bez mapy, jedinec může mít vlastní čísla (deník na instanci místo na druh), „NPC zůstane na mapě, když družina odejde“ platí dál (to funguje už
+dnes — tokeny jsou vázané na `mapa_id`) a existující výbava (`nestvura_instance_vybava`), životy i loot fungují bez úprav. Je to zároveň předpoklad pro budoucí
+generátor výbavy — ten musí mít kam generovaného NPC uložit. Cena: ruční SQL (`ALTER ADD svet_id` + `MODIFY mapa_id` na nullable, tedy phpMyAdmin pod admin účtem)
+a úpravy asi na 23 místech v kódu, která dnes instanci dohledávají přes `mapa_id`.
+
+**Nerozhodnuté, protože je to otázka na hru, ne na kód:** jestli mají být NPC dvě úrovně (jedineční se jménem a vlastními čísly × bezejmenná masa „Městan“ sdílející
+čísla druhu), nebo jedna. Doporučení: dvě úrovně, protože město s 50 měšťany nemá cenu ladit po jednom.
+
+**Vyřazeno ze plánu (rozhodnutí uživatele 2026-11-09):** duplikace map („knihovna map“, blok C bod 16) — každá mapa a zóna má být unikátní, kopírování je k ničemu.
+Řazení scén zůstává jako pohodlnost po MVP.
+
+**Nalezeno mimochodem, operační riziko:** `svet_udalosti` (log událostí pro polling) se **nikdy nemaže** — žádné `DELETE` v celém repu. Roste s každým pohybem
+tokenu navždy. Polling to nezpomaluje (index), ale záloha a velikost DB na hostingu ano. Opravit mazáním záznamů starších než N dní, až bude po zkušebním večeru.
+
 ### MVP před zkušebním večerem — přehled po frontách (2026-11-09)
 
 **Zadání uživatele (2026-11-09):** nejdřív funkční MVP na všech frontách, teprve potom jemné ladění. Do dokončení MVP se nestaví leštění stínů, výkonové
