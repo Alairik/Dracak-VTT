@@ -10,3 +10,6 @@ logs/*
 
 # Podklady testovacích map (tests/fixture/make-images.py) — nesmí do commitu ani na hosting.
 uploads/mapy/testmapa_*
+# Soubory, které vyrobí import oblasti (tests/e2e/oblast_api.js i ostrý provoz) — data, ne obsah repa
+uploads/mapy/import_*
+uploads/obrazky/import_*

@@ -149,7 +149,13 @@ w.close()
   await pj.locator('#oblastSoubor').setInputFiles({ name: 'jiny.zip', mimeType: 'application/zip', buffer: zip });
   ok(await pj.locator('#oblastPridatBtn').isDisabled(), 'výměna souboru zase zakáže přidání');
 
+  // Úklid: test nahrává podklady map do uploads/ — po sobě je smaž, ať se nehromadí v pracovní kopii.
   sql(`delete from svet where id=${svet2}`);
+  for (const slozka of ['mapy', 'obrazky']) {
+    for (const f of require('fs').readdirSync(require('path').resolve(__dirname, '../../uploads/' + slozka)).filter((x) => x.startsWith('import_'))) {
+      try { require('fs').unlinkSync(require('path').resolve(__dirname, '../../uploads/' + slozka, f)); } catch (e) {}
+    }
+  }
   await browser.close();
   console.log(chyb ? 'CHYB: ' + chyb : 'VŠE OK');
   process.exit(chyb ? 1 : 0);
