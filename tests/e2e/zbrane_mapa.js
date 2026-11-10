@@ -1,4 +1,5 @@
 const { chromium } = require(process.env.PLAYWRIGHT || '/opt/node22/lib/node_modules/playwright');
+const OUT = process.env.OUT || '/tmp/dracak-tests';
 const BASE = process.env.BASE || 'http://127.0.0.1:8099';
 const DB = process.env.DB || 'dracak', MAPA = 2;
 let chyb = 0;
@@ -21,7 +22,7 @@ const api = (page, name, body) => page.evaluate(async ([n, b]) => {
 }, [name, body]);
 const stav = (page) => page.evaluate(async (m) => (await fetch('/hra/api/mapa_stav.php?mapa_id=' + m, { cache: 'no-store' })).json(), MAPA);
 (async () => {
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
   const pj = await login(browser, 'test@local', 'test1234', '/hra/mapa.php?id=' + MAPA);
   const g = await pj.evaluate(() => window.MAPA.grid);
   const colStep = Math.sqrt(3) * g.px, rowStep = 1.5 * g.px;
@@ -51,7 +52,7 @@ const stav = (page) => page.evaluate(async (m) => (await fetch('/hra/api/mapa_st
   ok(/id=2/.test(src || ''), 'deník postavy 2: ' + src);
   const fr = hr.frameLocator('#denikFrame');
   ok(await fr.locator('#boj').isVisible(), 'v deníku je vidět sekce Boj');
-  await hr.screenshot({ path: 'zbrane_mapa.png' });
+  await hr.screenshot({ path: OUT + '/zbrane_mapa.png' });
   // vytasit z okna deníku → mapa ukáže log a ubyde akce
   const pred = parseInt(sqlVal(`select akce_zbyvajici from kolo_iniciativa where token_id=${sindor}`), 10);
   hr.dialogy.length = 0;

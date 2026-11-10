@@ -94,8 +94,27 @@ kompaktním deníkem, vrstva PJ uvnitř něj, světlo k předmětu v inventáři
 
 **Designové okno k připomínkám (2026-11-10):** https://claude.ai/artifact/ShFfKGCh8AUcW3jK3ncVnQ — plátno se čtyřmi
 nákresy (návrh mimo boj, návrh v souboji, dnešní postranní panel pro srovnání, telefon 390 px). Uživatel do něj píše
-připomínky komentářem přímo na místo v nákresu; co z toho vyjde, se teprve staví. Zdrojové soubory nákresů nejsou
-v repu (jsou v plátně samotném) — repo drží jen tenhle odkaz.
+připomínky komentářem přímo na místo v nákresu. Zdrojové soubory nákresů nejsou v repu (jsou v plátně samotném) —
+repo drží jen tenhle odkaz. **Plátno edituje i uživatel**, takže před další úpravou se jeho soubory musí přečíst
+(`Artifact action: "read"`), ne přepsat z lokální kopie — 2026-11-10 si tam sám přidal odkaz „Deník ↗“ do hlavičky.
+
+#### Zapracované připomínky z plátna (2026-11-10, verze 2 návrhu i kódu)
+
+Devět komentářů, všech devět vyřízeno v `assets/js/tvor_okno.js`, `assets/css/mapa.css`, `hra/api/nestvura_denik.php`
+a `hra/api/hp_uprava.php`:
+
+| Připomínka | Co se stalo |
+|---|---|
+| „tam kde jsou komenty, chtěl bych tooltip s otazníčkem v kulatém poli… používej to všude“ | Nový vzor `.tvor-hlp` + `.tvor-tip`: kolečko `?` za nadpisem sekce, bublina na nájezd i na klepnutí (telefon). **Zapsáno jako pravidlo do `CLAUDE.md`** — platí pro celou aplikaci. |
+| 3× „zbytečný koment“ (mez vyřazení, „co v seznamu není“, „efekty nasazuje kouzlo…“) | Odstavce z okna zmizely, texty jsou v bublinách. Pole `zranitelnosti_pozn` v API zrušené (byla to tatáž věta podruhé). |
+| „tady stačí písmena zranitelnosti a na mouseover vyjede, čím je to zranitelné, případně ikona“ | Čip je písmeno A–P (`kody_zranitelnosti.kod`) + ikona, celé jméno a popis v nájezdu a v `aria-label`. Násobek jako horní index. |
+| „velikost nepatří mezi čísla obrany“ | Z Obrany ven, je v hlavičce u druhu tvora („nemrtvý · velikost B“). |
+| „±životy mají být vedle ukazatele, stačí + a −, PJ může přepsat ručně, stejně tak hráči“ | Čtyři tlačítka → `−` a `+` po stranách pruhu; číslo je vstup, co jde přepsat. Nové `dracak_vtt_hp_nastav()` + parametr `nastavit` v `hp_uprava.php` (ořez a souběhy řeší DB stejně jako u delty, práva beze změny — PJ komukoli, hráč u své postavy). |
+| „dovednosti bychom neměli zapomenout“ | `nestvura_denik.php` posílá i `zvlastni_schopnosti.druh`; nadpis se jmenuje podle toho, co v sekci opravdu je (Schopnosti / Dovednosti / Schopnosti a dovednosti). |
+| odkaz „Deník ↗“, který si uživatel přidal do hlavičky nákresu | Převzatý do kódu; spodní tlačítko „Deník, výbava a kořist…“ bylo jeho dvojník, takže je venku (sekce `.tvor-paticka` zrušená). |
+
+Test `tests/e2e/tvor_okno_ui.js` je rozšířený na všechno z toho (písmena a jejich jména, schovaná i otevřená bublina,
+dvě tlačítka u pruhu, značka meze, ruční přepis včetně nesmyslného vstupu, velikost mimo obranu, odkaz v hlavičce).
 
 ### Stránka Změny databáze umí ukázat i data (2026-11-10)
 

@@ -1,4 +1,5 @@
 const { chromium } = require(process.env.PLAYWRIGHT || '/opt/node22/lib/node_modules/playwright');
+const OUT = process.env.OUT || '/tmp/dracak-tests';
 const DB = process.env.DB || 'dracak';
 const BASE = (process.env.BASE || 'http://127.0.0.1:8099');
 const sql = (q) => require('child_process').execSync(`mysql --default-character-set=utf8mb4 ${DB} -e "${q}"`);
@@ -6,7 +7,7 @@ let chyb = 0;
 const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK   ' : 'CHYBA') + ' ' + m); };
 (async () => {
   sql("insert ignore into postava_predmety (postava_id,predmet_id,mnozstvi) values (2,90,20),(2,91,3),(2,92,5); insert ignore into postava_lektvary (postava_id,lektvar_id,mnozstvi) values (2,1,2)");
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
   const page = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
   const chybyJs = []; page.on('pageerror', (e) => chybyJs.push(e.message));
   await page.goto(BASE + '/index.php'); await page.fill('#email', 'test@local'); await page.fill('#password', 'test1234');
@@ -65,12 +66,12 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK   ' : 'CHYBA') + ' '
   await page.click('#boj [data-detail="predmet"][data-id="39"]'); await page.waitForSelector('#dn-detail:not([hidden])');
   d = (await page.locator('#dn-detail').innerText()).replace(/\s+/g, ' ');
   ok(/Cep/.test(d) && /Postih k iniciativě −2/.test(d) && /Třída těžká/.test(d), 'detail zbraně z tabulky Boj (i když je Inventář skrytý): ' + d.slice(0, 220));
-  await page.screenshot({ path: 'inv_detail.png' });
+  await page.screenshot({ path: OUT + '/inv_detail.png' });
   // mobil
   await page.setViewportSize({ width: 390, height: 800 });
   const box = await page.locator('#dn-detail').boundingBox();
   ok(box.width >= 370 && box.x <= 10, 'na telefonu je detail přes celou šířku: ' + JSON.stringify(box));
-  await page.screenshot({ path: 'inv_detail_mobil.png' });
+  await page.screenshot({ path: OUT + '/inv_detail_mobil.png' });
   ok(chybyJs.length === 0, 'žádné chyby JS: ' + chybyJs.join('; '));
   sql("delete from postava_predmety where postava_id=2 and predmet_id in (90,91,92); delete from postava_lektvary where postava_id=2 and lektvar_id=1");
   console.log(chyb ? 'CHYB: ' + chyb : 'VŠE OK');

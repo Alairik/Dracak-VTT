@@ -1,6 +1,10 @@
 # Panel tokenu → kompaktní deník — návrh (2026-11-09)
 
-**Stav: NÁVRH, nestaví se. Rozhodnutí uživatele 2026-11-09, že směr je správný; realizace až po zkušebním večeru.**
+**Stav: část A/B/C se už staví.** Rozhodnutí uživatele 2026-11-09, že směr je správný. 2026-11-10 vzniklo
+plovoucí okno tvora (`assets/js/tvor_okno.js`) a uživatel k němu dal připomínky na designovém plátně
+https://claude.ai/artifact/ShFfKGCh8AUcW3jK3ncVnQ — co z nich plyne, je v `docs/stav-projektu.md`
+(sekce „Zapracované připomínky z plátna“). Nejdůležitější obecné pravidlo, které z toho vzešlo:
+**vysvětlivka k sekci patří do bubliny za otazníčkem, ne jako text v okně** (je i v `CLAUDE.md`).
 
 ## 1. Co je dnes špatně
 

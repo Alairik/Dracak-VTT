@@ -160,6 +160,11 @@
   spadlo 55 z 61 sad na „executable doesn't exist“ — vypadalo to jako rozbitý
   kód, přitom šlo jen o cestu. Když padá naráz skoro všechno, hledej nejdřív
   prostředí, ne kód.
+  **Screenshot ani jiný výstup testu nepatří do repa** — piš ho do `OUT`
+  (`process.env.OUT || '/tmp/dracak-tests'`), ne vedle testu. Čtyři PNG
+  (`druzina_pj`, `inv_detail`, `inv_detail_mobil`, `zbrane_mapa`) se takhle
+  commitly a měnily se při každém běhu testů, takže špinily každý commit;
+  `tests/e2e/*.png` je proto v `.gitignore`.
 - **Test, který kontroluje konkrétní záznam, si ho musí sám určit** — ne
   „první ze seznamu“. Pořadí dává server (nejnovější první) a změní se, jakmile
   se do něj něco přidá; takový test pak padá na špatném očekávání, ne na chybě
@@ -194,6 +199,17 @@
   maskují samy. Server o chybě v JS ví díky `assets/js/chyby.js` (načítá
   ho `dracak_vtt_page_start` a `hra/mapa.php`) — nová samostatná stránka
   bez `dracak_vtt_page_start` ho musí přidat sama.
+- **Vysvětlivka k sekci patří do bubliny za otazníčkem, ne jako text v okně.**
+  Rozhodnutí uživatele 2026-11-10 k návrhu okna tvora: *„tam kde jsou komenty, tak to
+  bych chtěl zobrazit na tooltip, kde bude otazníček v kulatém poli. jako že help pro
+  danou sekci. používej to všude, kde budeš chtít dát vysvětlení dané sekce.“* Platí
+  pro celou aplikaci, ne jen pro okno tvora: kolečko s `?` za nadpisem sekce
+  (`.tvor-hlp` + `.tvor-tip` v `assets/css/mapa.css` je vzor), bublina na nájezd myší
+  a na telefonu na klepnutí. Vysvětlující odstavce v ploše okna nepřidávej — zabírají
+  místo při hře a uživatel je označil za „zbytečný koment“. Totéž u hodnot, které mají
+  v knize zažitý krátký kód: ukaž kód (u zranitelností písmeno A–P, viz
+  `kody_zranitelnosti.kod` — „MUSÍ zůstat viditelné v UI“) a celé slovo dej do nájezdu,
+  případně vedle písmene malou ikonu.
 - **Content-Security-Policy (`includes/csp.php`): nový inline `<script>` musí mít
   `nonce="<?= dracak_csp_nonce() ?>"` a žádný ovládací prvek nesmí mít inline
   `onclick`/`onsubmit`/`onchange`** — použij `data-potvrdit`, `data-odeslat-pri-zmene`,

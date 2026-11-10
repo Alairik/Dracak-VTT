@@ -321,6 +321,18 @@ function dracak_vtt_hp_zmen(PDO $pdo, string $typEntity, int $entitaId, int $del
     return $r === null ? null : [$r['hodnota'], $r['dalsi']];
 }
 
+// Životy NASTAVENÉ na konkrétní hodnotu (PJ komukoli, hráč u své postavy — ruční přepis místo klikání po jednom,
+// rozhodnutí uživatele 2026-11-10). Ořez je stejný jako u dracak_vtt_hp_zmen a dělá ho DB jedním UPDATE,
+// takže souběžný zásah od někoho jiného se neztratí. Vrací [nove_hp, max_hp] nebo null.
+function dracak_vtt_hp_nastav(PDO $pdo, string $typEntity, int $entitaId, int $hodnota): ?array
+{
+    $tabulka = $typEntity === 'nestvura_instance' ? 'nestvura_instance' : 'postavy';
+    $r = dracak_vtt_cital_zmen($pdo, $tabulka, 'aktualni_hp',
+        'GREATEST(0, LEAST(IF(max_hp > 0, CAST(max_hp AS SIGNED), 32767), :delta))',
+        $entitaId, $hodnota, 'max_hp');
+    return $r === null ? null : [$r['hodnota'], $r['dalsi']];
+}
+
 // Magenergie postavy o $delta: nejníž 0, nejvýš max_magenergie. Vrací [nova_magenergie, max_magenergie] nebo null.
 function dracak_vtt_magenergie_zmen(PDO $pdo, int $postavaId, int $delta): ?array
 {

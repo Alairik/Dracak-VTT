@@ -10,6 +10,11 @@ $mapaId = (int)($data['mapa_id'] ?? 0);
 $typEntity = ($data['typ_entity'] ?? '') === 'nestvura_instance' ? 'nestvura_instance' : 'postava';
 $entitaId = (int)($data['entita_id'] ?? 0);
 $delta = (int)($data['delta'] ?? 0);
+// „nastavit“ = ruční přepis životů na konkrétní číslo (okno tvora, rozhodnutí uživatele 2026-11-10).
+// Neposílá se delta, protože PJ píše cílovou hodnotu a mezitím se mohlo trefit zranění od někoho jiného.
+$nastavit = array_key_exists('nastavit', $data) && $data['nastavit'] !== null && $data['nastavit'] !== ''
+    ? max(0, min(32767, (int)$data['nastavit']))
+    : null;
 
 $pdo = dracak_db();
 $stmt = $pdo->prepare('SELECT * FROM mapy WHERE id = ?');
@@ -36,7 +41,9 @@ if (!dracak_vtt_can_edit_hp($user, $typEntity, $entity)) {
 // max_hp = 0 znamená "nezadáno/neznámé" (viz nečistá data bestiáře), ne
 // "postava/nestvůra nemůže mít žádný život" — v tom případě nahoru neklem.
 // Změna je jeden UPDATE v DB (dracak_vtt_hp_zmen), ne čtení a zápis v PHP: dva současné zásahy se nesmí ztratit.
-[$noveHp, $maxHp] = dracak_vtt_hp_zmen($pdo, $typEntity, $entitaId, $delta) ?? [0, (int)$entity['max_hp']];
+[$noveHp, $maxHp] = ($nastavit !== null
+    ? dracak_vtt_hp_nastav($pdo, $typEntity, $entitaId, $nastavit)
+    : dracak_vtt_hp_zmen($pdo, $typEntity, $entitaId, $delta)) ?? [0, (int)$entity['max_hp']];
 
 $eventId = dracak_vtt_log_event((int)$mapa['svet_id'], $mapaId, 'hp_zmena', [
     'typ_entity' => $typEntity,

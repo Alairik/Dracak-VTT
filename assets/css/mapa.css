@@ -590,15 +590,53 @@ body.denik-dock-cela { overflow:hidden; }
 .tvor-druh { font-size:11.5px; color:#9a9088; }
 .tvor-zavrit { background:none; border:none; color:#9a9088; font-size:14px; cursor:pointer; padding:2px 4px; line-height:1; }
 .tvor-zavrit:hover { color:#fff; }
-.tvor-hp { display:flex; align-items:center; gap:8px; padding:8px 10px 4px; flex-wrap:wrap; }
-.tvor-hp-cislo { font-size:20px; font-weight:600; letter-spacing:.5px; }
-.tvor-hp-tl { display:flex; gap:4px; margin-left:auto; }
-.tvor-hp-tl .btn { font-size:12px; padding:3px 8px; color:#eee; border-color:rgba(255,255,255,.22); }
-.tvor-stav { padding:0 10px 6px; font-size:11.5px; color:#9ec79e; }
-.tvor-stav.vyrazena { color:#ff9d8a; font-weight:600; }
-.tvor-stav.zranena { color:#ffd166; }
+/* Životy: ruční přepis čísla + jen − a + vedle pruhu (připomínka uživatele 2026-11-10 — čtyři tlačítka
+   ±1/±5 byla přebytek a stála daleko od ukazatele). Pruh má značku meze vyřazení. */
+.tvor-hp { padding:8px 10px; }
+.tvor-hp-cislo { display:flex; align-items:baseline; gap:6px; margin-bottom:7px; }
+.tvor-hp-vstup { width:3.2em; font:600 20px/1 inherit; background:none; border:none;
+                 border-bottom:1px dashed rgba(255,255,255,.35); color:#f3ece2; text-align:center; padding:0 2px; }
+.tvor-hp-vstup:focus { outline:none; border-bottom-color:#ffd166; }
+.tvor-hp-max { font-size:12.5px; color:#9a9088; }
+.tvor-hp-tl { display:flex; align-items:center; gap:8px; }
+.tvor-hpb { width:26px; height:22px; flex:0 0 auto; border-radius:999px; background:rgba(255,255,255,.06);
+            color:#eee; border:1px solid rgba(255,255,255,.22); font:400 15px/1 inherit; cursor:pointer; }
+.tvor-hpb:hover { background:rgba(255,255,255,.14); }
+.tvor-pruh { position:relative; flex:1; height:10px; border-radius:999px; background:rgba(255,255,255,.14); }
+.tvor-pruh i { display:block; height:100%; border-radius:999px; background:#6bbf7a; }
+.tvor-pruh b { position:absolute; top:-3px; width:2px; height:16px; background:#ffd166; cursor:help; }
+.tvor-pruh.zranena i { background:#ffd166; }
+.tvor-pruh.vyrazena i { background:#d9604c; }
+.tvor-pruh.zranena b, .tvor-pruh.vyrazena b { background:#ff9a8a; }
+/* Stav (bojeschopná / pod třetinou / vyřazená) je štítek v nadpisu sekce, ne věta pod čísly. */
+.tvor-stav { margin-left:auto; font:600 11px/1.5 inherit; letter-spacing:0; text-transform:none;
+             border-radius:999px; padding:2px 9px; background:#6bbf7a; color:#0f2416; }
+.tvor-stav.vyrazena { background:#d9604c; color:#2a0f0b; }
+.tvor-stav.zranena { background:#ffd166; color:#2a1b06; }
 .tvor-sekce { padding:6px 10px; border-top:1px solid rgba(255,255,255,.07); }
-.tvor-h { font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:#c6a87f; margin:0 0 5px; }
+.tvor-h { display:flex; align-items:center; gap:6px; font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:#c6a87f; margin:0 0 5px; }
+/* Nápověda k sekci: kolečko s otazníkem, bublina na nájezd myší nebo na klepnutí (zadání uživatele 2026-11-10).
+   Vysvětlivky tím zmizely z okna — text je vidět, až když ho někdo chce. */
+.tvor-hlp { position:relative; flex:0 0 auto; width:15px; height:15px; padding:0; border-radius:50%;
+            border:1px solid rgba(255,255,255,.3); background:none; color:#9a9088; font:700 10px/1 inherit;
+            letter-spacing:0; cursor:help; display:inline-flex; align-items:center; justify-content:center; }
+.tvor-hlp:hover, .tvor-hlp.otevreno { border-color:#ffd166; color:#ffd166; }
+.tvor-tip { display:none; position:absolute; left:-4px; top:22px; width:210px; max-width:62vw; z-index:5;
+            background:#0f0d0c; color:#e9e2d8; border:1px solid rgba(255,255,255,.22); border-radius:8px;
+            padding:8px 10px; font:400 11.5px/1.4 inherit; text-transform:none; letter-spacing:0; text-align:left;
+            box-shadow:0 6px 18px rgba(0,0,0,.6); }
+.tvor-hlp:hover .tvor-tip, .tvor-hlp.otevreno .tvor-tip { display:block; }
+.tvor-denik { font:400 11.5px/1 inherit; color:#c6a87f; background:none; cursor:pointer;
+              border:1px solid rgba(198,168,127,.4); border-radius:999px; padding:4px 9px; white-space:nowrap; }
+.tvor-denik:hover { background:rgba(198,168,127,.14); color:#fff; }
+/* Zranitelnost = zažité písmeno A–P (kody_zranitelnosti: „MUSÍ zůstat viditelné v UI“) s ikonou,
+   celé slovo vyjede na nájezd (připomínka uživatele 2026-11-10). */
+.tvor-zr { display:inline-flex; align-items:center; gap:4px; background:rgba(180,70,50,.3);
+           border:1px solid rgba(255,154,138,.45); color:#ffd7cf; border-radius:8px;
+           padding:2px 8px 2px 6px; font-size:13px; font-weight:700; cursor:help; }
+.tvor-zr.nasobek { background:rgba(200,120,30,.34); border-color:rgba(255,209,102,.6); color:#ffe2a8; }
+.tvor-zr sup { font-size:9.5px; margin-left:1px; }
+.tvor-zr svg { flex:0 0 auto; }
 .tvor-cipy { display:flex; flex-wrap:wrap; gap:4px; }
 .tvor-cip { display:inline-block; background:rgba(255,255,255,.09); border:1px solid rgba(255,255,255,.14);
             border-radius:999px; padding:2px 8px; font-size:11.5px; }
@@ -623,4 +661,7 @@ body.denik-dock-cela { overflow:hidden; }
 @media (max-width: 760px) {
   .tvor-okno { left:6px !important; right:6px; top:auto !important; bottom:8px; width:auto; max-height:58vh; }
   .tvor-hlava { cursor:default; }
+  /* Prstem se musí dát trefit: − a + aspoň 44 px na šířku. */
+  .tvor-hpb { width:44px; height:38px; font-size:20px; }
+  .tvor-hlp { width:20px; height:20px; font-size:11px; }
 }

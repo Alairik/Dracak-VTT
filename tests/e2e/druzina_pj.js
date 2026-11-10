@@ -1,6 +1,7 @@
 const { chromium } = require(process.env.PLAYWRIGHT || '/opt/node22/lib/node_modules/playwright');
+const OUT = process.env.OUT || '/tmp/dracak-tests';
 (async () => {
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
   const page = await browser.newPage({ viewport: { width: 1300, height: 1000 } });
   const errs = [];
   page.on('pageerror', e => errs.push('PAGEERROR ' + e.message));
@@ -11,7 +12,7 @@ const { chromium } = require(process.env.PLAYWRIGHT || '/opt/node22/lib/node_mod
   const pj = await page.$('.dz-pj');
   console.log('PJ sekce:', !!pj);
   if (pj) console.log((await pj.textContent()).replace(/\s+/g, ' '));
-  await page.screenshot({ path: process.argv[2] || 'druzina_pj.png', fullPage: true });
+  await page.screenshot({ path: process.argv[2] || OUT + '/druzina_pj.png', fullPage: true });
   console.log(errs.join('\n') || 'bez JS chyb');
   await browser.close();
 })();

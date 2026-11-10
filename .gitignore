@@ -13,3 +13,7 @@ uploads/mapy/testmapa_*
 # Soubory, které vyrobí import oblasti (tests/e2e/oblast_api.js i ostrý provoz) — data, ne obsah repa
 uploads/mapy/import_*
 uploads/obrazky/import_*
+
+# Screenshoty z testů (tests/e2e/*.js) — výstup běhu, ne obsah repa. Dřív se čtyři z nich
+# commitly a měnily se při každém spuštění testů, takže špinily každý commit.
+tests/e2e/*.png

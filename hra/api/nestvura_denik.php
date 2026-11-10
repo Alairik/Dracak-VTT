@@ -101,20 +101,25 @@ if ($s['staty']['odolnost'] !== null && (int)$t['max_hp'] > 0) {
     $mez = $bojeschopnost['mez_vyrazeni'];
 }
 // Schopnosti i s hodnotou, když ji kniha uvádí (migrace 0116): „Infravidění 30 sáhů“ místo holého názvu.
+// `zvlastni_schopnosti.druh` rozlišuje schopnost a dovednost — obojí se posílá a obojí se v okně tvora ukazuje
+// (připomínka uživatele 2026-11-10: „dovednosti bychom neměli zapomenout“), nadpis se podle toho pojmenuje.
 try {
-    $q = $pdo->prepare('SELECT z.nazev, ns.hodnota FROM nestvura_schopnosti ns JOIN zvlastni_schopnosti z ON z.id = ns.schopnost_id WHERE ns.nestvura_id = ? ORDER BY z.nazev');
+    $q = $pdo->prepare('SELECT z.nazev, z.druh, ns.hodnota FROM nestvura_schopnosti ns JOIN zvlastni_schopnosti z ON z.id = ns.schopnost_id WHERE ns.nestvura_id = ? ORDER BY z.nazev');
     $q->execute([$nestvuraId]);
     $schopnostiRadky = $q->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable $e) {
-    $q = $pdo->prepare('SELECT z.nazev, NULL AS hodnota FROM nestvura_schopnosti ns JOIN zvlastni_schopnosti z ON z.id = ns.schopnost_id WHERE ns.nestvura_id = ? ORDER BY z.nazev');
+    $q = $pdo->prepare('SELECT z.nazev, z.druh, NULL AS hodnota FROM nestvura_schopnosti ns JOIN zvlastni_schopnosti z ON z.id = ns.schopnost_id WHERE ns.nestvura_id = ? ORDER BY z.nazev');
     $q->execute([$nestvuraId]);
     $schopnostiRadky = $q->fetchAll(PDO::FETCH_ASSOC);
 }
 $schopnosti = [];
+$schopnostiDetail = [];
 foreach ($schopnostiRadky as $r) {
-    $schopnosti[] = $r['hodnota'] !== null && $r['hodnota'] !== ''
+    $text = $r['hodnota'] !== null && $r['hodnota'] !== ''
         ? $r['nazev'] . ' ' . $r['hodnota'] . ' sáhů'
         : $r['nazev'];
+    $schopnosti[] = $text;
+    $schopnostiDetail[] = ['text' => $text, 'druh' => ($r['druh'] ?? 'schopnost') === 'dovednost' ? 'dovednost' : 'schopnost'];
 }
 
 // Na co je tvor citlivý (kouzelná zbraň, oheň, stříbro, jed, mentální útok…). V datech to je od začátku,
@@ -163,9 +168,10 @@ echo json_encode([
     'mez_vyrazeni' => $mez,
     'bojeschopnost' => $bojeschopnost,
     'schopnosti' => $schopnosti,
+    'schopnosti_detail' => $schopnostiDetail,
     'zranitelnosti' => $zranitelnosti,
-    // Pravidlo z bestiáře, ať ho PJ nemusí hledat: co v seznamu není, nestvůře podle pravidel neublíží.
-    'zranitelnosti_pozn' => $zranitelnosti ? 'Co v seznamu není, nestvůře podle pravidel neublíží.' : null,
+    // Pozn.: pravidlo „co v seznamu není, nestvůře neublíží“ sem už nepatří. Vysvětlivky jsou v nápovědě
+    // u sekce (bublina za otazníčkem v assets/js/tvor_okno.js) — jinak by se tatáž věta posílala dvakrát.
     // Co PJ potřebuje po boji, ne během něj: zkušenost za zabití a poklady z bestiáře.
     'zkusenost' => $n['zkusenost'] !== null && $n['zkusenost'] !== '' ? (string)$n['zkusenost'] : null,
     'poklady' => $n['poklady'] !== null && $n['poklady'] !== '' ? (string)$n['poklady'] : null,
