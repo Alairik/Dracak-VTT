@@ -2,7 +2,8 @@
 const { chromium } = require(process.env.PLAYWRIGHT || '/opt/node22/lib/node_modules/playwright');
 const BASE = process.env.BASE || 'http://127.0.0.1:8099';
 const DB = process.env.DB || 'dracak';
-const sql = (q) => require('child_process').execSync(`mysql ${DB} -e "${q}"`);
+// Bez --default-character-set=utf8mb4 se české názvy v dotazu rozbijí a WHERE tiše nezasáhne nic (viz CLAUDE.md).
+const sql = (q) => require('child_process').execSync(`mysql --default-character-set=utf8mb4 ${DB} -e "${q}"`);
 let chyb = 0;
 const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m); };
 (async () => {
@@ -37,6 +38,22 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
     if (vDb !== stranka) nesedi.push(sloupec + ' (v DB: ' + vDb + ', stránka: ' + zobrazeno + ')');
   }
   ok(nesedi.length === 0, 'každý řádek přehledu sedí se skutečnou databází' + (nesedi.length ? ': ' + nesedi.join(', ') : ' (' + radky.length + ' řádků)'));
+
+  // Kontrola DAT (ne jen sloupců): u věcí z pravidel samotný sloupec nestačí, musí v něm něco být.
+  // Sloupec přidá ruční SQL, obsah až „Spustit čekající změny“ — bez téhle tabulky to nejde poznat.
+  const radkyData = await p.locator('[data-kontrola]').evaluateAll((els) => els.map((e) => [e.dataset.kontrola, e.textContent.replace(/\s+/g, ' ').trim()]));
+  ok(radkyData.length >= 3, 'přehled „Co z pravidel je v datech“ má řádky: ' + radkyData.length);
+  ok(radkyData.every(([, t]) => /✓/.test(t)), 'všechny datové kontroly sedí: ' + radkyData.map(([k, t]) => k + ' → ' + t.slice(-12)).join(' | '));
+  const infraRadek = radkyData.find(([k]) => /infraviděním/.test(k));
+  ok(!!infraRadek && /✓ 16/.test(infraRadek[1]), 'nestvůry s infraviděním z bestiáře jsou v datech: ' + (infraRadek ? infraRadek[1] : 'řádek chybí'));
+  // Když data zmizí, musí to stránka poznat — jinak hlídač tiše lže.
+  sql("delete ns from nestvura_schopnosti ns join zvlastni_schopnosti z on z.id=ns.schopnost_id where z.nazev='Infravidění' and ns.nestvura_id=(select id from nestvury where nazev='Bazilišek')");
+  await p.reload();
+  const po = await p.locator('[data-kontrola*="infraviděním"]').textContent();
+  ok(/✗ 15/.test(po.replace(/\s+/g, ' ')), 'po smazání jednoho řádku stránka ukáže ✗ s menším číslem: ' + po.replace(/\s+/g, ' ').trim());
+  sql("insert into nestvura_schopnosti (nestvura_id, schopnost_id) select (select id from nestvury where nazev='Bazilišek'), id from zvlastni_schopnosti where nazev='Infravidění'");
+  await p.reload();
+  ok(/✓ 16/.test((await p.locator('[data-kontrola*="infraviděním"]').textContent()).replace(/\s+/g, ' ')), 'po vrácení je zase ✓');
 
   ok(p.chybyJs.length === 0, 'žádná chyba JavaScriptu');
   await browser.close();

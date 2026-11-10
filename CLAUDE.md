@@ -105,6 +105,12 @@
      pak jestli uživatel spustil SQL jinde. Když přidáváš řádek do kontroly,
      ověř, že kontrola tu tabulku opravdu čte (seznam tabulek se musí odvodit
      z dat, ne psát natvrdo podruhé).
+  **6b. Kontrola musí umět ukázat i DATA, nejen sloupce.** U migrace, která přidá sloupec
+     a pak ho naplní, je ruční SQL jen půlka — obsah doplní až „Spustit čekající změny“.
+     Stránka Změny databáze proto má pod tabulkou sloupců i „Co z pravidel je v datech“
+     (`$datoveKontroly` v `admin_migrace.php`: popis, očekávané číslo, skutečné). Když
+     přidáváš migraci s daty z pravidel, přidej tam řádek — jinak se uživatel nemá jak
+     zeptat „je to tam?“ a odpověď musí hádat.
   **7. „Spustil jsem to“ NENÍ potvrzení — potvrzení je ✓ na stránce Změny
      databáze → „Co aplikace v databázi vidí“.** Blok se už TŘIKRÁT provedl
      do jiné databáze, než kterou používá web (naposledy blok J, 2026-11-09:

@@ -42,6 +42,8 @@ $e = static fn($v): string => htmlspecialchars((string)$v, ENT_QUOTES);
 // Co aplikace ve své databázi opravdu vidí: název databáze a sloupce, které přidává ruční SQL (docs/sql-k-rucnimu-spusteni.sql). Slouží ke kontrole po spuštění
 // ručního SQL — číslo z phpMyAdminu může být z jiné databáze, než jakou používá web; tahle tabulka je z pohledu webu.
 $ruckySql = [
+    ['nestvura_schopnosti', 'hodnota', '0116 — hodnota schopnosti u nestvůry (dosah infravidění)'],
+    ['rasa_schopnosti', 'hodnota', '0117 — hodnota schopnosti u rasy (dosah infravidění)'],
     ['nestvura_instance', 'svet_id', '0115 — NPC patří do světa (zásoba tokenů)'],
     ['nestvura_instance', 'lokace_mapa_id', '0115 — místo, kam NPC patří'],
     ['nestvura_instance', 'jedinecny', '0115 — jedinečné NPC s vlastními čísly'],
@@ -75,6 +77,23 @@ try {
     }
 } catch (Throwable $ex) {
     // information_schema nedostupné — tabulka se jen neukáže
+}
+
+// Kontrola DAT, ne jen sloupců: u věcí z pravidel samotný sloupec nestačí — musí v něm něco být.
+// Sloupec přidá ruční SQL, data doplní až „Spustit čekající změny“, takže se to dá rozejít a bez téhle
+// tabulky by to nebylo poznat (stalo se u bloku J, kdy stránka hlásila „chybí“ a nikdo nevěděl proč).
+$datoveKontroly = [];
+foreach ([
+    ['Nestvůry s infraviděním (bestiář)', 'SELECT COUNT(*) FROM nestvura_schopnosti ns JOIN zvlastni_schopnosti z ON z.id = ns.schopnost_id WHERE z.nazev = "Infravidění"', 16],
+    ['Nestvůry, které infravidění nerozezná', 'SELECT COUNT(*) FROM nestvura_schopnosti ns JOIN zvlastni_schopnosti z ON z.id = ns.schopnost_id WHERE z.nazev = "Nerozezná ho infravidění"', 11],
+    ['Trpaslíkovo infravidění v sázích (hrac b790)', 'SELECT IFNULL(MAX(rs.hodnota), 0) FROM rasa_schopnosti rs JOIN rasy r ON r.id = rs.rasa_id JOIN zvlastni_schopnosti z ON z.id = rs.schopnost_id WHERE z.nazev = "Infravidění" AND r.nazev = "Trpaslík"', 20],
+] as [$popis, $sql, $ocekavano]) {
+    try {
+        $mam = (int)$pdo->query($sql)->fetchColumn();
+    } catch (Throwable $ex) {
+        $mam = null;   // sloupec nebo tabulka ještě není
+    }
+    $datoveKontroly[] = ['popis' => $popis, 'mam' => $mam, 'ocekavano' => $ocekavano];
 }
 ?>
 <!doctype html>
@@ -161,6 +180,26 @@ try {
           <tbody>
             <?php foreach ($ruckySql as [$t, $c, $popis]): $je = isset($sloupceDb[$t . '.' . $c]); ?>
               <tr><td><code><?= $e($t . '.' . $c) ?></code></td><td><?= $e($popis) ?></td><td data-sloupec="<?= $e($t . '.' . $c) ?>"><?= $je ? '✓' : '✗ chybí' ?></td></tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table></div>
+      </details>
+    <?php endif; ?>
+
+    <?php if ($datoveKontroly): ?>
+      <details style="max-width:760px; margin:16px 0;">
+        <summary>Co z pravidel je v datech</summary>
+        <p class="note" style="margin-top:8px;">Tohle nejsou sloupce, ale obsah — doplní ho až „Spustit čekající změny“.
+          Když se číslo liší, chybí buď ruční SQL, nebo spuštění čekajících změn.</p>
+        <div class="table-wrap"><table class="table" style="margin-top:8px;">
+          <thead><tr><th style="text-align:left;">Co</th><th>Má být</th><th>Je</th></tr></thead>
+          <tbody>
+            <?php foreach ($datoveKontroly as $k): ?>
+              <tr data-kontrola="<?= $e($k['popis']) ?>">
+                <td><?= $e($k['popis']) ?></td>
+                <td style="text-align:center;"><?= (int)$k['ocekavano'] ?></td>
+                <td style="text-align:center;"><?= $k['mam'] === null ? '— zatím nejde zjistit' : ((int)$k['mam'] === (int)$k['ocekavano'] ? '✓ ' . (int)$k['mam'] : '✗ ' . (int)$k['mam']) ?></td>
+              </tr>
             <?php endforeach; ?>
           </tbody>
         </table></div>

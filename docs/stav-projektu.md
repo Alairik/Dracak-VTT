@@ -62,6 +62,21 @@ nemá odkládat mechanika (uživatel 2026-11-09: *„nesmysl neimplementovat mec
 (kompaktní deník místo „deníku lite“) a vrstvu PJ uvnitř něj (zámek, efekty i mimo iniciativu, ±životy, kořist); světlo přesunout
 k předmětu v inventáři („Zapálit / zhasnout“); deník nestvůry doplnit o životy, efekty a výbavu.
 
+### Stránka Změny databáze umí ukázat i data (2026-11-10)
+
+Uživatel se zeptal „nevím, jestli je infra v DB, koukni tam“ — a neměl se kam podívat: blok K (migrace 0116/0117)
+jsem přidal **bez řádků v kontrolní tabulce**, takže `nestvura_schopnosti.hodnota` ani `rasa_schopnosti.hodnota`
+na stránce nebyly. Stejná chyba jako u bloku J, jen o úroveň výš.
+
+Opraveno a rozšířeno: kromě sloupců má stránka nově **„Co z pravidel je v datech“** — očekávané číslo proti
+skutečnému. U migrace, která přidá sloupec a pak ho naplní, je totiž ruční SQL jen půlka práce; obsah doplní až
+„Spustit čekající změny“, a to z tabulky sloupců poznat nejde. Teď tam je: 16 nestvůr s infraviděním,
+11 nestvůr, které infravidění nerozezná, a trpaslíkových 20 sáhů. `admin_migrace_ui` kontroluje i tenhle přehled
+včetně toho, že po smazání řádku v datech ukáže ✗ (hlídač musí umět říct obě odpovědi).
+
+Mimochodem se při tom našla past z `CLAUDE.md` v samotném testu: `admin_migrace_ui` volal `mysql` bez
+`--default-character-set=utf8mb4`, takže dotaz s „Infravidění“ tiše nezasáhl nic. Doplněno.
+
 ### Export a import oblasti — HOTOVO (2026-11-09)
 
 Zadání uživatele: *„vytvoř export import pro nové části mapy. Mělo by to vzít PIN/mapu a vše úrovňové pod ní.“*
