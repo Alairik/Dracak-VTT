@@ -13,6 +13,9 @@ const svetloStiny = await import('./svetlo_stiny.js?v=' + VERZE_MODULU);   // sv
 const initRaidPanel = document.getElementById('raidPanel') ? (await import('./raid_panel.js?v=' + VERZE_MODULU)).initRaidPanel : null;
 // Správa tokenů (jen PJ, až po ručním SQL migrace 0115): lišta dole uprostřed se zásobou NPC.
 const initTokenBar = document.getElementById('tokenBar') ? (await import('./token_bar.js?v=' + VERZE_MODULU)).initTokenBar : null;
+// Okno tvora (jen PJ): plovoucí karta u tokenu nestvůry místo postranního panelu.
+// CFG, ne IS_PJ_OR_ADMIN — ta konstanta vzniká až o 160 řádků níž a tady by ještě neexistovala.
+const initTvorOkno = window.MAPA.jePj ? (await import('./tvor_okno.js?v=' + VERZE_MODULU)).initTvorOkno : null;
 
 // --- Kamera: zoom a posun přes CSS transform na #mapWrap ---
 // Souřadnice mapy (pixely původního obrázku) se na obrazovku převádějí jen
@@ -1759,6 +1762,7 @@ if (modalObrazky) {
 // Souboj s fázemi (assets/js/souboj.js) — jen když je na serveru zapnutý
 // (ruční SQL 0085); jinak zůstává dnešní jednoduchá iniciativa.
 let tokenBar = null;   // lišta správy tokenů (assets/js/token_bar.js) — jen PJ a jen po ručním SQL 0115
+let tvorOkno = null;   // plovoucí okno tvora (assets/js/tvor_okno.js) — jen PJ, jen u nestvůr
 let raid = null;   // raid panel (assets/js/raid_panel.js) — vznikne hned za soubojem, který do něj vkládá ovládání tvorů
 const souboj = initSouboj ? initSouboj({
   mapaId: MAPA_ID,
@@ -1797,6 +1801,15 @@ const denikDock = initDenikDock ? initDenikDock({
 // Raid panel (assets/js/raid_panel.js): plovoucí okno s boxy tvorů a ovládáním souboje; myš nad boxem zvýrazní token a naopak.
 // PJ vidí všechny tvory a všechny údaje, hráč družinu / účastníky souboje a jen pruh životů.
 // Správa tokenů (assets/js/token_bar.js): zásoba NPC, výroba dávkou, pokládání tažením.
+tvorOkno = initTvorOkno ? initTvorOkno({
+  mapaId: MAPA_ID,
+  postJson,
+  getJson: (url) => fetch(url, {cache: 'no-store', credentials: 'same-origin'}).then((r) => r.json()).catch(() => null),
+  logLine,
+  obnovitStav,
+  otevritPanel: (t) => otevritSpravovat(t),
+}) : null;
+
 tokenBar = initTokenBar ? initTokenBar({
   svetId: SVET_ID,
   mapaId: MAPA_ID,
@@ -1826,7 +1839,9 @@ raid = initRaidPanel ? initRaidPanel({
     const t = tokenData(id);
     if (!t) return;
     nastavVyber([id]);
-    otevritSpravovat(t);
+    // Stejně jako klik na mapě: u nestvůry okno tvora, jinak postranní panel.
+    if (tvorOkno && t.typ_entity === 'nestvura_instance') tvorOkno.otevrit(t, zvyraznenyBod(t));
+    else otevritSpravovat(t);
   },
   obrazekUrl: (id) => (FUNKCE.obrazek && id ? 'obrazek.php?id=' + id : null),
 }) : null;
@@ -1901,6 +1916,7 @@ function aplikujStav(s) {
   nakreslitIniciativu();
   naplnitVolnePostavy();
   obnovPanelSpravovat();
+  obnovTvorOkno();
   if (raid) raid.prekresli();
   if (denikDock) {
     const naTahu = koloStav && koloStav.aktivni_token_id ? tokeny.find((x) => x.id === koloStav.aktivni_token_id) : null;
@@ -1965,6 +1981,21 @@ function otevritSpravovat(t) {
   }
   spravovatPanel.classList.add('open');
 }
+// Kde na obrazovce token je — okno tvora se u něj otevře i při kliknutí v panelu tvorů.
+function zvyraznenyBod(t) {
+  const e = tokenEl.get(t.id);
+  if (!e) return {x: window.innerWidth / 2, y: window.innerHeight / 2};
+  const r = e.getBoundingClientRect();
+  return {x: r.left, y: r.top};
+}
+
+// Okno tvora drží čísla aktuální (zásah, efekt, konec kola) stejně jako panel.
+function obnovTvorOkno() {
+  if (!tvorOkno || !tvorOkno.jeOtevrene()) return;
+  const t = tokenData(tvorOkno.tokenId());
+  if (t) tvorOkno.obnov(t); else tvorOkno.zavrit();
+}
+
 // Po obnově stavu sedí panel k aktuálním datům (životy, magenergie…);
 // zmizel-li token (smazaný jiným klientem), panel se zavře.
 function obnovPanelSpravovat() {
@@ -2660,7 +2691,9 @@ function dokoncitAkci(a, e) {
           aktualizujVyber();
         } else {
           nastavVyber([t.id]);
-          if (t.owned && t.na_tahu) otevritSpravovat(t);
+          // PJ: u nestvůry se otevře plovoucí okno tvora u tokenu (postranní panel je pak jen pro deník a výbavu).
+          if (tvorOkno && t.typ_entity === 'nestvura_instance') tvorOkno.otevrit(t, {x: e.clientX, y: e.clientY});
+          else if (t.owned && t.na_tahu) otevritSpravovat(t);
         }
       }
       break;
@@ -2975,6 +3008,7 @@ document.querySelectorAll('#panel-spravovat [data-delta]').forEach(btn => {
           nakreslitToken(t);
         }
         obnovPanelSpravovat();
+        obnovTvorOkno();
         posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
       });
   });

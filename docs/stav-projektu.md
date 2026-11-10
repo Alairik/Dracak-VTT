@@ -62,6 +62,36 @@ nemá odkládat mechanika (uživatel 2026-11-09: *„nesmysl neimplementovat mec
 (kompaktní deník místo „deníku lite“) a vrstvu PJ uvnitř něj (zámek, efekty i mimo iniciativu, ±životy, kořist); světlo přesunout
 k předmětu v inventáři („Zapálit / zhasnout“); deník nestvůry doplnit o životy, efekty a výbavu.
 
+### Okno tvora místo postranního panelu — první krok hotový (2026-11-10)
+
+Zadání uživatele: *„Panel tvora musí zmizet v tom, jak je. Ten postranní panel je prostě nešťastný. Po kliknutí na token
+musí PJ vidět věci, co se mi hodí. Spíš float u příšery.“* Upřesnění: **odolnost a pohyblivost do okna nepatří**
+(jsou v deníku), **efekty se vyhodnocují samy a tady jsou jen vidět** — nasazují se kouzlem, lektvarem nebo akcí jiného
+tvora, stejně jako u postav hráčů.
+
+**Hotovo:** klik PJ na nestvůru otevře **plovoucí okno u tokenu** (`assets/js/tvor_okno.js`, CSS `.tvor-okno`), ne postranní
+panel. Okno jde táhnout za hlavičku, na telefonu sedí dole přes šířku. Obsah: jméno a druh, **životy s ±1/±5 a stavem
+z pravidel** (bojeschopná / pod třetinou s postihem / vyřazená — počítá server, `dracak_vtt_bojeschopnost`), **útoky
+s ÚČ a útočností**, obrana (OČ, OZ, velikost), **čím jde tvora zranit**, schopnosti i s hodnotou („Infravidění 30 sáhů“),
+**co na něj působí** (efekty jen k vidění, s křížkem na sundání), sbalené „Po boji“ (zkušenost, poklady) a popis z bestiáře.
+Dole tlačítko do postranního panelu, kde zůstal deník nestvůry, výbava a kořist.
+
+**Největší nález: zranitelnosti hra nikdy neukazovala.** V databázi je 755 vazeb nestvůra ↔ způsob útoku, ale používal je
+jen editor pravidel — PJ při hře neviděl, čím tvora vůbec jde zranit. Teď jsou v okně jako čipy, včetně násobitele zranění
+(*„Za písmenem může být ještě číslo… Tímto číslem se vynásobí počet odebraných životů po úspěšném útoku, zaokrouhluj nahoru“*)
+a připomínky pravidla, že **co v seznamu není, tvorovi neublíží**.
+
+**Migrace `0118` (jen data, ruční SQL netřeba):** šest kódů zranitelnosti mělo prázdný název s poznámkou „TBD, ověřit proti
+bestiáři“ — legenda v knize přitom je. Doplněno s citací: I = I. skupina kouzel (hraničářská), J = II. (útočná),
+K = III. (ohnivá a mrazivá), L = IV. (fyzická), M = V. (psychická), N = VI. (hraničářská). Vazba na tabulku `skupiny_kouzel`
+se **záměrně nedoplnila** — ta má čtyři řádky proti šesti číslovaným skupinám, spojovat by byl odhad.
+
+Test `tests/e2e/tvor_okno_ui.js` (otevření, obsah, že odolnost a pohyblivost tam nejsou, zranitelnosti i s jménem skupin
+kouzel, stav podle životů, efekt se objeví sám a jde sundat, hráči se okno neotevře).
+
+**Zbývá z návrhu `docs/panel-tokenu-navrh.md`:** přesunout vzhled tokenu do lišty dole, u postav nahradit postranní panel
+kompaktním deníkem, vrstva PJ uvnitř něj, světlo k předmětu v inventáři, deník nestvůry doplnit o životy a výbavu.
+
 ### Stránka Změny databáze umí ukázat i data (2026-11-10)
 
 Uživatel se zeptal „nevím, jestli je infra v DB, koukni tam“ — a neměl se kam podívat: blok K (migrace 0116/0117)

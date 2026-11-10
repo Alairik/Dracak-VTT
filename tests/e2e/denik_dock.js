@@ -47,8 +47,13 @@ const stav = (page) => page.evaluate(async (m) => (await fetch('api/mapa_stav.ph
   // ===== PJ =====
   ok(await pj.locator('#tb-denik').count() === 0, 'v levé liště už tlačítko Deník není');
   ok(!(await pj.locator('#denikDock').isVisible()), 'panel je zavřený');
+  // Od 2026-11-10 otevře klik na nestvůru plovoucí okno tvora, ne postranní panel; do panelu (deník, výbava,
+  // kořist) vede tlačítko v jeho patičce. Tlačítko deníku POSTAVY tam u nestvůry být nesmí.
   await klik(tGob);
-  ok(await pj.locator('#panel-spravovat.open').count() === 1 && !(await pj.locator('#spravovatDenik').isVisible()), 'v detailu nestvůry tlačítko deníku zatím není (deník nestvůry se teprve navrhuje)');
+  ok(await pj.locator('.tvor-okno').count() === 1, 'klik na nestvůru otevře okno tvora');
+  await pj.locator('.tvor-paticka .btn').click();
+  await pj.waitForTimeout(600);
+  ok(await pj.locator('#panel-spravovat.open').count() === 1 && !(await pj.locator('#spravovatDenik').isVisible()), 'v detailu nestvůry tlačítko deníku postavy není');
   await klik(tSindor);
   ok(await pj.locator('#spravovatDenik').isVisible(), 'v detailu tokenu postavy je tlačítko „Otevřít deník“');
   // skoky na sekce z detailu tokenu

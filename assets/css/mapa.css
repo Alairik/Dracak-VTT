@@ -575,3 +575,52 @@ body.denik-dock-cela { overflow:hidden; }
 .vzhled-sekce > .vzhled-summary::before { content:'▸'; font-size:11px; color:#9a9088; transition:transform .12s; }
 .vzhled-sekce[open] > .vzhled-summary::before { transform:rotate(90deg); }
 .vzhled-souhrn { font-weight:400; font-size:11px; color:#9a9088; }
+
+/* ---------- Okno tvora (jen PJ; assets/js/tvor_okno.js): plovoucí karta u tokenu nestvůry ----------
+   Ukazuje jen tvora: životy, útoky, obranu, čím ho jde zranit, schopnosti a co na něj působí.
+   Vzhled značky na mapě ani ruční nasazování efektů sem nepatří. */
+.tvor-okno { position:fixed; z-index:260; width:min(330px, calc(100vw - 16px)); max-height:min(76vh, 720px); overflow-y:auto;
+             box-sizing:border-box; background:rgba(24,22,20,.97); color:#f3ece2; border:1px solid rgba(255,255,255,.16);
+             border-radius:14px; box-shadow:0 12px 34px rgba(0,0,0,.55); padding:0 0 10px; font-size:13px; }
+.tvor-okno.tahne { user-select:none; box-shadow:0 18px 44px rgba(0,0,0,.7); }
+.tvor-hlava { display:flex; align-items:center; gap:8px; padding:9px 10px; cursor:move; touch-action:none;
+              border-bottom:1px solid rgba(255,255,255,.1); position:sticky; top:0; background:rgba(24,22,20,.98); border-radius:14px 14px 0 0; }
+.tvor-jmeno { display:flex; flex-direction:column; min-width:0; flex:1; }
+.tvor-jmeno strong { font-size:14.5px; }
+.tvor-druh { font-size:11.5px; color:#9a9088; }
+.tvor-zavrit { background:none; border:none; color:#9a9088; font-size:14px; cursor:pointer; padding:2px 4px; line-height:1; }
+.tvor-zavrit:hover { color:#fff; }
+.tvor-hp { display:flex; align-items:center; gap:8px; padding:8px 10px 4px; flex-wrap:wrap; }
+.tvor-hp-cislo { font-size:20px; font-weight:600; letter-spacing:.5px; }
+.tvor-hp-tl { display:flex; gap:4px; margin-left:auto; }
+.tvor-hp-tl .btn { font-size:12px; padding:3px 8px; color:#eee; border-color:rgba(255,255,255,.22); }
+.tvor-stav { padding:0 10px 6px; font-size:11.5px; color:#9ec79e; }
+.tvor-stav.vyrazena { color:#ff9d8a; font-weight:600; }
+.tvor-stav.zranena { color:#ffd166; }
+.tvor-sekce { padding:6px 10px; border-top:1px solid rgba(255,255,255,.07); }
+.tvor-h { font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:#c6a87f; margin:0 0 5px; }
+.tvor-cipy { display:flex; flex-wrap:wrap; gap:4px; }
+.tvor-cip { display:inline-block; background:rgba(255,255,255,.09); border:1px solid rgba(255,255,255,.14);
+            border-radius:999px; padding:2px 8px; font-size:11.5px; }
+.tvor-cip.zranitelnost { background:rgba(180,70,50,.26); border-color:rgba(255,140,110,.35); }
+.tvor-cip.zranitelnost.nasobek { background:rgba(200,120,30,.3); border-color:rgba(255,200,120,.45); font-weight:600; }
+.tvor-utok { display:flex; justify-content:space-between; gap:8px; padding:2px 0; flex-wrap:wrap; }
+.tvor-utok-jmeno { font-weight:600; }
+/* Dlouhý popis útoku se musí zalomit, ne uříznout o okraj okna. */
+.tvor-utok-cisla { color:#c9c0b5; font-size:12px; margin-left:auto; }
+.tvor-efekt { display:flex; align-items:center; gap:6px; padding:2px 0; }
+.tvor-efekt span { flex:1; }
+.tvor-efekt-x { background:none; border:none; color:#9a9088; cursor:pointer; font-size:12px; padding:0 2px; }
+.tvor-efekt-x:hover { color:#ff8f7a; }
+.tvor-pozn { font-size:11px; color:#9a9088; margin:5px 0 0; }
+.tvor-det { padding:6px 10px; border-top:1px solid rgba(255,255,255,.07); font-size:12px; }
+.tvor-det > summary { cursor:pointer; color:#c6a87f; font-size:11px; text-transform:uppercase; letter-spacing:.6px; }
+.tvor-radek { padding:3px 0; }
+.tvor-popis { margin:5px 0 0; color:#d8d0c6; line-height:1.45; }
+.tvor-paticka { padding:8px 10px 0; border-top:1px solid rgba(255,255,255,.07); }
+.tvor-paticka .btn { width:100%; font-size:12px; color:#eee; border-color:rgba(255,255,255,.22); }
+/* Telefon: okno přes celou šířku dole, ať nepřekrývá mapu uprostřed. */
+@media (max-width: 760px) {
+  .tvor-okno { left:6px !important; right:6px; top:auto !important; bottom:8px; width:auto; max-height:58vh; }
+  .tvor-hlava { cursor:default; }
+}

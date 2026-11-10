@@ -427,6 +427,14 @@ začne hrát často, přidá se mu složka (nový řádek v `efekt_slozky`, bez 
 
 ## Na kontrolu při proofreadingu
 
+- [ ] **Zranitelnost: skupiny kouzel I a VI jsou obě „hraničářská“.** Legenda v bestiáři uvádí „I. skupina kouzel
+  (hraničářská)“ i „N. VI. skupina kouzel (hraničářská) – bílá střela“. Podle obsahu je I. léčivá/hraničářská
+  a VI. obsahuje jen bílou střelu, takže jedno z označení je nejspíš překlep v knize nebo v přepisu.
+  Ponecháno podle zdroje (migrace 0118), k ověření při korektuře.
+- [ ] **Písmeno J v legendě zranitelnosti má useknutou předponu** — přepis má „I. I. skupina kouzel (hraničářská)…
+  II. skupina kouzel (útočná)“ bez „J.“. Pořadí písmen vychází jednoznačně (J = II. skupina), ale text to neříká.
+
+
 - [x] ~~**Dosah trpasličího infravidění chybí.**~~ **Omyl z 2026-11-09 — v pravidlech JE:** „Trpaslík má infravidění
   s dosahem 20 sáhů; neproniká materiálem, kterým neproniká obyčejné světlo.“ (hrac **b790**). Moje první hledání
   větu utnulo v půlce (chyba ve vytahování textu) a vyvodilo z toho, že číslo v knize není. Hodnota 20 v databázi

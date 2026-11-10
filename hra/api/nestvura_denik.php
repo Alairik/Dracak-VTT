@@ -94,12 +94,52 @@ if ($metoda === 'POST') {
 
 $s = dracak_vtt_nestvura_staty($pdo, $svetId, $nestvuraId, $n, $instanceId);
 $mez = null;
+$bojeschopnost = null;
 if ($s['staty']['odolnost'] !== null && (int)$t['max_hp'] > 0) {
-    $mez = dracak_vtt_bojeschopnost((int)$s['staty']['odolnost'], (int)$t['max_hp'], (int)$t['aktualni_hp'])['mez_vyrazeni'];
+    // Celý stav, ne jen mez: okno tvora z toho píše „vyřazená“ / „pod třetinou životů, postih −2“.
+    $bojeschopnost = dracak_vtt_bojeschopnost((int)$s['staty']['odolnost'], (int)$t['max_hp'], (int)$t['aktualni_hp']);
+    $mez = $bojeschopnost['mez_vyrazeni'];
 }
-$q = $pdo->prepare('SELECT z.nazev FROM nestvura_schopnosti ns JOIN zvlastni_schopnosti z ON z.id = ns.schopnost_id WHERE ns.nestvura_id = ? ORDER BY z.nazev');
-$q->execute([$nestvuraId]);
-$schopnosti = $q->fetchAll(PDO::FETCH_COLUMN);
+// Schopnosti i s hodnotou, když ji kniha uvádí (migrace 0116): „Infravidění 30 sáhů“ místo holého názvu.
+try {
+    $q = $pdo->prepare('SELECT z.nazev, ns.hodnota FROM nestvura_schopnosti ns JOIN zvlastni_schopnosti z ON z.id = ns.schopnost_id WHERE ns.nestvura_id = ? ORDER BY z.nazev');
+    $q->execute([$nestvuraId]);
+    $schopnostiRadky = $q->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+    $q = $pdo->prepare('SELECT z.nazev, NULL AS hodnota FROM nestvura_schopnosti ns JOIN zvlastni_schopnosti z ON z.id = ns.schopnost_id WHERE ns.nestvura_id = ? ORDER BY z.nazev');
+    $q->execute([$nestvuraId]);
+    $schopnostiRadky = $q->fetchAll(PDO::FETCH_ASSOC);
+}
+$schopnosti = [];
+foreach ($schopnostiRadky as $r) {
+    $schopnosti[] = $r['hodnota'] !== null && $r['hodnota'] !== ''
+        ? $r['nazev'] . ' ' . $r['hodnota'] . ' sáhů'
+        : $r['nazev'];
+}
+
+// Na co je tvor citlivý (kouzelná zbraň, oheň, stříbro, jed, mentální útok…). V datech to je od začátku,
+// ale hra to dosud nikde neukazovala — přitom je to v boji první otázka, co na nestvůru platí.
+$zranitelnosti = [];
+try {
+    // Za písmenem může být v knize číslo (½, ¼, 2): „Tímto číslem se vynásobí počet odebraných životů
+    // po úspěšném útoku (zaokrouhluj nahoru)“ — méně než 1 = částečně odolná, víc než 1 = náchylná.
+    $q = $pdo->prepare(
+        'SELECT k.kod, k.nazev, k.popis, nz.modifikator FROM nestvura_zranitelnosti nz
+         JOIN kody_zranitelnosti k ON k.id = nz.kod_zranitelnosti_id
+         WHERE nz.nestvura_id = ? AND k.nazev IS NOT NULL AND k.nazev <> "" ORDER BY k.id'
+    );
+    $q->execute([$nestvuraId]);
+    foreach ($q->fetchAll(PDO::FETCH_ASSOC) as $z) {
+        $zranitelnosti[] = [
+            'kod' => (string)$z['kod'],
+            'nazev' => (string)$z['nazev'],
+            'popis' => $z['popis'] !== null && $z['popis'] !== '' ? (string)$z['popis'] : null,
+            'nasobek' => $z['modifikator'] !== null && $z['modifikator'] !== '' ? (string)$z['modifikator'] : null,
+        ];
+    }
+} catch (Throwable $e) {
+    // tabulka tu není — zranitelnosti se prostě neukážou
+}
 
 echo json_encode([
     'ok' => true,
@@ -121,6 +161,14 @@ echo json_encode([
     'lze_jen_tento' => dracak_vtt_npc_funkce(),
     'hp' => ['aktualni' => (int)$t['aktualni_hp'], 'max' => (int)$t['max_hp']],
     'mez_vyrazeni' => $mez,
+    'bojeschopnost' => $bojeschopnost,
     'schopnosti' => $schopnosti,
+    'zranitelnosti' => $zranitelnosti,
+    // Pravidlo z bestiáře, ať ho PJ nemusí hledat: co v seznamu není, nestvůře podle pravidel neublíží.
+    'zranitelnosti_pozn' => $zranitelnosti ? 'Co v seznamu není, nestvůře podle pravidel neublíží.' : null,
+    // Co PJ potřebuje po boji, ne během něj: zkušenost za zabití a poklady z bestiáře.
+    'zkusenost' => $n['zkusenost'] !== null && $n['zkusenost'] !== '' ? (string)$n['zkusenost'] : null,
+    'poklady' => $n['poklady'] !== null && $n['poklady'] !== '' ? (string)$n['poklady'] : null,
+    'popis' => $n['popis'] !== null && $n['popis'] !== '' ? (string)$n['popis'] : null,
     'lze_ulozit' => dracak_vtt_denik_nestvur_funkce(),
 ], JSON_UNESCAPED_UNICODE);

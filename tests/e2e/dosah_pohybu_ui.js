@@ -68,9 +68,15 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   await pj.click('#dosahUkazat');
   await pj.waitForTimeout(300);
   ok(await pj.locator('#rulerSvg circle').count() === 3, 'na mapě se ukážou tři kruhy (poklus, běh, sprint)');
+  // Nestvůra má od 2026-11-10 plovoucí okno tvora; dosah pohybu je věc postavy, takže ani v něm,
+  // ani v postranním panelu (kam vede tlačítko z patičky) být nesmí.
   await pj.locator('.vtt-token[data-id="' + gob + '"] .puck').click();
-  await pj.waitForTimeout(500);
-  ok(await pj.locator('#dosahBlok').isHidden(), 'u nestvůry se blok Dosah pohybu nenabízí');
+  await pj.waitForTimeout(700);
+  ok(await pj.locator('.tvor-okno').count() === 1, 'klik na nestvůru otevře okno tvora');
+  ok(!/Dosah pohybu/.test(await pj.locator('.tvor-okno').textContent()), 'okno tvora dosah pohybu nenabízí');
+  await pj.locator('.tvor-paticka .btn').click();
+  await pj.waitForTimeout(600);
+  ok(await pj.locator('#dosahBlok').isHidden(), 'ani v postranním panelu se u nestvůry blok Dosah pohybu nenabízí');
   ok(pj.chybyJs.length === 0 && hrac.chybyJs.length === 0, 'žádná chyba JavaScriptu: ' + pj.chybyJs.concat(hrac.chybyJs).join('; '));
 
   for (const t of (await (await pj.request.get(BASE + '/hra/api/mapa_stav.php?mapa_id=' + MAPA)).json()).tokeny) await api(pj, 'token_smazat', { token_id: t.id, mapa_id: MAPA });
