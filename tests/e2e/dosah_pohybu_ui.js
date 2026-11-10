@@ -74,7 +74,7 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   await pj.waitForTimeout(700);
   ok(await pj.locator('.tvor-okno').count() === 1, 'klik na nestvůru otevře okno tvora');
   ok(!/Dosah pohybu/.test(await pj.locator('.tvor-okno').textContent()), 'okno tvora dosah pohybu nenabízí');
-  await pj.locator('.tvor-paticka .btn').click();
+  await pj.locator('.tvor-okno .tvor-denik').click();
   await pj.waitForTimeout(600);
   ok(await pj.locator('#dosahBlok').isHidden(), 'ani v postranním panelu se u nestvůry blok Dosah pohybu nenabízí');
   ok(pj.chybyJs.length === 0 && hrac.chybyJs.length === 0, 'žádná chyba JavaScriptu: ' + pj.chybyJs.concat(hrac.chybyJs).join('; '));
