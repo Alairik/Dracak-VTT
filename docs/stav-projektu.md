@@ -92,6 +92,11 @@ kouzel, stav podle životů, efekt se objeví sám a jde sundat, hráči se okno
 **Zbývá z návrhu `docs/panel-tokenu-navrh.md`:** přesunout vzhled tokenu do lišty dole, u postav nahradit postranní panel
 kompaktním deníkem, vrstva PJ uvnitř něj, světlo k předmětu v inventáři, deník nestvůry doplnit o životy a výbavu.
 
+**Designové okno k připomínkám (2026-11-10):** https://claude.ai/artifact/ShFfKGCh8AUcW3jK3ncVnQ — plátno se čtyřmi
+nákresy (návrh mimo boj, návrh v souboji, dnešní postranní panel pro srovnání, telefon 390 px). Uživatel do něj píše
+připomínky komentářem přímo na místo v nákresu; co z toho vyjde, se teprve staví. Zdrojové soubory nákresů nejsou
+v repu (jsou v plátně samotném) — repo drží jen tenhle odkaz.
+
 ### Stránka Změny databáze umí ukázat i data (2026-11-10)
 
 Uživatel se zeptal „nevím, jestli je infra v DB, koukni tam“ — a neměl se kam podívat: blok K (migrace 0116/0117)
