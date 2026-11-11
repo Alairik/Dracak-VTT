@@ -37,13 +37,22 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   ok(Math.abs(stred.s - stred.w / 2) < 30, 'lišta je dole uprostřed (střed ' + stred.s + ' z ' + stred.w + ')');
   ok(await pj.locator('#tbDruh option').count() > 100, 'výběr druhu nabízí bestiář: ' + await pj.locator('#tbDruh option').count());
 
-  // --- hledání druhu ---
+  // --- hledání druhu v seznamu s náhledy (assets/js/tvor_vyber.js) ---
+  // Druh se vybírá klepnutím na řádek se jménem a náhledem; skrytý <select> drží vybrané id.
+  const vybratDruh = async (page, jmeno) => {
+    await page.fill('#tbHledat', jmeno); await page.waitForTimeout(250);
+    await page.locator('#tbDruhSeznam .tv-radek').first().click(); await page.waitForTimeout(200);
+  };
   await pj.fill('#tbHledat', 'goblin'); await pj.waitForTimeout(250);
-  const prvni = (await pj.locator('#tbDruh option').first().textContent()).trim();
+  ok(await pj.locator('#tbDruhSeznam').isVisible(), 'seznam druhů se při hledání ukáže');
+  const prvni = (await pj.locator('#tbDruhSeznam .tv-radek strong').first().textContent()).trim();
   ok(/goblin/i.test(prvni), 'hledání zúží výběr na Goblina: ' + prvni);
+  ok(await pj.locator('#tbDruhSeznam .tv-radek').first().locator('.tv-nahled').count() === 1, 'řádek má náhled tokenu');
 
   // --- výroba dávky navázané na tuhle lokaci ---
-  await pj.selectOption('#tbDruh', { index: 0 });
+  await pj.locator('#tbDruhSeznam .tv-radek').first().click(); await pj.waitForTimeout(200);
+  ok(!(await pj.locator('#tbDruhSeznam').isVisible()), 'po výběru se seznam zavře');
+  ok(/goblin/i.test(await pj.locator('#tbHledat').inputValue()), 'vybraný druh je vidět v poli: ' + (await pj.locator('#tbHledat').inputValue()));
   await pj.fill('#tbPocet', '3');
   await pj.click('#tbVyrobit'); await pj.waitForTimeout(900);
   ok(sqlVal('select count(*) from nestvura_instance') === '3', 'vyrobily se 3 kusy do DB');
@@ -107,8 +116,7 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   sql("delete from tokeny where typ_entity='nestvura_instance'; delete from nestvura_instance");
   const tablet = await otevri('test@local', 'test1234', true);
   await tablet.click('#tb-tokeny'); await tablet.waitForTimeout(600);
-  await tablet.fill('#tbHledat', 'goblin'); await tablet.waitForTimeout(250);
-  await tablet.selectOption('#tbDruh', { index: 0 });
+  await vybratDruh(tablet, 'goblin');
   await tablet.fill('#tbPocet', '1');
   await tablet.click('#tbVyrobit'); await tablet.waitForTimeout(900);
   const cdp = await tablet.context().newCDPSession(tablet);

@@ -101,7 +101,12 @@ $efektyKatalog = [];
 $rychleEfekty = [];
 $hraciVeSvete = [];
 if ($isPjOrAdmin) {
-    $nestvuryKatalog = dracak_db()->query('SELECT id, nazev FROM nestvury ORDER BY nazev')->fetchAll();
+    // Pro seznam s náhledy (assets/js/tvor_vyber.js) potřebujeme i pár čísel, která PJ při výběru
+    // zajímají: životaschopnost, útočné číslo (může jich být víc, v textu oddělené středníkem),
+    // obranné číslo a velikost (písmeno A–F z pravidel, ne „třída“).
+    $nestvuryKatalog = dracak_db()->query(
+        'SELECT id, nazev, zivotaschopnost, uc, oc, velikost FROM nestvury ORDER BY nazev'
+    )->fetchAll();
     // Poškození a Léčení nejsou trvalé efekty (jednorázová změna životů přes kouzlo / lektvar) — v nabídce nejsou.
     $efektyMech = dracak_vtt_tokeny_funkce()['efekty_mech'];
     $efektyKatalog = array_values(array_filter(
@@ -287,8 +292,14 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
     <div class="tb-telo">
       <div class="tb-panel" data-tb-panel="novy">
         <div class="tb-radek">
-          <input class="input tb-hledat" type="text" id="tbHledat" placeholder="hledat druh…" autocomplete="off">
-          <select class="input tb-druh" id="tbDruh" size="1"></select>
+          <!-- Druh se vybírá ze seznamu s náhledy (assets/js/tvor_vyber.js), který vyjede nad polem;
+               <select> zůstává skrytý, protože z něj čte výroba NPC. -->
+          <div class="tb-vyber">
+            <input class="input tb-hledat" type="text" id="tbHledat" placeholder="hledat druh…" autocomplete="off"
+                   role="combobox" aria-expanded="false" aria-controls="tbDruhSeznam">
+            <div class="tv-seznam tb-druhy" id="tbDruhSeznam" role="listbox" aria-label="Druh nestvůry" hidden></div>
+          </div>
+          <select class="input tb-druh" id="tbDruh" size="1" hidden></select>
           <label class="tb-pole" title="Kolik kusů vyrobit do zásoby">počet
             <input class="input tb-pocet-input" type="number" id="tbPocet" min="1" max="50" value="1">
           </label>
@@ -365,8 +376,11 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
     <p class="note" id="novaPostavaPrazdno" style="display:none;">Všechny postavy už na mapě jsou.</p>
     <?php if ($isPjOrAdmin && $nestvuryKatalog): ?>
       <label for="nestvuraHledat">Nestvůra (bestiář)</label>
-      <input class="input" type="text" id="nestvuraHledat" placeholder="hledat…">
-      <select class="input" id="novaNestvuraSelect" size="6">
+      <input class="input" type="text" id="nestvuraHledat" placeholder="hledat…" autocomplete="off">
+      <!-- Vidět je seznam s náhledy (assets/js/tvor_vyber.js); <select> zůstává kvůli zbytku kódu
+           (pokládání tokenu, klonování druhů do lišty správy tokenů) a jen se neukazuje. -->
+      <div class="tv-seznam" id="nestvuraSeznam" role="listbox" aria-label="Nestvůra z bestiáře"></div>
+      <select class="input" id="novaNestvuraSelect" size="6" hidden>
         <?php foreach ($nestvuryKatalog as $n): ?><option value="<?= (int)$n['id'] ?>"><?= htmlspecialchars($n['nazev']) ?></option><?php endforeach; ?>
       </select>
     <?php endif; ?>
@@ -1010,7 +1024,7 @@ window.MAPA = <?= json_encode([
     'funkce' => dracak_vtt_tokeny_funkce(),
     'cas' => $casSveta,
     'pravidla' => dracak_vtt_souboj_pravidla(),
-    'verzeModulu' => max((int)@filemtime(__DIR__ . '/../assets/js/souboj.js'), (int)@filemtime(__DIR__ . '/../assets/js/kostky3d.js'), (int)@filemtime(__DIR__ . '/../assets/js/hexy.js'), (int)@filemtime(__DIR__ . '/../assets/js/denik_dock.js'), (int)@filemtime(__DIR__ . '/../assets/js/raid_panel.js'), (int)@filemtime(__DIR__ . '/../assets/js/svetlo_stiny.js'), (int)@filemtime(__DIR__ . '/../assets/js/token_bar.js'), (int)@filemtime(__DIR__ . '/../assets/js/tvor_okno.js'), (int)@filemtime(__DIR__ . '/../assets/js/kostky.js')),
+    'verzeModulu' => max((int)@filemtime(__DIR__ . '/../assets/js/souboj.js'), (int)@filemtime(__DIR__ . '/../assets/js/kostky3d.js'), (int)@filemtime(__DIR__ . '/../assets/js/hexy.js'), (int)@filemtime(__DIR__ . '/../assets/js/denik_dock.js'), (int)@filemtime(__DIR__ . '/../assets/js/raid_panel.js'), (int)@filemtime(__DIR__ . '/../assets/js/svetlo_stiny.js'), (int)@filemtime(__DIR__ . '/../assets/js/token_bar.js'), (int)@filemtime(__DIR__ . '/../assets/js/tvor_okno.js'), (int)@filemtime(__DIR__ . '/../assets/js/kostky.js'), (int)@filemtime(__DIR__ . '/../assets/js/tvor_vyber.js')),
     'grid' => [
         'px' => (int)($mapa['grid_velikost_px'] ?? 0),
         'typ' => $mapa['grid_typ'] ?? 'ctverec',
@@ -1024,6 +1038,16 @@ window.MAPA = <?= json_encode([
     'piny' => array_values($mapaBody),
     'svetPostavy' => $svetPostavyKorist,
     'denikPostavy' => $denikPostavy,
+    // Bestiář pro seznam s náhledy. Texty z knihy jsou volné (ÚČ bývá víc útoků za středníkem),
+    // proto se posílají tak, jak jsou, a rozděluje je až prohlížeč.
+    'bestiar' => array_map(fn($n) => [
+        'id' => (int)$n['id'],
+        'nazev' => (string)$n['nazev'],
+        'zvt' => (string)($n['zivotaschopnost'] ?? ''),
+        'uc' => (string)($n['uc'] ?? ''),
+        'oc' => (string)($n['oc'] ?? ''),
+        'vel' => (string)($n['velikost'] ?? ''),
+    ], $nestvuryKatalog),
     'mlhaAktivni' => (bool)$mapa['mlha_aktivni'],
     'stav' => $stav,
 ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>;

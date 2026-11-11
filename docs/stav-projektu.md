@@ -204,6 +204,29 @@ Kód: `hra/mapa.php` (`.tb-skup`, `#kostkyOtevrit`, `#kostkyTray`), `assets/css/
 `assets/js/mapa.js`. Test `tests/e2e/lista_skupiny_ui.js` (21 kontrol: sekce, jeden sloupec, sbalení i jeho
 paměť po reloadu, házecí místo, hod v logu u hazeče a karta u ostatních).
 
+### Výběr tvora s náhledy (2026-11-11)
+
+Zadání: *„chtěl bych, aby měl výběr tokenů a přidání lepší UI. Představoval jsem si v seznamu, tak jak je
+kompaktní teď, aby tam byl náhledový obrázek potvory a pak její název.“* K návrhu pak upřesnil: řádky
+**snížit**, náhled má **přesahovat** bublinu řádku, *„není to třída, je to velikost — stačí napsat B“*,
+*„kolik zabírá je nesmysl, jedinečný zbytečná informace“*, *„je potřeba žvt X“*, *„úč může být vícero,
+vypsat jich všechny za nějaký rozdělovač“*.
+
+* Seznam `assets/js/tvor_vyber.js` nahradil holý `<select>` **na dvou místech**: v popoveru „Přidat token“
+  a v liště správy tokenů (tam vyjede nad polem hledání jako našeptávač a vybraný druh se do pole zapíše).
+  Skrytý `<select>` v obou případech zůstal — drží vybrané id, takže pokládání tokenu i výroba NPC jedou beze změny.
+* Řádek: **náhled** (iniciála na barvě nestvůry, `#4a2b2b` jako token na mapě) + jméno + štítky
+  **velikost · žvt · OČ · ÚČ**. Útoků bývá v knize víc (oddělené středníkem) — jsou všechny v jednom štítku
+  oddělené „|“, celé znění v nájezdu myši; co se nevejde, se vytrácí doprava.
+* **Tvar náhledu se řídí mřížkou** — na hexové mapě šestiúhelník, na čtvercové kolečko, tedy to, co po
+  položení opravdu uvidíš. Obrázek tvora bestiář needviduje (žádný sloupec `nestvury` ho nemá), takže
+  náhled je iniciála; až budou tokeny s obrázky, může se sem doplnit.
+* Čísla do prohlížeče posílá `hra/mapa.php` v `window.MAPA.bestiar` (`zivotaschopnost`, `uc`, `oc`,
+  `velikost`) — texty z knihy jsou volné, dělí je až prohlížeč.
+
+Test `tests/e2e/tvor_vyber_ui.js` (20 kontrol, mimo jiné že v řádku NENÍ slovo „třída“, „zabírá“ ani
+„jedinečný“ a že tvar náhledu sedí s mřížkou) a rozšířený `tests/e2e/token_bar_ui.js`.
+
 ### Vzhled tokenů a pinů podle mřížky (2026-11-11)
 
 Čtyři stížnosti uživatele z 2026-11-11, všechny opravené:

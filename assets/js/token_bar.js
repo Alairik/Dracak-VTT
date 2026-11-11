@@ -39,17 +39,42 @@ export function initTokenBar(opts) {
   }));
   el('tbZavrit').addEventListener('click', () => { bar.style.display = 'none'; });
 
-  // --- výběr druhu: options se klonují ze seznamu v popoveru „Přidat token“, aby se bestiář nevypisoval do HTML dvakrát ---
+  // --- výběr druhu ---
+  // Vidět je seznam s náhledy (tvor_vyber.js), který vyjede nad polem hledání; skrytý <select>
+  // drží vybrané id, protože z něj čte výroba NPC. Options se klonují ze seznamu v popoveru
+  // „Přidat token“, aby se bestiář nevypisoval do HTML dvakrát.
   const druhSel = el('tbDruh');
   const zdroj = document.getElementById('novaNestvuraSelect');
   const vsechnyDruhy = zdroj ? Array.from(zdroj.options).map((o) => ({ id: o.value, nazev: o.textContent })) : [];
-  const vykreslitDruhy = (hledat) => {
-    const h = (hledat || '').trim().toLowerCase();
-    const sez = h ? vsechnyDruhy.filter((d) => d.nazev.toLowerCase().includes(h)) : vsechnyDruhy;
-    druhSel.innerHTML = sez.slice(0, 400).map((d) => '<option value="' + esc(d.id) + '">' + esc(d.nazev) + '</option>').join('');
+  druhSel.innerHTML = vsechnyDruhy.map((d) => '<option value="' + esc(d.id) + '">' + esc(d.nazev) + '</option>').join('');
+  druhSel.selectedIndex = -1;
+  const hledatEl = el('tbHledat');
+  const seznamEl = el('tbDruhSeznam');
+  // Vybraný druh se napíše rovnou do pole hledání (jako u našeptávače) — lišta tím nebobtná
+  // o další popisek a je na jeden pohled vidět, co se vyrobí.
+  const popisVybraneho = () => {
+    const d = vsechnyDruhy.find((x) => String(x.id) === String(druhSel.value));
+    hledatEl.classList.toggle('ma', !!d);
+    if (d) hledatEl.value = d.nazev;
   };
-  vykreslitDruhy('');
-  el('tbHledat').addEventListener('input', (e) => vykreslitDruhy(e.target.value));
+  const otevritSeznam = (ano) => {
+    seznamEl.hidden = !ano;
+    hledatEl.setAttribute('aria-expanded', ano ? 'true' : 'false');
+  };
+  if (opts.tvorVyber) {
+    opts.tvorVyber({
+      kontejner: seznamEl, select: druhSel, hledat: hledatEl,
+      tvorove: (window.MAPA && window.MAPA.bestiar) || vsechnyDruhy.map((d) => ({ id: Number(d.id), nazev: d.nazev })),
+      hex: !!opts.hex,
+      poVybrani: () => { otevritSeznam(false); popisVybraneho(); },
+    });
+  }
+  hledatEl.addEventListener('focus', () => { hledatEl.select(); otevritSeznam(true); });
+  hledatEl.addEventListener('input', () => otevritSeznam(true));
+  document.addEventListener('pointerdown', (e) => {
+    if (!seznamEl.hidden && !e.target.closest('.tb-vyber')) otevritSeznam(false);
+  });
+  popisVybraneho();
 
   // --- data ---
   async function nacist() {

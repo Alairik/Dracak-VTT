@@ -15,6 +15,7 @@ const initRaidPanel = document.getElementById('raidPanel') ? (await import('./ra
 const initTokenBar = document.getElementById('tokenBar') ? (await import('./token_bar.js?v=' + VERZE_MODULU)).initTokenBar : null;
 // „Hoď si“ a kostka, kterou vidí celý stůl (zadání uživatele 2026-11-11).
 const initKostky = document.getElementById('kostkyVrstva') ? (await import('./kostky.js?v=' + VERZE_MODULU)).initKostky : null;
+const {initTvorVyber} = await import('./tvor_vyber.js?v=' + VERZE_MODULU);
 // Okno tvora (jen PJ): plovoucí karta u tokenu nestvůry místo postranního panelu.
 // CFG, ne IS_PJ_OR_ADMIN — ta konstanta vzniká až o 160 řádků níž a tady by ještě neexistovala.
 const initTvorOkno = window.MAPA.jePj ? (await import('./tvor_okno.js?v=' + VERZE_MODULU)).initTvorOkno : null;
@@ -1262,13 +1263,18 @@ function zobrazPing(x, y, jmeno) {
   setTimeout(() => el.remove(), 3000);
 }
 
+// Výběr nestvůry v popoveru „Přidat token“: místo holého <select> seznam s náhledy
+// (assets/js/tvor_vyber.js). <select> zůstává skrytý a seznam do něj jen zapisuje,
+// takže pokládání tokenu i lišta správy tokenů fungují beze změny.
 const nestvuraHledat = document.getElementById('nestvuraHledat');
-if (nestvuraHledat) {
-  nestvuraHledat.addEventListener('input', () => {
-    const q = nestvuraHledat.value.trim().toLowerCase();
-    document.querySelectorAll('#novaNestvuraSelect option').forEach(opt => {
-      opt.style.display = (!q || opt.textContent.toLowerCase().includes(q)) ? '' : 'none';
-    });
+const nestvuraSeznam = document.getElementById('nestvuraSeznam');
+if (nestvuraSeznam) {
+  initTvorVyber({
+    kontejner: nestvuraSeznam,
+    select: document.getElementById('novaNestvuraSelect'),
+    hledat: nestvuraHledat,
+    tvorove: window.MAPA.bestiar || [],
+    hex: (CFG.grid && CFG.grid.typ === 'hex'),
   });
 }
 
@@ -1957,6 +1963,9 @@ tokenBar = initTokenBar ? initTokenBar({
   obnovitStav,
   logLine,
   viewport,
+  // Seznam druhů s náhledy je tentýž modul jako v popoveru „Přidat token“.
+  tvorVyber: initTvorVyber,
+  hex: (CFG.grid && CFG.grid.typ === 'hex'),
 }) : null;
 const tbTokeny = document.getElementById('tb-tokeny');
 if (tbTokeny && tokenBar) tbTokeny.addEventListener('click', () => tokenBar.prepnout());
