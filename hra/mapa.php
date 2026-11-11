@@ -483,6 +483,13 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
         <option value="<?= (int)$zm['id'] ?>"><?= htmlspecialchars($zm['nazev']) ?></option>
       <?php endforeach; ?>
     </select>
+    <!-- Mapa rovnou odsud (zadání 2026-11-11): obrázek → nová mapa se jménem pinu → pin na ni ukazuje.
+         Mřížku a měřítko doladí PJ na nové mapě jako vždycky. -->
+    <div class="pin-mapa">
+      <button class="pin-mapa-btn" type="button" id="pinNovyNahratMapu">Nahrát mapu odsud…</button>
+      <input type="file" id="pinNovyMapaSoubor" accept="image/png,image/jpeg,image/webp" hidden>
+      <span class="pin-mapa-stav" id="pinNovyMapaStav"></span>
+    </div>
     <label for="pinNovyPopis">Popis</label>
     <textarea id="pinNovyPopis"></textarea>
     <label style="display:flex;align-items:center;gap:6px;font-weight:400;">
@@ -518,6 +525,13 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
         <option value="<?= (int)$zm['id'] ?>"><?= htmlspecialchars($zm['nazev']) ?></option>
       <?php endforeach; ?>
     </select>
+    <!-- Mapa rovnou odsud (zadání 2026-11-11): obrázek → nová mapa se jménem pinu → pin na ni ukazuje.
+         Mřížku a měřítko doladí PJ na nové mapě jako vždycky. -->
+    <div class="pin-mapa">
+      <button class="pin-mapa-btn" type="button" id="pinUpravitNahratMapu">Nahrát mapu odsud…</button>
+      <input type="file" id="pinUpravitMapaSoubor" accept="image/png,image/jpeg,image/webp" hidden>
+      <span class="pin-mapa-stav" id="pinUpravitMapaStav"></span>
+    </div>
     <label for="pinUpravitPopis">Popis</label>
     <textarea id="pinUpravitPopis"></textarea>
     <label style="display:flex;align-items:center;gap:6px;font-weight:400;">
@@ -570,6 +584,14 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
     </div>
     <button class="btn btn-primary" type="button" id="gridUlozitBtn" style="width:100%;margin-top:10px;">Uložit</button>
     <p class="note">Náhled na mapě se mění hned, uloží se až tlačítkem.</p>
+    <!-- Velikost značek míst. Na mapě s mřížkou se piny zvětšují a zmenšují spolu s mapou (aby držely
+         poměr k hexům a tokenům); tímhle se dá ten poměr doladit. Je to nastavení vzhledu, pamatuje
+         si ho prohlížeč pro tuhle mapu — do databáze se nic nezapisuje. -->
+    <div style="border-top:1px solid rgba(255,255,255,.12); margin-top:12px; padding-top:10px;">
+      <label for="pinyVelikostSlider">Velikost značek míst (<span id="pinyVelikostHodnota">100</span> %)</label>
+      <input type="range" id="pinyVelikostSlider" min="50" max="200" step="5" value="100" style="width:100%;">
+      <p class="note" style="margin-top:4px;">Platí jen pro tvůj prohlížeč a pro tuhle mapu.</p>
+    </div>
     <?php if (dracak_vtt_tokeny_funkce()['meritko']): ?>
     <div style="border-top:1px solid rgba(255,255,255,.15);margin-top:10px;padding-top:8px;">
       <label for="meritkoMil">Měřítko mapy — kolik mil je 1000 px (světová mapa; prázdné = bez měřítka)</label>
@@ -993,6 +1015,15 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
 
   <!-- Kostka, kterou vidí celý stůl (assets/js/kostky.js). Vpravo dole, asi třetinu od hran — volba
        uživatele 2026-11-11. Vrstva nechytá kliknutí, jen ukazuje. -->
+  <!-- Hláška po vstupu do nové zóny, kde chyběla cesta zpátky: hra pin založila sama a PJ ho tu může
+       zrušit („pin nedělej“) nebo posunout jinam i s družinou (rozhodnutí uživatele 2026-11-11). -->
+  <div id="zpatecniPin" class="zp-hlaska" hidden role="status">
+    <span class="zp-text" id="zpatecniPinText"></span>
+    <button class="zp-btn zp-hlavni" type="button" id="zpatecniPinPosunout">Posunout jinam</button>
+    <button class="zp-btn" type="button" id="zpatecniPinZrusit">Pin nedělej</button>
+    <button class="zp-btn zp-x" type="button" id="zpatecniPinZavrit" title="Nechat, jak je"><?php dracak_icon('x', 14); ?></button>
+  </div>
+
   <div id="kostkyVrstva" aria-live="polite" aria-label="Hody kostkou"></div>
 
   <!-- „Hoď si“ — malé okno u hráče, když ho PJ vyzve k hodu. Nízké (uživatel: „předstvoval jsem si výšku

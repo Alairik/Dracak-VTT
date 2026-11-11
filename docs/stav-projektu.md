@@ -227,6 +227,32 @@ vypsat jich všechny za nějaký rozdělovač“*.
 Test `tests/e2e/tvor_vyber_ui.js` (20 kontrol, mimo jiné že v řádku NENÍ slovo „třída“, „zabírá“ ani
 „jedinečný“ a že tvar náhledu sedí s mřížkou) a rozšířený `tests/e2e/token_bar_ui.js`.
 
+### Piny: cesta zpátky, mapa odsud, velikost (2026-11-11)
+
+Tři věci ze zadání uživatele k pinům:
+
+1. **Družina se už neobjeví uprostřed mapy.** Při vstupu pinem do nové zóny hledal
+   `includes/vtt_prechod.php` pin, který vede zpátky, a když žádný nebyl, postavil družinu doprostřed —
+   přesně to uživateli vadilo. Teď se takový pin **založí sám** (`Zpět: <jméno mapy, odkud se přišlo>`,
+   typ „přechod“, viditelný hráčům) a družina stojí u něj. PJ pak na nové mapě dostane nízkou hlášku
+   (`#zpatecniPin`) se dvěma volbami — *„Pin nedělej“* (`hra/api/pin_zpatecni.php`, akce `zrusit`) a
+   *„Posunout jinam“* (akce `posunout` — klepne na mapu a pin se i s družinou přemístí; volná pole kolem
+   počítá server toutéž logikou jako při vstupu). To odpovídá jeho rozhodnutí: *„měl by se zakládat
+   automaticky, ten prompt by měl jít zrušit, aby pin nevznikl“* + *„mělo by se zeptat přesun družiny na
+   pin? a buď dám ano, nebo vyberu jinam“*. Že se pin založil, pozná klient z `zpatecni_pin` v odpovědi
+   `pin_vstoupit.php`; mezi stránkami si to předá přes `sessionStorage`.
+2. **Mapa rovnou z okna pinu** (`hra/api/mapa_z_pinu.php`, tlačítko „Nahrát mapu odsud…“ v obou oknech
+   pinu). Obrázek → nová zónová mapa pojmenovaná podle pinu → pin na ni ukazuje. U existujícího pinu se
+   napojí hned v databázi, u nového se předvybere v „Cílová mapa“ a napojí se při uložení. Mřížku si PJ
+   doladí na nové mapě jako vždycky. Dřív se musela mapa založit ve správě světa a pin napojit zvlášť.
+3. **Velikost značek míst** — posuvník v „Nastavení gridu“ (50–200 %). Piny se na mapě s mřížkou
+   zvětšují a zmenšují spolu s mapou (to bylo hotové dřív); tímhle se doladí poměr k hexům a tokenům.
+   Je to nastavení vzhledu, drží ho `localStorage` pro každou mapu zvlášť — **žádný nový sloupec
+   v databázi**, takže to nečeká na ruční SQL.
+
+Testy: rozšířený `tests/e2e/pin_vstoupit_api.js` (automatický zpáteční pin, zrušení, posunutí i s družinou,
+hláška v prohlížeči) a nový `tests/e2e/pin_mapa_ui.js` (mapa z pinu, práva, velikost značek).
+
 ### Vzhled tokenů a pinů podle mřížky (2026-11-11)
 
 Čtyři stížnosti uživatele z 2026-11-11, všechny opravené:

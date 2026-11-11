@@ -16,6 +16,8 @@ const initTokenBar = document.getElementById('tokenBar') ? (await import('./toke
 // „Hoď si“ a kostka, kterou vidí celý stůl (zadání uživatele 2026-11-11).
 const initKostky = document.getElementById('kostkyVrstva') ? (await import('./kostky.js?v=' + VERZE_MODULU)).initKostky : null;
 const {initTvorVyber} = await import('./tvor_vyber.js?v=' + VERZE_MODULU);
+// Klíč, pod kterým si prohlížeč mezi dvěma stránkami předá, že se při vstupu založil zpáteční pin.
+const ZPATECNI_PIN_KLIC = 'dracak_zpatecni_pin';
 // Okno tvora (jen PJ): plovoucí karta u tokenu nestvůry místo postranního panelu.
 // CFG, ne IS_PJ_OR_ADMIN — ta konstanta vzniká až o 160 řádků níž a tady by ještě neexistovala.
 const initTvorOkno = window.MAPA.jePj ? (await import('./tvor_okno.js?v=' + VERZE_MODULU)).initTvorOkno : null;
@@ -1313,8 +1315,32 @@ function oznacitMrizku() {
   // v terénu, a drží si stálou velikost na obrazovce jako dosud.
   const sah = typeof pxNaSah === 'function' ? pxNaSah() : 0;
   document.body.classList.toggle('pin-v-mape', sah > 0);
-  if (sah > 0) document.body.style.setProperty('--pin-d', Math.round(Math.max(18, Math.min(96, sah * 0.62))) + 'px');
+  if (sah > 0) document.body.style.setProperty('--pin-d', Math.round(Math.max(12, Math.min(140, sah * 0.62 * pinyMeritko()))) + 'px');
   else document.body.style.removeProperty('--pin-d');
+}
+
+// Doladění velikosti značek míst. Je to nastavení vzhledu, ne vlastnost mapy — pamatuje si ho
+// prohlížeč (pro každou mapu zvlášť), aby kvůli němu nemusel vznikat nový sloupec v databázi.
+const PINY_MERITKO_KLIC = 'dracak_piny_meritko_' + MAPA_ID;
+function pinyMeritko() {
+  try {
+    const v = parseInt(localStorage.getItem(PINY_MERITKO_KLIC) || '100', 10);
+    return isFinite(v) && v >= 50 && v <= 200 ? v / 100 : 1;
+  } catch (e) { return 1; }
+}
+{
+  const slider = document.getElementById('pinyVelikostSlider');
+  const hodnota = document.getElementById('pinyVelikostHodnota');
+  if (slider) {
+    const start = Math.round(pinyMeritko() * 100);
+    slider.value = String(start);
+    if (hodnota) hodnota.textContent = String(start);
+    slider.addEventListener('input', () => {
+      if (hodnota) hodnota.textContent = slider.value;
+      try { localStorage.setItem(PINY_MERITKO_KLIC, slider.value); } catch (e) { /* soukromé okno */ }
+      oznacitMrizku();
+    });
+  }
 }
 oznacitMrizku();
 
@@ -3042,10 +3068,121 @@ if (pinInfoVstoupitBtn) {
     if (!confirm('Přenést družinu na „' + bod.nazev + '“ a přepnout tam všechny hráče?')) return;
     postJson('api/pin_vstoupit.php', {bod_id: bod.id}).then(d => {
       if (d.error) { logLine('Chyba: ' + d.error); return; }
+      // Cesta zpátky na cílové mapě chyběla a server pin založil sám — na nové mapě o tom
+      // PJ dostane hlášku s možností ho zrušit nebo posunout (viz zpatecniPinHlaska níž).
+      if (d.zpatecni_pin) {
+        try {
+          sessionStorage.setItem(ZPATECNI_PIN_KLIC, JSON.stringify(Object.assign({mapa_id: d.mapa_id}, d.zpatecni_pin)));
+        } catch (e) { /* soukromé okno — hláška se prostě neukáže */ }
+      }
       location.href = 'mapa.php?id=' + d.mapa_id;
     });
   });
 }
+// --- Nová mapa rovnou z okna pinu ---
+// Zadání uživatele 2026-11-11: „v pinu na mapě mi chybí možnost přidat mapu odtamtud. musím nejdřív
+// zvenku vytvořit mapu a pin pak napojit.“ Obrázek se nahraje, založí se z něj mapa pojmenovaná podle
+// pinu a pin se na ni rovnou napojí (u existujícího pinu hned v DB, u nového při uložení pinu).
+function pripojNahraniMapy(predpona, bodIdFn) {
+  const btn = document.getElementById(predpona + 'NahratMapu');
+  const soubor = document.getElementById(predpona + 'MapaSoubor');
+  const stav = document.getElementById(predpona + 'MapaStav');
+  const nazevEl = document.getElementById(predpona + 'Nazev');
+  const cilEl = document.getElementById(predpona + 'CilovaMapa');
+  if (!btn || !soubor || !cilEl) return;
+
+  btn.addEventListener('click', () => {
+    if (!nazevEl.value.trim()) { stav.textContent = 'Nejdřív vyplň název pinu — mapa se podle něj pojmenuje.'; return; }
+    soubor.click();
+  });
+  soubor.addEventListener('change', async () => {
+    const f = soubor.files && soubor.files[0];
+    if (!f) return;
+    const nazev = nazevEl.value.trim();
+    stav.textContent = 'Nahrávám…';
+    btn.disabled = true;
+    try {
+      const fd = new FormData();
+      fd.append('svet_id', String(SVET_ID));
+      fd.append('nazev', nazev);
+      fd.append('obrazek', f);
+      const bodId = bodIdFn();
+      if (bodId) fd.append('bod_id', String(bodId));
+      const d = await fetch('api/mapa_z_pinu.php', {method: 'POST', body: fd}).then((r) => r.json()).catch(() => null);
+      if (!d || d.error) { stav.textContent = 'Chyba: ' + ((d && d.error) || 'nahrání se nepovedlo'); return; }
+      // Nová mapa se přidá do obou nabídek cílových map a rovnou se vybere.
+      document.querySelectorAll('#pinNovyCilovaMapa, #pinUpravitCilovaMapa').forEach((sel) => {
+        const opt = document.createElement('option');
+        opt.value = String(d.mapa_id);
+        opt.textContent = d.nazev;
+        sel.appendChild(opt);
+      });
+      cilEl.value = String(d.mapa_id);
+      stav.textContent = 'Hotovo — pin vede na „' + d.nazev + '“.';
+      logLine('Z pinu založena mapa „' + d.nazev + '“ (' + d.sirka_px + '×' + d.vyska_px + ' px).');
+    } finally {
+      btn.disabled = false;
+      soubor.value = '';
+    }
+  });
+}
+pripojNahraniMapy('pinNovy', () => 0);
+pripojNahraniMapy('pinUpravit', () => parseInt(document.getElementById('pinUpravitId').value, 10) || 0);
+
+// --- Zpáteční pin: hláška po vstupu do nové zóny ---
+// Když na nové mapě nebyla cesta zpátky, server ji založil sám (includes/vtt_prechod.php), aby se
+// družina neobjevila uprostřed mapy. PJ ji tu může zrušit, nebo i s družinou posunout jinam.
+function zpatecniPinHlaska() {
+  const box = document.getElementById('zpatecniPin');
+  if (!box || !IS_PJ_OR_ADMIN) return;
+  let ulozeny = null;
+  try {
+    ulozeny = JSON.parse(sessionStorage.getItem(ZPATECNI_PIN_KLIC) || 'null');
+    sessionStorage.removeItem(ZPATECNI_PIN_KLIC);
+  } catch (e) { return; }
+  if (!ulozeny || Number(ulozeny.mapa_id) !== MAPA_ID || !ulozeny.id) return;
+
+  const skryt = () => { box.hidden = true; };
+  document.getElementById('zpatecniPinText').textContent =
+    'Cesta zpátky tu nebyla, tak jsem založil pin „' + ulozeny.nazev + '“ a družinu postavil k němu.';
+  box.hidden = false;
+
+  document.getElementById('zpatecniPinZavrit').addEventListener('click', skryt);
+  document.getElementById('zpatecniPinZrusit').addEventListener('click', () => {
+    postJson('api/pin_zpatecni.php', {akce: 'zrusit', bod_id: ulozeny.id}).then((d) => {
+      if (d.error) { logLine('Chyba: ' + d.error); return; }
+      const btn = document.querySelector('.mapa-bod-marker[data-bod-id="' + ulozeny.id + '"]');
+      if (btn) btn.remove();
+      const i = MAPA_BODY.findIndex((b) => b.id === ulozeny.id);
+      if (i >= 0) MAPA_BODY.splice(i, 1);
+      logLine('Zpáteční pin zrušen — družina zůstala, kde je.');
+      skryt();
+    });
+  });
+  document.getElementById('zpatecniPinPosunout').addEventListener('click', () => {
+    skryt();
+    logLine('Klepni na mapu, kam zpáteční pin patří — družina se přesune k němu.');
+    viewport.classList.add('ceka-na-pin');
+    const klik = (e) => {
+      viewport.removeEventListener('click', klik, true);
+      viewport.classList.remove('ceka-na-pin');
+      const m = bodMapy(e);
+      const x = Math.round(m.x), y = Math.round(m.y);
+      postJson('api/pin_zpatecni.php', {akce: 'posunout', bod_id: ulozeny.id, x, y}).then((d) => {
+        if (d.error) { logLine('Chyba: ' + d.error); return; }
+        const btn = document.querySelector('.mapa-bod-marker[data-bod-id="' + ulozeny.id + '"]');
+        if (btn) { btn.style.left = d.x + 'px'; btn.style.top = d.y + 'px'; }
+        const bod = MAPA_BODY.find((b) => b.id === ulozeny.id);
+        if (bod) { bod.x = d.x; bod.y = d.y; }
+        logLine('Zpáteční pin přesunut, družina stojí u něj.');
+        obnovitStav();
+      });
+    };
+    viewport.addEventListener('click', klik, true);
+  });
+}
+zpatecniPinHlaska();
+
 const pinInfoCestovatBtn = document.getElementById('pinInfoCestovatBtn');
 if (pinInfoCestovatBtn) {
   pinInfoCestovatBtn.addEventListener('click', () => {

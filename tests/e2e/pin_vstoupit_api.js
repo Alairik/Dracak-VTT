@@ -53,12 +53,44 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   ok(r.s === 200 && r.mapa_id === B && r.vstup === 'stred' && r.presunuto.length === 1, 'PJ vstoupí s družinou: ' + JSON.stringify(r).slice(0, 120));
   let p = poloha(h);
   ok(p[0] === B && Math.hypot(p[1] - stredB[0], p[2] - stredB[1]) < 100, 'postava hráče stojí na mapě 2 u středu (' + p.join(', ') + ')');
+
+  // --- cesta zpátky chyběla: pin se založí sám (rozhodnutí uživatele 2026-11-11) ---
+  ok(r.zpatecni_pin && r.zpatecni_pin.id, 'odpověď nese nově založený zpáteční pin: ' + JSON.stringify(r.zpatecni_pin));
+  const auto = r.zpatecni_pin;
+  ok(sqlVal(`select concat(mapa_id, ' ', cilova_mapa_id) from mapa_body where id=${auto.id}`) === B + ' ' + A,
+    'pin leží na nové mapě a vede zpátky na tu, odkud družina přišla');
+  ok(/^Zpět: /.test(auto.nazev), 'jmenuje se podle mapy, odkud se přišlo: ' + auto.nazev);
+  ok(sqlVal(`select viditelny_hracum from mapa_body where id=${auto.id}`) === '1', 'cestu zpátky vidí i hráči');
+
+  // „Posunout jinam“ — pin i družina se přemístí.
+  let z = await api(hrac, 'pin_zpatecni', { akce: 'posunout', bod_id: auto.id, x: 200, y: 200 });
+  ok(z.s === 403, 'hráč se zpátečním pinem hýbat nesmí (403): ' + z.s);
+  z = await api(pj, 'pin_zpatecni', { akce: 'posunout', bod_id: auto.id, x: 200, y: 200 });
+  p = poloha(h);
+  ok(z.s === 200 && sqlVal(`select concat(x, ' ', y) from mapa_body where id=${auto.id}`) === '200 200', 'pin se posunul tam, kam PJ klepl');
+  ok(Math.hypot(p[1] - 200, p[2] - 200) < 120, 'družina se přesunula k němu (' + p.slice(1).join(', ') + ')');
+
+  // „Pin nedělej“ — zmizí, družina zůstane.
+  const kdeByla = poloha(h);
+  z = await api(pj, 'pin_zpatecni', { akce: 'zrusit', bod_id: auto.id });
+  ok(z.s === 200 && sqlVal(`select count(*) from mapa_body where id=${auto.id}`) === '0', 'pin se dá zrušit');
+  ok(poloha(h).join(',') === kdeByla.join(','), 'zrušení pinu družinou nehýbe');
+
+  // Podruhé už cesta zpátky existuje — nic dalšího se nezakládá.
+  sql(`update tokeny set mapa_id=${A}, x=335, y=315 where id=${h}`);
+  const pinZpet = (await api(pj, 'mapa_bod_pridat', { mapa_id: B, nazev: 'Ven', typ: 'prechod', x: 420, y: 420, cilova_mapa_id: A, viditelny_hracum: true })).id;
+  r = await api(pj, 'pin_vstoupit', { bod_id: pinAB });
+  ok(r.vstup === 'pin' && !r.zpatecni_pin, 'když cesta zpátky je, nový pin nevzniká');
+  ok(sqlVal(`select count(*) from mapa_body where mapa_id=${B} and cilova_mapa_id=${A}`) === '1', 'na mapě zůstal jen ten jeden');
+  await api(pj, 'mapa_bod_smazat', { id: pinZpet });
+  sql(`update tokeny set mapa_id=${A}, x=335, y=315 where id=${h}`);
   ok(poloha(gob)[0] === A, 'nestvůra zůstala na mapě 1');
   ok(sqlVal(`select aktivni_mapa_id from svet where id=${SVET}`) === String(B), 'aktivní mapa světa je teď mapa 2');
   const ud = await (await hrac.request.get(BASE + '/hra/api/udalosti.php?svet_id=1&od=' + posl)).text();
   ok(/aktivni_mapa_zmena/.test(ud) && /"vstup":true/.test(ud), 'hráč dostane událost o přechodu s příznakem vstup');
 
   // --- pin zpátky = vstupní bod; obsazená buňka se přeskočí ---
+  sql(`delete from mapa_body where mapa_id=${B}`);   // ať vstupní bod určuje jen pin založený tady
   const pinBA = (await api(pj, 'mapa_bod_pridat', { mapa_id: B, nazev: 'Východ', typ: 'prechod', x: 300, y: 300, cilova_mapa_id: A, viditelny_hracum: true })).id;
   sql(`update tokeny set mapa_id=${A}, x=335, y=315 where id=${h}`);
   const gob2 = (await api(pj, 'token_pridat', { mapa_id: B, typ_entity: 'nestvura', nestvura_id: 41, x: 300, y: 300 })).token_id;
@@ -95,6 +127,22 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   ok(hrac.url().includes('id=' + B), 'hráč se přepne za družinou na mapu 2: ' + hrac.url());
   await hrac.waitForTimeout(1200);
   ok(await hrac.locator('.vtt-token').count() >= 1, 'hráč na nové mapě vidí svůj token');
+  // --- prohlížeč: hláška o zpátečním pinu, když cesta zpátky chyběla ---
+  sql(`delete from mapa_body where mapa_id=${B}`);
+  sql(`update tokeny set mapa_id=${A}, x=335, y=315 where typ_entity='postava' and entita_id=2; update svet set aktivni_mapa_id=${A} where id=${SVET}`);
+  await pj.goto(BASE + '/hra/mapa.php?id=' + A); await pj.waitForTimeout(1200);
+  await pj.locator('.mapa-bod-marker[data-bod-id="' + pinAB + '"]').click(); await pj.waitForTimeout(400);
+  await pj.click('#pinInfoVstoupitBtn');
+  await pj.waitForURL('**/mapa.php?id=' + B, { timeout: 8000 }).catch(() => {});
+  await pj.waitForTimeout(1500);
+  ok(await pj.locator('#zpatecniPin').isVisible(), 'PJ dostane hlášku, že se cesta zpátky založila sama');
+  ok(/Zpět:/.test(await pj.locator('#zpatecniPinText').textContent()), 'hláška jmenuje pin: ' + (await pj.locator('#zpatecniPinText').textContent()).trim());
+  const pinuPred = parseInt(sqlVal(`select count(*) from mapa_body where mapa_id=${B}`), 10);
+  await pj.click('#zpatecniPinZrusit'); await pj.waitForTimeout(900);
+  ok(parseInt(sqlVal(`select count(*) from mapa_body where mapa_id=${B}`), 10) === pinuPred - 1, '„Pin nedělej“ ho zruší');
+  ok(!(await pj.locator('#zpatecniPin').isVisible()), 'hláška po rozhodnutí zmizí');
+  ok(await pj.locator('.mapa-bod-marker').count() === 0, 'značka pinu zmizela i z mapy');
+
   ok(pj.chybyJs.length === 0 && hrac.chybyJs.length === 0, 'žádná chyba JavaScriptu: ' + pj.chybyJs.concat(hrac.chybyJs).join('; '));
 
   sql(`delete from kolo_stav; delete from mapa_body; update svet set aktivni_mapa_id=${A} where id=${SVET}`);

@@ -10,17 +10,44 @@ declare(strict_types=1);
 require_once __DIR__ . '/vtt.php';
 require_once __DIR__ . '/vtt_mlha.php';
 require_once __DIR__ . '/vtt_hexy.php';
+require_once __DIR__ . '/vtt_mapa_body.php';
 
-// Vstupní bod na cílové mapě: [x, y, 'pin'|'stred'].
+// Vstupní bod na cílové mapě: [x, y, 'pin'|'stred', id zpátečního pinu nebo null].
+//
+// Pin, který z cílové mapy vede zpátky na zdrojovou, je cesta ven. Když chybí, družina by se objevila
+// uprostřed mapy — což uživateli vadilo (2026-11-11: „chci, aby se mi družina neobjevovala uprostřed
+// mapy, pokud zapomenu, že jsem tam nedal pin zpět“). Proto se takový pin ZALOŽÍ SÁM
+// (rozhodnutí uživatele: „měl by se zakládat automaticky; ten prompt by měl jít zrušit, aby pin
+// nevznikl“) a PJ ho pak může jedním klepnutím zrušit nebo posunout jinam.
 function dracak_vtt_prechod_vstupni_bod(PDO $pdo, array $cil, int $zdrojMapaId): array
 {
-    $q = $pdo->prepare('SELECT x, y FROM mapa_body WHERE mapa_id = ? AND cilova_mapa_id = ? ORDER BY id LIMIT 1');
+    $q = $pdo->prepare('SELECT id, x, y FROM mapa_body WHERE mapa_id = ? AND cilova_mapa_id = ? ORDER BY id LIMIT 1');
     $q->execute([(int)$cil['id'], $zdrojMapaId]);
     $b = $q->fetch();
     if ($b) {
-        return [(float)$b['x'], (float)$b['y'], 'pin'];
+        return [(float)$b['x'], (float)$b['y'], 'pin', null];
     }
-    return [((int)$cil['sirka_px']) / 2, ((int)$cil['vyska_px']) / 2, 'stred'];
+    return [((int)$cil['sirka_px']) / 2, ((int)$cil['vyska_px']) / 2, 'stred', null];
+}
+
+// Založí na cílové mapě pin zpátky na zdrojovou. Vrací [id, nazev, x, y] nebo null, když se to nepovede.
+function dracak_vtt_prechod_zalozit_zpatecni(PDO $pdo, int $svetId, array $cil, int $zdrojMapaId, float $x, float $y, int $ucetId): ?array
+{
+    $q = $pdo->prepare('SELECT nazev FROM mapy WHERE id = ?');
+    $q->execute([$zdrojMapaId]);
+    $zdrojNazev = (string)($q->fetchColumn() ?: 'předchozí mapu');
+    $nazev = mb_substr('Zpět: ' . $zdrojNazev, 0, 150);
+    $xi = (int)round($x);
+    $yi = (int)round($y);
+    $bodId = dracak_vtt_mapa_bod_pridat($pdo, $svetId, (int)$cil['id'], $nazev, 'prechod', $xi, $yi, $zdrojMapaId, null, true);
+    if ($bodId <= 0) {
+        return null;
+    }
+    dracak_vtt_log_event($svetId, (int)$cil['id'], 'mapa_bod_pridan', [
+        'id' => $bodId, 'nazev' => $nazev, 'typ' => 'prechod', 'x' => $xi, 'y' => $yi,
+        'cilova_mapa_id' => $zdrojMapaId, 'viditelny_hracum' => true,
+    ], $ucetId);
+    return ['id' => $bodId, 'nazev' => $nazev, 'x' => $xi, 'y' => $yi];
 }
 
 // Až $kolik volných míst kolem [$x, $y] v pořadí od nejbližšího: [[x, y], …]. $obsazene = [[x, y], …] středy tokenů, které tam už stojí.
@@ -118,6 +145,11 @@ function dracak_vtt_prechod_vstoupit(PDO $pdo, array $bod, int $ucetId): array
     $druzina = $q->fetchAll();
 
     [$vx, $vy, $zpusob] = dracak_vtt_prechod_vstupni_bod($pdo, $cil, $zdrojId);
+    // Cesta zpátky na cílové mapě chybí — založí se sama, ať družina nestojí uprostřed mapy.
+    // PJ ji pak v hlášce může zrušit („pin nedělej“) nebo posunout jinam.
+    $zpatecni = $zpusob === 'stred'
+        ? dracak_vtt_prechod_zalozit_zpatecni($pdo, $svetId, $cil, $zdrojId, $vx, $vy, $ucetId)
+        : null;
     $q = $pdo->prepare('SELECT id, typ_entity, entita_id, x, y FROM tokeny WHERE mapa_id = ?');
     $q->execute([$cilId]);
     $naCili = $q->fetchAll();
@@ -173,5 +205,9 @@ function dracak_vtt_prechod_vstoupit(PDO $pdo, array $bod, int $ucetId): array
     $eventId = dracak_vtt_log_event($svetId, $cilId, 'aktivni_mapa_zmena', [
         'mapa_id' => $cilId, 'nazev' => $cil['nazev'], 'vstup' => true, 'z_mapy' => $zdrojId, 'tokeny' => $presunuto,
     ], $ucetId);
-    return ['mapa_id' => $cilId, 'nazev' => (string)$cil['nazev'], 'presunuto' => $presunuto, 'vstup' => $zpusob, 'udalost_id' => $eventId];
+    return [
+        'mapa_id' => $cilId, 'nazev' => (string)$cil['nazev'], 'presunuto' => $presunuto,
+        'vstup' => $zpusob, 'udalost_id' => $eventId,
+        'zpatecni_pin' => $zpatecni,   // null = cesta zpátky už existovala
+    ];
 }
