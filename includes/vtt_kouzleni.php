@@ -366,10 +366,29 @@ function dracak_vtt_kouzli_ihned_proved(PDO $pdo, array $user, int $svetId, int 
         $cilLabel = isset($info[$cil['token_id']]) ? (string)$info[$cil['token_id']]['label'] : null;
         dracak_vtt_kouzli_udalost($svetId, $mapaId, (int)$user['id'], $tvor, 'ihned', $kouzlo, null, null,
             ['magy' => $cena, 'cil_label' => $cilLabel, 'cil_sam' => $cil['sam'], 'hp' => $v['hp'], 'ceka_na_past' => count($v['ceka_na_past']) > 0,
+                'cil_token_id' => (int)($cil['token_id'] ?? 0) ?: null, 'obor_id' => dracak_vtt_kouzlo_obor($pdo, $id),
                 'bez_magenergie' => dracak_vtt_kouzli_bez_magenergie($tvor, $entity, $katalog)]);
         $vysledky[] = ['kouzlo' => $kouzlo['nazev'], 'cil_label' => $cilLabel, 'hp' => $v['hp'], 'ceka_na_past' => $v['ceka_na_past']];
     }
     return $vysledky;
+}
+
+// Obor magie kouzla (obory_magie) — podle něj se na mapě barví animace kouzla
+// (zadání uživatele 2026-11-11: „kouzlo navíc barevné podle typu“). Vrací null, když kouzlo
+// obor v databázi nemá; animace pak použije neutrální barvu.
+function dracak_vtt_kouzlo_obor(PDO $pdo, ?int $kouzloId): ?int
+{
+    static $pamet = [];
+    if ($kouzloId === null || $kouzloId <= 0) {
+        return null;
+    }
+    if (array_key_exists($kouzloId, $pamet)) {
+        return $pamet[$kouzloId];
+    }
+    $q = $pdo->prepare('SELECT obor_id FROM kouzlo_obor_magie WHERE kouzlo_id = ? ORDER BY obor_id LIMIT 1');
+    $q->execute([$kouzloId]);
+    $obor = $q->fetchColumn();
+    return $pamet[$kouzloId] = ($obor === false ? null : (int)$obor);
 }
 
 // Událost „kouzleni_stav“ do logu (klient ji vypíše; skrytým tvorům patří mezi tajné události).
@@ -457,6 +476,9 @@ function dracak_vtt_kouzli_po_akci(PDO $pdo, array $user, int $svetId, int $mapa
                     ['zbyva_kol' => array_key_exists('kola', $dataRadku) ? $dataRadku['kola'] : null, 'cena' => null]);
                 $extra['seslano'] = true;
                 $extra['hp'] = $v['hp'];
+                // Pro animaci na mapě: odkud kam kouzlo letí a jaké barvy má být.
+                $extra['cil_token_id'] = (int)($dataRadku['ti'] ?? 0) ?: null;
+                $extra['obor_id'] = dracak_vtt_kouzlo_obor($pdo, (int)$radek['kouzlo_id']);
                 $dataRadku['ap'] = 1;
             } catch (RuntimeException $e) {
                 $extra['seslano'] = false;

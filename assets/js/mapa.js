@@ -16,6 +16,7 @@ const initTokenBar = document.getElementById('tokenBar') ? (await import('./toke
 // „Hoď si“ a kostka, kterou vidí celý stůl (zadání uživatele 2026-11-11).
 const initKostky = document.getElementById('kostkyVrstva') ? (await import('./kostky.js?v=' + VERZE_MODULU)).initKostky : null;
 const {initTvorVyber} = await import('./tvor_vyber.js?v=' + VERZE_MODULU);
+const {initSoubojAnimace} = await import('./souboj_animace.js?v=' + VERZE_MODULU);
 // Klíč, pod kterým si prohlížeč mezi dvěma stránkami předá, že se při vstupu založil zpáteční pin.
 const ZPATECNI_PIN_KLIC = 'dracak_zpatecni_pin';
 // Okno tvora (jen PJ): plovoucí karta u tokenu nestvůry místo postranního panelu.
@@ -1302,6 +1303,20 @@ function esc(text) {
   return String(text ?? '').replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 }
 function tokenData(id) { return tokeny.find((t) => t.id === id) || null; }
+
+// Animace souboje: pohyb, útoky a hlášení, kdo je na tahu (assets/js/souboj_animace.js).
+// Vypínají se v nastavení světa — rozhodnutí uživatele 2026-11-11 („animace může být asi na volbu,
+// řekl bych do nastavení světa“). Dokud ten sloupec v databázi není, jsou zapnuté.
+const bojAnim = initSoubojAnimace({
+  vrstva: document.getElementById('bojAnimace'),
+  oznamEl: document.getElementById('bojOznam'),
+  tokenEl: (id) => tokenEl.get(id) || null,
+  tokenData,
+  pxNaSah: () => (typeof pxNaSah === 'function' ? pxNaSah() : 0),
+  zapnuto: CFG.animace !== false,
+});
+// Koho máme ukázat tlačítkem „na tahu“ (automaticky se mapa nikdy necentruje).
+let naTahuTokenId = null;
 // Token je ve výchozí velikosti o něco menší než buňka gridu (aby se do hexu
 // vešel celý); bez gridu pevných 40 px jako dřív.
 // Tvar rámečku tokenu se řídí mřížkou: kolečko na čtvercové, šestiúhelník na hexové (zadání uživatele
@@ -2085,6 +2100,9 @@ async function obnovitStav() {
 function aplikujStav(s) {
   tokeny = s.tokeny;
   koloStav = s.kolo;
+  // Tlačítko „ukaž, kdo je na tahu“ se řídí stavem kola (souboj mohl skončit i začít jinde).
+  naTahuTokenId = (koloStav && koloStav.aktivni_token_id) || null;
+  aktualizovatBojCentr();
   iniciativa = s.iniciativa;
   ucastnici = s.ucastnici || [];
   vyzvy = s.vyzvy || [];
@@ -3677,6 +3695,52 @@ const kostkyOtevrit = document.getElementById('kostkyOtevrit');
 // Události, po kterých se stav mapy znovu načte celý (token přibyl/zmizel,
 // efekty, pořadí tahů, použitý předmět…). Načte se "na místě" — nic se
 // nepřenačítá a nikomu nezmizí otevřené panely ani zoom.
+// Animace a hlášení ze souboje. Děje se tu jen to, co je vidět — stav mapy mění ostatní větve.
+function bojAnimUdalost(u) {
+  const p = u.payload || {};
+  if (u.typ === 'tah_zmena') {
+    naTahuTokenId = p.novy_token_id || null;
+    if (naTahuTokenId) {
+      const t = tokenData(naTahuTokenId);
+      bojAnim.oznamTah('Na tahu: ' + (t ? t.label : 'protivník'), !!(t && t.owned));
+    }
+    aktualizovatBojCentr();
+  } else if (u.typ === 'souboj_start' || u.typ === 'souboj_faze' || u.typ === 'kolo_nove') {
+    aktualizovatBojCentr();
+  } else if (u.typ === 'akce_provedena' && p.cil_token_id) {
+    // Zblízka, nebo na dálku, pozná animace ze vzdálenosti tokenů — pravidla mají jen „útok“.
+    bojAnim.utok(p.token_id, p.cil_token_id, 'utok');
+  } else if (u.typ === 'kouzleni_stav' && p.seslano && p.cil_token_id && p.token_id) {
+    bojAnim.utok(p.token_id, p.cil_token_id, 'kouzlo', bojAnim.barvaOboru(p.obor_id));
+  }
+}
+
+// Tlačítko „ukaž, kdo je na tahu“. Mapa se nikdy necentruje sama (rozhodnutí uživatele).
+// Prvky si funkce hledá sama a nedrží je v `const` nad sebou: volá ji i aplikujStav(), který může
+// doběhnout dřív, než se sem načítání modulu dostane (viz pravidlo v CLAUDE.md o TDZ).
+function aktualizovatBojCentr() {
+  const btn = document.getElementById('bojCentr');
+  if (!btn) return;
+  const t = naTahuTokenId ? tokenData(naTahuTokenId) : null;
+  btn.classList.toggle('je-boj', !!t);
+  const jmeno = document.getElementById('bojCentrJmeno');
+  if (t && jmeno) jmeno.textContent = t.label;
+}
+// Při načtení stránky uprostřed souboje se tlačítko ukáže rovnou (bez čekání na událost).
+if (koloStav && koloStav.aktivni_token_id) naTahuTokenId = koloStav.aktivni_token_id;
+{
+  const btn = document.getElementById('bojCentr');
+  if (btn) {
+    aktualizovatBojCentr();
+    btn.addEventListener('click', () => {
+      const t = naTahuTokenId ? tokenData(naTahuTokenId) : null;
+      if (!t) return;
+      const r = viewport.getBoundingClientRect();
+      kamera.nastav(r.width / 2 - t.x * kamera.stav.z, r.height / 2 - t.y * kamera.stav.z, kamera.stav.z);
+    });
+  }
+}
+
 const UDALOSTI_OBNOVA_STAVU = ['token_pridan', 'token_smazan', 'efekt_aplikovan', 'efekt_konci', 'kouzleni_stav', 'iniciativa_hozena', 'kolo_nove', 'tah_zmena', 'predmet_pouzit', 'predmet_loot', 'krok_zpet',
   'souboj_start', 'souboj_faze', 'souboj_ucastnici', 'umysl_nastaven', 'akce_provedena', 'tah_konec', 'akce_uprava',
   'vyzva_nova', 'vyzva_zmena', 'vyzva_hod', 'vyzva_zrusena', 'souboj_vysledek'];
@@ -3685,13 +3749,22 @@ let obnovitMlhuPoPollu = false;
 function applyEvent(u) {
   const naTeteMape = u.mapa_id === null || u.mapa_id === undefined || u.mapa_id == MAPA_ID;
   if (souboj && naTeteMape) souboj.logUdalost(u);
+  if (bojAnim && naTeteMape) bojAnimUdalost(u);
   if (souboj && (u.typ === 'token_presun' || u.typ === 'tokeny_presun' || u.typ === 'token_zmena')) setTimeout(() => souboj.prekreslitOverlay(), 0);
   if (u.typ === 'token_presun') {
     const t = tokenData(u.payload.token_id);
     if (t) {
+      const zX = t.x, zY = t.y;
       t.x = u.payload.x_po;
       t.y = u.payload.y_po;
-      if (!drzeneTokeny.has(t.id)) nakreslitToken(t);
+      if (!drzeneTokeny.has(t.id)) {
+        // Cizí pohyb se přehraje plynule: otočka → přesun → dotočení (0,7 s celkem).
+        // Token se nejdřív překreslí beze změny polohy (velikost, životy, efekty), pak animace
+        // posune left/top; po doběhnutí se dokreslí načisto, ať sedí i tělo tvora na víc hexech.
+        const bezi = bojAnim ? bojAnim.pohyb(t.id, zX, zY, t.x, t.y, t.smer) : 0;
+        if (bezi) setTimeout(() => nakreslitToken(t), bezi + 60);
+        else nakreslitToken(t);
+      }
       if (t.svetlo) renderSvetla();
     } else if (naTeteMape) {
       planujObnovuStavu();   // token, který klient nezná (třeba právě vstoupil do dohledu)

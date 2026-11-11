@@ -37,6 +37,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    if ($akce === 'animace') {
+        // Sloupec svet.animace přidává migrace 0120 (ruční SQL). Bez něj se nic neukládá a animace běží.
+        $maSloupec = (int)dracak_db()->query(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'svet' AND COLUMN_NAME = 'animace'"
+        )->fetchColumn() > 0;
+        if ($maSloupec) {
+            dracak_db()->prepare('UPDATE svet SET animace = ? WHERE id = ?')
+                ->execute([isset($_POST['animace']) ? 1 : 0, $svetId]);
+        }
+        header("Location: svet_administrace.php?id=$svetId");
+        exit;
+    }
+
     if ($akce === 'pohyb') {
         // Fáze 5 (migrace 0077): bez sloupců se nic neukládá.
         $mamSloupce = (int)dracak_db()->query(
@@ -151,6 +164,20 @@ dracak_vtt_page_start('Administrace — ' . $svet['nazev'], $user);
       <button class="btn btn-primary" type="submit">Uložit</button>
     </form>
     <p class="note" style="max-width:520px;">Automatizace zatím jen ukládá nastavení — samotné napojení na kouzla/schopnosti/pasti přijde v další vrstvě.</p>
+
+    <h2 class="page-title" style="font-size:20px;margin-top:28px;">Animace na mapě</h2>
+    <p class="note" style="margin-top:-6px;">Plynulý pohyb tokenů, máchnutí zbraní, letící střely a kouzla, hlášení „kdo je na tahu“. Vypnutím zůstane všechno, jen se to děje skokem.</p>
+    <?php $maAnimaci = array_key_exists('animace', $svet); ?>
+    <form method="post" class="card elev-sm" style="max-width:520px;">
+      <input type="hidden" name="akce" value="animace">
+      <label style="display:flex;align-items:center;gap:6px;font-weight:400;font-size:13px;margin-bottom:10px;">
+        <input type="checkbox" name="animace" <?= !$maAnimaci || $svet['animace'] ? 'checked' : '' ?> <?= $maAnimaci ? '' : 'disabled' ?>> Animace souboje zapnuté
+      </label>
+      <button class="btn btn-primary" type="submit" <?= $maAnimaci ? '' : 'disabled' ?>>Uložit</button>
+      <?php if (!$maAnimaci): ?>
+        <p class="note" style="margin-bottom:0;">Zapne se po jednorázovém kroku správce (ruční SQL). Do té doby animace běží.</p>
+      <?php endif; ?>
+    </form>
 
     <h2 class="page-title" style="font-size:20px;margin-top:28px;">Pohyb, naložení a únava</h2>
     <p class="note" style="margin-top:-6px;">Tohle engine počítá sám (deník postavy, družina, <a href="cesta.php?id=<?= $svetId ?>">kalkulačka cesty</a>). Vypni, co chceš u stolu řešit ručně.</p>

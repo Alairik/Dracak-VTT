@@ -50,6 +50,24 @@ if (!$isPjOrAdmin) {
     }));
 }
 
+// Plný log ze souboje patří PJ. Hráč se dozví, že někdo zaútočil a jestli trefil — ne kolik ubral
+// (rozhodnutí uživatele 2026-11-11: „plná log vidí jen PJ. hráč vidí jen že někdo zaútočil na
+// příšeru, kolik jí ubral dmg neví“). Čísla se vystřihnou až při odesílání, v databázi událost
+// zůstává celá, aby ji PJ viděl i zpětně.
+const DRACAK_VTT_VYSLEDEK_JEN_PJ = ['utok', 'obrana', 'zraneni', 'zraneni_zaklad', 'nasobek', 'nasobek_duvod',
+    'tma_bonus', 'hp_pred', 'hp_nove', 'max_hp', 'utocnost', 'zranitelnost'];
+if (!$isPjOrAdmin) {
+    foreach ($udalosti as &$u) {
+        if ($u['typ'] === 'souboj_vysledek' && is_array($u['payload'])) {
+            foreach (DRACAK_VTT_VYSLEDEK_JEN_PJ as $klic) {
+                unset($u['payload'][$klic]);
+            }
+            $u['payload']['jen_shrnuti'] = true;
+        }
+    }
+    unset($u);
+}
+
 // Stejně tak skrytý token (viditelny_hracum = 0): jeho pohyb, změny vzhledu
 // a životy nesmí hráčům prosáknout přes polling. Výjimka je událost, která
 // právě mění viditelnost (token_zmena s klíčem "viditelny") — hráč se z ní

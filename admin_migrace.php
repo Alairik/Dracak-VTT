@@ -42,6 +42,8 @@ $e = static fn($v): string => htmlspecialchars((string)$v, ENT_QUOTES);
 // Co aplikace ve své databázi opravdu vidí: název databáze a sloupce, které přidává ruční SQL (docs/sql-k-rucnimu-spusteni.sql). Slouží ke kontrole po spuštění
 // ručního SQL — číslo z phpMyAdminu může být z jiné databáze, než jakou používá web; tahle tabulka je z pohledu webu.
 $ruckySql = [
+    ['svet', 'animace', '0120 — přepínač animací souboje (blok M)'],
+    ['predmety', 'zranitelnost_skupina', '0118 — skupina útoku u zbraně: kouzelná / stříbrná (blok L)'],
     ['nestvura_schopnosti', 'hodnota', '0116 — hodnota schopnosti u nestvůry (dosah infravidění)'],
     ['rasa_schopnosti', 'hodnota', '0117 — hodnota schopnosti u rasy (dosah infravidění)'],
     ['nestvura_instance', 'svet_id', '0115 — NPC patří do světa (zásoba tokenů)'],

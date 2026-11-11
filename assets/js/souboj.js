@@ -1754,6 +1754,13 @@ export function initSouboj(ctx) {
     const k = el('div', 'vyzva-karta vyzva-vysledek ' + (p.zasah ? 'zasah' : 'minuti'));
     const kdo = (p.label || 'Někdo') + ' → ' + (p.cil_label || 'někdo');
     k.appendChild(el('strong', '', p.zasah ? 'Zásah! ' + kdo : 'Minul(a). ' + kdo));
+    if (p.jen_shrnuti) {
+      // Karta hráče: jestli to sedlo, ne za kolik. Čísla zná PJ.
+      k.appendChild(el('div', 'vyzva-poznamka', p.zasah ? 'Zásah sedl.' : 'Útok minul.'));
+      if (p.vyrazen) k.appendChild(el('div', '', (p.cil_label || 'Obránce') + ' je vyřazen(a) z boje.'));
+      k.appendChild(tlacitko('Zavřít', 'btn btn-ghost', () => { vysledekKarta = null; kreslitVyzvy(true); }));
+      return k;
+    }
     k.appendChild(el('div', 'vyzva-poznamka', 'Útok ' + p.utok + ' proti obraně ' + p.obrana
       + (p.zasah ? ' → zranění ' + p.zraneni + (p.nasobek > 1 ? ' (' + p.zraneni_zaklad + ' × ' + p.nasobek + ', ' + p.nasobek_duvod + ')' : (p.nasobek_duvod ? ' (' + p.nasobek_duvod + ': násobí se úrovní)' : '')) : '')
       + (p.zasah && p.tma_bonus ? ' (zranění bez postihu za tmu +' + p.tma_bonus + ')' : '')));
@@ -1837,6 +1844,14 @@ export function initSouboj(ctx) {
         break;
       }
       case 'souboj_vysledek':
+        // Hráč dostane jen shrnutí — čísla (útok, obrana, zranění, životy) z události vystřihuje
+        // server (hra/api/udalosti.php); plný log vidí PJ.
+        if (p.jen_shrnuti) {
+          logLine((p.zasah ? 'Zásah: ' : 'Minul(a): ') + (p.label || 'někdo') + ' → ' + (p.cil_label || 'někdo')
+            + (p.vyrazen ? ' — VYŘAZEN(A)' : ''));
+          ukazVysledek(p);
+          break;
+        }
         logLine((p.zasah ? 'Zásah: ' : 'Minul(a): ') + (p.label || 'někdo') + ' → ' + (p.cil_label || 'někdo') + ' — útok ' + p.utok + ' proti obraně ' + p.obrana
           + (p.zasah ? ', zranění ' + p.zraneni + (p.nasobek > 1 ? ' (' + p.zraneni_zaklad + ' × ' + p.nasobek + ')' : (p.nasobek_duvod ? ' (násobí se úrovní: ' + p.nasobek_duvod + ')' : '')) + (p.tma_bonus ? ' (bez postihu za tmu +' + p.tma_bonus + ')' : '') + (p.hp_nove !== null && p.hp_nove !== undefined ? ' (zbývá ' + p.hp_nove + (p.max_hp ? '/' + p.max_hp : '') + ' životů)' : '') : '')
           + (p.vyrazen ? ' — VYŘAZEN(A)' : '') + (p.kouzlo_zasazeno ? (p.kouzlo_stav === 'selhalo'

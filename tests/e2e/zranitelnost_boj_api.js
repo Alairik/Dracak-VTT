@@ -126,6 +126,27 @@ const stav = (page) => page.evaluate(async (m) => (await fetch('api/mapa_stav.ph
       return JSON.stringify(await r.json());
     }, MAPA);
     ok(!/zranitelnost/.test(udalosti), 'hráči se čím je nestvůra zranitelná neposílá');
+
+    // --- 6) log souboje: hráč vidí, že se útočilo, ne kolik to ubralo ---
+    // Rozhodnutí uživatele 2026-11-11: „plná log vidí jen PJ; hráč vidí jen že někdo zaútočil
+    // na příšeru, kolik jí ubral dmg neví.“ Čísla vystřihuje hra/api/udalosti.php při odesílání.
+    const vysledky = async (page) => page.evaluate(async () => {
+      const r = await fetch('api/udalosti.php?svet_id=1&od=0', { cache: 'no-store' });
+      const d = await r.json();
+      return (d.udalosti || []).filter((u) => u.typ === 'souboj_vysledek').map((u) => u.payload);
+    });
+    const proHrace = await vysledky(hr);
+    const proPj = await vysledky(pj);
+    ok(proPj.length > 0 && proHrace.length > 0, 'oba mají v událostech nějaký výsledek souboje (PJ ' + proPj.length + ', hráč ' + proHrace.length + ')');
+    if (proPj.length && proHrace.length) {
+      const pjPosl = proPj[proPj.length - 1];
+      const hrPosl = proHrace[proHrace.length - 1];
+      ok(pjPosl.zraneni !== undefined && pjPosl.utok !== undefined, 'PJ má v události čísla (zranění ' + pjPosl.zraneni + ', útok ' + pjPosl.utok + ')');
+      ok(hrPosl.zraneni === undefined && hrPosl.utok === undefined && hrPosl.obrana === undefined && hrPosl.hp_nove === undefined,
+        'hráč čísla nedostane: ' + JSON.stringify(hrPosl).slice(0, 120));
+      ok(hrPosl.jen_shrnuti === true, 'událost je označená jako shrnutí');
+      ok(hrPosl.zasah !== undefined && hrPosl.cil_label !== undefined, 'ale pozná, kdo na koho a jestli trefil');
+    }
   } finally {
     // vrátit zranitelnosti goblina do původního stavu, ať na sobě sady nezávisí
     sql(`delete from nestvura_zranitelnosti where nestvura_id=${druh}`);

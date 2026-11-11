@@ -202,6 +202,9 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
         <span data-typ="jine"><?php dracak_icon('map-pin', 28); ?></span>
       </div>
       <div id="rotUchyt" title="Táhni a otoč token" style="display:none;"></div>
+      <!-- Vrstva animací souboje (assets/js/souboj_animace.js) — leží v souřadnicích mapy, takže se
+           seky, střely a kouzla posouvají a zvětšují spolu s ní. -->
+      <div id="bojAnimace" aria-hidden="true"></div>
       <div id="mapaBodyLayer" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:50;">
         <?php foreach ($mapaBody as $b): ?>
           <button type="button" class="mapa-bod-marker" data-bod-id="<?= (int)$b['id'] ?>"
@@ -1024,6 +1027,11 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
     <button class="zp-btn zp-x" type="button" id="zpatecniPinZavrit" title="Nechat, jak je"><?php dracak_icon('x', 14); ?></button>
   </div>
 
+  <!-- Kdo je na tahu (krátké hlášení) a tlačítko, které ho ukáže. Automaticky se mapa necentruje —
+       rozhodnutí uživatele 2026-11-11: „automaticky bych to nedělal, na mobilu by to bylo peklo“. -->
+  <div id="bojOznam" class="boj-oznam" hidden role="status" aria-live="polite"></div>
+  <button class="boj-centr" type="button" id="bojCentr" title="Ukázat, kdo je na tahu"><?php dracak_icon('crosshair', 15); ?> <span id="bojCentrJmeno">Na tahu</span></button>
+
   <div id="kostkyVrstva" aria-live="polite" aria-label="Hody kostkou"></div>
 
   <!-- „Hoď si“ — malé okno u hráče, když ho PJ vyzve k hodu. Nízké (uživatel: „předstvoval jsem si výšku
@@ -1051,11 +1059,14 @@ window.MAPA = <?= json_encode([
     'mapaId' => $mapaId,
     'jePj' => $isPjOrAdmin,
     'ucetId' => (int)$user['id'],
+    // Animace souboje na mapě. Sloupec svet.animace přidává migrace 0120 (ruční SQL, blok M);
+    // dokud v databázi není, animace běží — chová se to jako výchozí 1.
+    'animace' => !array_key_exists('animace', $svet) || (int)$svet['animace'] === 1,
     'pohybAuto' => ['unava' => $pohybNastaveni['auto_unava'], 'nalozeni' => $pohybNastaveni['auto_naklad'], 'zbran' => $zbraneIni && $souboj],
     'funkce' => dracak_vtt_tokeny_funkce(),
     'cas' => $casSveta,
     'pravidla' => dracak_vtt_souboj_pravidla(),
-    'verzeModulu' => max((int)@filemtime(__DIR__ . '/../assets/js/souboj.js'), (int)@filemtime(__DIR__ . '/../assets/js/kostky3d.js'), (int)@filemtime(__DIR__ . '/../assets/js/hexy.js'), (int)@filemtime(__DIR__ . '/../assets/js/denik_dock.js'), (int)@filemtime(__DIR__ . '/../assets/js/raid_panel.js'), (int)@filemtime(__DIR__ . '/../assets/js/svetlo_stiny.js'), (int)@filemtime(__DIR__ . '/../assets/js/token_bar.js'), (int)@filemtime(__DIR__ . '/../assets/js/tvor_okno.js'), (int)@filemtime(__DIR__ . '/../assets/js/kostky.js'), (int)@filemtime(__DIR__ . '/../assets/js/tvor_vyber.js')),
+    'verzeModulu' => max((int)@filemtime(__DIR__ . '/../assets/js/souboj.js'), (int)@filemtime(__DIR__ . '/../assets/js/kostky3d.js'), (int)@filemtime(__DIR__ . '/../assets/js/hexy.js'), (int)@filemtime(__DIR__ . '/../assets/js/denik_dock.js'), (int)@filemtime(__DIR__ . '/../assets/js/raid_panel.js'), (int)@filemtime(__DIR__ . '/../assets/js/svetlo_stiny.js'), (int)@filemtime(__DIR__ . '/../assets/js/token_bar.js'), (int)@filemtime(__DIR__ . '/../assets/js/tvor_okno.js'), (int)@filemtime(__DIR__ . '/../assets/js/kostky.js'), (int)@filemtime(__DIR__ . '/../assets/js/tvor_vyber.js'), (int)@filemtime(__DIR__ . '/../assets/js/souboj_animace.js')),
     'grid' => [
         'px' => (int)($mapa['grid_velikost_px'] ?? 0),
         'typ' => $mapa['grid_typ'] ?? 'ctverec',

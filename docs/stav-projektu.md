@@ -253,6 +253,35 @@ Tři věci ze zadání uživatele k pinům:
 Testy: rozšířený `tests/e2e/pin_vstoupit_api.js` (automatický zpáteční pin, zrušení, posunutí i s družinou,
 hláška v prohlížeči) a nový `tests/e2e/pin_mapa_ui.js` (mapa z pinu, práva, velikost značek).
 
+### Animace souboje (2026-11-11)
+
+Zadání uživatele a jeho upřesnění k návrhu (deska „Souboj — kdo je na tahu a animace“):
+
+* **Pohyb** se přehrává plynule: otočka → přesun → dotočení, **0,7 s na celou animaci** („zkusme 0,7,
+  uvidíme“). Animuje se jen CIZÍ pohyb — vlastní tažení myší je přímé.
+* **Kdo je na tahu** se hlásí krátkým pruhem nahoře. Mapa se **nikdy necentruje sama** („na mobilu by
+  to bylo peklo“); místo toho je vpravo dole tlačítko se jménem tvora, které na něj mapu posune.
+* **Útok**: zblízka máchnutí u cíle, na dálku letící střela. Pozná se to ze **vzdálenosti tokenů**
+  (do 1,5 sáhu zblízka), protože pravidla znají jen „útok“ — žádný zvláštní druh akce pro střelbu.
+  Útočník se nadechne, zasažený cukne.
+* **Kouzlo** letí barvou svého **oboru magie** (`obory_magie`, osm barev v `BARVY_OBORU`). Uživatel
+  uvažoval o barvách podle povolání a sám si odpověděl, že to nesedí („chodcova kouzla nebudou vždy
+  zelená“); obor magie je jediné dělení, které pravidla nabízejí a které u Ohnivé koule i u psychického
+  kouzla dopadne správně. **Pozn.: „stínová“ barva chybí proto, že pravidla obor „stínová magie“ nemají** —
+  kdyby ji chtěl, je to rozhodnutí o datech, ne o kódu. Kvůli animaci posílá `kouzleni_stav` navíc
+  `obor_id` a `cil_token_id` (`includes/vtt_kouzleni.php`, `dracak_vtt_kouzlo_obor()`).
+* **Vypínání**: zaškrtávátko „Animace souboje zapnuté“ v administraci světa (sloupec `svet.animace`,
+  migrace **0120**, ruční SQL **blok M**). Dokud sloupec v databázi není, animace běží a přepínač je
+  neaktivní — nic se tím nerozbije.
+* **Log**: plný vidí jen PJ. Hráči `hra/api/udalosti.php` z události `souboj_vysledek` vystřihne čísla
+  (útok, obrana, zranění, životy) a přidá `jen_shrnuti` — hráč se dozví, kdo na koho a jestli trefil.
+  V databázi zůstává událost celá, takže PJ ji vidí i zpětně. *(Životy na tokenu nestvůry tím dotčené
+  nejsou — jestli má hráč vidět i ty, je samostatné rozhodnutí.)*
+
+Kód: `assets/js/souboj_animace.js`, napojení v `assets/js/mapa.js`, styly v `assets/css/mapa.css`,
+markup v `hra/mapa.php` (`#bojAnimace`, `#bojOznam`, `#bojCentr`). Testy `tests/e2e/souboj_animace_ui.js`
+(15 kontrol včetně vypnutých animací) a rozšířený `tests/e2e/zranitelnost_boj_api.js` (log hráče bez čísel).
+
 ### Vzhled tokenů a pinů podle mřížky (2026-11-11)
 
 Čtyři stížnosti uživatele z 2026-11-11, všechny opravené:
