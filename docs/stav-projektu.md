@@ -116,6 +116,136 @@ a `hra/api/hp_uprava.php`:
 Test `tests/e2e/tvor_okno_ui.js` je rozšířený na všechno z toho (písmena a jejich jména, schovaná i otevřená bublina,
 dvě tlačítka u pruhu, značka meze, ruční přepis včetně nesmyslného vstupu, velikost mimo obranu, odkaz v hlavičce).
 
+### Rychlý deník místo postranního panelu u postav (2026-11-10)
+
+Zadání uživatele: *„rychlý deník mám zkontrolovaný, přijde mi super. zaimplementuj.“* Tím se dodělala část B a C
+návrhu `docs/panel-tokenu-navrh.md`.
+
+**Co se změnilo:** klik na token postavy otevře **rychlý deník** (`hra/denik.php?embed=1` v plovoucím okně,
+`assets/js/denik_dock.js`), ne postranní panel. Dřív se u postavy otevíral panel, a to jen když šlo o vlastní
+token na tahu — na cizí postavu nebo mimo tah tedy klik nedělal vůbec nic.
+
+* nestvůra → okno tvora u tokenu (beze změny),
+* postava, na kterou má uživatel deník (PJ všechny ve světě, hráč své) → rychlý deník,
+* ostatní → postranní panel jako dřív.
+* Klik ctí režim okna („pevně tuhle postavu“ / „podle toho, kdo je na tahu“ se klikem nepřebíjí) — na to je
+  v `denik_dock.js` zvlášť `otevriZTokenu()`, protože `otevriPro()` je výslovná volba z tlačítka a režim přebít má.
+
+**Vrstva PJ uvnitř deníku (část C návrhu):** blok `#sekceEntita` z postranního panelu se při otevření deníku
+**přesune** do `#denikPjObsah` v okně deníku a při zavření se vrátí zpět. Přesunem v DOM zůstanou v platnosti
+všechny obsluhy, které na něm visí (iniciativa, rychlé efekty, aplikace efektu, kořist) — nevzniká druhá sada
+ovládání, která by se s panelem rozcházela. Co deník ukazuje sám (životy, magenergie, únava, inventář), se ve
+vrstvě skryje přes CSS `.denik-pj` — jinak by vedle sebe stály dvě sady týchž tlačítek, což je přesně ten
+„deník lite“, kterému se vyhýbáme. Když má PJ otevřený i postranní panel, nástroje zůstanou tam (jeden blok
+nemůže být na dvou místech).
+
+**Postranní panel** (vzhled značky, zámek, smazání, dosah pohybu) se otevírá z kontextového menu nad tokenem,
+položkou **„Nastavení tokenu…“** — a nově pro kterýkoli token, se kterým uživatel smí hýbat, ne jen pro vlastní
+na tahu. Vedle je položka „Rychlý deník“.
+
+Pozor při psaní testů: klik na postavu **neotevře** `#panel-spravovat`. Sady, které panel potřebují, si ho
+otvírají přes kontextové menu (vzor `otevriPanel()` v `tests/e2e/denik_dock.js`, `efekty_ui.js`,
+`noc_videni_api.js`, `dosah_pohybu_ui.js`) a předtím zavřou deník, aby pravé tlačítko trefilo token.
+
+### Zranitelnost nestvůry konečně počítá i boj (2026-11-10)
+
+Data o tom, čím jde nestvůru zranit, jsou v databázi od začátku (1559 vazeb `nestvura_zranitelnosti`) a od
+2026-11-10 je vidí PJ v okně tvora. **Boj s nimi ale nepočítal vůbec.** Teď ano:
+
+* Fyzický útok patří vždy do skupiny **B „obyčejná zbraň“** — podle b17731 sem kniha řadí i ránu beze zbraně,
+  pád z výšky a pařáty, takže každý útok, který hra umí vyhodnotit, je B. (b17748 ještě upozorňuje, že
+  zranitelnost nestvůry není totéž co kategorie jejího vlastního útoku.)
+* Má-li nestvůra u B **násobek** („B ½“, „B 2“ — v datech 103 takových vazeb), zranění se jím vynásobí
+  a **zaokrouhlí nahoru** (b17753). Nikdy neklesne pod 1, dokud zásah prošel obranou.
+* **Nemá-li nestvůra B vůbec**, zranění se *nenuluje samo* — hra nepozná kouzelnou (C) ani stříbrnou (D)
+  zbraň, protože tabulka `predmety` na to nemá pole. PJ dostane varování a rozhodne. **To je ten pravý
+  blokátor: dokud předmět neumí říct „jsem kouzelný / stříbrný“, nejde skupinu útoku určit a zbytek
+  zranitelností (C, D, E, G, H…) zůstane na PJ.** Je to jedno `ALTER TABLE` a chce to ruční SQL, proto se to
+  nedělalo svévolně.
+* Nestvůra bez vyplněných zranitelností se chová přesně jako dřív — žádná změna, žádné hlášení.
+* Výsledek jde **jen PJ**: z veřejné události se vyndává (b17728 — „Nesdělují hráčům hned na začátku boje,
+  čím je nestvůra nezranitelná“).
+
+Kód: `dracak_vtt_nestvura_zranitelnost()`, `dracak_vtt_zranitelnost_nasobek()`,
+`dracak_vtt_zranitelnost_uprav()` v `includes/vtt_nestvury.php`; použití v `includes/vtt_souboj_utok.php`;
+zobrazení v kartě výsledku `assets/js/souboj.js`. Test `tests/e2e/zranitelnost_boj_api.js` (půlení i zdvojení
+se zaokrouhlením nahoru, chybějící B jako varování bez nulování, nestvůra bez dat beze změny, hráč se nic
+nedozví) — na konci si vrátí zranitelnosti zkoušené nestvůry do původního stavu.
+
+### Tabulka událostí se konečně zkracuje (2026-11-10)
+
+`svet_udalosti` je deník všeho, co se ve světě stalo (hod, pohyb, efekt, tik kola) — a od začátku se jen
+plnila, nic ji nikdy nezkracovalo. Při pravidelném hraní to roste donekonečna a na polling jde čím dál víc dat.
+
+Úklid je v `dracak_vtt_udalosti_uklid()` (`includes/vtt.php`) a spouští se **opportunisticky přímo při zápisu
+události**, průměrně jednou za 300 zápisů, nejvýš 200 řádků naráz — cron na tohle hosting nemá a zdržovat
+souboj velkým mazáním nejde. Pravidla: ve světě vždy zůstane posledních **5000** událostí a **nic mladšího
+než 2 dny**, strop má přednost před stářím. Čísla vycházejí z nejhlubšího zpětného čtení v kódu — 200 událostí
+mapy od posledního `souboj_start` (`includes/vtt_zbrane_u_sebe.php`) a 80 posledních `akce_provedena`
+(`includes/vtt_souboj_utok.php`) — takže na co se v souboji kouká, se nikdy nesmaže.
+
+Test `tests/unit/udalosti_uklid.php` (celý v transakci, na konci rollback): smaže se přesně přebytek nad
+stropem a nic víc, čerstvé události se nemažou ani nad stropem, cizí svět ani svět pod stropem se nedotkne,
+prázdný svět nespadne.
+
+### Jak daleko jde zautomatizovat kouzla a schopnosti — rozbor (2026-11-10)
+
+Otázka uživatele: *„zkontroluj, jestli můžeš kouzla a schopnosti ještě více zautomatizovat. mnoho jich
+automatických není.“* Rozbor nad celou databází:
+
+| Co | Celkem | Má navázaný efekt |
+|---|---|---|
+| Kouzla | 699 | 138 |
+| Zvláštní schopnosti a dovednosti | 349 | 19 |
+| Lektvary | 91 | 78 |
+
+Efekty samotné: 13 `auto` (boj vyhodnotí sám), 8 `cast`, 63 `pj` (jen štítek), 35 `past`, 7 `ceka`.
+
+**Kde automatizace NENÍ a proč.** Engine strhne životy jen tehdy, když je k položce navázaný efekt
+„Poškození“ / „Léčení“; kostky v tabulce `kouzla` samy o sobě nedělají nic. Takových kouzel — kostky bez
+efektu — je **95**. Prošel jsem je jedno po druhém a navázat „Poškození“ šlo jen u **dvou** (migrace 0119,
+Řetězový blesk b9717 a Zmrzlá země b5380). U zbytku kostky neznamenají „zranění cíle“:
+
+* škálují podle velikosti cíle (Sloup ohně: A0 = 1k6 … E = 6k6),
+* platí pro okolí, ne pro cíl (Zvukový výboj: 1k4 kolemstojícím, 1k10+5 cíli),
+* jsou bonusem zbraně nebo útoku (Ledové kopí, Rampouch, Ledová tvorba-zbraň, Rychlý úder),
+* zraňují útočníka, ne cíl (Ledová zbroj, Fénixův plášť),
+* zraní **nebo** vyléčí podle povahy cíle (Paprsek, Vlna moci, Napuštění mocí, Svatyně, Pramen),
+* mají hod proti pasti (Živá bomba, Chlad hvězd, Smrtící déšť, Tornádo, Zemětřesení),
+* působí každé kolo, ne jednorázově (Požár, regenerace),
+* jsou kostky vyvolané bytosti, ne kouzla (Stínový válečník, Stínový střelec),
+* nebo nejsou zranění vůbec (Melenina krása = hod 1k6 na šanci, Zabij = součet životaschopnosti,
+  Ochrana múz = snížení zranění).
+
+Navázat jim „Poškození“ plošně by byl odhad mechaniky — přesně to, co `CLAUDE.md` zakazuje a co se hůř opravuje
+než chybějící efekt.
+
+**Čím je automatizace zablokovaná doopravdy.** Nechybí data (katalog efektů má u každého vyplněné `cil`,
+`hodnota_vzorec`, `trvani` a často i přesnou citaci) — chybí engine. Pro zbývající efekty by byly potřeba
+tyhle druhy složek (`efekt_slozky.druh`), které zatím neexistují:
+
+1. **procentní odolnost vůči druhu zranění** (7 efektů: pět drahokamů, Chladné vody, Pouštní vítr) —
+   vyžaduje, aby útok vůbec věděl, jakého je druhu (oheň / chlad / jed / bodné / drtivé). To dnes nikde není
+   a je to největší chybějící kus.
+2. **plošná změna přijatého nebo způsobeného zranění** (Aura Ochrany −1, Aura Bolesti +1, Nehmotnost Jadeitu
+   −1k6) — menší zásah do stejného místa v kódu.
+3. **bonus k vlastnosti** (Obří síla +5 Síla, Polichocen +1/+2, Wolfrikův elixír) — vlastnosti se dnes do
+   bojových čísel nepropisují, takže samotná složka by nestačila.
+4. **dosah světla** (Aura Světla) — token už světlo umí, chybí jen propojení z efektu.
+5. **změna třídy velikosti** (Zmenšení).
+
+Zbytek `pj` efektů je naopak **správně** neautomatický: „Drak splní žádost“, „Šifra rozluštěna“, „Klidná mysl“
+a podobné nemají co počítat.
+
+**Co se udělalo hned:** efekt u tvora už neukazuje jen název. Vedle jména je značka ⚙ / ◐ / ✋ / ❓ (kolik
+z efektu vyhodnotí hra sama) a pod ním řádka, co efekt dělá — `efekty.cil` + `efekty.hodnota_vzorec` plus
+rozpis složek (`dracak_vtt_efekt_ucinek_text()` v `includes/vtt_efekty.php`, zobrazení v
+`assets/js/tvor_okno.js`). U efektů se značkou ✋ je to jediné, podle čeho se PJ u stolu rozhodne, takže to
+nesmí být schované jen v nájezdu myší.
+
+**Další krok, až na to bude čas:** bod 1 (druh zranění u útoku) — odemkne sedm hotových efektů naráz a je
+předpokladem pro zranitelnosti nestvůr, které dnes okno tvora jen ukazuje, ale boj s nimi nepočítá.
+
 ### Stránka Změny databáze umí ukázat i data (2026-11-10)
 
 Uživatel se zeptal „nevím, jestli je infra v DB, koukni tam“ — a neměl se kam podívat: blok K (migrace 0116/0117)

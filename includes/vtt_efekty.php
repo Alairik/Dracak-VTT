@@ -282,7 +282,7 @@ function dracak_vtt_efekty_mapy(PDO $pdo, array $entity): array
         $params[] = $ei;
     }
     $q = $pdo->prepare(
-        'SELECT ae.id, ae.typ_entity, ae.entita_id, ae.efekt_id, ae.zbyva_kol, e.nazev, e.tooltip_text'
+        'SELECT ae.id, ae.typ_entity, ae.entita_id, ae.efekt_id, ae.zbyva_kol, e.nazev, e.tooltip_text, e.cil, e.hodnota_vzorec'
         . ($mech ? ', e.mechanika_stav' : ', "pj" AS mechanika_stav')
         . " FROM aktivni_efekty ae JOIN efekty e ON e.id = ae.efekt_id WHERE $where ORDER BY ae.id"
     );
@@ -299,10 +299,24 @@ function dracak_vtt_efekty_mapy(PDO $pdo, array $entity): array
             'stav' => $mech ? $stav : null,
             'stav_nazev' => $mech ? DRACAK_VTT_EFEKT_STAVY[$stav] : null,
             'shrnuti' => dracak_vtt_efekt_shrnuti($slozky[(int)$r['efekt_id']] ?? []),
+            'ucinek' => dracak_vtt_efekt_ucinek_text($r),
             'text' => (string)($r['tooltip_text'] ?? ''),
         ];
     }
     return $vystup;
+}
+
+// Jedna řádka, co efekt dělá, pro zobrazení u tvora: „na co“ a „kolik“ z katalogu (efekty.cil, efekty.hodnota_vzorec).
+// Proč: většina efektů je zatím `pj` — boj je sám nevyhodnotí a PJ je musí posoudit podle knihy. Dokud u nich
+// v okně svítil jen název, musel pravidlo hledat jinde; takhle má čísla (např. „ÚČ, OČ: +1 ÚČ, +1 OČ“) na očích.
+function dracak_vtt_efekt_ucinek_text(array $r): string
+{
+    $cil = trim((string)($r['cil'] ?? ''));
+    $vzorec = trim((string)($r['hodnota_vzorec'] ?? ''));
+    if ($vzorec === '') {
+        return $cil;
+    }
+    return $cil === '' ? $vzorec : $cil . ': ' . $vzorec;
 }
 
 // Číslo kola, ve kterém se právě nasazuje efekt (null mimo souboj).

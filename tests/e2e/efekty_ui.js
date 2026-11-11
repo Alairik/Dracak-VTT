@@ -47,8 +47,18 @@ const stav = (page) => page.evaluate(async (m) => (await fetch('api/mapa_stav.ph
 
   // Panel Spravovat: výběr efektu ukazuje značky a výchozí trvání
   const klik = async (id) => { const b = await pj.$eval('.vtt-token[data-id="' + id + '"] .puck', e => { const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }); await pj.mouse.click(b.x, b.y); await pj.waitForTimeout(900); };
+  // Od 2026-11-10 otevírá klik na postavu rychlý deník; panel s nástroji PJ je v kontextovém menu.
+  const otevriPanel = async (id) => {
+    // Rychlý deník plave přes mapu a mohl by token překrývat — zavřít, ať pravé tlačítko trefí token.
+    if (await pj.locator('#denikDock').isVisible()) { await pj.click('#denikZavrit'); await pj.waitForTimeout(300); }
+    const b = await pj.$eval('.vtt-token[data-id="' + id + '"] .puck', e => { const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+    await pj.mouse.click(b.x, b.y, { button: 'right' }); await pj.waitForTimeout(400);
+    await pj.locator('#kontextMenu button', { hasText: 'Nastavení tokenu' }).click(); await pj.waitForTimeout(700);
+  };
   await klik(sindor);
-  ok(await pj.$eval('#panel-spravovat', e => e.classList.contains('open')), 'klik na Sindora otevře panel');
+  ok(await pj.locator('#denikDock').isVisible(), 'klik na Sindora otevře rychlý deník');
+  await otevriPanel(sindor);
+  ok(await pj.$eval('#panel-spravovat', e => e.classList.contains('open')), 'z kontextového menu se otevře panel');
   const jePanel = await pj.evaluate(() => !!document.getElementById('efektSelect'));
   ok(jePanel, 'v panelu je nabídka efektů');
   const moznosti = await pj.evaluate(() => [...document.querySelectorAll('#efektSelect option')].map(o => o.textContent.trim()));

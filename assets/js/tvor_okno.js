@@ -20,6 +20,9 @@
 
 // Ikona k písmenu zranitelnosti — jen napovídá, písmeno zůstává hlavní (kody_zranitelnosti.kod:
 // „Zažité písmeno A-P, MUSÍ zůstat viditelné v UI“). Kódy bez ikony se ukážou jen jako písmeno.
+// Značka u efektu: kolik z něj vyhodnotí hra sama (DRACAK_VTT_EFEKT_STAVY v includes/vtt_efekty.php).
+const ZNACKY_STAVU = { auto: '⚙', cast: '◐', pj: '✋', past: '✋', ceka: '❓' };
+
 const ZR_IKONY = {
   A: 'M8 11V5.5a1.5 1.5 0 0 1 3 0V11m0-1.5a1.5 1.5 0 0 1 3 0V11m0-1a1.5 1.5 0 0 1 3 0v4a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5v-2',
   B: 'M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4',
@@ -292,7 +295,21 @@ export function initTvorOkno(opts) {
         'Efekty nasazuje kouzlo, lektvar nebo akce jiného tvora a hra je vyhodnocuje sama. Tady se jen vidí a dají sundat.'));
       efekty.forEach((e) => {
         const r = el('div', 'tvor-efekt');
-        r.appendChild(el('span', null, e.nazev + (e.zbyva_kol != null ? ' · ' + e.zbyva_kol + ' kol' : '')));
+        const popis = el('span');
+        const hlavicka = el('span', 'tvor-efekt-jmeno');
+        // Značka říká, kolik z efektu vyhodnotí hra sama (stejná legenda jako u nasazování efektu v panelu).
+        if (e.stav && ZNACKY_STAVU[e.stav]) {
+          const z = el('span', 'tvor-efekt-znacka', ZNACKY_STAVU[e.stav]);
+          z.title = e.stav_nazev || '';
+          hlavicka.appendChild(z);
+        }
+        hlavicka.appendChild(document.createTextNode(e.nazev + (e.zbyva_kol != null ? ' · ' + e.zbyva_kol + ' kol' : '')));
+        popis.appendChild(hlavicka);
+        // Co efekt dělá — u efektů, které boj sám nevyhodnotí, je tohle jediné, podle čeho se PJ u stolu rozhodne.
+        const radky = (e.shrnuti && e.shrnuti.length ? e.shrnuti.slice() : []);
+        if (e.ucinek) radky.unshift(e.ucinek);
+        if (radky.length) popis.appendChild(el('span', 'tvor-efekt-ucinek', radky.join(' · ')));
+        r.appendChild(popis);
         if (e.text) r.title = e.text;
         const x = el('button', 'tvor-efekt-x', '✕');
         x.type = 'button';

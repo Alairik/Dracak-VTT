@@ -911,6 +911,16 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
         <option value="nic">pevně tuhle postavu</option>
       </select>
     </div>
+    <?php if ($isPjOrAdmin): ?>
+    <!-- Vrstva PJ uvnitř rychlého deníku (návrh docs/panel-tokenu-navrh.md, část C; „zaimplementuj“ 2026-11-10):
+         nástroje, které PJ potřebuje nad cizí postavou — životy, magenergie, efekty, kořist. Obsah se sem
+         PŘESUNE z postranního panelu (`#sekceEntita`), nevyrábí se podruhé: tím nevznikne „deník lite“,
+         co se musí udržovat zvlášť, a všechny existující obsluhy zůstanou v platnosti. -->
+    <details id="denikPjVrstva" class="denik-pj" style="display:none;" open>
+      <summary>Nástroje PJ k téhle postavě</summary>
+      <div id="denikPjObsah"></div>
+    </details>
+    <?php endif; ?>
     <iframe id="denikFrame" class="denik-dock-frame" title="Deník postavy"></iframe>
   </div>
   <?php endif; ?>

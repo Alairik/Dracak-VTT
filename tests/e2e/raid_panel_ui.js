@@ -80,8 +80,9 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   ok(await pj.locator('#raidSeznam .raid-box[data-token-id="' + h + '"]').evaluate(e => e.classList.contains('vybrany')), 'vybraný box je označený');
 
   // --- přetažení boxu ---
-  await pj.click('#panel-spravovat .close-x');   // detail tokenu, který klik otevřel, panel překrývá
-  await pj.waitForTimeout(200);
+  // Klik na token od 2026-11-10 postranní panel neotevírá (u postavy vyjede rychlý deník); zavřeme, co překáží.
+  if (await pj.locator('#panel-spravovat.open').count()) { await pj.click('#panel-spravovat .close-x'); await pj.waitForTimeout(200); }
+  if (await pj.locator('#denikDock').isVisible()) { await pj.click('#denikZavrit'); await pj.waitForTimeout(200); }
   await pj.dragAndDrop('#raidSeznam .raid-box[data-token-id="' + g2 + '"] .raid-grip', '#raidSeznam .raid-box[data-token-id="' + g1 + '"]', { targetPosition: { x: 100, y: 4 } });
   await pj.waitForTimeout(400);
   p = await poradi();

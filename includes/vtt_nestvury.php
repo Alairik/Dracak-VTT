@@ -261,3 +261,93 @@ function dracak_vtt_rasa_smysly(PDO $pdo, int $rasaId): array
     }
     return $out;
 }
+
+// ---------------------------------------------------------------------------------------------
+// Zranitelnost nestvůry v boji
+// ---------------------------------------------------------------------------------------------
+//
+// Pravidla (content/pravidla-bestiar.html):
+//   b17729–b17745 — útoky se dělí do skupin A–P; nestvůra je zranitelná jen těmi, které má vyjmenované.
+//   b17731 — „B. Obyčejná zbraň (také útok naplocho, útok beze zbraně – kop, úder pěstí a podobně,
+//            i pád z výšky a k tomu i přirozené zbraně magických i nemagických nestvůr – pařáty, drápy).“
+//            Každý fyzický útok, který dnes hra umí vyhodnotit, tedy spadá pod B.
+//   b17748 — zranitelnost není totéž co kategorie útoku nestvůry: pařáty se počítají jako obyčejná zbraň.
+//   b17753 — za písmenem může stát číslo („A ½, D 2“): tím se násobí odebrané životy, zaokrouhluje se nahoru.
+//   b17728 — „Nesdělují hráčům hned na začátku boje, čím je nestvůra nezranitelná“ → zjištění patří jen PJ.
+//
+// Co hra NEUMÍ: rozpoznat kouzelnou (C) nebo stříbrnou (D) zbraň — tabulka `predmety` pro to nemá pole.
+// Proto se chybějící B nikdy nepřepisuje na nulové zranění samo; PJ dostane upozornění a rozhodne.
+
+const DRACAK_VTT_ZRANITELNOST_ZBRAN = 'B';
+
+// Násobek ze zápisu v bestiáři („½“, „1/2“, „2“) jako zlomek [čitatel, jmenovatel], nebo null.
+function dracak_vtt_zranitelnost_nasobek(?string $zapis): ?array
+{
+    $t = trim((string)$zapis);
+    if ($t === '') {
+        return null;
+    }
+    $t = str_replace(['½', '¼', '⅛', ','], ['1/2', '1/4', '1/8', '.'], $t);
+    if (preg_match('~^(\d+)\s*/\s*(\d+)$~', $t, $m) && (int)$m[2] > 0) {
+        return [(int)$m[1], (int)$m[2]];
+    }
+    if (preg_match('~^(\d+)$~', $t, $m)) {
+        return [(int)$m[1], 1];
+    }
+    return null;
+}
+
+// Jak se zranění změní útokem skupiny $kod na tuhle nestvůru. Vrací:
+//   ['ma_data' => bool, 'kod' => 'B', 'nazev' => …, 'nasobek' => [čitatel, jmenovatel]|null, 'v_seznamu' => bool]
+// ma_data = false znamená, že nestvůra v bestiáři zranitelnosti vyplněné nemá — pak se nic nemění a nic nehlásí.
+function dracak_vtt_nestvura_zranitelnost(PDO $pdo, int $nestvuraId, string $kod): array
+{
+    $vychozi = ['ma_data' => false, 'kod' => $kod, 'nazev' => null, 'nasobek' => null, 'v_seznamu' => false];
+    try {
+        $q = $pdo->prepare(
+            'SELECT k.kod, k.nazev, nz.modifikator FROM nestvura_zranitelnosti nz
+               JOIN kody_zranitelnosti k ON k.id = nz.kod_zranitelnosti_id
+              WHERE nz.nestvura_id = ?'
+        );
+        $q->execute([$nestvuraId]);
+        $radky = $q->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        return $vychozi;
+    }
+    if (!$radky) {
+        return $vychozi;
+    }
+    $vychozi['ma_data'] = true;
+    foreach ($radky as $r) {
+        if (strcasecmp((string)$r['kod'], $kod) === 0) {
+            $vychozi['v_seznamu'] = true;
+            $vychozi['nazev'] = $r['nazev'] !== null ? (string)$r['nazev'] : null;
+            $vychozi['nasobek'] = dracak_vtt_zranitelnost_nasobek($r['modifikator'] ?? null);
+            break;
+        }
+    }
+    return $vychozi;
+}
+
+// Totéž podle údajů o tokenu v souboji ({typ_entity, entita_id}). U postavy a obecného tokenu vrací „nemám data“.
+function dracak_vtt_zranitelnost_tokenu(PDO $pdo, array $infoTokenu, string $kod): array
+{
+    $prazdne = ['ma_data' => false, 'kod' => $kod, 'nazev' => null, 'nasobek' => null, 'v_seznamu' => false];
+    if (($infoTokenu['typ_entity'] ?? '') !== 'nestvura_instance' || empty($infoTokenu['entita_id'])) {
+        return $prazdne;
+    }
+    $q = $pdo->prepare('SELECT nestvura_id FROM nestvura_instance WHERE id = ?');
+    $q->execute([(int)$infoTokenu['entita_id']]);
+    $nestvuraId = (int)($q->fetchColumn() ?: 0);
+    return $nestvuraId > 0 ? dracak_vtt_nestvura_zranitelnost($pdo, $nestvuraId, $kod) : $prazdne;
+}
+
+// Použije násobek zranitelnosti na spočítané zranění. Zaokrouhluje NAHORU (b17753) a nikdy nespadne pod 1,
+// dokud původní zranění bylo aspoň 1 — zásah, který prošel obranou, nesmí násobkem zmizet úplně.
+function dracak_vtt_zranitelnost_uprav(int $zraneni, ?array $nasobek): int
+{
+    if ($zraneni <= 0 || $nasobek === null || $nasobek[1] <= 0) {
+        return $zraneni;
+    }
+    return max(1, (int)ceil($zraneni * $nasobek[0] / $nasobek[1]));
+}

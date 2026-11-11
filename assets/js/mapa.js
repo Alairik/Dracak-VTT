@@ -1789,6 +1789,48 @@ const souboj = initSouboj ? initSouboj({
   raidPrekresli: () => { if (raid) raid.prekresli(); },
 }) : null;
 // Deník postavy v plovoucím okně přes mapu (assets/js/denik_dock.js) — upravuje se přímo při hře.
+// ---- Vrstva PJ uvnitř rychlého deníku (návrh docs/panel-tokenu-navrh.md, část C) ----
+// Místo druhé sady ovládání se existující blok `#sekceEntita` z postranního panelu PŘESUNE do okna deníku.
+// Přesun v DOM zachová všechny obsluhy, které na něm už visí (iniciativa, efekty, kořist), takže nemůže
+// vzniknout „deník lite“, co se rozchází s panelem. Co deník ukazuje sám (životy, magenergie, únava,
+// inventář), se ve vrstvě schová — řeší to CSS `.denik-pj` v assets/css/mapa.css.
+// Prvky se hledají až při volání, ne do konstanty nad tímhle řádkem: `initDenikDock` výš si okno hned otevře,
+// když si prohlížeč pamatuje, že bylo otevřené, a rovnou zavolá poZobrazeni — konstanta deklarovaná pod ním by
+// v tu chvíli ještě neexistovala („Cannot access before initialization“, odhalil test denik_dock).
+const pjVrstvaEl = () => document.getElementById('denikPjVrstva');
+let pjVrstvaPostava = null;
+
+function pjVrstvaDoDoku(postavaId) {
+  const pjVrstva = pjVrstvaEl();
+  const pjVrstvaObsah = document.getElementById('denikPjObsah');
+  if (!pjVrstva || !pjVrstvaObsah || !IS_PJ_OR_ADMIN) return;
+  // Když má PJ zároveň otevřený postranní panel (vzhled značky, zámek, inventář), nástroje mu zůstanou tam —
+  // jeden blok nemůže být na dvou místech a panel je v tu chvíli ten, se kterým PJ zrovna pracuje.
+  if (spravovatPanel.classList.contains('open')) { pjVrstvaZpet(); return; }
+  if (pjVrstvaPostava === postavaId && document.querySelector('#denikPjObsah #sekceEntita')) return;
+  const t = tokeny.find((x) => x.typ_entity === 'postava' && x.entita_id === postavaId);
+  if (!t) {     // postava na téhle mapě token nemá — není co ovládat
+    pjVrstva.style.display = 'none';
+    pjVrstvaPostava = null;
+    return;
+  }
+  pjVrstvaPostava = postavaId;
+  otevritSpravovat(t, true);
+  const sekce = document.getElementById('sekceEntita');
+  if (sekce && sekce.parentElement !== pjVrstvaObsah) pjVrstvaObsah.appendChild(sekce);
+  pjVrstva.style.display = '';
+}
+
+function pjVrstvaZpet() {
+  const pjVrstva = pjVrstvaEl();
+  if (!pjVrstva) return;
+  pjVrstva.style.display = 'none';
+  pjVrstvaPostava = null;
+  const sekce = document.getElementById('sekceEntita');
+  const smazat = document.getElementById('smazatTokenBtn');
+  if (sekce && smazat && sekce.parentElement !== smazat.parentElement) smazat.parentElement.insertBefore(sekce, smazat);
+}
+
 const denikDock = initDenikDock ? initDenikDock({
   postavy: window.MAPA.denikPostavy,
   spravovaneId: () => (spravovanyToken && spravovanyToken.typEntity === 'postava' ? spravovanyToken.entitaId : null),
@@ -1796,7 +1838,12 @@ const denikDock = initDenikDock ? initDenikDock({
     obnovitStav();
     if (spravovanyToken && spravovanyToken.typEntity === 'postava' && spravovanyToken.entitaId === postavaId) nactiInventar();
   },
+  // setTimeout, protože dok si při načtení stránky (zapamatované „okno bylo otevřené“) zavolá poZobrazeni
+  // ještě UVNITŘ initDenikDock — a vrstva PJ sahá na `denikDock`, který v tu chvíli ještě není přiřazený.
+  poZobrazeni: (postavaId) => setTimeout(() => pjVrstvaDoDoku(postavaId), 0),
+  poZavreni: () => pjVrstvaZpet(),
 }) : null;
+
 // Otevře deník vybrané postavy (volitelně rovnou na sekci: boj, schopnosti, vybaveni). Používá se z tlačítek v detailu tokenu.
 // Raid panel (assets/js/raid_panel.js): plovoucí okno s boxy tvorů a ovládáním souboje; myš nad boxem zvýrazní token a naopak.
 // PJ vidí všechny tvory a všechny údaje, hráč družinu / účastníky souboje a jen pruh životů.
@@ -1839,9 +1886,8 @@ raid = initRaidPanel ? initRaidPanel({
     const t = tokenData(id);
     if (!t) return;
     nastavVyber([id]);
-    // Stejně jako klik na mapě: u nestvůry okno tvora, jinak postranní panel.
-    if (tvorOkno && t.typ_entity === 'nestvura_instance') tvorOkno.otevrit(t, zvyraznenyBod(t));
-    else otevritSpravovat(t);
+    // Stejně jako klik na mapě: nestvůra → okno tvora, postava → rychlý deník, zbytek → postranní panel.
+    if (!otevritProToken(t)) otevritSpravovat(t);
   },
   obrazekUrl: (id) => (FUNKCE.obrazek && id ? 'obrazek.php?id=' + id : null),
 }) : null;
@@ -1928,7 +1974,8 @@ function aplikujStav(s) {
 const inventarCache = new Map();
 function klicEntity(typEntity, entitaId) { return typEntity + ':' + entitaId; }
 
-function otevritSpravovat(t) {
+// $jenNaplnit = jen napiš do panelu čísla tohohle tokenu, ale neotevírej ho (vrstva PJ v rychlém deníku).
+function otevritSpravovat(t, jenNaplnit) {
   spravovanyToken = {
     typEntity: t.typ_entity,
     entitaId: t.entita_id,
@@ -1938,7 +1985,9 @@ function otevritSpravovat(t) {
     maxMagenergie: t.max_magenergie,
   };
   document.getElementById('spravovatNazev').textContent = t.label;
-  if (denikDock && t.typ_entity === 'postava') denikDock.nasleduj(t.entita_id);
+  // Při plnění pro vrstvu PJ se deníku NEhlásí „následuj tenhle token“ — ukazuje tu postavu už teď a zavolal si nás sám
+  // (jinak by se mapa a deník navzájem přepínaly dokola: zobraz → poZobrazeni → otevritSpravovat → nasleduj → zobraz).
+  if (denikDock && !jenNaplnit && t.typ_entity === 'postava') denikDock.nasleduj(t.entita_id);
   const dosahBlok = document.getElementById('dosahBlok');
   if (dosahBlok) {
     // Dosah pohybu mimo boj: postava a její PJ / vlastník; po výběru jiného tokenu se blok zavře.
@@ -1979,8 +2028,26 @@ function otevritSpravovat(t) {
     denikNestvuryEl.textContent = '';
     if (IS_PJ_OR_ADMIN && t.typ_entity === 'nestvura_instance') nactiDenikNestvury(t.id);
   }
+  if (jenNaplnit) return;
+  pjVrstvaZpet();   // panel a deník si blok nástrojů nemůžou držet oba
   spravovatPanel.classList.add('open');
 }
+// Co otevře klik na token (rozhodnutí uživatele 2026-11-10, „rychlý deník mám zkontrolovaný, zaimplementuj“):
+//   * nestvůra   → plovoucí okno tvora u tokenu (assets/js/tvor_okno.js);
+//   * postava    → RYCHLÝ DENÍK v plovoucím okně (hra/denik.php?embed=1), ne postranní panel; PJ v něm navíc
+//                  dostane vrstvu nástrojů k téhle postavě (přesunutý `#sekceEntita`);
+//   * postava, na kterou uživatel nemá deník (cizí hráčova), a obecný token → postranní panel jako dřív.
+// Postranní panel (vzhled značky, zámek, smazat) zůstává dostupný z kontextového menu nad tokenem.
+function otevritProToken(t, bod) {
+  if (tvorOkno && t.typ_entity === 'nestvura_instance') { tvorOkno.otevrit(t, bod || zvyraznenyBod(t)); return true; }
+  if (denikDock && t.typ_entity === 'postava' && denikDock.smi(t.entita_id)) {
+    if (spravovatPanel.classList.contains('open')) spravovatPanel.classList.remove('open');
+    denikDock.otevriZTokenu(t.entita_id);
+    return true;
+  }
+  return false;
+}
+
 // Kde na obrazovce token je — okno tvora se u něj otevře i při kliknutí v panelu tvorů.
 function zvyraznenyBod(t) {
   const e = tokenEl.get(t.id);
@@ -2691,9 +2758,7 @@ function dokoncitAkci(a, e) {
           aktualizujVyber();
         } else {
           nastavVyber([t.id]);
-          // PJ: u nestvůry se otevře plovoucí okno tvora u tokenu (postranní panel je pak jen pro deník a výbavu).
-          if (tvorOkno && t.typ_entity === 'nestvura_instance') tvorOkno.otevrit(t, {x: e.clientX, y: e.clientY});
-          else if (t.owned && t.na_tahu) otevritSpravovat(t);
+          if (!otevritProToken(t, {x: e.clientX, y: e.clientY}) && t.owned && t.na_tahu) otevritSpravovat(t);
         }
       }
       break;
@@ -3555,7 +3620,10 @@ function polozkyKontextu(t, cile) {
   const pocet = n > 1 ? ' (' + n + ')' : '';
   const polozky = [];
   if (t) {
-    if (n === 1 && t.owned && t.na_tahu) polozky.push(['Otevřít panel', () => otevritSpravovat(t)]);
+    // Panel drží vzhled značky, zámek a smazání — od 2026-11-10 ho klik na token neotevírá, takže musí být
+    // dostupný odtud, a to kdykoli (ne jen vlastní token na tahu, jak to bylo dřív).
+    if (n === 1 && (pj || t.owned)) polozky.push(['Nastavení tokenu…', () => otevritSpravovat(t)]);
+    if (n === 1 && denikDock && t.typ_entity === 'postava' && denikDock.smi(t.entita_id)) polozky.push(['Rychlý deník', () => otevritProToken(t)]);
     if (cile.every(smiMenitSmer)) {
       polozky.push(['Otočit doleva' + pocet + '  (Q)', () => cile.forEach((c) => otocitTokenO(c, -krokOtoceni()))]);
       polozky.push(['Otočit doprava' + pocet + '  (E)', () => cile.forEach((c) => otocitTokenO(c, krokOtoceni()))]);

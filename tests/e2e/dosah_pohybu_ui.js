@@ -56,8 +56,15 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
 
   // --- prohlížeč ---
   await pj.goto(BASE + '/hra/mapa.php?id=' + MAPA); await pj.waitForTimeout(1500);
-  await pj.locator('.vtt-token[data-id="' + h + '"] .puck').click();
-  await pj.waitForTimeout(600);
+  // Od 2026-11-10 otevírá klik na postavu rychlý deník, ne postranní panel — ten je v kontextovém menu.
+  const otevriPanel = async (id) => {
+    // Rychlý deník plave přes mapu a mohl by token překrývat — zavřít, ať pravé tlačítko trefí token.
+    if (await pj.locator('#denikDock').isVisible()) { await pj.click('#denikZavrit'); await pj.waitForTimeout(300); }
+    const b = await pj.$eval('.vtt-token[data-id="' + id + '"] .puck', e => { const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+    await pj.mouse.click(b.x, b.y, { button: 'right' }); await pj.waitForTimeout(400);
+    await pj.locator('#kontextMenu button', { hasText: 'Nastavení tokenu' }).click(); await pj.waitForTimeout(700);
+  };
+  await otevriPanel(h);
   ok(await pj.locator('#dosahBlok').isVisible(), 'v detailu postavy je blok Dosah pohybu');
   await pj.click('#dosahBtn');
   await pj.waitForTimeout(800);

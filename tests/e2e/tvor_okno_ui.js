@@ -107,11 +107,18 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   ok(/Zkušenost 70/.test(text2), 'zkušenost je vidět rovnou: ' + (text2.match(/Zkušenost[^|]{0,30}/) || [''])[0]);
 
   // Efekty: jen k vidění. Nasazuje je kouzlo/lektvar/akce — tady se objeví a jdou sundat.
-  const efekt = parseInt(sqlVal('select id from efekty order by id limit 1'), 10);
+  // Efekt si test vybírá sám a schválně takový, který má v katalogu vyplněné, co dělá (efekty.cil /
+  // hodnota_vzorec) — jinak by se nedalo ověřit, že se ta řádka v okně ukáže.
+  const efekt = parseInt(sqlVal("select id from efekty where coalesce(cil,'')<>'' or coalesce(hodnota_vzorec,'')<>'' order by id limit 1"), 10);
   const instance = instanceId;
   await pj.request.post(BASE + '/hra/api/efekt_pridat.php', { data: { mapa_id: MAPA, typ_entity: 'nestvura_instance', entita_id: parseInt(instance, 10), efekt_id: efekt, kola: 3 } });
   await pj.waitForTimeout(2600);
   ok(await pj.locator('.tvor-okno .tvor-efekt').count() === 1, 'nasazený efekt se v okně objeví sám');
+  // U efektu musí být vidět, co dělá a kolik z něj vyhodnotí hra sama — většina efektů je zatím „jen pro PJ“
+  // a bez téhle řádky by PJ musel pravidlo hledat v knize (zadání uživatele 2026-11-10).
+  ok(await pj.locator('.tvor-okno .tvor-efekt-znacka').count() === 1, 'u efektu je značka, kolik z něj hra vyhodnotí sama');
+  const ucinek = (await pj.locator('.tvor-okno .tvor-efekt-ucinek').allTextContents()).join(' ').trim();
+  ok(ucinek.length > 0, 'u efektu je i řádka, co dělá: ' + ucinek.slice(0, 70));
   await pj.locator('.tvor-okno .tvor-efekt-x').click(); await pj.waitForTimeout(1300);
   ok(sqlVal(`select count(*) from aktivni_efekty where typ_entity='nestvura_instance' and entita_id=${instance}`) === '0', 'křížkem jde efekt sundat');
 

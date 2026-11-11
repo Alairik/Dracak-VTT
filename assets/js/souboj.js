@@ -1761,6 +1761,11 @@ export function initSouboj(ctx) {
       k.appendChild(el('div', '', (p.cil_label || 'Obránce') + ': ' + p.hp_nove + (p.max_hp ? '/' + p.max_hp : '') + ' životů'
         + (p.vyrazen ? ' — VYŘAZEN(A) z boje' : '')));
     }
+    // Zranitelnost nestvůry z bestiáře: násobek už je v zranění započítaný, chybějící skupina B je varování.
+    // Chodí jen PJ (server to z veřejné události vyndává, b17728 — hráčům se neříká, čím je nestvůra nezranitelná).
+    if (p.zranitelnost && p.zranitelnost.text) {
+      k.appendChild(el('div', 'vyzva-poznamka vyzva-zranitelnost' + (p.zranitelnost.nasobek ? '' : ' varovani'), p.zranitelnost.text));
+    }
     const zavrit = tlacitko('Zavřít', 'btn btn-ghost', () => { vysledekKarta = null; kreslitVyzvy(true); });
     k.appendChild(zavrit);
     return k;

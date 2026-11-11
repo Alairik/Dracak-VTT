@@ -114,8 +114,15 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   await pj.selectOption('#mapaOsvetleni', 'noc');
   await pj.waitForTimeout(800);
   ok(sqlVal(`select osvetleni from mapy where id=${MAPA}`) === 'noc', 'PJ přepne mapu na Noc v rozhraní');
-  await pj.locator('.vtt-token[data-id="' + h + '"] .puck').click();
-  await pj.waitForTimeout(600);
+  // Od 2026-11-10 otevírá klik na postavu rychlý deník, ne postranní panel — ten je v kontextovém menu.
+  const otevriPanel = async (id) => {
+    // Rychlý deník plave přes mapu a mohl by token překrývat — zavřít, ať pravé tlačítko trefí token.
+    if (await pj.locator('#denikDock').isVisible()) { await pj.click('#denikZavrit'); await pj.waitForTimeout(300); }
+    const b = await pj.$eval('.vtt-token[data-id="' + id + '"] .puck', e => { const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+    await pj.mouse.click(b.x, b.y, { button: 'right' }); await pj.waitForTimeout(400);
+    await pj.locator('#kontextMenu button', { hasText: 'Nastavení tokenu' }).click(); await pj.waitForTimeout(700);
+  };
+  await otevriPanel(h);
   // „Vzhled a smysly“ je od 2026-11-09 sbalená sekce (velikost i hexy se odvodí z tvora, infravidění nestvůry
   // z bestiáře), takže se musí nejdřív rozbalit; světlo zůstalo mimo ni.
   await pj.locator('#vzhledSekce > summary').click();

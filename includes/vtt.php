@@ -379,6 +379,16 @@ function dracak_vtt_prvni_cislo_se_znamenkem(?string $text): ?int
 const DRACAK_VTT_UDALOSTI_SKRYTE = ['iniciativa_hozena', 'umysl_nastaven', 'akce_provedena', 'tah_konec', 'akce_uprava',
     'vyzva_nova', 'vyzva_zmena', 'vyzva_hod', 'vyzva_zrusena', 'souboj_vysledek', 'efekt_tik', 'kouzleni_stav'];
 
+// Kolik událostí světa se drží, i kdyby byly sebestarší, a jak staré se nikdy nemažou.
+// Čím se ta čísla řídí: nejhlubší zpětné čtení v kódu je 200 událostí mapy od posledního „souboj_start“
+// (includes/vtt_zbrane_u_sebe.php) a 80 posledních „akce_provedena“ mapy (includes/vtt_souboj_utok.php).
+// 5000 na svět je proti tomu násobně víc i při několika mapách a dvoudenní lhůta pokryje rozehranou hru,
+// která se protáhne přes noc.
+const DRACAK_VTT_UDALOSTI_STROP = 5000;
+const DRACAK_VTT_UDALOSTI_DNI = 2;
+const DRACAK_VTT_UDALOSTI_DAVKA = 200;    // nejvýš tolik řádků na jeden úklid, ať se nezdrží zápis v souboji
+const DRACAK_VTT_UDALOSTI_SANCE = 300;    // úklid se zkusí průměrně jednou za tolik zapsaných událostí
+
 // Zápis události do logu — vždy stejný tvar, ať se na to nezapomíná
 // u jednotlivých endpointů (viz docs/vtt-datovy-model-navrh-v1.md).
 function dracak_vtt_log_event(int $svetId, ?int $mapaId, string $typ, array $payload, int $ucetId): int
@@ -387,7 +397,34 @@ function dracak_vtt_log_event(int $svetId, ?int $mapaId, string $typ, array $pay
         'INSERT INTO svet_udalosti (svet_id, mapa_id, typ, payload, ucet_id) VALUES (?, ?, ?, ?, ?)'
     );
     $stmt->execute([$svetId, $mapaId, $typ, json_encode($payload, JSON_UNESCAPED_UNICODE), $ucetId]);
-    return (int)dracak_db()->lastInsertId();
+    $id = (int)dracak_db()->lastInsertId();
+    // Tabulka se dosud nikdy nezkracovala a roste s každým hodem, pohybem i efektem. Úklid se nespouští
+    // z cronu (hosting ho pro tohle nemá), ale občas rovnou odtud — jen zlomek zápisů a jen po malých dávkách.
+    if (random_int(1, DRACAK_VTT_UDALOSTI_SANCE) === 1) {
+        dracak_vtt_udalosti_uklid($svetId);
+    }
+    return $id;
+}
+
+// Smaže nejstarší události světa nad strop a starší než lhůta. Vrací, kolik řádků zmizelo.
+// Nikdy nesmaže nic z posledních DRACAK_VTT_UDALOSTI_STROP událostí světa ani nic novějšího než lhůta —
+// na obojím stojí zpětná čtení v souboji, takže strop má přednost před stářím.
+function dracak_vtt_udalosti_uklid(int $svetId, ?int $davka = null): int
+{
+    $davka = $davka !== null ? max(1, $davka) : DRACAK_VTT_UDALOSTI_DAVKA;
+    $pdo = dracak_db();
+    // Hranice: id DRACAK_VTT_UDALOSTI_STROP-té nejnovější události světa. Nic s vyšším id se nemaže.
+    $q = $pdo->prepare('SELECT MIN(id) FROM (SELECT id FROM svet_udalosti WHERE svet_id = ? ORDER BY id DESC LIMIT '
+        . (int)DRACAK_VTT_UDALOSTI_STROP . ') t');
+    $q->execute([$svetId]);
+    $hranice = $q->fetchColumn();
+    if ($hranice === null || $hranice === false) {
+        return 0;
+    }
+    $del = $pdo->prepare('DELETE FROM svet_udalosti WHERE svet_id = ? AND id < ? AND vytvoreno < (NOW() - INTERVAL '
+        . (int)DRACAK_VTT_UDALOSTI_DNI . ' DAY) ORDER BY id LIMIT ' . (int)$davka);
+    $del->execute([$svetId, (int)$hranice]);
+    return $del->rowCount();
 }
 
 // Parsování jednoduchého zápisu kostek "2k6+2" / "1k20-1" / "k6".

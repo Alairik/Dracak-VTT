@@ -165,6 +165,11 @@
   (`druzina_pj`, `inv_detail`, `inv_detail_mobil`, `zbrane_mapa`) se takhle
   commitly a měnily se při každém běhu testů, takže špinily každý commit;
   `tests/e2e/*.png` je proto v `.gitignore`.
+- **Nikdy neupravuj `tests/run.sh` (ani jiný běžící shellový skript), dokud běží.** Bash si skript načítá
+  po kouskách podle pozice v souboru, takže úprava za běhu mu posune zbytek a běh spadne uprostřed na
+  nesmyslnou hlášku („se: command not found“, „syntax error near unexpected token `fi`“) — vypadá to jako
+  rozbitý runner, přitom soubor na disku je v pořádku (`bash -n tests/run.sh` projde). Stalo se 2026-11-10
+  při přidávání nové sady do seznamu. Přidej sadu až po doběhnutí, nebo ji pusť zvlášť jménem.
 - **Test, který kontroluje konkrétní záznam, si ho musí sám určit** — ne
   „první ze seznamu“. Pořadí dává server (nejnovější první) a změní se, jakmile
   se do něj něco přidá; takový test pak padá na špatném očekávání, ne na chybě
@@ -177,6 +182,12 @@
   skutečnou databází. Obecně: u věci, která má hlídat něco jiného, testuj, že
   hlásí správně OBĚ odpovědi (je / není) na KAŽDÉM řádku — jinak hlídač tiše lže
   a posílá uživatele dělat práci, která už je hotová.
+- **Když modul při načtení sám zavolá zpětnou vazbu, nesmí ta sahat na `const`/`let` deklarované pod ním.**
+  `assets/js/denik_dock.js` si okno otevře hned při startu (pamatuje si, že bylo otevřené) a zavolá
+  `poZobrazeni` ještě *uvnitř* `initDenikDock(...)` — obsluha v `mapa.js` pak spadla na „Cannot access
+  'pjVrstva' / 'denikDock' before initialization“. Stalo se to podruhé (poprvé `IS_PJ_OR_ADMIN` v okně tvora).
+  Řešení: co obsluha potřebuje, deklaruj **nad** voláním, nebo ji odlož (`setTimeout(…, 0)`), ať modul stihne
+  doběhnout. A v testu nech `page.on('pageerror')` zvyšovat počet chyb — jinak to projde tiše.
 - **Nový ovládací prvek v UI zapoj ve stejném kroku, v jakém ho přidáš do HTML.**
   Filtry v liště správy tokenů se vykreslily, ale neměly obsluhu — nic nedělaly
   a odhalil to až test. Když přidáváš tlačítko, přidej i jeho `addEventListener`

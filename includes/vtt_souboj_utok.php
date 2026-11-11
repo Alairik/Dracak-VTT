@@ -686,6 +686,39 @@ function dracak_vtt_utok_vyhodnot(PDO $pdo, array $mapa, array $info, array $uto
     $obrId = (int)$obranaVyzva['token_id'];
     $utId = (int)$utokVyzva['token_id'];
 
+    // Zranitelnost nestvůry (bestiář, b17729–b17753). Fyzický útok je vždy skupina B „obyčejná zbraň“ — i rána
+    // beze zbraně a pařáty (b17731). Násobek u písmene („A ½“, „D 2“) se použije rovnou, zaokrouhluje se nahoru.
+    // Když nestvůra B v seznamu nemá, zranění se NEnuluje samo: hra nepozná kouzelnou (C) ani stříbrnou (D)
+    // zbraň, tabulka předmětů pro to nemá pole. Dostane to jen PJ jako upozornění (b17728: hráčům se to neříká).
+    $zranitelnost = null;
+    require_once __DIR__ . '/vtt_nestvury.php';
+    $zr = dracak_vtt_zranitelnost_tokenu($pdo, $info[$obrId], DRACAK_VTT_ZRANITELNOST_ZBRAN);
+    if ($zasah && $zraneni > 0 && $zr['ma_data']) {
+        if ($zr['v_seznamu'] && $zr['nasobek'] !== null) {
+            $pred = $zraneni;
+            $zraneni = dracak_vtt_zranitelnost_uprav($zraneni, $zr['nasobek']);
+            $zranitelnost = [
+                'kod' => $zr['kod'],
+                'nazev' => $zr['nazev'],
+                'nasobek' => $zr['nasobek'][0] . '/' . $zr['nasobek'][1],
+                'zraneni_pred' => $pred,
+                'text' => 'Zranitelnost ' . $zr['kod'] . ' (' . ($zr['nazev'] ?? 'obyčejná zbraň') . ') má v bestiáři násobek '
+                    . $zr['nasobek'][0] . ($zr['nasobek'][1] > 1 ? '/' . $zr['nasobek'][1] : '')
+                    . ' — zranění ' . $pred . ' → ' . $zraneni . ' (zaokrouhluje se nahoru).',
+            ];
+        } elseif (!$zr['v_seznamu']) {
+            $zranitelnost = [
+                'kod' => $zr['kod'],
+                'nazev' => $zr['nazev'],
+                'nasobek' => null,
+                'zraneni_pred' => $zraneni,
+                'text' => 'Pozor: obyčejná zbraň (skupina B) v zranitelnostech téhle nestvůry NENÍ — podle bestiáře jí'
+                    . ' neublíží. Zranění jsem nechal, protože nepoznám kouzelnou ani stříbrnou zbraň; když útočí'
+                    . ' obyčejnou, dej zranění 0.',
+            ];
+        }
+    }
+
     $hp = ['hp_pred' => null, 'hp_nove' => null, 'max_hp' => null, 'vyrazen' => false];
     if ($zraneni > 0) {
         $hp = dracak_vtt_souboj_zranit($pdo, $svetId, $mapaId, $info[$obrId], $zraneni, $ucetId);
@@ -730,6 +763,7 @@ function dracak_vtt_utok_vyhodnot(PDO $pdo, array $mapa, array $info, array $uto
         'kouzlo_stav' => $kouzloZasah['stav'] ?? null,
         'kouzlo_nazev' => $kouzloZasah['kouzlo'] ?? null,
         'kouzlo_cena' => $kouzloZasah['cena'] ?? null,
+        'zranitelnost' => $zranitelnost,
     ];
     $utokVyzva['data']['vysledek'] = $vysledek;
     $obranaVyzva['data']['vysledek'] = $vysledek;
@@ -738,6 +772,8 @@ function dracak_vtt_utok_vyhodnot(PDO $pdo, array $mapa, array $info, array $uto
     // Do události jen to, co smí vidět každý: útočnost zbraně a životy skrytého obránce ne.
     $verejne = $vysledek;
     unset($verejne['utocnost']);
+    // Čím je nestvůra (ne)zranitelná, se hráčům na začátku boje neříká (b17728) — zůstává jen PJ.
+    unset($verejne['zranitelnost']);
     if ($info[$obrId]['typ_entity'] !== 'postava') {
         // Násobek nestvůry je její životaschopnost — tajná jako bestiář; zůstane jen důvod („Spánek“).
         unset($verejne['nasobek'], $verejne['zraneni_zaklad']);

@@ -19,7 +19,9 @@ function uloz(stav) {
   try { localStorage.setItem(KLIC, JSON.stringify(stav)); } catch (e) { /* soukromé okno, zablokované úložiště */ }
 }
 
-// ctx: {postavy: [{id, nazev}], spravovaneId: () => id postavy vybraného tokenu | null, poZmene: (postavaId) => void}
+// ctx: {postavy: [{id, nazev}], spravovaneId: () => id postavy vybraného tokenu | null, poZmene: (postavaId) => void,
+//       poZobrazeni: (postavaId) => void (okno ukazuje tuhle postavu — vrstva PJ se na ni přepne),
+//       poZavreni: () => void (okno se zavřelo — vrstva PJ se vrátí do postranního panelu)}
 export function initDenikDock(ctx) {
   const dock = document.getElementById('denikDock');
   if (!dock || !ctx.postavy.length) return null;
@@ -131,7 +133,10 @@ export function initDenikDock(ctx) {
     titul.textContent = (ctx.postavy.find((p) => p.id === postavaId) || {}).nazev || '';
     otevrit.href = 'denik.php?id=' + postavaId;
     uloz(stav);
-    if (!stav.otevreno || zobrazena === postavaId) return;
+    if (!stav.otevreno) return;
+    // Vrstva PJ (nástroje nad cizí postavou) se v okně musí přepnout na tutéž postavu, i když se rámeček nenačítá znovu.
+    if (ctx.poZobrazeni) ctx.poZobrazeni(postavaId);
+    if (zobrazena === postavaId) return;
     zobrazena = postavaId;
     frame.src = 'denik.php?id=' + postavaId + '&embed=1';
   }
@@ -177,6 +182,7 @@ export function initDenikDock(ctx) {
     frame.src = 'about:blank';   // zastaví i pravidelné obnovování deníku
     zobrazena = null;
     uloz(stav);
+    if (ctx.poZavreni) ctx.poZavreni();
   }
 
   document.getElementById('denikZavrit').addEventListener('click', zavri);
@@ -204,6 +210,8 @@ export function initDenikDock(ctx) {
   return {
     // Smí aktuální uživatel otevřít deník téhle postavy (PJ všechny ze světa, hráč své)?
     smi: (postavaId) => povoleneId.has(postavaId),
+    jeOtevreno: () => stav.otevreno,
+    kteraPostava: () => zobrazena,
     // Tlačítko „Otevřít deník“ v detailu tokenu: výslovná volba, přebije i režim „pevně“. Volitelně rovnou na sekci
     // deníku (Boj, Schopnosti a kouzla, Vybavení…). Sbalené okno se rozbalí.
     otevriPro(postavaId, sekce) {
@@ -217,6 +225,15 @@ export function initDenikDock(ctx) {
     // Klik na token na mapě: ukaž jeho postavu (jen v režimu „podle vybraného tokenu“).
     nasleduj(postavaId) {
       if (stav.sledovat === 'vyber') zobraz(postavaId);
+    },
+    // Klik na token postavy na mapě otevírá rychlý deník (rozhodnutí uživatele 2026-11-10). Na rozdíl od tlačítka
+    // „Otevřít deník“ to NENÍ výslovná volba postavy: režim „pevně tuhle postavu“ i „podle toho, kdo je na tahu“
+    // zůstávají v platnosti, okno se jen otevře (a rozbalí, když bylo sbalené).
+    otevriZTokenu(postavaId) {
+      if (!povoleneId.has(postavaId)) return;
+      if (stav.sbaleno) { stav.sbaleno = false; aplikuj(); uloz(stav); }
+      if (!stav.otevreno) otevri(stav.sledovat === 'vyber' ? postavaId : null);
+      else if (stav.sledovat === 'vyber') zobraz(postavaId);
     },
     // Změna tvora na tahu v souboji (režim „podle toho, kdo je na tahu“).
     tah(postavaId) {

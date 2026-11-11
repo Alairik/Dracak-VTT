@@ -381,6 +381,20 @@ body.denik-dock-cela { overflow:hidden; }
 .denik-dock-titul strong { color:#f1e6d8; }
 .denik-dock-grip { opacity:.55; margin-right:4px; }
 .denik-dock-volby { display:flex; gap:6px; padding:3px 8px 7px; flex:none; }
+/* Vrstva PJ v rychlém deníku: nástroje k cizí postavě (životy, magenergie, efekty, kořist). Obsah se sem
+   přesune z postranního panelu, proto tu dědí jeho styly — tohle řeší jen rám a to, aby okno nepřetékalo. */
+.denik-pj { flex:none; max-height:42%; overflow-y:auto; margin:0 8px 7px; padding:0 8px;
+            background:rgba(0,0,0,.22); border:1px solid rgba(255,255,255,.14); border-radius:8px; }
+.denik-pj > summary { cursor:pointer; padding:6px 0; font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:#c6a87f; }
+.denik-pj[open] > summary { border-bottom:1px solid rgba(255,255,255,.1); margin-bottom:6px; }
+.denik-pj #sekceEntita { padding-bottom:8px; }
+/* Co deník ukazuje sám, se ve vrstvě PJ schová — jinak by vedle sebe stály dvě sady ovládání životů,
+   magenergie, únavy a inventáře, což je přesně ten „deník lite“, kterému se vyhýbáme (uživatel 2026-11-09).
+   Zůstává jen to, co deník neumí: iniciativa mimo boj, nasazení efektu a kořist.
+   Schovává to CSS, ne JS, aby se blok po vrácení do postranního panelu ukázal celý sám od sebe. */
+.denik-pj .panel-hp-row, .denik-pj #panelMagenergieRow,
+.denik-pj #spravovatPjStav, .denik-pj #spravovatInventar { display:none !important; }
+.denik-dock.sbaleno .denik-pj { display:none; }
 .denik-dock-volby select.input { background:#2b251f; color:#f1e6d8; border:1px solid rgba(255,255,255,.28); border-radius:6px;
                                  padding:4px 6px; margin:0; width:auto; min-width:0; font-size:12.5px; box-sizing:border-box; cursor:pointer; }
 .denik-dock-volby #denikPostava { flex:1 1 40%; font-weight:600; }
@@ -646,8 +660,13 @@ body.denik-dock-cela { overflow:hidden; }
 .tvor-utok-jmeno { font-weight:600; }
 /* Dlouhý popis útoku se musí zalomit, ne uříznout o okraj okna. */
 .tvor-utok-cisla { color:#c9c0b5; font-size:12px; margin-left:auto; }
-.tvor-efekt { display:flex; align-items:center; gap:6px; padding:2px 0; }
-.tvor-efekt span { flex:1; }
+.tvor-efekt { display:flex; align-items:flex-start; gap:6px; padding:3px 0; }
+.tvor-efekt > span { flex:1; display:flex; flex-direction:column; gap:1px; min-width:0; }
+.tvor-efekt-jmeno { display:flex; align-items:center; gap:5px; }
+.tvor-efekt-znacka { flex:0 0 auto; font-size:11px; opacity:.85; cursor:help; }
+/* Co efekt dělá (efekty.cil + hodnota_vzorec a rozpis složek) — u efektů se značkou ✋ je to jediné,
+   podle čeho PJ u stolu rozhodne, takže to nesmí být schované jen v nájezdu. */
+.tvor-efekt-ucinek { font-size:11px; color:#9a9088; line-height:1.35; }
 .tvor-efekt-x { background:none; border:none; color:#9a9088; cursor:pointer; font-size:12px; padding:0 2px; }
 .tvor-efekt-x:hover { color:#ff8f7a; }
 .tvor-pozn { font-size:11px; color:#9a9088; margin:5px 0 0; }
@@ -663,3 +682,7 @@ body.denik-dock-cela { overflow:hidden; }
   .tvor-hpb { width:44px; height:38px; font-size:20px; }
   .tvor-hlp { width:20px; height:20px; font-size:11px; }
 }
+
+/* Zranitelnost nestvůry ve výsledku útoku (jen PJ): násobek z bestiáře je informace, chybějící skupina B varování. */
+.vyzva-zranitelnost { margin-top:4px; }
+.vyzva-zranitelnost.varovani { color:#ffd166; font-weight:600; }

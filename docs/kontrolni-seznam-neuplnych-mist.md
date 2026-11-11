@@ -337,6 +337,20 @@ Tohle jsou místa, která agent při sweepu označil, ale po bližším pohledu 
 
 ---
 
+## F0. Chybí v datech: předmět neumí říct, že je kouzelný nebo stříbrný (2026-11-10)
+
+Tabulka `predmety` nemá pole, podle kterého by se poznala **kouzelná (skupina C)** nebo **stříbrná (D)** zbraň.
+Kvůli tomu nejde u útoku určit skupinu podle bestiáře jinak než jako **B „obyčejná zbraň“** — a boj tak nemůže
+sám vyhodnotit, že nestvůra zranitelná jen C se obyčejným mečem zabít nedá. Dnes to řeší varování PJ (viz
+`docs/stav-projektu.md`, „Zranitelnost nestvůry konečně počítá i boj“), ale správné řešení je přidat předmětu
+příznak a podle něj skupinu určovat. Je to `ALTER TABLE`, takže to vyžaduje ruční SQL — **čeká na rozhodnutí
+uživatele**, protože se k tomu musí doplnit, které předměty v katalogu kouzelné nebo stříbrné vlastně jsou
+(v knize to u konkrétních kusů bývá v popisu, ne jako parametr).
+
+Souvisí s tím i zbytek skupin: E (svěcená voda), G (oheň a mráz), H (jed a kyselina), I–N (skupiny kouzel),
+O, P — u kouzel by skupina šla odvodit ze `seznam_kouzel` / `skupiny_kouzel`, ale ta tabulka má čtyři řádky
+proti šesti číslovaným skupinám bestiáře (viz migrace 0118), takže ani to se zatím nehádá.
+
 ## F. Efekty ve VTT — co boj z efektů nevyhodnotí (stav 2026-10-16)
 
 Každý efekt má v DB `mechanika_stav`; co není `auto`, boj sám nevyhodnotí a PJ ho posoudí podle popisu (v panelu tokenu je
