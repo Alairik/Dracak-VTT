@@ -710,3 +710,47 @@ body.denik-dock-cela { overflow:hidden; }
 /* Zranitelnost nestvůry ve výsledku útoku (jen PJ): násobek z bestiáře je informace, chybějící skupina B varování. */
 .vyzva-zranitelnost { margin-top:4px; }
 .vyzva-zranitelnost.varovani { color:#ffd166; font-weight:600; }
+
+/* ---------- Kostka pro celý stůl a výzva „Hoď si“ (assets/js/kostky.js) ----------
+   Hod vidí všichni stejně: kostka se zatočí, dopadne a zůstane na ní číslo. Jestli hod prošel, řeší PJ —
+   aplikace nic nevyhodnocuje (rozhodnutí uživatele 2026-11-11). */
+#kostkyVrstva { position:fixed; right:12%; bottom:14%; z-index:300; display:flex; flex-direction:column-reverse;
+                align-items:center; gap:10px; pointer-events:none; }
+.kostka-hod { display:flex; flex-direction:column; align-items:center; gap:6px; transition:opacity .35s ease; }
+.kostka-hod.mizi { opacity:0; }
+.kostka-telo { width:84px; height:84px; display:flex; align-items:center; justify-content:center;
+               background:#f0e6d8; color:#2a1b06; border:2px solid #2a1b06; border-radius:14px;
+               box-shadow:0 10px 26px rgba(0,0,0,.55); transform:scale(.4) rotate(-120deg); opacity:0;
+               transition:transform .7s cubic-bezier(.2,.9,.3,1.4), opacity .25s ease, background .2s ease; }
+.kostka-hod.leti .kostka-telo { transform:scale(1.05) rotate(380deg); opacity:1; }
+.kostka-hod.dopadlo .kostka-telo { transform:scale(1) rotate(360deg); opacity:1; background:#ffd166;
+                                   box-shadow:0 0 0 6px rgba(255,209,102,.25), 0 10px 26px rgba(0,0,0,.55); }
+.kostka-cislo { font-size:34px; font-weight:700; font-variant-numeric:tabular-nums lining-nums; }
+.kostka-popis { font-size:12px; color:#f3ece2; background:rgba(0,0,0,.65); border-radius:999px; padding:3px 10px; }
+@media (prefers-reduced-motion: reduce) {
+  .kostka-telo, .kostka-hod.leti .kostka-telo, .kostka-hod.dopadlo .kostka-telo { transition:none; transform:none; opacity:1; }
+}
+
+/* Výzva u hráče: nízké okno dole uprostřed, ne přes půl obrazovky. */
+.hod-vyzva { position:fixed; left:0; right:0; bottom:18px; z-index:320; display:flex; justify-content:center; pointer-events:none; }
+.hod-vyzva[hidden] { display:none; }
+.hod-vyzva-okno { position:relative; pointer-events:auto; display:flex; align-items:center; gap:14px;
+                  background:rgba(24,22,20,.98); color:#f3ece2; border:1px solid #ffd166; border-radius:14px;
+                  padding:12px 44px 12px 18px; box-shadow:0 12px 36px rgba(0,0,0,.65); max-width:min(560px, calc(100vw - 24px)); }
+.hod-vyzva-okno > strong { font-size:17px; white-space:nowrap; }
+.hod-vyzva-x { position:absolute; top:8px; right:10px; background:none; border:none; color:#9a9088; cursor:pointer; padding:2px; line-height:0; }
+.hod-vyzva-x:hover { color:#fff; }
+.hod-vyzva-volba { display:flex; gap:8px; }
+/* `hidden` musí přebít display:flex, jinak zůstane výběr kostek vidět i u určené kostky. */
+.hod-vyzva-volba[hidden], .hod-vyzva-prikaz[hidden] { display:none; }
+/* Tlačítka výzvy v panelu PJ: tři kostky a „Hoď si“ (hráč si vybere sám). */
+.hod-vyzva-pj { display:flex; gap:5px; margin-top:4px; }
+.hod-vyzva-pj .btn { flex:1; font-size:12px; padding:5px 0; }
+.hod-vyzva-kostka, .hod-vyzva-hodit { font:700 15px/1 inherit; padding:11px 16px; min-height:44px; border-radius:999px; cursor:pointer; }
+.hod-vyzva-kostka { background:rgba(255,255,255,.06); color:#f3ece2; border:1px solid rgba(255,255,255,.22); }
+.hod-vyzva-kostka:hover { background:rgba(255,209,102,.2); border-color:#ffd166; }
+.hod-vyzva-hodit { background:#ffd166; color:#2a1b06; border:none; padding:11px 26px; }
+@media (max-width: 760px) {
+  .hod-vyzva-okno { width:calc(100vw - 20px); justify-content:space-between; }
+  #kostkyVrstva { right:8%; bottom:22%; }
+}

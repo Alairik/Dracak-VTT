@@ -147,6 +147,35 @@ Pozor při psaní testů: klik na postavu **neotevře** `#panel-spravovat`. Sady
 otvírají přes kontextové menu (vzor `otevriPanel()` v `tests/e2e/denik_dock.js`, `efekty_ui.js`,
 `noc_videni_api.js`, `dosah_pohybu_ui.js`) a předtím zavřou deník, aby pravé tlačítko trefilo token.
 
+### „Hoď si“ a kostka pro celý stůl (2026-11-11)
+
+Zadání uživatele a jeho připomínky k návrhu na plátně https://claude.ai/artifact/RZz5NCY8rSRKjty6fm7btz
+(deska „Hoď si — co vidí PJ“ a „co vidí hráč“). Postaveno přesně podle nich:
+
+* **PJ** má v panelu tokenu postavy blok **Hoď si**: k6 · k10 · k100 · „Hoď si“. Nic jiného tam není —
+  sekci „na co se hází“ uživatel zrušil jako duplicitní („past je k10, postřeh je implicitně k100“), stejně
+  jako seznam posledních hodů a poznámku o víc tokenech naráz. U nestvůry se blok nezobrazí, té hází PJ sám.
+* **Hráč** dostane nízké okno dole (ne dialog přes půl obrazovky): když PJ kostku určil, je v něm jen
+  tlačítko *Hodit k10* a křížek; když ji nechal na hráči, vybírá si hráč z k6 / k10 / k100. Žádné hlášení
+  vlastního hodu od stolu — to řeší hlas nebo chat.
+* **Kostku vidí celý stůl**: vpravo dole, asi třetinu od hran, zatočí se, dopadne a zůstane na ní číslo.
+  Tím to končí — **jestli hod prošel, řeší PJ**, aplikace nic nevyhodnocuje. Zvuk dopadu se dá vypnout
+  (pamatuje si to prohlížeč).
+* **Hází server** (`hra/api/kostka_hod.php`), ne prohlížeč: jinak by šlo v konzoli přepsat, co padlo.
+
+Technicky: výzva je **jen událost** `hod_vyzva` ve `svet_udalosti` (`hra/api/hod_vyzva.php`), žádná nová
+tabulka — hráčův prohlížeč ji uvidí při pollu a otevře okno. Odpovědí je obyčejný hod s `vyzva_id`, takže
+výzva po hodu zanikne sama a nemůže „uvíznout“. Okno se otevře **vlastníkovi postavy**, ne každému, kdo ji
+má v nabídce deníku — PJ vidí v deníku všechny postavy světa, takže by si jinak výzvu otevřel sám sobě;
+u postavy bez vlastníka (NPC vedené PJ) okno dostane PJ.
+
+Kód: `assets/js/kostky.js` (okno výzvy i kostka pro všechny), markup a styly v `hra/mapa.php` a
+`assets/css/mapa.css`, tlačítka PJ v `#hodVyzvaBlok` uvnitř `#sekceEntita` (putuje tedy i do vrstvy PJ
+v rychlém deníku). Test `tests/e2e/hod_vyzva_ui.js`.
+
+**Zbytek plátna čeká na rozhodnutí** — uživatel zatím okomentoval i lištu, výběr tokenu, souboj a pin;
+shrnutí jeho odpovědí je v komentářích na plátně.
+
 ### Vzhled tokenů a pinů podle mřížky (2026-11-11)
 
 Čtyři stížnosti uživatele z 2026-11-11, všechny opravené:

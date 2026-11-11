@@ -9,6 +9,10 @@ $data = json_decode((string)file_get_contents('php://input'), true) ?: [];
 $svetId = (int)($data['svet_id'] ?? 0);
 $mapaId = !empty($data['mapa_id']) ? (int)$data['mapa_id'] : null;
 $notace = trim(dracak_text($data['notace'] ?? ''));
+// Odpověď na výzvu „Hoď si“ (hra/api/hod_vyzva.php): id výzvy a za koho se hází. Díky tomu klient pozná,
+// že výzva byla vyřízená, a u hodu je vidět jméno postavy, ne jen účtu.
+$vyzvaId = !empty($data['vyzva_id']) ? (int)$data['vyzva_id'] : null;
+$zaKoho = trim(dracak_text($data['za_koho'] ?? ''));
 
 if (!dracak_vtt_svet_access($user, $svetId)) {
     http_response_code(403);
@@ -43,7 +47,8 @@ $eventId = dracak_vtt_log_event($svetId, $mapaId, 'kostka_hod', [
     'hody' => $vysledek['hody'],
     'bonus' => $vysledek['bonus'],
     'celkem' => $vysledek['celkem'],
-    'hodil' => $user['jmeno'],
+    'hodil' => $zaKoho !== '' ? $zaKoho : $user['jmeno'],
+    'vyzva_id' => $vyzvaId,
 ], (int)$user['id']);
 
 echo json_encode([

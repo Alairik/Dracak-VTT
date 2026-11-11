@@ -738,6 +738,19 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
         <button class="btn btn-ghost" type="button" data-mag-delta="5">+5</button>
       </div>
     </div>
+    <?php if ($isPjOrAdmin): ?>
+    <!-- „Hoď si“ (zadání uživatele 2026-11-11): PJ pošle hráči výzvu k hodu. Kostka sama říká, oč jde —
+         past se hází k10, postřeh k100 — takže se nikde nevybírá „na co“. Vidí to jen PJ a jen u postavy. -->
+    <div id="hodVyzvaBlok" class="panel-sekce" style="display:none;margin-top:10px;">
+      <label style="font-size:11px;font-weight:600;">Hoď si — vyzvat hráče</label>
+      <div class="hod-vyzva-pj">
+        <button class="btn btn-ghost" type="button" data-hod-vyzva="6">k6</button>
+        <button class="btn btn-ghost" type="button" data-hod-vyzva="10">k10</button>
+        <button class="btn btn-ghost" type="button" data-hod-vyzva="100">k100</button>
+        <button class="btn btn-secondary" type="button" data-hod-vyzva="" title="Hráč si kostku vybere sám">Hoď si</button>
+      </div>
+    </div>
+    <?php endif; ?>
     <?php if (!$souboj): ?>
     <div style="margin-top:10px;">
       <label style="font-size:11px;font-weight:600;">Iniciativa — bonusy/postihy (zaškrtni, co platí)</label>
@@ -927,6 +940,27 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
 
   <div id="diceBoxContainer" style="position:fixed;inset:0;pointer-events:none;z-index:9999;"></div>
 
+  <!-- Kostka, kterou vidí celý stůl (assets/js/kostky.js). Vpravo dole, asi třetinu od hran — volba
+       uživatele 2026-11-11. Vrstva nechytá kliknutí, jen ukazuje. -->
+  <div id="kostkyVrstva" aria-live="polite" aria-label="Hody kostkou"></div>
+
+  <!-- „Hoď si“ — malé okno u hráče, když ho PJ vyzve k hodu. Nízké (uživatel: „předstvoval jsem si výšku
+       tak 20 %“), bez hlášení výsledku: jestli hod prošel, řeší PJ. -->
+  <div id="hodVyzvaDialog" class="hod-vyzva" hidden role="dialog" aria-modal="false" aria-labelledby="hodVyzvaNadpis">
+    <div class="hod-vyzva-okno">
+      <button type="button" class="hod-vyzva-x" data-vyzva-zavrit aria-label="Zavřít výzvu"><?php dracak_icon('x', 16); ?></button>
+      <strong id="hodVyzvaNadpis" data-vyzva-nadpis>Hoď si</strong>
+      <div class="hod-vyzva-volba" data-vyzva-volba>
+        <button type="button" class="hod-vyzva-kostka" data-vyzva-kostka="6">k6</button>
+        <button type="button" class="hod-vyzva-kostka" data-vyzva-kostka="10">k10</button>
+        <button type="button" class="hod-vyzva-kostka" data-vyzva-kostka="100">k100</button>
+      </div>
+      <div class="hod-vyzva-prikaz" data-vyzva-prikaz hidden>
+        <button type="button" class="hod-vyzva-hodit" data-vyzva-hodit data-kostka="10">Hodit</button>
+      </div>
+    </div>
+  </div>
+
 <script nonce="<?= dracak_csp_nonce() ?>">
 // Konfigurace a počáteční data pro assets/js/mapa.js (samotný skript je
 // statický soubor, aby se dal cachovat).
@@ -934,11 +968,12 @@ window.MAPA = <?= json_encode([
     'svetId' => $svetId,
     'mapaId' => $mapaId,
     'jePj' => $isPjOrAdmin,
+    'ucetId' => (int)$user['id'],
     'pohybAuto' => ['unava' => $pohybNastaveni['auto_unava'], 'nalozeni' => $pohybNastaveni['auto_naklad'], 'zbran' => $zbraneIni && $souboj],
     'funkce' => dracak_vtt_tokeny_funkce(),
     'cas' => $casSveta,
     'pravidla' => dracak_vtt_souboj_pravidla(),
-    'verzeModulu' => max((int)@filemtime(__DIR__ . '/../assets/js/souboj.js'), (int)@filemtime(__DIR__ . '/../assets/js/kostky3d.js'), (int)@filemtime(__DIR__ . '/../assets/js/hexy.js'), (int)@filemtime(__DIR__ . '/../assets/js/denik_dock.js'), (int)@filemtime(__DIR__ . '/../assets/js/raid_panel.js'), (int)@filemtime(__DIR__ . '/../assets/js/svetlo_stiny.js'), (int)@filemtime(__DIR__ . '/../assets/js/token_bar.js'), (int)@filemtime(__DIR__ . '/../assets/js/tvor_okno.js')),
+    'verzeModulu' => max((int)@filemtime(__DIR__ . '/../assets/js/souboj.js'), (int)@filemtime(__DIR__ . '/../assets/js/kostky3d.js'), (int)@filemtime(__DIR__ . '/../assets/js/hexy.js'), (int)@filemtime(__DIR__ . '/../assets/js/denik_dock.js'), (int)@filemtime(__DIR__ . '/../assets/js/raid_panel.js'), (int)@filemtime(__DIR__ . '/../assets/js/svetlo_stiny.js'), (int)@filemtime(__DIR__ . '/../assets/js/token_bar.js'), (int)@filemtime(__DIR__ . '/../assets/js/tvor_okno.js'), (int)@filemtime(__DIR__ . '/../assets/js/kostky.js')),
     'grid' => [
         'px' => (int)($mapa['grid_velikost_px'] ?? 0),
         'typ' => $mapa['grid_typ'] ?? 'ctverec',

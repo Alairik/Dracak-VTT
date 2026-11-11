@@ -13,6 +13,8 @@ const svetloStiny = await import('./svetlo_stiny.js?v=' + VERZE_MODULU);   // sv
 const initRaidPanel = document.getElementById('raidPanel') ? (await import('./raid_panel.js?v=' + VERZE_MODULU)).initRaidPanel : null;
 // Správa tokenů (jen PJ, až po ručním SQL migrace 0115): lišta dole uprostřed se zásobou NPC.
 const initTokenBar = document.getElementById('tokenBar') ? (await import('./token_bar.js?v=' + VERZE_MODULU)).initTokenBar : null;
+// „Hoď si“ a kostka, kterou vidí celý stůl (zadání uživatele 2026-11-11).
+const initKostky = document.getElementById('kostkyVrstva') ? (await import('./kostky.js?v=' + VERZE_MODULU)).initKostky : null;
 // Okno tvora (jen PJ): plovoucí karta u tokenu nestvůry místo postranního panelu.
 // CFG, ne IS_PJ_OR_ADMIN — ta konstanta vzniká až o 160 řádků níž a tady by ještě neexistovala.
 const initTvorOkno = window.MAPA.jePj ? (await import('./tvor_okno.js?v=' + VERZE_MODULU)).initTvorOkno : null;
@@ -1882,6 +1884,16 @@ function pjVrstvaZpet() {
   if (sekce && smazat && sekce.parentElement !== smazat.parentElement) smazat.parentElement.insertBefore(sekce, smazat);
 }
 
+const kostky = initKostky ? initKostky({
+  svetId: SVET_ID,
+  mapaId: MAPA_ID,
+  postJson,
+  logLine,
+  jsemPj: IS_PJ_OR_ADMIN,
+  mujUcetId: CFG.ucetId,
+  mojePostavy: (window.MAPA.denikPostavy || []).map((p) => Number(p.id)),
+}) : null;
+
 const denikDock = initDenikDock ? initDenikDock({
   postavy: window.MAPA.denikPostavy,
   spravovaneId: () => (spravovanyToken && spravovanyToken.typEntity === 'postava' ? spravovanyToken.entitaId : null),
@@ -1947,6 +1959,14 @@ if (raid) {
   mapWrap.addEventListener('mouseover', (e) => { const id = tokenZPoloh(e); if (id !== null) raid.zvyraznenyToken(id); });
   mapWrap.addEventListener('mouseout', (e) => { const id = tokenZPoloh(e); if (id !== null && !(e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('.vtt-token[data-id="' + id + '"]'))) raid.zvyraznenyToken(null); });
 }
+// Výzva k hodu z panelu (delegovaně, kvůli CSP žádný inline onclick).
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-hod-vyzva]');
+  if (!b || !kostky || !spravovanyToken || spravovanyToken.typEntity !== 'postava') return;
+  const kostka = b.dataset.hodVyzva === '' ? null : parseInt(b.dataset.hodVyzva, 10);
+  kostky.vyzvat(spravovanyToken.tokenId, kostka);
+});
+
 function otevritDenikVybrane(sekce) {
   if (!denikDock || !spravovanyToken || spravovanyToken.typEntity !== 'postava') return;
   denikDock.otevriPro(spravovanyToken.entitaId, sekce || null);
@@ -2045,6 +2065,9 @@ function otevritSpravovat(t, jenNaplnit) {
     dosahBlok.style.display = t.typ_entity === 'postava' && (IS_PJ_OR_ADMIN || t.owned) ? '' : 'none';
     document.getElementById('dosahObsah').style.display = 'none';
   }
+  // „Hoď si“ je jen pro postavy hráčů — nestvůře hází PJ sám.
+  const hodBlok = document.getElementById('hodVyzvaBlok');
+  if (hodBlok) hodBlok.style.display = IS_PJ_OR_ADMIN && t.typ_entity === 'postava' ? '' : 'none';
   const denikBlok = document.getElementById('spravovatDenikBlok');
   if (denikBlok) denikBlok.style.display = denikDock && t.typ_entity === 'postava' && denikDock.smi(t.entita_id) ? '' : 'none';
   // Vlastní (obecný) token nemá životy, iniciativu, efekty ani inventář.
@@ -3502,9 +3525,13 @@ function applyEvent(u) {
     zobrazitCasSveta(u.payload);
     if (naTeteMape) obnovitMlhuPoPollu = true;   // dohořívající světlo slábne (mapa Noc / Tma)
     if (u.payload.zhasla && u.payload.zhasla.length) logLine('Čas ' + (u.payload.text || '') + ' — ' + u.payload.zhasla.length + ' světl' + (u.payload.zhasla.length === 1 ? 'o dohořelo' : 'a dohořela') + '.');
+  } else if (u.typ === 'hod_vyzva') {
+    // „Hoď si“: okno se otevře jen tomu, kdo tu postavu hraje (uvnitř se to ještě ověří).
+    if (kostky) kostky.vyzva(Object.assign({vyzva_id: u.id}, u.payload));
   } else if (u.typ === 'kostka_hod') {
     logLine((u.payload.hodil || '?') + ' hodil ' + u.payload.notace + ': [' + u.payload.hody.join(', ') + ']'
       + (u.payload.bonus ? (u.payload.bonus > 0 ? '+' : '') + u.payload.bonus : '') + ' = ' + u.payload.celkem);
+    if (kostky) kostky.hod(u.payload);
   } else if (u.typ === 'hp_zmena') {
     const t = tokeny.find((x) => x.typ_entity === u.payload.typ_entity && x.entita_id === u.payload.entita_id);
     if (t) {

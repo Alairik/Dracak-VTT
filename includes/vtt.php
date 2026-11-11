@@ -374,6 +374,10 @@ function dracak_vtt_prvni_cislo_se_znamenkem(?string $text): ?int
     return null;
 }
 
+// Kostky, kterými smí PJ vyzvat hráče k hodu („Hoď si“). Zatím tři — rozhodnutí uživatele 2026-11-11:
+// „zatím stačí tyhle, uvidíme při testu“. Past se hází k10, postřeh k100, k6 je obecná.
+const DRACAK_VTT_KOSTKY_VYZVY = [6, 10, 100];
+
 // Události, které se hráčům nesmí poslat, patří-li skryté postavě (nestvůra,
 // postava ovládaná PJ): hody a úmysly PJ jsou tajné.
 const DRACAK_VTT_UDALOSTI_SKRYTE = ['iniciativa_hozena', 'umysl_nastaven', 'akce_provedena', 'tah_konec', 'akce_uprava',
