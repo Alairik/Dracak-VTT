@@ -180,11 +180,13 @@ Data o tom, čím jde nestvůru zranit, jsou v databázi od začátku (1559 vaze
   zranitelnost nestvůry není totéž co kategorie jejího vlastního útoku.)
 * Má-li nestvůra u B **násobek** („B ½“, „B 2“ — v datech 103 takových vazeb), zranění se jím vynásobí
   a **zaokrouhlí nahoru** (b17753). Nikdy neklesne pod 1, dokud zásah prošel obranou.
-* **Nemá-li nestvůra B vůbec**, zranění se *nenuluje samo* — hra nepozná kouzelnou (C) ani stříbrnou (D)
-  zbraň, protože tabulka `predmety` na to nemá pole. PJ dostane varování a rozhodne. **To je ten pravý
-  blokátor: dokud předmět neumí říct „jsem kouzelný / stříbrný“, nejde skupinu útoku určit a zbytek
-  zranitelností (C, D, E, G, H…) zůstane na PJ.** Je to jedno `ALTER TABLE` a chce to ruční SQL, proto se to
-  nedělalo svévolně.
+* **Nemá-li nestvůra B vůbec**, zranění se *nenuluje samo* a PJ dostane varování — hra totiž sama nepozná,
+  že útočník drží kouzelnou nebo stříbrnou zbraň.
+* **Blok L (připravený, čeká na ruční SQL):** předmět dostane pole „skupina útoku proti nestvůrám“
+  (`predmety.zranitelnost_skupina`, prázdné = B). PJ ho u konkrétní zbraně vybere v editoru vybavení a boj
+  pak bere skupinu podle držené zbraně (`dracak_vtt_utok_skupina()`), ne natvrdo B. Dokud sloupec není,
+  nic se nemění (příznak `zbran_skupina` v `dracak_vtt_tokeny_funkce()`). Kdo který kus katalogu označí za
+  kouzelný, zůstává na PJ — kniha to píše v popisu konkrétních kusů, ne jako parametr, takže se to nehádá.
 * Nestvůra bez vyplněných zranitelností se chová přesně jako dřív — žádná změna, žádné hlášení.
 * Výsledek jde **jen PJ**: z veřejné události se vyndává (b17728 — „Nesdělují hráčům hned na začátku boje,
   čím je nestvůra nezranitelná“).

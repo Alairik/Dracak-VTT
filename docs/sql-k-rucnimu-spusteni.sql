@@ -1,6 +1,6 @@
 -- Dračák VTT — SQL k ručnímu spuštění (phpMyAdmin, admin účet, vybraná databáze Dračáku — TA SAMÁ, kterou používá web).
 --
--- Jeden blok:
+-- Dva bloky:
 --  K) Infravidění nestvůr z bestiáře (migrace 0116). Dosud se infravidění zadávalo ručně na každém tokenu, přestože
 --     bestiář ho u řady nestvůr popisuje i s dosahem (zmije rohatá 10 sáhů, vážka jeskynní a nemrtví 30 sáhů…).
 --     Po tomhle kroku token nestvůry infravidění dostane sám a stejně tak příznak „infravidění ho nerozezná“
@@ -14,7 +14,17 @@
 --   1. V administraci otevři Změny databáze a přečti si řádek „Databáze, kterou web používá: …“.
 --   2. V phpMyAdminu klikni VLEVO na databázi s přesně tímhle jménem a teprve pak na záložku SQL.
 --   3. Vlož celý blok a spusť. První výsledek (K0) musí ukázat to samé jméno databáze a u tabulky „ANO“.
---   4. Zkontroluj poslední výsledek (2) a pak na stránce Změny databáze klikni na „Spustit čekající změny“
+--  L) Skupina útoku u zbraně (bestiář b17729–b17745). Boj od 2026-11-10 počítá se zranitelností nestvůry,
+--     ale každý fyzický útok musí brát jako „B obyčejná zbraň“ — kouzelnou (C) ani stříbrnou (D) zbraň
+--     katalog předmětů nijak neoznačuje. Tenhle sloupec to umožní: u konkrétní zbraně se v editoru vybere
+--     skupina a boj pak sám pozná, že nestvůra zranitelná jen kouzelnými zbraněmi obyčejný meč neucítí.
+--     Prázdná hodnota = obyčejná zbraň, takže se po přidání sloupce nic nezmění, dokud PJ něco nenastaví.
+--
+-- JAK NA TO:
+--   1. V administraci otevři Změny databáze a přečti si řádek „Databáze, kterou web používá: …“.
+--   2. V phpMyAdminu klikni VLEVO na databázi s přesně tímhle jménem a teprve pak na záložku SQL.
+--   3. Vlož celý blok a spusť. První výsledek (K0) musí ukázat to samé jméno databáze a u tabulky „ANO“.
+--   4. Zkontroluj poslední výsledek (3) a pak na stránce Změny databáze klikni na „Spustit čekající změny“
 --      — teprve ta do databáze doplní, které nestvůry infravidění mají (to už jsou běžné INSERTy, ty web účet umí).
 
 -- K0) KONTROLA NA ZAČÁTEK: kde vlastně jsem.
@@ -43,7 +53,20 @@ SET @s = (SELECT IF(@je_tu2 = 0 OR COUNT(*) > 0, 'DO 0',
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'rasa_schopnosti' AND COLUMN_NAME = 'hodnota');
 PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
 
--- Kontrola — očekávaná hodnota: 2 (sloupec „hodnota“ u nestvur i u ras)
-SELECT COUNT(*) AS sloupce_hodnota_ocekavano_2 FROM information_schema.COLUMNS
-  WHERE TABLE_SCHEMA = DATABASE() AND COLUMN_NAME = 'hodnota'
-    AND TABLE_NAME IN ('nestvura_schopnosti', 'rasa_schopnosti');
+-- L1) Skupina útoku u zbraně: prázdné = obyčejná zbraň (B), jinak písmeno z bestiáře (C kouzelná, D stříbrná…).
+SET @je_tu3 = (SELECT COUNT(*) FROM information_schema.TABLES
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'predmety');
+SET @s = (SELECT IF(@je_tu3 = 0 OR COUNT(*) > 0, 'DO 0',
+  'ALTER TABLE predmety ADD COLUMN zranitelnost_skupina CHAR(1) NULL COMMENT ''skupina útoku podle bestiáře (b17729-b17745); prázdné = B obyčejná zbraň''')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'predmety' AND COLUMN_NAME = 'zranitelnost_skupina');
+PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
+
+-- Kontrola — očekávaná hodnota: 3 (sloupec „hodnota“ u nestvur i u ras, skupina útoku u předmětů)
+SELECT
+  (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND COLUMN_NAME = 'hodnota'
+      AND TABLE_NAME IN ('nestvura_schopnosti', 'rasa_schopnosti'))
+  + (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'predmety' AND COLUMN_NAME = 'zranitelnost_skupina')
+  AS sloupce_ocekavano_3;

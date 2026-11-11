@@ -692,7 +692,8 @@ function dracak_vtt_utok_vyhodnot(PDO $pdo, array $mapa, array $info, array $uto
     // zbraň, tabulka předmětů pro to nemá pole. Dostane to jen PJ jako upozornění (b17728: hráčům se to neříká).
     $zranitelnost = null;
     require_once __DIR__ . '/vtt_nestvury.php';
-    $zr = dracak_vtt_zranitelnost_tokenu($pdo, $info[$obrId], DRACAK_VTT_ZRANITELNOST_ZBRAN);
+    $skupinaUtoku = dracak_vtt_utok_skupina($pdo, $info[$utId]);
+    $zr = dracak_vtt_zranitelnost_tokenu($pdo, $info[$obrId], $skupinaUtoku);
     if ($zasah && $zraneni > 0 && $zr['ma_data']) {
         if ($zr['v_seznamu'] && $zr['nasobek'] !== null) {
             $pred = $zraneni;
@@ -702,7 +703,7 @@ function dracak_vtt_utok_vyhodnot(PDO $pdo, array $mapa, array $info, array $uto
                 'nazev' => $zr['nazev'],
                 'nasobek' => $zr['nasobek'][0] . '/' . $zr['nasobek'][1],
                 'zraneni_pred' => $pred,
-                'text' => 'Zranitelnost ' . $zr['kod'] . ' (' . ($zr['nazev'] ?? 'obyčejná zbraň') . ') má v bestiáři násobek '
+                'text' => 'Zranitelnost ' . $zr['kod'] . ' (' . ($zr['nazev'] ?? 'útok skupiny ' . $zr['kod']) . ') má v bestiáři násobek '
                     . $zr['nasobek'][0] . ($zr['nasobek'][1] > 1 ? '/' . $zr['nasobek'][1] : '')
                     . ' — zranění ' . $pred . ' → ' . $zraneni . ' (zaokrouhluje se nahoru).',
             ];
@@ -712,9 +713,12 @@ function dracak_vtt_utok_vyhodnot(PDO $pdo, array $mapa, array $info, array $uto
                 'nazev' => $zr['nazev'],
                 'nasobek' => null,
                 'zraneni_pred' => $zraneni,
-                'text' => 'Pozor: obyčejná zbraň (skupina B) v zranitelnostech téhle nestvůry NENÍ — podle bestiáře jí'
-                    . ' neublíží. Zranění jsem nechal, protože nepoznám kouzelnou ani stříbrnou zbraň; když útočí'
-                    . ' obyčejnou, dej zranění 0.',
+                'text' => $skupinaUtoku === DRACAK_VTT_ZRANITELNOST_ZBRAN
+                    ? 'Pozor: obyčejná zbraň (skupina B) v zranitelnostech téhle nestvůry NENÍ — podle bestiáře jí'
+                        . ' neublíží. Zranění jsem nechal, protože nepoznám kouzelnou ani stříbrnou zbraň; když útočí'
+                        . ' obyčejnou, dej zranění 0.'
+                    : 'Pozor: skupina ' . $skupinaUtoku . ' (podle držené zbraně) v zranitelnostech téhle nestvůry NENÍ'
+                        . ' — podle bestiáře jí tenhle útok neublíží. Zranění jsem nechal, rozhodni sám.',
             ];
         }
     }

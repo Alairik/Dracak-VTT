@@ -56,7 +56,7 @@ function dracak_vtt_ddl_mapa(): array
         foreach ($pdo->query(
             'SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS
              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ("kolo_ucastnik", "kolo_iniciativa", "predmety")
-               AND COLUMN_NAME IN ("utoku_za_2_kola", "zavazek", "zavazek_akci", "zavazek_hotovo", "akce_hotovo", "chvat", "trida_zbrane", "ini_postih", "ini_prenos")'
+               AND COLUMN_NAME IN ("utoku_za_2_kola", "zavazek", "zavazek_akci", "zavazek_hotovo", "akce_hotovo", "chvat", "trida_zbrane", "ini_postih", "ini_prenos", "zranitelnost_skupina")'
         )->fetchAll(PDO::FETCH_NUM) as [$tabulka, $sloupec]) {
             $stav['ini_sloupce'][$tabulka . '.' . $sloupec] = true;
         }
@@ -146,6 +146,9 @@ function dracak_vtt_tokeny_funkce(): array
         'meritko' => isset($ddl['videni_sloupce']['mapy.mil_na_1000px']),
         'svetlo_zbyva' => isset($ddl['videni_sloupce']['tokeny.svetlo_zbyva']) && isset($ddl['videni_sloupce']['tokeny.svetlo_sahy']),
         'zbrane_ini' => isset($ddl['ini_sloupce']['predmety.chvat'], $ddl['ini_sloupce']['predmety.trida_zbrane'], $ddl['ini_sloupce']['predmety.ini_postih']),
+        // Skupina útoku podle bestiáře u zbraně (ruční SQL: predmety.zranitelnost_skupina). Bez sloupce se každý
+        // fyzický útok počítá jako „B obyčejná zbraň“ (b17731) a kouzelnou ani stříbrnou zbraň hra nepozná.
+        'zbran_skupina' => isset($ddl['ini_sloupce']['predmety.zranitelnost_skupina']),
         // Postup kouzlení na štítku „Kouzlí“ (ruční SQL, migrace 0113: aktivni_efekty.kouzlo_id, akci_celkem, akci_hotovo): hra počítá akce kouzlení podle vyvolání kouzla.
         'kouzleni_postup' => isset($ddl['efekty_sloupce']['aktivni_efekty.kouzlo_id'], $ddl['efekty_sloupce']['aktivni_efekty.akci_celkem'], $ddl['efekty_sloupce']['aktivni_efekty.akci_hotovo']),
         // Automatické seslání kouzla po předposlední akci kouzlení (ruční SQL, migrace 0114: aktivni_efekty.kouzleni_data): bez sloupce se účinek zadává z deníku.
