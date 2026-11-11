@@ -445,12 +445,53 @@ function dracak_vtt_aktivni_efekty_postavy(PDO $pdo, int $postavaId): array
 // tu nejsou — jsou v dracak_vtt_kontejnery_postavy(). 'kapacita_mn' je vyplněná
 // jen u předmětu, který je kontejner (vak, truhla…) a leží ve volném inventáři
 // (např. přidal ho PJ) — deník nabídne "rozbalit jako kontejner".
+// Čím právě svítí token postavy: ['typ' => 'pochoden'|…, 'sahy' => float, 'zbyva' => ?int] nebo null.
+function dracak_vtt_postava_svetlo(PDO $pdo, int $postavaId): ?array
+{
+    if (!dracak_vtt_ma_sloupec($pdo, 'tokeny', 'svetlo_sahy')) {
+        return null;
+    }
+    $maZbyva = dracak_vtt_ma_sloupec($pdo, 'tokeny', 'svetlo_zbyva');
+    $q = $pdo->prepare('SELECT svetlo_sahy, svetlo_typ' . ($maZbyva ? ', svetlo_zbyva' : ', NULL AS svetlo_zbyva')
+        . ' FROM tokeny WHERE typ_entity = "postava" AND entita_id = ? ORDER BY id DESC LIMIT 1');
+    $q->execute([$postavaId]);
+    $r = $q->fetch();
+    if (!$r || $r['svetlo_sahy'] === null) {
+        return null;
+    }
+    return [
+        'typ' => $r['svetlo_typ'] !== null ? (string)$r['svetlo_typ'] : null,
+        'sahy' => (float)$r['svetlo_sahy'],
+        'zbyva' => $r['svetlo_zbyva'] !== null ? (int)$r['svetlo_zbyva'] : null,
+    ];
+}
+
+// Co předmět umí posvítit: ['typ' => 'pochoden'|'lucerna', 'sahy' => float, 'smeny' => ?int] nebo null.
+// Poznává se podle kategorie vybavení „Svícení“ z katalogu (ne podle názvu — ten se v homebrew liší).
+// Dosahy a doby hoření jsou tytéž, jaké měl ruční výběr na tokenu; ceník u pochodně uvádí 2 směny, zatímco
+// aplikace počítá 3 — rozpor je zapsaný v docs/kontrolni-seznam-neuplnych-mist.md, PJ může na tokenu přepsat.
+function dracak_vtt_predmet_svetlo(string $nazev, ?string $kategorie): ?array
+{
+    if (trim((string)$kategorie) !== 'Svícení') {
+        return null;
+    }
+    $n = mb_strtolower($nazev);
+    if (mb_strpos($n, 'pochod') !== false) {
+        return ['typ' => 'pochoden', 'sahy' => 6.0, 'smeny' => 3, 'popis' => 'Pochodeň — 6 sáhů, vydrží 3 směny'];
+    }
+    if (mb_strpos($n, 'lucern') !== false) {
+        return ['typ' => 'lucerna', 'sahy' => 8.0, 'smeny' => 24, 'popis' => 'Lucerna — 8 sáhů, vydrží 24 směn'];
+    }
+    return null;   // olej, křesadlo a podobné samy nesvítí
+}
+
 function dracak_vtt_inventar_s_vahou(PDO $pdo, int $postavaId): array
 {
     $vysledek = [];
     $kapacita = dracak_vtt_ma_sloupec($pdo, 'predmety', 'kapacita_mn') ? 'p.kapacita_mn' : 'NULL';
+    $kategorie = dracak_vtt_ma_sloupec($pdo, 'predmety', 'kategorie_vybaveni') ? 'p.kategorie_vybaveni' : 'NULL';
     $stmt = $pdo->prepare(
-        "SELECT p.id, p.nazev, p.typ, p.vaha, $kapacita AS kapacita_mn, pp.mnozstvi
+        "SELECT p.id, p.nazev, p.typ, p.vaha, $kapacita AS kapacita_mn, $kategorie AS kategorie_vybaveni, pp.mnozstvi
          FROM postava_predmety pp JOIN predmety p ON p.id = pp.predmet_id
          WHERE pp.postava_id = ? ORDER BY FIELD(p.typ, 'zbran', 'zbroj', 'artefakt', 'surovina', 'vybaveni'), p.nazev"
     );
@@ -462,6 +503,9 @@ function dracak_vtt_inventar_s_vahou(PDO $pdo, int $postavaId): array
             'mnozstvi' => (int)$r['mnozstvi'],
             'vaha_ks' => $r['vaha'] !== null ? (float)$r['vaha'] : null,
             'vaha_celkem' => $r['vaha'] !== null ? (float)$r['vaha'] * (int)$r['mnozstvi'] : null,
+            // Zdroj světla (kategorie „Svícení“ v katalogu): deník u něj nabídne Zapálit / Zhasnout a token
+            // se rozsvítí sám — dřív to PJ klikal ručně na tokenu, i když postava pochodeň fyzicky má.
+            'svetlo' => dracak_vtt_predmet_svetlo((string)$r['nazev'], $r['kategorie_vybaveni'] ?? null),
         ];
     }
     $stmt = $pdo->prepare(
@@ -560,6 +604,8 @@ function dracak_vtt_denik_data(PDO $pdo, array $postava, bool $plne = true): arr
         'jazyky' => $plne ? dracak_vtt_jazyky_postavy($pdo, $postava) : [],
         'efekty' => $plne ? dracak_vtt_aktivni_efekty_postavy($pdo, (int)$postava['id']) : [],
         'inventar' => $plne ? dracak_vtt_inventar_s_vahou($pdo, (int)$postava['id']) : [],
+        // Čím token postavy právě svítí — aby tlačítko u předmětu rovnou nabízelo „Zhasnout“, ne „Zapálit“.
+        'svetlo_token' => $plne ? dracak_vtt_postava_svetlo($pdo, (int)$postava['id']) : null,
         'kontejnery' => $plne ? dracak_vtt_kontejnery_postavy($pdo, (int)$postava['id']) : [],
         'kontejnery_dostupne' => dracak_vtt_kontejnery_dostupne($pdo),
         'doprava' => dracak_vtt_postava_doprava($pdo, $postava),

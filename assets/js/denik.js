@@ -499,6 +499,25 @@
     if (d) ukazHod(d);
   });
 
+  // Zapálit / zhasnout zdroj světla z inventáře (hra/api/svetlo_predmet.php). Token postavy se rozsvítí sám —
+  // dřív to PJ nastavoval ručně na tokenu, přestože postava pochodeň fyzicky nesla (návrh část D).
+  document.addEventListener('click', async function (ev) {
+    const tl = ev.target.closest('[data-svetlo]');
+    if (!tl || !wrap.contains(tl)) return;
+    ev.preventDefault();
+    const zapnout = tl.dataset.hori !== '1';
+    const d = await volej('api/svetlo_predmet.php', {
+      postava_id: Number(ID), predmet_id: Number(tl.dataset.svetlo), zapnout: zapnout,
+    });
+    if (!d) return;
+    tl.dataset.hori = zapnout ? '1' : '';
+    tl.textContent = zapnout ? 'Zhasnout' : 'Zapálit';
+    tl.classList.toggle('hori', zapnout);
+    hlaska(zapnout
+      ? tl.dataset.nazev + ' hoří — ' + d.sahy + ' sáhů' + (d.zbyva ? ', vydrží ' + d.zbyva + ' směn' : '')
+      : tl.dataset.nazev + ' zhasnut(a).');
+  });
+
   // Seslat kouzlo / vypít lektvar (hra/api/pouzij_predmet.php).
   document.addEventListener('click', async function (ev) {
     const tl = ev.target.closest('[data-pouzij]');

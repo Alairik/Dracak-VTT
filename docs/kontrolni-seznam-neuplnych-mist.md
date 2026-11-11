@@ -337,6 +337,15 @@ Tohle jsou místa, která agent při sweepu označil, ale po bližším pohledu 
 
 ---
 
+## F1. Doba hoření pochodně: ceník 2 směny vs. aplikace 3 (2026-11-11)
+
+Popis předmětu „Pochodeň“ v katalogu říká „v ceníku: 2 směny“, zatímco aplikace (výběr světla na tokenu
+i nové tlačítko Zapálit v deníku) počítá **3 směny**. V přepisu pravidel se dosah ani doba hoření pochodně
+a lucerny přímo nenašly — `content/pravidla-hrac.html` je zmiňuje jen jako srovnání („svítí jako pochodeň“).
+Hodnoty 6 sáhů / 3 směny a 8 sáhů / 24 směn jsou tedy prozatímní; při korektuře ověřit proti ceníku
+a kapitole o vybavení a sjednotit. Mechanika se kvůli tomu neodkládala (pravidlo uživatele: „nesmysl
+neimplementovat mechaniku jen na neshodě čísel“), PJ může hodnotu na tokenu přepsat.
+
 ## F0. Chybí v datech: předmět neumí říct, že je kouzelný nebo stříbrný (2026-11-10)
 
 Tabulka `predmety` nemá pole, podle kterého by se poznala **kouzelná (skupina C)** nebo **stříbrná (D)** zbraň.

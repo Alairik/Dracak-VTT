@@ -147,6 +147,29 @@ Pozor při psaní testů: klik na postavu **neotevře** `#panel-spravovat`. Sady
 otvírají přes kontextové menu (vzor `otevriPanel()` v `tests/e2e/denik_dock.js`, `efekty_ui.js`,
 `noc_videni_api.js`, `dosah_pohybu_ui.js`) a předtím zavřou deník, aby pravé tlačítko trefilo token.
 
+### Světlo se zapaluje u předmětu, ne ručně na tokenu (2026-11-11)
+
+Část D návrhu `docs/panel-tokenu-navrh.md`. Dosud PJ klikal „Pochodeň (6 sáhů)“ v panelu tokenu, přestože
+postava pochodeň fyzicky nesla v inventáři — dvě místa pro jednu věc a dalo se na to zapomenout.
+
+Zdroj světla se pozná podle **kategorie vybavení „Svícení“** v katalogu (ne podle názvu — ten se v homebrew
+liší): pochodeň 6 sáhů / 3 směny, lucerna 8 sáhů / 24 směn. Olej a křesadlo samy nesvítí, akci nedostanou.
+V inventáři v deníku je u nich tlačítko **Zapálit / Zhasnout** (`hra/api/svetlo_predmet.php`), které rovnou
+nastaví světlo na tokenu postavy; deník si při načtení přečte, jestli už něco hoří, takže tlačítko ukazuje
+správný stav i po obnovení stránky. Hořící předmět je v inventáři žlutě. Práva jsou stejná jako u životů:
+vlastník postavy nebo PJ světa.
+
+Ruční nastavení světla na tokenu **zůstává** — pro nestvůry, obecné tokeny (ohniště, svítící socha, kouzlo
+Tma) a opravy.
+
+Pozn. k číslům: ceník u pochodně uvádí „2 směny“, aplikace počítá 3 (hodnota tam byla už před tím, než se
+světlo přesunulo k předmětu). Rozpor je zapsaný v `docs/kontrolni-seznam-neuplnych-mist.md`; mechanika se
+kvůli neshodě jednoho čísla neodkládá (pravidlo uživatele), PJ může na tokenu hodnotu přepsat.
+
+Test `tests/e2e/svetlo_predmet_ui.js` (tlačítko jen u toho, co svítí; zapálení i zhasnutí se propíše do
+tokenu; stav přežije načtení stránky; hráč smí svou postavu, cizí ne; předmět, který postava nemá, server
+odmítne).
+
 ### Zranitelnost nestvůry konečně počítá i boj (2026-11-10)
 
 Data o tom, čím jde nestvůru zranit, jsou v databázi od začátku (1559 vazeb `nestvura_zranitelnosti`) a od
