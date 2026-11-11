@@ -209,41 +209,64 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
     </div>
   </div>
 
+  <!-- Nástroje jsou v pěti skupinách (zadání uživatele 2026-11-11: „levé boční menu je masivní, potřeboval
+       bych ho rozsekat na logické sekce“). Skupinu odděluje linka a drobný popisek; lišta zůstává JEDEN
+       sloupec a při nedostatku místa se roluje — na dva sloupce se nikdy nerozpadne. -->
   <div class="toolbar">
-    <button class="tbtn" type="button" id="tb-pridat" title="Přidat token"><?php dracak_icon('user-round-plus'); ?></button>
-    <button class="tbtn armed" type="button" id="tb-move" title="Vybrat / přesunout (V)"><?php dracak_icon('move'); ?></button>
-    <button class="tbtn" type="button" id="tb-vyber" title="Výběr rámečkem — táhni přes tokeny, klepnutím přidáš další (jde i Shiftem)"><?php dracak_icon('mouse-pointer-2'); ?></button>
-    <button class="tbtn" type="button" id="tb-ruka" title="Posouvat mapu (ruka) — jde i mezerníkem, pravým tlačítkem nebo dvěma prsty"><?php dracak_icon('hand'); ?></button>
-    <button class="tbtn" type="button" id="tb-ruler" title="Měřit vzdálenost (na mapě světa s měřítkem navazuje Shift další úsek trasy)"><?php dracak_icon('ruler'); ?></button>
-    <button class="tbtn" type="button" id="tb-kresleni" title="Kreslit na mapu (čára, šipka, obrazec, text)" style="display:none;"><?php dracak_icon('pen-line'); ?></button>
-    <button class="tbtn" type="button" id="tb-ping" title="Ukázat na mapu ostatním"><?php dracak_icon('crosshair'); ?></button>
-    <?php if ($mapaStrom): ?>
-      <button class="tbtn" type="button" id="tb-strom" title="Mapa míst"><?php dracak_icon('list-tree'); ?></button>
-    <?php endif; ?>
-    <?php if ($isPjOrAdmin): ?>
-      <button class="tbtn" type="button" id="tb-zed" title="Kreslit zeď"><?php dracak_icon('brick-wall'); ?></button>
-    <?php endif; ?>
-    <?php if ($isPjOrAdmin): ?>
-      <button class="tbtn" type="button" id="tb-pin" title="Přidat pin (místo)"><?php dracak_icon('map-pin'); ?></button>
-    <?php endif; ?>
-    <?php if ($isPjOrAdmin && dracak_vtt_tokeny_funkce()['npc_zasoba']): ?>
-      <button class="tbtn" type="button" id="tb-tokeny" title="Správa tokenů — výroba NPC do zásoby a pokládání tažením (lišta dole uprostřed)"><?php dracak_icon('layers'); ?></button>
-    <?php endif; ?>
-    <button class="tbtn" type="button" id="tb-raid" title="<?= $isPjOrAdmin ? 'Panel tvorů a souboje — nestvůry, družina, pořadí tahů (plovoucí okno)' : 'Družina a pořadí tahů (plovoucí okno)' ?>"><?php dracak_icon('users'); ?></button>
-    <button class="tbtn" type="button" id="tb-kostky" title="Hodit kostkou"><?php dracak_icon('dices'); ?></button>
-    <button class="tbtn" type="button" id="tb-log" title="Log"><?php dracak_icon('scroll-text'); ?></button>
-    <?php if ($isPjOrAdmin): ?>
-      <button class="tbtn" type="button" id="tb-grid" title="Nastavení gridu"><?php dracak_icon('grid-2x2'); ?></button>
-      <button class="tbtn" type="button" id="tb-mlha" title="Mlha války"><?php dracak_icon('cloud-fog'); ?></button>
-      <?php if ($souboj): ?>
+    <div class="tb-skup" role="group" aria-label="Pohyb a výběr">
+      <button type="button" class="tb-nazev" data-tb-skup="pohyb" aria-expanded="true" title="Sbalit / rozbalit sekci Pohyb">Pohyb</button>
+      <button class="tbtn armed" type="button" id="tb-move" title="Vybrat / přesunout (V)"><?php dracak_icon('move'); ?></button>
+      <button class="tbtn" type="button" id="tb-vyber" title="Výběr rámečkem — táhni přes tokeny, klepnutím přidáš další (jde i Shiftem)"><?php dracak_icon('mouse-pointer-2'); ?></button>
+      <button class="tbtn" type="button" id="tb-ruka" title="Posouvat mapu (ruka) — jde i mezerníkem, pravým tlačítkem nebo dvěma prsty"><?php dracak_icon('hand'); ?></button>
+      <?php if ($isPjOrAdmin): ?>
+        <button class="tbtn" type="button" id="tb-krok-zpet" title="Krok zpět (vrátit poslední akci)"><?php dracak_icon('undo-2'); ?></button>
+      <?php endif; ?>
+    </div>
+
+    <div class="tb-skup" role="group" aria-label="Souboj">
+      <button type="button" class="tb-nazev" data-tb-skup="souboj" aria-expanded="true" title="Sbalit / rozbalit sekci Souboj">Souboj</button>
+      <?php if ($isPjOrAdmin && $souboj): ?>
         <button class="tbtn" type="button" id="tb-souboj" title="Zahájit souboj"><?php dracak_icon('swords'); ?></button>
       <?php endif; ?>
-      <button class="tbtn" type="button" id="tb-kolo" title="Konec kola (odpočítat trvání efektů)"><?php dracak_icon('rotate-cw'); ?></button>
-      <?php if (!$souboj): ?>
+      <?php if ($isPjOrAdmin && !$souboj): ?>
         <button class="tbtn" type="button" id="tb-dalsi-tah" title="Další na tahu (iniciativa)"><?php dracak_icon('skip-forward'); ?></button>
       <?php endif; ?>
-      <button class="tbtn" type="button" id="tb-krok-zpet" title="Krok zpět (vrátit poslední akci)"><?php dracak_icon('undo-2'); ?></button>
-    <?php endif; ?>
+      <?php if ($isPjOrAdmin): ?>
+        <button class="tbtn" type="button" id="tb-kolo" title="Konec kola (odpočítat trvání efektů)"><?php dracak_icon('rotate-cw'); ?></button>
+      <?php endif; ?>
+      <button class="tbtn" type="button" id="tb-raid" title="<?= $isPjOrAdmin ? 'Panel tvorů a souboje — nestvůry, družina, pořadí tahů (plovoucí okno)' : 'Družina a pořadí tahů (plovoucí okno)' ?>"><?php dracak_icon('users'); ?></button>
+    </div>
+
+    <div class="tb-skup" role="group" aria-label="Tvorové a místa">
+      <button type="button" class="tb-nazev" data-tb-skup="tvorove" aria-expanded="true" title="Sbalit / rozbalit sekci Tvorové">Tvorové</button>
+      <button class="tbtn" type="button" id="tb-pridat" title="Přidat token"><?php dracak_icon('user-round-plus'); ?></button>
+      <?php if ($isPjOrAdmin && dracak_vtt_tokeny_funkce()['npc_zasoba']): ?>
+        <button class="tbtn" type="button" id="tb-tokeny" title="Správa tokenů — výroba NPC do zásoby a pokládání tažením (lišta dole uprostřed)"><?php dracak_icon('layers'); ?></button>
+      <?php endif; ?>
+      <?php if ($isPjOrAdmin): ?>
+        <button class="tbtn" type="button" id="tb-pin" title="Přidat pin (místo)"><?php dracak_icon('map-pin'); ?></button>
+      <?php endif; ?>
+      <?php if ($mapaStrom): ?>
+        <button class="tbtn" type="button" id="tb-strom" title="Mapa míst"><?php dracak_icon('list-tree'); ?></button>
+      <?php endif; ?>
+    </div>
+
+    <div class="tb-skup" role="group" aria-label="Mapa">
+      <button type="button" class="tb-nazev" data-tb-skup="mapa" aria-expanded="true" title="Sbalit / rozbalit sekci Mapa">Mapa</button>
+      <button class="tbtn" type="button" id="tb-ruler" title="Měřit vzdálenost (na mapě světa s měřítkem navazuje Shift další úsek trasy)"><?php dracak_icon('ruler'); ?></button>
+      <button class="tbtn" type="button" id="tb-kresleni" title="Kreslit na mapu (čára, šipka, obrazec, text)" style="display:none;"><?php dracak_icon('pen-line'); ?></button>
+      <?php if ($isPjOrAdmin): ?>
+        <button class="tbtn" type="button" id="tb-zed" title="Kreslit zeď"><?php dracak_icon('brick-wall'); ?></button>
+        <button class="tbtn" type="button" id="tb-mlha" title="Mlha války"><?php dracak_icon('cloud-fog'); ?></button>
+        <button class="tbtn" type="button" id="tb-grid" title="Nastavení gridu"><?php dracak_icon('grid-2x2'); ?></button>
+      <?php endif; ?>
+    </div>
+
+    <div class="tb-skup" role="group" aria-label="Ostatní">
+      <button type="button" class="tb-nazev" data-tb-skup="ostatni" aria-expanded="true" title="Sbalit / rozbalit sekci Ostatní">Ostatní</button>
+      <button class="tbtn" type="button" id="tb-ping" title="Ukázat na mapu ostatním"><?php dracak_icon('crosshair'); ?></button>
+      <button class="tbtn" type="button" id="tb-log" title="Log"><?php dracak_icon('scroll-text'); ?></button>
+    </div>
   </div>
 
   <?php if ($isPjOrAdmin): ?>
@@ -300,6 +323,27 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
     </div>
   </div>
   <?php endif; ?>
+
+  <!-- Kostky stojí MIMO lištu nástrojů (rozhodnutí uživatele 2026-11-11: „kostka by měla být floating sama
+       o sobě někde bokem, takové vyskakovací okno, které vyvolá házecí místo — dice tray“). Tlačítko je
+       vpravo dole, u místa, kam kostky dopadají. -->
+  <button class="kostky-btn" type="button" id="kostkyOtevrit" aria-expanded="false" aria-controls="kostkyTray" title="Házecí místo (kostky)"><?php dracak_icon('dices'); ?></button>
+  <div class="kostky-tray" id="kostkyTray" hidden>
+    <div class="kostky-hlava">
+      <strong>Házecí místo</strong>
+      <button class="close-x" type="button" id="kostkyZavrit" title="Zavřít"><?php dracak_icon('x', 14); ?></button>
+    </div>
+    <div class="kostky-rada">
+      <?php foreach ([4, 6, 8, 10, 12, 20, 100] as $k): ?>
+        <button type="button" class="kostky-k" data-kostka="<?= $k ?>">k<?= $k ?></button>
+      <?php endforeach; ?>
+    </div>
+    <div class="kostky-vlastni">
+      <input class="input" type="text" id="kostkyNotace" placeholder="2k6+2" aria-label="Vlastní hod, například 2k6+2">
+      <button class="btn btn-primary" id="hoditBtn" type="button">Hodit</button>
+    </div>
+    <label class="kostky-zvuk"><input type="checkbox" id="kostkyZvuk"> Zvuk dopadu</label>
+  </div>
 
   <div id="zoomCtl">
     <button class="tbtn" type="button" id="zoom-minus" title="Oddálit (−)"><?php dracak_icon('zoom-out', 18); ?></button>
@@ -367,13 +411,6 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
       <?php if ($isPjOrAdmin): ?><button class="btn btn-ghost" type="button" id="kresbaSmazatVse" style="flex:1;font-size:12px;">Smazat všechny</button><?php endif; ?>
     </div>
     <p class="note">Táhni po mapě. Kruh a kužel ukážou dosah v sázích (na hexech v hexech). Jednotlivou kresbu smažeš pravým tlačítkem (na dotyku dlouhým stisknutím).</p>
-  </div>
-
-  <div class="popover" id="popover-kostky">
-    <button class="close-x" data-close-popover><?php dracak_icon('x', 14); ?></button>
-    <h3>Hodit kostkou</h3>
-    <input class="input" type="text" id="kostkyNotace" placeholder="2k6+2">
-    <button class="btn btn-primary" id="hoditBtn" type="button" style="width:100%;margin-top:8px;">Hodit</button>
   </div>
 
   <?php if ($isPjOrAdmin): ?>

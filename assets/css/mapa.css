@@ -148,12 +148,31 @@ body.pin-v-mape .mapa-bod-marker svg { width:var(--pin-d, 28px); height:var(--pi
   .breadcrumb .sep { opacity:.4; }
   .breadcrumb span:not(.sep) { font-weight:600; }
 
+  /* flex-wrap:nowrap je tu schválně: obecná .toolbar v organic.css má wrap, a lišta se pak
+     při větším počtu nástrojů rozpadla na DVA sloupce (uživatel 2026-11-11: „chci zachovat,
+     že bude jen jeden panel nabídky“). Jeden sloupec, a když se nevejde, roluje se. */
   .toolbar { position:fixed; left:16px; top:50%; transform:translateY(-50%); z-index:200;
-             display:flex; flex-direction:column; gap:8px; background:rgba(24,22,20,.88);
+             display:flex; flex-direction:column; flex-wrap:nowrap; gap:6px; background:rgba(24,22,20,.88);
              padding:8px; border-radius:14px; backdrop-filter:blur(4px);
              max-height:calc(100vh - 32px); overflow-y:auto; scrollbar-width:thin;
              margin:0; align-items:flex-start; align-content:flex-start; }
-  .tbtn { flex:none; width:46px; height:46px; border-radius:10px; border:none; background:transparent; color:#eee;
+  /* Skupiny v liště (zadání 2026-11-11): lišta zůstává JEDEN sloupec, skupinu odděluje linka
+     a drobný popisek. Na dva sloupce se nerozpadne nikdy — při nedostatku místa se roluje. */
+  .tb-skup { display:flex; flex-direction:column; flex-wrap:nowrap; gap:6px; align-items:flex-start; }
+  .tb-skup + .tb-skup { border-top:1px solid rgba(255,255,255,.14); padding-top:6px; }
+  /* Popisek sekce je zároveň tlačítko: klepnutím se sekce sbalí (pamatuje si to prohlížeč).
+     Na krátkých obrazovkách se tak lišta vejde bez rolování, a nemusí být na dva sloupce. */
+  /* Popisek musí být celý čitelný — pevná šířka 42 px ho ořezávala na „PO…“. Necháme ho,
+     ať si šířku určí sám; lišta kvůli tomu povyroste o pár pixelů, pořád je to jeden sloupec. */
+  .tb-nazev { font:700 8.5px/1 inherit; letter-spacing:.3px; text-transform:uppercase; color:#e8c9a8;
+              opacity:.72; padding:2px 3px; border:none; background:transparent; cursor:pointer;
+              user-select:none; border-radius:5px; text-align:left; white-space:nowrap; }
+  .tb-nazev:hover { opacity:1; background:rgba(255,255,255,.1); }
+  .tb-skup.sbaleno .tb-nazev { opacity:.45; }
+  .tb-skup.sbaleno .tbtn { display:none; }
+  .tb-skup.sbaleno .tb-nazev::after { content:' ▸'; }
+
+  .tbtn { flex:none; width:42px; height:42px; border-radius:10px; border:none; background:transparent; color:#eee;
           font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center;
           transition:background .12s; }
   .tbtn:hover { background:rgba(255,255,255,.12); }
@@ -268,6 +287,11 @@ body.pin-v-mape .mapa-bod-marker svg { width:var(--pin-d, 28px); height:var(--pi
   .toolbar { left:8px; right:8px; top:auto; bottom:8px; transform:none; flex-direction:row; overflow-x:auto; overflow-y:hidden;
              max-height:none; padding:6px; gap:4px; }
   .tbtn { width:44px; height:44px; }
+  .tb-skup { flex-direction:row; gap:4px; align-items:center; }
+  .tb-skup + .tb-skup { border-top:none; border-left:1px solid rgba(255,255,255,.14);
+                        padding-top:0; margin-top:0; padding-left:5px; margin-left:1px; }
+  .tb-nazev { display:none; }
+  .tb-skup.sbaleno .tbtn { display:flex; }
   #zoomCtl { right:8px; bottom:70px; }
   #zoomCtl .tbtn { width:36px; height:36px; }
   .popover { left:8px !important; right:8px; width:auto; top:auto !important; bottom:70px; max-height:58vh; overflow-y:auto; }
@@ -716,6 +740,38 @@ body.denik-dock-cela { overflow:hidden; }
    aplikace nic nevyhodnocuje (rozhodnutí uživatele 2026-11-11). */
 #kostkyVrstva { position:fixed; right:12%; bottom:14%; z-index:300; display:flex; flex-direction:column-reverse;
                 align-items:center; gap:10px; pointer-events:none; }
+/* Házecí místo (dice tray) — plovoucí tlačítko vpravo dole, mimo lištu nástrojů. */
+.kostky-btn { position:fixed; right:16px; bottom:62px; z-index:195; width:46px; height:46px; border-radius:50%;
+              border:1px solid rgba(255,255,255,.18); background:rgba(24,22,20,.9); color:#eee; cursor:pointer;
+              display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px);
+              box-shadow:0 6px 18px rgba(0,0,0,.45); transition:background .12s, transform .12s; }
+.kostky-btn:hover { background:rgba(255,255,255,.14); }
+.kostky-btn.open { background:var(--color-accent-600, #7a3b2e); transform:scale(1.05); }
+.kostky-btn svg { display:block; }
+.kostky-tray { position:fixed; right:16px; bottom:116px; z-index:196; width:212px; box-sizing:border-box;
+               background:rgba(24,22,20,.96); border:1px solid rgba(255,255,255,.16); border-radius:14px;
+               padding:10px 12px 12px; color:#eee; box-shadow:0 10px 28px rgba(0,0,0,.55); backdrop-filter:blur(4px); }
+.kostky-tray[hidden] { display:none; }
+.kostky-hlava { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.kostky-hlava strong { font-size:12px; letter-spacing:.4px; text-transform:uppercase; color:#e8c9a8; }
+.kostky-hlava .close-x { position:static; background:transparent; border:none; color:#cfc6bb; cursor:pointer;
+                         padding:2px; line-height:0; border-radius:6px; }
+.kostky-hlava .close-x:hover { background:rgba(255,255,255,.12); color:#fff; }
+.kostky-rada { display:grid; grid-template-columns:repeat(4, 1fr); gap:5px; }
+.kostky-k { font:inherit; font-size:12.5px; font-weight:600; padding:7px 0; border-radius:9px; cursor:pointer;
+            border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.06); color:#eee;
+            transition:background .12s; }
+.kostky-k:hover { background:#ffd166; color:#2a1b06; border-color:#ffd166; }
+.kostky-k:disabled { opacity:.5; cursor:default; }
+.kostky-vlastni { display:flex; gap:5px; margin-top:8px; }
+.kostky-vlastni .input { flex:1 1 auto; min-width:0; background:rgba(255,255,255,.07); color:#eee;
+                         border:1px solid rgba(255,255,255,.2); border-radius:9px; padding:7px 9px;
+                         font:inherit; font-size:13px; box-shadow:none; }
+.kostky-vlastni .input::placeholder { color:#9a9289; }
+.kostky-vlastni .input:focus { outline:none; border-color:#ffd166; }
+.kostky-vlastni .btn { flex:none; }
+.kostky-zvuk { display:flex; align-items:center; gap:6px; margin-top:8px; font-size:11.5px; color:#cfc6bb; cursor:pointer; }
+
 .kostka-hod { display:flex; flex-direction:column; align-items:center; gap:6px; transition:opacity .35s ease; }
 .kostka-hod.mizi { opacity:0; }
 .kostka-telo { width:84px; height:84px; display:flex; align-items:center; justify-content:center;
@@ -753,4 +809,6 @@ body.denik-dock-cela { overflow:hidden; }
 @media (max-width: 760px) {
   .hod-vyzva-okno { width:calc(100vw - 20px); justify-content:space-between; }
   #kostkyVrstva { right:8%; bottom:22%; }
+  .kostky-btn { right:8px; bottom:118px; width:42px; height:42px; }
+  .kostky-tray { right:8px; left:auto; bottom:166px; width:min(248px, calc(100vw - 16px)); }
 }

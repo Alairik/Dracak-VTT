@@ -176,6 +176,34 @@ v rychlém deníku). Test `tests/e2e/hod_vyzva_ui.js`.
 **Zbytek plátna čeká na rozhodnutí** — uživatel zatím okomentoval i lištu, výběr tokenu, souboj a pin;
 shrnutí jeho odpovědí je v komentářích na plátně.
 
+### Lišta nástrojů po sekcích a házecí místo (2026-11-11)
+
+Zadání: *„levé boční menu je masivní, asi bych ho potřeboval rozsekat na logické sekce“* + k návrhu
+*„popisky se mi líbí, jen bych chtěl zachovat, že bude jen jeden panel nabídky“* a *„kostka mi přijde,
+že by měla být floating sama o sobě někde bokem — takové vyskakovací okno, které vyvolá házecí místo,
+dice tray třeba“*.
+
+* **Pět sekcí** s drobným popiskem a oddělovací linkou: **Pohyb** (výběr, rámeček, ruka, krok zpět),
+  **Souboj** (zahájit souboj / další na tahu, konec kola, panel tvorů), **Tvorové** (přidat token, správa
+  tokenů, pin, mapa míst), **Mapa** (měřidlo, kreslení, zeď, mlha, grid), **Ostatní** (ping, log).
+* **Jeden sloupec, nikdy dva.** Obecná `.toolbar` v `assets/css/organic.css` má `flex-wrap:wrap`, takže se
+  lišta při větším počtu nástrojů **rozpadala na dva sloupce** — to byl kus té „masivnosti“. `mapa.css`
+  teď má `flex-wrap:nowrap` a tlačítka 42 px; když se lišta nevejde, roluje se.
+* **Popisek sekce je tlačítko**: klepnutím se sekce sbalí (ikony zmizí, popisek zešedne a dostane ▸) a
+  prohlížeč si to pamatuje (`localStorage`, klíč `dracak_lista_sbaleno`). Na krátké obrazovce se tak lišta
+  vejde bez rolování, místo aby se musela dělit na záložky. Na telefonu (vodorovná lišta dole) se popisky
+  skrývají a sbalit nejde — tam se roluje do strany.
+* **Kostky z lišty pryč**: plovoucí kolečko vpravo dole (nad ovládáním zoomu, u místa, kam kostky dopadají)
+  otevře **házecí místo** — k4 · k6 · k8 · k10 · k12 · k20 · k100, pole na vlastní zápis (`2k6+2`, Enter
+  hází) a přepínač zvuku dopadu. Starý popover `popover-kostky` i tlačítko `tb-kostky` jsou zrušené.
+* **Kdo hází, hodí 3D kostkou** (`assets/js/kostky3d.js`) — a to i při odpovědi na „Hoď si“. Ostatní u stolu
+  uvidí kartu s číslem (`assets/js/kostky.js`), protože dice-box 1.1.4 **neumí přehrát cizí hod na předem
+  dané číslo**; kdo hodil 3D, kartu už nedostane (události si prohlížeč pamatuje v `vlastni3d`).
+
+Kód: `hra/mapa.php` (`.tb-skup`, `#kostkyOtevrit`, `#kostkyTray`), `assets/css/mapa.css`,
+`assets/js/mapa.js`. Test `tests/e2e/lista_skupiny_ui.js` (21 kontrol: sekce, jeden sloupec, sbalení i jeho
+paměť po reloadu, házecí místo, hod v logu u hazeče a karta u ostatních).
+
 ### Vzhled tokenů a pinů podle mřížky (2026-11-11)
 
 Čtyři stížnosti uživatele z 2026-11-11, všechny opravené:

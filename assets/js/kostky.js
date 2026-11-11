@@ -26,6 +26,7 @@ export function initKostky(ctx) {
   try { zvuk = localStorage.getItem(KLIC_ZVUK) !== '0'; } catch (e) { /* soukromé okno */ }
   let audioCtx = null;
   let vyzvaOtevrena = null;   // {vyzva_id, postava_id, label, kostka}
+  const vlastni3d = new Set();  // id událostí, které si tenhle prohlížeč odbyl 3D kostkou
 
   // --- zvuk: krátké cvaknutí dopadu, vyrobené v prohlížeči (žádný soubor navíc) ---
   function cvaknout() {
@@ -109,11 +110,17 @@ export function initKostky(ctx) {
   async function hodit(typKostky) {
     const v = vyzvaOtevrena;
     zavritVyzvu();
-    const d = await postJson('api/kostka_hod.php', {
+    // Kdo hází, hodí si 3D kostkou (stejně jako z házecího místa); čísla z ní jsou ten hod
+    // a posílají se na server. Bez 3D kostek (starý prohlížeč, k100) hodí server.
+    let hody = null;
+    if (ctx.hodit3D && [4, 6, 8, 10, 12, 20].includes(typKostky)) hody = await ctx.hodit3D(1, typKostky);
+    const d = await postJson('api/kostka_hod.php', Object.assign({
       svet_id: ctx.svetId, mapa_id: ctx.mapaId, notace: 'k' + typKostky,
       vyzva_id: v ? v.vyzva_id : null, za_koho: v ? v.label : '',
-    });
+    }, hody ? { hody } : {}));
     if (d && d.error) { logLine('Chyba: ' + d.error); return; }
+    // Vlastní hod si hazeč ukázal 3D kostkou — ať mu ho poll neukáže ještě jako kartu.
+    if (hody && d && d.udalost_id) vlastni3d.add(Number(d.udalost_id));
   }
 
   if (dialog) {
@@ -154,7 +161,8 @@ export function initKostky(ctx) {
     },
     // Hod došel pollem (nebo ho hodil tenhle prohlížeč): ukáže se všem stejně.
     hod(payload) {
-      ukazHod(payload);
+      const vlastni = payload.udalost_id && vlastni3d.delete(Number(payload.udalost_id));
+      if (!vlastni) ukazHod(payload);
       // Výzva, na kterou se odpovědělo, u hráče zmizí, i kdyby okno nechal otevřené.
       if (vyzvaOtevrena && payload.vyzva_id && Number(payload.vyzva_id) === Number(vyzvaOtevrena.vyzva_id)) zavritVyzvu();
     },

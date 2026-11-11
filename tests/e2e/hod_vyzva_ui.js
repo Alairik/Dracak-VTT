@@ -6,7 +6,7 @@
 //   * výzva na konkrétní kostku: hráč nemá co vybírat, jen tlačítko Hodit,
 //   * výzva bez kostky: hráč si vybere z k6 / k10 / k100,
 //   * okno dostane jen ten, kdo postavu hraje — PJ si vlastní výzvu neotevře,
-//   * hod hází SERVER a oba konce vidí totéž číslo,
+//   * kdo hází, hodí si 3D kostkou; ostatní u stolu uvidí kartu se stejným číslem,
 //   * práva: hráč výzvu poslat nemůže, nestvůru ani neznámou kostku server odmítne.
 //
 // Po resetu dat: mysql dracak < ../fixture/seed.sql; node hod_vyzva_ui.js
@@ -66,17 +66,34 @@ async function login(b, email, heslo) {
   ok(await hr.locator('[data-vyzva-hodit]').isVisible(), 'je tam jen tlačítko Hodit');
   ok(!(await pj.locator('#hodVyzvaDialog').isVisible()), 'PJ svoji vlastní výzvu jako okno nedostane');
 
-  // --- hráč hodí, kostku vidí oba ---
+  // --- hráč hodí, hod vidí celý stůl ---
+  // Kdo hází, hodí si 3D kostkou (assets/js/kostky3d.js) a kartu s číslem už nedostane —
+  // ostatní u stolu ji dostanou, protože dice-box neumí přehrát cizí hod na dané číslo.
   await hr.locator('[data-vyzva-hodit]').click();
-  await hr.waitForTimeout(1600);
-  ok(await hr.locator('.kostka-hod').count() >= 1, 'hráč vidí kostku');
-  const cislo = (await hr.locator('.kostka-cislo').first().textContent()).trim();
-  ok(/^\d+$/.test(cislo) && Number(cislo) >= 1 && Number(cislo) <= 10, 'na kostce je číslo z rozsahu k10: ' + cislo);
+  await hr.waitForTimeout(1200);
   ok(!(await hr.locator('#hodVyzvaDialog').isVisible()), 'po hodu okno výzvy zmizelo');
-  await pj.waitForTimeout(3200);
-  ok(await pj.locator('.kostka-hod').count() >= 1, 'PJ vidí tentýž hod');
-  const cisloPj = (await pj.locator('.kostka-cislo').first().textContent()).trim();
-  ok(cisloPj === cislo, 'oba vidí stejné číslo: hráč ' + cislo + ' / PJ ' + cisloPj);
+  const kostek3D = await hr.evaluate(() => document.querySelectorAll('#diceBoxContainer canvas').length);
+  ok(kostek3D > 0 || (await hr.locator('.kostka-hod').count()) >= 1, 'hazeč vidí hod (3D kostka nebo karta)');
+  // Log a karta u ostatních přijdou pollem — čeká se na ně, ne na pevný čas.
+  const vLogu = async (page) => {
+    try {
+      await page.waitForFunction(() => /hodil k10: \[\d+\]/.test(document.getElementById('panel-log').textContent), null, { timeout: 15000 });
+    } catch (e) { return null; }
+    return (await page.locator('#panel-log').textContent()).match(/hodil k10: \[(\d+)\]/)[1];
+  };
+  const cislo = await vLogu(hr);
+  ok(cislo !== null, 'hráč má svůj hod v logu: ' + cislo);
+  const cisloPj = await vLogu(pj);
+  ok(cisloPj === cislo, 'oba mají v logu stejné číslo: hráč ' + cislo + ' / PJ ' + cisloPj);
+  let naKarte = null;
+  try {
+    await pj.waitForFunction(() => {
+      const el = document.querySelector('.kostka-hod.dopadlo .kostka-cislo');
+      return el && /^\d+$/.test(el.textContent.trim());
+    }, null, { timeout: 15000 });
+    naKarte = (await pj.locator('.kostka-hod.dopadlo .kostka-cislo').first().textContent()).trim();
+  } catch (e) { /* zůstane null */ }
+  ok(naKarte === cislo, 'ostatní u stolu vidí kartu s týmž číslem: ' + naKarte);
 
   // --- výzva bez určené kostky ---
   await pj.locator('#hodVyzvaBlok [data-hod-vyzva=""]').click();

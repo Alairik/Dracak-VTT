@@ -752,8 +752,31 @@ document.querySelectorAll('[data-close-panel]').forEach(b => b.addEventListener(
 
 const tbPridat = document.getElementById('tb-pridat');
 if (tbPridat) tbPridat.addEventListener('click', () => togglePopover('popover-pridat', tbPridat));
-const tbKostky = document.getElementById('tb-kostky');
-if (tbKostky) tbKostky.addEventListener('click', () => togglePopover('popover-kostky', tbKostky));
+// Sekce v liště nástrojů: klepnutí na popisek sekci sbalí nebo rozbalí a prohlížeč si to pamatuje
+// (zadání 2026-11-11 — lišta má zůstat jeden sloupec, na krátké obrazovce se tak vejde bez rolování).
+const TB_SBALENO_KLIC = 'dracak_lista_sbaleno';
+{
+  let sbaleno = [];
+  try { sbaleno = JSON.parse(localStorage.getItem(TB_SBALENO_KLIC) || '[]') || []; } catch (e) { sbaleno = []; }
+  if (!Array.isArray(sbaleno)) sbaleno = [];
+  document.querySelectorAll('.tb-nazev[data-tb-skup]').forEach((popisek) => {
+    const skupina = popisek.closest('.tb-skup');
+    const klic = popisek.dataset.tbSkup;
+    const nastav = (zavrit) => {
+      skupina.classList.toggle('sbaleno', zavrit);
+      popisek.setAttribute('aria-expanded', zavrit ? 'false' : 'true');
+    };
+    nastav(sbaleno.includes(klic));
+    popisek.addEventListener('click', () => {
+      const zavrit = !skupina.classList.contains('sbaleno');
+      nastav(zavrit);
+      sbaleno = sbaleno.filter((k) => k !== klic);
+      if (zavrit) sbaleno.push(klic);
+      try { localStorage.setItem(TB_SBALENO_KLIC, JSON.stringify(sbaleno)); } catch (e) { /* soukromé okno */ }
+    });
+  });
+}
+
 const tbLog = document.getElementById('tb-log');
 if (tbLog) tbLog.addEventListener('click', () => document.getElementById('panel-log').classList.toggle('open'));
 const tbStrom = document.getElementById('tb-strom');
@@ -1892,6 +1915,10 @@ const kostky = initKostky ? initKostky({
   jsemPj: IS_PJ_OR_ADMIN,
   mujUcetId: CFG.ucetId,
   mojePostavy: (window.MAPA.denikPostavy || []).map((p) => Number(p.id)),
+  // Hod na výzvu si ten, kdo hází, odbyde stejnými 3D kostkami jako hod z házecího místa.
+  // Ostatní u stolu uvidí kartu s číslem (3D kostky umí jen ten, kdo hází — knihovna
+  // neumí cizí hod přehrát na konkrétní číslo).
+  hodit3D,
 }) : null;
 
 const denikDock = initDenikDock ? initDenikDock({
@@ -3438,13 +3465,24 @@ if (tbKrokZpet) {
 // posílají se na server (ten hlídá jen rozsah). Bez 3D kostek hodí server.
 nactiKostky();
 
+// Házecí místo stojí mimo lištu nástrojů (rozhodnutí uživatele 2026-11-11 — „kostka by měla být floating
+// sama o sobě, vyskakovací okno, které vyvolá házecí místo“): plovoucí tlačítko vpravo dole otevře
+// panel s kostkami k4–k100 a polem na vlastní zápis. Hod je jeden a tentýž pro rychlé tlačítko i pole.
 const hoditBtn = document.getElementById('hoditBtn');
-if (hoditBtn) {
+const kostkyTray = document.getElementById('kostkyTray');
+const kostkyOtevrit = document.getElementById('kostkyOtevrit');
+{
   const DOSTUPNE_3D = [4, 6, 8, 10, 12, 20];
-  hoditBtn.addEventListener('click', async () => {
-    const notace = document.getElementById('kostkyNotace').value.trim();
-    if (!notace) return;
-    hoditBtn.disabled = true;
+  let haziSe = false;
+  const prepnoutTlacitka = (vyp) => {
+    if (hoditBtn) hoditBtn.disabled = vyp;
+    document.querySelectorAll('.kostky-k').forEach((b) => { b.disabled = vyp; });
+  };
+  async function hodKostkou(notace) {
+    notace = String(notace || '').trim();
+    if (!notace || haziSe) return;
+    haziSe = true;
+    prepnoutTlacitka(true);
     try {
       let hody = null;
       const m = notace.toLowerCase().match(/^(\d*)k(\d+)([+-]\d+)?$/);
@@ -3456,11 +3494,37 @@ if (hoditBtn) {
       const d = await postJson('api/kostka_hod.php', Object.assign({svet_id: SVET_ID, mapa_id: MAPA_ID, notace}, hody ? {hody} : {}));
       if (d.error) { logLine('Chyba: ' + d.error); return; }
       logLine(d.hodil + ' hodil ' + d.notace + ': [' + d.hody.join(', ') + ']' + (d.bonus ? (d.bonus > 0 ? '+' : '') + d.bonus : '') + ' = ' + d.celkem);
+      // 3D kostky si hod ukázaly samy; 2D kartu pro ostatní pošle událost pollem, proto si
+      // kurzor událostí posuneme za vlastní hod, ať ho hazeč nevidí dvakrát.
       posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
+      if (kostky && !hody) kostky.hod({hodil: d.hodil, notace: d.notace, celkem: d.celkem});
     } finally {
-      hoditBtn.disabled = false;
+      haziSe = false;
+      prepnoutTlacitka(false);
     }
+  }
+  const zavritTray = () => {
+    if (!kostkyTray) return;
+    kostkyTray.hidden = true;
+    if (kostkyOtevrit) { kostkyOtevrit.classList.remove('open'); kostkyOtevrit.setAttribute('aria-expanded', 'false'); }
+  };
+  if (kostkyOtevrit && kostkyTray) {
+    kostkyOtevrit.addEventListener('click', () => {
+      const otevrit = kostkyTray.hidden;
+      kostkyTray.hidden = !otevrit;
+      kostkyOtevrit.classList.toggle('open', otevrit);
+      kostkyOtevrit.setAttribute('aria-expanded', otevrit ? 'true' : 'false');
+      if (otevrit) { const vst = document.getElementById('kostkyNotace'); if (vst) vst.focus(); }
+    });
+  }
+  const kostkyZavrit = document.getElementById('kostkyZavrit');
+  if (kostkyZavrit) kostkyZavrit.addEventListener('click', zavritTray);
+  document.querySelectorAll('.kostky-k').forEach((b) => {
+    b.addEventListener('click', () => hodKostkou('k' + b.dataset.kostka));
   });
+  if (hoditBtn) hoditBtn.addEventListener('click', () => hodKostkou(document.getElementById('kostkyNotace').value));
+  const vstup = document.getElementById('kostkyNotace');
+  if (vstup) vstup.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); hodKostkou(vstup.value); } });
 }
 
 // --- Polling delt ---
@@ -3531,7 +3595,7 @@ function applyEvent(u) {
   } else if (u.typ === 'kostka_hod') {
     logLine((u.payload.hodil || '?') + ' hodil ' + u.payload.notace + ': [' + u.payload.hody.join(', ') + ']'
       + (u.payload.bonus ? (u.payload.bonus > 0 ? '+' : '') + u.payload.bonus : '') + ' = ' + u.payload.celkem);
-    if (kostky) kostky.hod(u.payload);
+    if (kostky) kostky.hod(Object.assign({udalost_id: u.id}, u.payload));
   } else if (u.typ === 'hp_zmena') {
     const t = tokeny.find((x) => x.typ_entity === u.payload.typ_entity && x.entita_id === u.payload.entita_id);
     if (t) {
