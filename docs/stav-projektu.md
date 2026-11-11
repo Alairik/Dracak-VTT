@@ -147,6 +147,30 @@ Pozor při psaní testů: klik na postavu **neotevře** `#panel-spravovat`. Sady
 otvírají přes kontextové menu (vzor `otevriPanel()` v `tests/e2e/denik_dock.js`, `efekty_ui.js`,
 `noc_videni_api.js`, `dosah_pohybu_ui.js`) a předtím zavřou deník, aby pravé tlačítko trefilo token.
 
+### Vzhled tokenů a pinů podle mřížky (2026-11-11)
+
+Čtyři stížnosti uživatele z 2026-11-11, všechny opravené:
+
+* **Rámeček tokenu kopíruje mřížku** — kolečko na čtvercové mapě, šestiúhelník na hexové. Řídí to třída
+  `mrizka-hex` / `mrizka-ctverec` na `<body>` (`oznacitMrizku()` v `assets/js/mapa.js`), takže to CSS vyřeší
+  jednou pro všechny tokeny. Na hexu `clip-path` ořízne i rámeček, proto obrys dělá podložka `::before`
+  o 2 px větší.
+* **Token je menší než buňka** (0,76 místo 0,82 násobku na hexu), aby se sousedé nelepili k sobě.
+* **Tvor na víc hexech je jeden slitý tvar** — hexy se vyplní bez obrysu a obtáhne se jen vnější hranice
+  (hrana, za kterou další hex té bytosti není). Dřív měl každý hex vlastní obrys, takže drak vypadal jako
+  poskládaná kolečka, a kolečko s iniciálou přes celou bytost z něj dělalo „obří kruh“. Kolečko je teď jen
+  malý štítek se jménem uprostřed (`--dp`), životy a efekty se drží jeho, a šipka směru u takového tvora
+  zmizela úplně — čelo je vyznačené přímo na obrysu těla.
+* **Pin se na mapě s mřížkou zvětšuje a zmenšuje s mapou** (`body.pin-v-mape`, velikost `--pin-d` z buňky),
+  aby zůstal v poměru k tokenům. Na mapě bez mřížky (svět) si drží stálou velikost na obrazovce jako dosud.
+
+### Okno deníku neschovává token, na který se kliklo (2026-11-11)
+
+Stížnost: „kliknutí na token hráče se mi otevře tak, že není vidět samotný token.“ Okno teď při otevření
+z tokenu uhne k tomu okraji obrazovky, který je od tokenu dál (`uhniTokenu()` v `assets/js/denik_dock.js`) —
+ne jen „vedle tokenu“, aby klik na souseda okno nezachytil. A když vpravo stojí otevřený postranní panel,
+okno se pod něj neschová (`uhniPanelu()`, volá se i z `otevritSpravovat`).
+
 ### Světlo se zapaluje u předmětu, ne ručně na tokenu (2026-11-11)
 
 Část D návrhu `docs/panel-tokenu-navrh.md`. Dosud PJ klikal „Pochodeň (6 sáhů)“ v panelu tokenu, přestože

@@ -174,7 +174,47 @@ export function initDenikDock(ctx) {
     zobraz(cil);
     aplikuj();
     uloz(stav);
+    uhniPanelu();
   }
+  // Okno nesmí stát na tokenu, na který se právě kliklo (stížnost uživatele 2026-11-11: „kliknutí na token
+  // hráče se mi otevře tak, že není vidět samotný token“). Když ho překrývá, uhne na druhou stranu — a když
+  // se nevejde ani tam, posune se jen tak daleko, aby token odkryl. Na telefonu je okno spodní list přes
+  // celou šířku, tam se uhnout nedá a nic se neděje.
+  function uhniTokenu(bod) {
+    if (!bod || !stav.otevreno || stav.cela || stav.sbaleno || window.innerWidth <= TELEFON) return;
+    const r = dock.getBoundingClientRect();
+    const rezerva = 24;
+    if (bod.x < r.left - rezerva || bod.x > r.right + rezerva || bod.y < r.top - rezerva || bod.y > r.bottom + rezerva) return;
+    // Okno se neposune jen „vedle tokenu“, ale k tomu okraji obrazovky, který je od tokenu dál. Střed mapy
+    // tak zůstane volný a klik na další token okno nezachytí — jinak by uhnutí od jednoho tokenu rovnou
+    // zakrylo sousední.
+    // Vpravo může stát otevřený postranní panel tokenu — tam okno parkovat nejde, schovalo by se pod něj
+    // i s křížkem na zavření.
+    const panel = document.querySelector('#panel-spravovat.open');
+    const pravyKraj = panel ? Math.min(window.innerWidth, panel.getBoundingClientRect().left) : window.innerWidth;
+    const sirka = window.innerWidth;
+    const uLevehoKraje = Math.max(OKRAJ, vychoziX());
+    const uPravehoKraje = Math.max(OKRAJ, pravyKraj - stav.w - OKRAJ);
+    const vpravoSeVejde = uPravehoKraje + stav.w <= pravyKraj - OKRAJ / 2;
+    stav.x = Math.round(bod.x < sirka / 2 && vpravoSeVejde ? uPravehoKraje : uLevehoKraje);
+    ohranic();
+    aplikuj();
+    uloz(stav);
+  }
+
+  // Postranní panel tokenu vyjíždí vpravo; když pod ním okno deníku zmizí i s křížkem, uhne doleva.
+  function uhniPanelu() {
+    if (!stav.otevreno || stav.cela || stav.sbaleno || window.innerWidth <= TELEFON) return;
+    const panel = document.querySelector('#panel-spravovat.open');
+    if (!panel) return;
+    const kraj = panel.getBoundingClientRect().left;
+    if (stav.x + stav.w <= kraj) return;
+    stav.x = Math.round(Math.max(OKRAJ, Math.min(vychoziX(), kraj - stav.w - OKRAJ)));
+    ohranic();
+    aplikuj();
+    uloz(stav);
+  }
+
   function zavri() {
     stav.otevreno = false;
     dock.style.display = 'none';
@@ -229,11 +269,13 @@ export function initDenikDock(ctx) {
     // Klik na token postavy na mapě otevírá rychlý deník (rozhodnutí uživatele 2026-11-10). Na rozdíl od tlačítka
     // „Otevřít deník“ to NENÍ výslovná volba postavy: režim „pevně tuhle postavu“ i „podle toho, kdo je na tahu“
     // zůstávají v platnosti, okno se jen otevře (a rozbalí, když bylo sbalené).
-    otevriZTokenu(postavaId) {
+    uhniPanelu,
+    otevriZTokenu(postavaId, bod) {
       if (!povoleneId.has(postavaId)) return;
       if (stav.sbaleno) { stav.sbaleno = false; aplikuj(); uloz(stav); }
       if (!stav.otevreno) otevri(stav.sledovat === 'vyber' ? postavaId : null);
       else if (stav.sledovat === 'vyber') zobraz(postavaId);
+      uhniTokenu(bod);
     },
     // Změna tvora na tahu v souboji (režim „podle toho, kdo je na tahu“).
     tah(postavaId) {

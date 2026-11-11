@@ -22,32 +22,56 @@ body { -webkit-tap-highlight-color:transparent; }
 
 /* Piny a ping zůstávají stejně velké na obrazovce bez ohledu na zoom */
 .mapa-bod-marker { transform:translate(-50%,-100%) scale(calc(1 / var(--z, 1))); transform-origin:50% 100%; }
+/* Na mapě s mřížkou pin patří do terénu: zvětšuje se s mapou (žádné zpětné škálování) a velikost se odvíjí
+   od buňky, takže vedle tokenů sedí v poměru i po přiblížení (zadání uživatele 2026-11-11). */
+body.pin-v-mape .mapa-bod-marker { transform:translate(-50%,-100%); }
+body.pin-v-mape .mapa-bod-marker svg { width:var(--pin-d, 28px); height:var(--pin-d, 28px); }
 
 /* --- Tokeny ---
    .vtt-token je nulový bod ve STŘEDU tokenu (x, y z databáze); puck, životy
    a šipka směru se kolem něj rozkládají podle velikosti --d. */
 .vtt-token { position:absolute; width:0; height:0; user-select:none; -webkit-user-select:none; }
-.vtt-token .puck { position:absolute; left:calc(var(--d) / -2); top:calc(var(--d) / -2); width:var(--d); height:var(--d);
+/* --dp = průměr kolečka; u tvora s tělem z víc hexů je to jen jeden hex, ne obrys celé bytosti. */
+.vtt-token { --dp:var(--d); }
+.vtt-token .puck { position:absolute; left:calc(var(--dp) / -2); top:calc(var(--dp) / -2); width:var(--dp); height:var(--dp);
                    box-sizing:border-box; border-radius:50%; color:#fff; display:flex; align-items:center; justify-content:center;
                    font-weight:600; border:2px solid rgba(255,255,255,.35); box-shadow:0 2px 6px rgba(0,0,0,.5);
                    overflow:hidden; text-shadow:0 1px 2px rgba(0,0,0,.6); }
-.vtt-token .hp { position:absolute; left:0; top:calc(var(--d) / 2 + 3px); transform:translateX(-50%); white-space:nowrap;
+/* Rámeček tokenu kopíruje mřížku (zadání uživatele 2026-11-11): kolečko na čtvercové, šestiúhelník na hexové.
+   Na hexu se `clip-path` ořízne i rámeček, takže obrys dělá podložka ::before o 2 px větší — leží v DOM před
+   kolečkem, takže kolečko kreslí přes ni. Token je o kousek menší než buňka, ať se sousedé nelepí k sobě. */
+.mrizka-hex .vtt-token .puck { border:none; border-radius:0; clip-path:polygon(50% 0%, 93.3% 25%, 93.3% 75%, 50% 100%, 6.7% 75%, 6.7% 25%); }
+.mrizka-hex .vtt-token::before { content:""; position:absolute; left:calc(var(--dp) / -2 - 2px); top:calc(var(--dp) / -2 - 2px);
+                   width:calc(var(--dp) + 4px); height:calc(var(--dp) + 4px); background:rgba(255,255,255,.4);
+                   clip-path:polygon(50% 0%, 93.3% 25%, 93.3% 75%, 50% 100%, 6.7% 75%, 6.7% 25%); pointer-events:none; }
+.mrizka-hex .vtt-token.vybrany::before { background:#ffd166; }
+.mrizka-hex .vtt-token.vybrany .puck { outline:none; }
+/* Tvor, který zabírá víc hexů, má vlastní tělo — kolečko je u něj jen malý štítek se jménem. */
+.vtt-token.ma-telo .puck { opacity:.92; }
+.mrizka-hex .vtt-token.ma-telo::before { background:rgba(255,255,255,.55); }
+/* Životy, efekty i šipka směru se drží kolečka (--dp), ne celého těla: u tvora na víc hexech by jinak
+   odlétly někam vedle a vypadaly jako cizí popisek. */
+.vtt-token .hp { position:absolute; left:0; top:calc(var(--dp) / 2 + 3px); transform:translateX(-50%); white-space:nowrap;
                  font-size:11px; background:rgba(0,0,0,.7); color:#fff; border-radius:4px; padding:1px 5px; pointer-events:none; }
-.vtt-token .fx { position:absolute; left:0; top:calc(var(--d) / 2 + 22px); transform:translateX(-50%); white-space:nowrap;
+.vtt-token .fx { position:absolute; left:0; top:calc(var(--dp) / 2 + 22px); transform:translateX(-50%); white-space:nowrap;
                  font-size:10px; background:rgba(0,0,0,.6); color:#fdd; border-radius:4px; padding:1px 5px; pointer-events:none; }
 .vtt-token .face { position:absolute; left:0; top:0; width:0; height:0; pointer-events:none; }
-.vtt-token .face::before { content:""; position:absolute; left:calc(var(--d) / 2 - 3px); top:-7px; width:0; height:0;
+/* Tvor s tělem má čelo vyznačené přímo na obrysu těla, šipka by byla druhá značka téhož. */
+.vtt-token.ma-telo .face { display:none; }
+.vtt-token .face::before { content:""; position:absolute; left:calc(var(--dp) / 2 - 3px); top:-7px; width:0; height:0;
                            border-left:12px solid #ffd166; border-top:7px solid transparent; border-bottom:7px solid transparent;
                            filter:drop-shadow(0 0 2px rgba(0,0,0,.85)); }
 /* Tělo tvora na více hexech (HB): průsvitné hexy + žlutá čelní hrana (D, E, F) */
 .vtt-token svg.telo { position:absolute; left:0; top:0; width:1px; height:1px; overflow:visible; }
-.telo-hex { fill-opacity:.6; stroke:rgba(255,255,255,.9); stroke-width:2.5; vector-effect:non-scaling-stroke; }
-.telo-hex.otocny { fill-opacity:.8; }
-.telo-hex.hlava { fill-opacity:.8; }
+/* Tělo je slitý tvar: výplň bez obrysu (hexy se nepatrně překrývají, ať mezi nimi není vlasová mezera)
+   a obtažená jen vnější hranice. Dřív měl každý hex vlastní obrys a bytost vypadala jako poskládaná kolečka. */
+.telo-hex { fill-opacity:.72; stroke:none; }
+.telo-hex.hlava { fill-opacity:.88; }
+.telo-obrys { stroke:rgba(255,255,255,.9); stroke-width:2.5; stroke-linecap:round; vector-effect:non-scaling-stroke; fill:none; }
 .telo-celo { fill:none; stroke:#ffd166; stroke-width:5; stroke-linecap:round; stroke-linejoin:round; vector-effect:non-scaling-stroke;
              filter:drop-shadow(0 0 2px rgba(0,0,0,.85)); }
 .vtt-token.dead svg.telo, .vtt-token.skryty svg.telo { opacity:.5; }
-.vtt-token.vybrany .telo-hex { stroke:#ffd166; }
+.vtt-token.vybrany .telo-obrys { stroke:#ffd166; }
 .vtt-token.movable { cursor:grab; }
 .vtt-token.tahnuty { cursor:grabbing; opacity:.85; }
 .vtt-token.not-turn { cursor:not-allowed; }

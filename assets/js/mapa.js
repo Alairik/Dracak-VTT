@@ -841,6 +841,7 @@ const gridNastaveniFields = document.getElementById('gridNastaveniFields');
 function zrusitZivyNahledGridu() {
   if (!gridZapnutyChk) return;
   GRID_PX = gridSaved.px; GRID_TYPE = gridSaved.typ; GRID_OFFSET_X = gridSaved.offX; GRID_OFFSET_Y = gridSaved.offY;
+  oznacitMrizku();
   renderGrid();
 }
 // Slider nastavuje GRID_PX (u hexu circumradius, viz pxNaSah() výš),
@@ -865,6 +866,7 @@ function nacistGridFormular() {
 function zivyNahledGridu() {
   GRID_PX = gridZapnutyChk.checked ? parseInt(gridVelikostSlider.value, 10) : 0;
   GRID_TYPE = gridTypSelect.value;
+  oznacitMrizku();
   GRID_OFFSET_X = parseInt(gridPosunXInput.value, 10) || 0;
   GRID_OFFSET_Y = parseInt(gridPosunYInput.value, 10) || 0;
   renderGrid();
@@ -892,6 +894,7 @@ if (gridUlozitBtn) {
         if (d.error) { logLine('Chyba: ' + d.error); return; }
         gridSaved = novy;
         GRID_PX = novy.px; GRID_TYPE = novy.typ; GRID_OFFSET_X = novy.offX; GRID_OFFSET_Y = novy.offY;
+        oznacitMrizku();
         aktualizovatZedJednotky();
         closeAllPopovers();
         logLine('Nastavení gridu uloženo.');
@@ -1268,9 +1271,28 @@ function esc(text) {
 function tokenData(id) { return tokeny.find((t) => t.id === id) || null; }
 // Token je ve výchozí velikosti o něco menší než buňka gridu (aby se do hexu
 // vešel celý); bez gridu pevných 40 px jako dřív.
+// Tvar rámečku tokenu se řídí mřížkou: kolečko na čtvercové, šestiúhelník na hexové (zadání uživatele
+// 2026-11-11). Třída je na obalu mapy, aby to CSS vyřešilo jednou — pro tokeny i pro náhledy ve výběru.
+function oznacitMrizku() {
+  document.body.classList.toggle('mrizka-hex', GRID_TYPE === 'hex');
+  document.body.classList.toggle('mrizka-ctverec', GRID_TYPE !== 'hex');
+  // Piny: na mapě s mřížkou (bojiště, kobka) se mají zvětšovat a zmenšovat spolu s mapou, aby zůstaly
+  // v poměru k hexům a tokenům — stížnost uživatele 2026-11-11, že „pin vypadá nesymetricky k ostatním
+  // bodům“, když se přiblíží nebo oddálí. Na mapě bez mřížky (svět) je pin značka v legendě, ne objekt
+  // v terénu, a drží si stálou velikost na obrazovce jako dosud.
+  const sah = typeof pxNaSah === 'function' ? pxNaSah() : 0;
+  document.body.classList.toggle('pin-v-mape', sah > 0);
+  if (sah > 0) document.body.style.setProperty('--pin-d', Math.round(Math.max(18, Math.min(96, sah * 0.62))) + 'px');
+  else document.body.style.removeProperty('--pin-d');
+}
+oznacitMrizku();
+
 function zakladniPrumerTokenu() {
   const sah = pxNaSah();
-  return sah > 0 ? sah * 0.82 : 40;
+  // Na hexu je token o kousek menší než buňka, ať se sousedé nelepí k sobě a mřížka zůstane čitelná
+  // (zadání uživatele 2026-11-11: „u hexu by mohl být odsazen pár pixelů od hrany“).
+  const podil = GRID_TYPE === 'hex' ? 0.76 : 0.82;
+  return sah > 0 ? sah * podil : 40;
 }
 function prumerTokenu(t) { return zakladniPrumerTokenu() * (t.velikost > 0 ? t.velikost : 1); }
 // Dvě písmena jména; u číslovaných kusů ("Goblin 3") první písmeno a číslo ("G3"),
@@ -1301,6 +1323,10 @@ function nakreslitToken(t) {
   let el = tokenEl.get(t.id);
   if (!el) { el = vytvorTokenEl(t); tokenEl.set(t.id, el); }
   const d = prumerTokenu(t);
+  // Tvor na víc hexech má vlastní tělo (slité hexy) — kolečko by z něj udělalo obří kruh (stížnost
+  // uživatele 2026-11-11: „černý drak vypadá jako obří kruh, má vypadat jen jako hexy“).
+  const maTeloHexu = FUNKCE.hexy && GRID_PX > 0 && GRID_TYPE === 'hex' && t.hexu > 1;
+  el.classList.toggle('ma-telo', maTeloHexu);
   if (!drzeneTokeny.has(t.id)) {
     el.style.left = t.x + 'px';
     el.style.top = t.y + 'px';
@@ -1316,8 +1342,11 @@ function nakreslitToken(t) {
   el.classList.toggle('aktivni-tah', !!koloStav && koloStav.aktivni_token_id === t.id);
   el.classList.toggle('vybrany', typeof jeVybrany === 'function' && jeVybrany(t.id));
   const puck = el.querySelector('.puck');
+  // Když má tvor tělo z hexů, je kolečko jen malý štítek se jménem uprostřed — velikost bere z jednoho hexu.
+  const dPuck = maTeloHexu ? zakladniPrumerTokenu() : d;
+  el.style.setProperty('--dp', dPuck.toFixed(1) + 'px');
   puck.style.backgroundColor = barvaTokenu(t);
-  puck.style.fontSize = Math.max(9, Math.round(d * 0.3)) + 'px';
+  puck.style.fontSize = Math.max(9, Math.round(dPuck * 0.3)) + 'px';
   puck.firstChild.textContent = iniciala(t.label);
   if (FUNKCE.obrazek && t.obrazek_id) {
     puck.style.backgroundImage = "url('obrazek.php?id=" + t.obrazek_id + "')";
@@ -1380,14 +1409,36 @@ function nakreslitTelo(t, el) {
   g.setAttribute('class', 'telo-skup');
   const cely = hexy.bunkyTvaru(tvar, pivot, orient);
   const predni = new Set(hexy.bunkyTvaru(tvar, pivot, orient, 'predni').map(hexy.klic));
+  // Tělo je JEDEN slitý tvar, ne poskládaná kolečka: hexy se vyplní bez obrysu (a s nepatrným přesahem,
+  // aby mezi nimi nezůstala vlasová mezera) a obtáhne se jen vnější hranice — hrany, za kterými další hex
+  // téhle bytosti není. Stížnost uživatele 2026-11-11: „nemají mezi jednotlivými hexy jedné postavy být čárky“.
+  const vCelku = new Set(cely.map(hexy.klic));
+  const velikostHexu = GRID_PX * 1.01;
   cely.forEach((b) => {
     const st = mlhaBunkaStred(b.row, b.col);
-    const pts = [0, 1, 2, 3, 4, 5].map((i) => hexBod(st.x - pivot.x + px, st.y - pivot.y + py, GRID_PX * 0.97, i).map((v) => v.toFixed(1)).join(',')).join(' ');
+    const pts = [0, 1, 2, 3, 4, 5].map((i) => hexBod(st.x - pivot.x + px, st.y - pivot.y + py, velikostHexu, i).map((v) => v.toFixed(1)).join(',')).join(' ');
     const poly = document.createElementNS(SVGNS, 'polygon');
     poly.setAttribute('points', pts);
-    poly.setAttribute('class', 'telo-hex' + (hexy.klic(b) === hexy.klic(pivot) ? ' otocny' : '') + (tvar.typ_otaceni === 'smer' && predni.has(hexy.klic(b)) ? ' hlava' : ''));
+    poly.setAttribute('class', 'telo-hex' + (tvar.typ_otaceni === 'smer' && predni.has(hexy.klic(b)) ? ' hlava' : ''));
     poly.style.fill = barva;
     g.appendChild(poly);
+  });
+  // Vnější obrys: hrana i-tého vrcholu patří sousedovi ve směru i; když ten soused do těla nepatří,
+  // je to hranice bytosti a nakreslí se. Hrany uvnitř těla se nekreslí vůbec, takže tvar vypadá slitý.
+  cely.forEach((b) => {
+    const st = mlhaBunkaStred(b.row, b.col);
+    const cx = st.x - pivot.x + px, cy = st.y - pivot.y + py;
+    for (let i = 0; i < 6; i++) {
+      const soused = hexy.soused ? hexy.soused(b, i) : null;
+      if (soused && vCelku.has(hexy.klic(soused))) continue;
+      const a = hexBod(cx, cy, GRID_PX, i);
+      const c = hexBod(cx, cy, GRID_PX, (i + 1) % 6);
+      const cara = document.createElementNS(SVGNS, 'line');
+      cara.setAttribute('x1', a[0].toFixed(1)); cara.setAttribute('y1', a[1].toFixed(1));
+      cara.setAttribute('x2', c[0].toFixed(1)); cara.setAttribute('y2', c[1].toFixed(1));
+      cara.setAttribute('class', 'telo-obrys');
+      g.appendChild(cara);
+    }
   });
   if (tvar.typ_otaceni === 'hrana') {
     // Čelo = vnější strany obou horních hexů (sousedé ve směrech 4+orient a 5+orient)
@@ -2031,6 +2082,8 @@ function otevritSpravovat(t, jenNaplnit) {
   if (jenNaplnit) return;
   pjVrstvaZpet();   // panel a deník si blok nástrojů nemůžou držet oba
   spravovatPanel.classList.add('open');
+  // Panel vyjede vpravo; kdyby pod ním zmizelo plovoucí okno deníku i s křížkem, ať uhne doleva.
+  if (denikDock) denikDock.uhniPanelu();
 }
 // Co otevře klik na token (rozhodnutí uživatele 2026-11-10, „rychlý deník mám zkontrolovaný, zaimplementuj“):
 //   * nestvůra   → plovoucí okno tvora u tokenu (assets/js/tvor_okno.js);
@@ -2042,7 +2095,7 @@ function otevritProToken(t, bod) {
   if (tvorOkno && t.typ_entity === 'nestvura_instance') { tvorOkno.otevrit(t, bod || zvyraznenyBod(t)); return true; }
   if (denikDock && t.typ_entity === 'postava' && denikDock.smi(t.entita_id)) {
     if (spravovatPanel.classList.contains('open')) spravovatPanel.classList.remove('open');
-    denikDock.otevriZTokenu(t.entita_id);
+    denikDock.otevriZTokenu(t.entita_id, bod || zvyraznenyBod(t));
     return true;
   }
   return false;

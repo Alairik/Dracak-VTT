@@ -174,7 +174,19 @@ const stav = (page) => page.evaluate(async (m) => (await fetch('api/mapa_stav.ph
   const vp = await pj.locator('#viewport').boundingBox();
   ok(Math.round(vp.x) === 0 && Math.round(vp.width) === 1400, 'mapa se otevřením deníku nezužuje (okno plave přes ni): ' + JSON.stringify([vp.x, vp.width]));
   let b0 = await bbox();
-  ok(b0.x > 60 && b0.x < 200 && b0.width >= 340, 'okno vzniklo vedle levé lišty: ' + JSON.stringify([b0.x, b0.width]));
+  ok(b0.x > 60 && b0.x + b0.width <= 1400 && b0.width >= 340, 'okno vzniklo na obrazovce vedle levé lišty: ' + JSON.stringify([b0.x, b0.width]));
+  // Okno nesmí stát na tokenu, na který se právě kliklo (stížnost uživatele 2026-11-11). Otevřeme deník
+  // klikem na token schválně pod oknem a ověříme, že okno uhnulo.
+  {
+    if (await pj.locator('#panel-spravovat.open').count()) { await pj.click('#panel-spravovat .close-x'); await pj.waitForTimeout(300); }
+    const pod = await pj.$eval('.vtt-token[data-id="' + tSindor + '"] .puck', (e) => { const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+    await pj.evaluate(() => { const d = document.getElementById('denikDock'); d.style.left = '0px'; });
+    await klik(tSindor); await pj.waitForTimeout(700);
+    const bt = await bbox();
+    const kryje = pod.x > bt.x && pod.x < bt.x + bt.width && pod.y > bt.y && pod.y < bt.y + bt.height;
+    ok(!kryje, 'okno deníku nestojí na tokenu, na který se kliklo: token ' + Math.round(pod.x) + ',' + Math.round(pod.y) + ' okno ' + JSON.stringify([Math.round(bt.x), Math.round(bt.width)]));
+  }
+  b0 = await bbox();
   { const sh = await pj.locator('.denik-hrana[data-hrana="s"]').boundingBox(); await pj.mouse.move(sh.x + 100, sh.y + 5); await pj.mouse.down(); await pj.mouse.move(sh.x + 100, sh.y + 5 - 300, { steps: 5 }); await pj.mouse.up(); }
   b0 = await bbox();
   ok(Math.abs(b0.height - 576) <= 14, 'dolní okraj zmenší výšku okna: ' + Math.round(b0.height));
