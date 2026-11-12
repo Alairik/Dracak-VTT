@@ -253,6 +253,42 @@ Tři věci ze zadání uživatele k pinům:
 Testy: rozšířený `tests/e2e/pin_vstoupit_api.js` (automatický zpáteční pin, zrušení, posunutí i s družinou,
 hláška v prohlížeči) a nový `tests/e2e/pin_mapa_ui.js` (mapa z pinu, práva, velikost značek).
 
+### Souboj — nový průběh, NÁVRH k připomínkám (2026-11-12, v kódu zatím nic)
+
+Zadání uživatele: *„potřebuju zrevidovat souboj. přijde mi to strašně složitý… musí to fungovat úplně samo,
+respektive aby to udělalo jen výzvy k hodům, o zbytek se postarají animace… jen nahlásím jakou akci budu dělat,
+podle toho se mi přičte iniciativa. potom už jen vybírám cíl a kouzlo.“* a *„pojďme udělat krok za krokem vzhled
+souboje, ať nefabulujeme“*.
+
+**Plátno s návrhem:** https://claude.ai/artifact/3ojke53iFM7Utts6MgXiX6 — deset nákresů (0 zahájení PJ, 1 co budu
+dělat, 2 hod na iniciativu, 3 můj tah, 3b kouzlo, 4 hod na útok, 5 obrana, 6 výsledek, 7 pohled PJ, telefon).
+Zdroj nákresů je v plátně, ne v repu; uživatel do něj píše připomínky — před úpravou ho přečíst (`Artifact read`).
+
+**Co návrh mění proti dnešku** (dnešek = `assets/js/souboj.js`, postranní panel se třemi záložkami fází):
+
+* Postranní panel Souboj mizí. Zůstávají tři stálá místa: **pořadí tahů nahoře**, **jedna karta dole** (co se po
+  mně právě chce), **mapa** (výběr cíle).
+* **Ohlášení akce** = jedno klepnutí na dlaždici (Útok / Střelba / Kouzlo / Pohyb + Čekám / Utíkám / Něco jiného),
+  u každé je vidět změna iniciativy. **Cíl se při ohlášení nevybírá** a pole „útoků za 2 kola“ mizí (bere se
+  z postavy). Od 2. kola je předvybrané „stejně jako minule“.
+* **Iniciativa**: jedna výzva s jedním tlačítkem, bonusy jsou vidět jako štítky a přičtou se samy. Kolo začne
+  samo, jakmile hodí poslední (dnes tlačítka PJ „Otevřít hody“ a „Začít kolo“).
+* **Tah**: klepnu na nepřítele = útok zbraní, kterou držím (bez zbraně = beze zbraně), klepnu na místo = přesun;
+  potvrzení jedním tlačítkem u cíle. Čelo se natočí samo k cíli. Karta s výpisem „Otočení celkem 0° z 270°“ mizí.
+* **Kouzlo**: vyberu kouzlo ze seznamu svých (s cenou v mazích, nedostupná zašedlá), pak klepnu na cíl v dosahu.
+  Dnešní ruční pole „kol / magy / akcí“ mizí.
+* **Hody**: výzva „Hoď na útok / na obranu“ s jedním tlačítkem, čísla z deníku, hráč nic nevyplňuje. Úprava čísel
+  zůstává jen PJ a je schovaná.
+* **Výsledek** nemá kartu k zavírání — číslo nad tokenem, pruh životů, krátká hláška, další na tahu sám.
+* **Nestvůry**: úmysl, iniciativu i obranu hází hra sama (přepínač u PJ), PJ zasahuje, jen když chce.
+* **Zbraně na začátku boje**: kdo není překvapený, má zbraň z deníku rovnou v ruce; překvapený ji tasí první akcí.
+  *Pozor — to je domácí pravidlo uživatele, kniha říká, že vytasení stojí akci (h1606); až se bude stavět, zapsat
+  ho do pravidel jako homebrew.*
+
+**Čeká na uživatele:** připomínky k plátnu a tři rozhodnutí (nestvůry hází samy? obrana hráče vždy na výzvu,
+nebo taky sama? čtvercová mapa stejné klepání jako hex?). **Další krok po schválení:** stavět po krocích odshora
+(0 → 1 → 2 …), server se z velké části nemění — jde hlavně o `assets/js/souboj.js` a markup v `hra/mapa.php`.
+
 ### Animace souboje (2026-11-11)
 
 Zadání uživatele a jeho upřesnění k návrhu (deska „Souboj — kdo je na tahu a animace“):
