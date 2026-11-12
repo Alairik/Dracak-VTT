@@ -253,6 +253,26 @@ Tři věci ze zadání uživatele k pinům:
 Testy: rozšířený `tests/e2e/pin_vstoupit_api.js` (automatický zpáteční pin, zrušení, posunutí i s družinou,
 hláška v prohlížeči) a nový `tests/e2e/pin_mapa_ui.js` (mapa z pinu, práva, velikost značek).
 
+### Malá karta postavy: jeden klik = karta, dvojklik = deník (2026-11-12)
+
+Zadání uživatele: *„když kliknu na token, rovnou se mi ukazuje full deník. to bych chtěl, aby se vyvolalo buď na
+dvouklik nebo až na kliknutí tlačítka deník. na jednoklik bych chtěl jen tiny deník, kde bude jen info životy,
+mana, uč oč… zrušit dialog buď křížkem nebo klikem mimo.“* Mění rozhodnutí z 2026-11-10 (klik = rychlý deník).
+
+* **Jeden klik na postavu** → malá karta u tokenu (`assets/js/postava_mini.js`, styly `.pmini` v `mapa.css`):
+  jméno, povolání a úroveň, pruh životů, pruh magenergie (jen kdo ji má), **ÚČ se zbraní v ruce** (bez zbraně
+  „–, beze zbraně“) a **OČ**. Jen ke čtení. Čísla dává `hra/api/postava_mini.php` z `dracak_vtt_souboj_bojovnik`,
+  tedy totéž, s čím počítá souboj. Smí PJ a vlastník postavy (cizí 403).
+* **Plný (rychlý) deník** → dvojklik na token (dva kliky bez tažení do 400 ms, `jeDvojklikTokenu` v `mapa.js`),
+  tlačítko „Deník“ v kartě, nebo „Rychlý deník“ v kontextovém menu. Na telefonu spolehlivě tlačítkem.
+* **Zavření karty**: křížek, klik mimo, Esc. Klik na jiný token ji přepne / zavře.
+* **Je-li okno deníku už otevřené**, klik ho jen přepne na kliknutou postavu jako dřív (režim „podle výběru“) —
+  karta by vedle něj byla dvojmo.
+* Okno tvora u nestvůr (PJ) se nemění.
+
+Testy: nový `tests/e2e/postava_mini_ui.js` (30 kontrol), upravené `denik_dock.js` a `efekty_ui.js` (deník se v nich
+otevírá dvojklikem). Bez změny databáze.
+
 ### Souboj — nový průběh, NÁVRH k připomínkám (2026-11-12, v kódu zatím nic)
 
 Zadání uživatele: *„potřebuju zrevidovat souboj. přijde mi to strašně složitý… musí to fungovat úplně samo,
@@ -280,13 +300,19 @@ Zdroj nákresů je v plátně, ne v repu; uživatel do něj píše připomínky 
 * **Hody**: výzva „Hoď na útok / na obranu“ s jedním tlačítkem, čísla z deníku, hráč nic nevyplňuje. Úprava čísel
   zůstává jen PJ a je schovaná.
 * **Výsledek** nemá kartu k zavírání — číslo nad tokenem, pruh životů, krátká hláška, další na tahu sám.
-* **Nestvůry**: úmysl, iniciativu i obranu hází hra sama (přepínač u PJ), PJ zasahuje, jen když chce.
-* **Zbraně na začátku boje**: kdo není překvapený, má zbraň z deníku rovnou v ruce; překvapený ji tasí první akcí.
+* **Nestvůry** hraje PJ stejnými kartami jako hráč (původní návrh „hází samy“ uživatel odložil na další verzi).
+* **Zbraně na začátku boje**: výchozí je, že zbraň z deníku mají v ruce všichni; PJ odklepne, koho boj zastihl beze zbraně.
   *Pozor — to je domácí pravidlo uživatele, kniha říká, že vytasení stojí akci (h1606); až se bude stavět, zapsat
   ho do pravidel jako homebrew.*
 
-**Čeká na uživatele:** připomínky k plátnu a tři rozhodnutí (nestvůry hází samy? obrana hráče vždy na výzvu,
-nebo taky sama? čtvercová mapa stejné klepání jako hex?). **Další krok po schválení:** stavět po krocích odshora
+**Rozhodnuto uživatelem 2026-11-12:** (1) **nestvůry hraje PJ** — ohlásí, hází i brání za ně; plná automatika
+„až bude VTT hotové“. (2) **Obrana: vždy hráč** — volí „bráním se / nebráním se“ a hází v obou případech.
+(3) **Mapa bez hexů v souboji existovat nebude** — seznam 14 tlačítek (`AKCE_PROSTE` v `souboj.js`) při stavbě zmizí.
+**Zapracované komentáře z plátna:** v pořadí tahů hráč vidí jen viditelné nepřátele; u hodu je útočné / obranné
+číslo vidět rovnou; výměna zbraně v tahu = přezbrojení za akci (nabídka to říká předem); **překvapení a „zbraň
+v ruce“ jsou dvě oddělené otázky** — výchozí je, že tasili všichni včetně překvapených (družina to tak hraje:
+„v jakési bonusové neviditelné akci všichni vytasili“), PJ jen odklepne stranu / jednotlivce zastižené beze zbraně.
+**Čeká na uživatele:** schválení upraveného plátna. **Další krok po schválení:** stavět po krocích odshora
 (0 → 1 → 2 …), server se z velké části nemění — jde hlavně o `assets/js/souboj.js` a markup v `hra/mapa.php`.
 
 ### Animace souboje (2026-11-11)

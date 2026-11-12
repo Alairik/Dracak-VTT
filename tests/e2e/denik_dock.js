@@ -63,8 +63,12 @@ const stav = (page) => page.evaluate(async (m) => (await fetch('api/mapa_stav.ph
   ok(await pj.locator('#panel-spravovat.open').count() === 1 && !(await pj.locator('#spravovatDenik').isVisible()), 'v detailu nestvůry tlačítko deníku postavy není');
 
   // Rychlý deník místo postranního panelu (rozhodnutí uživatele 2026-11-10: „rychlý deník mám zkontrolovaný, zaimplementuj“)
+  // Od 2026-11-12 jeden klik otevírá jen malou kartu (tests/e2e/postava_mini_ui.js), plný deník až dvojklik.
   await klik(tSindor);
-  ok(await pj.locator('#denikDock').isVisible(), 'klik na postavu otevře rovnou rychlý deník');
+  ok(!(await pj.locator('#denikDock').isVisible()) && await pj.locator('.pmini').count() === 1, 'jeden klik na postavu otevře malou kartu, ne deník');
+  { const b = await pj.$eval('.vtt-token[data-id="' + tSindor + '"] .puck', e => { const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+    await pj.mouse.click(b.x, b.y); await pj.waitForTimeout(120); await pj.mouse.click(b.x, b.y); await pj.waitForTimeout(1200); }
+  ok(await pj.locator('#denikDock').isVisible(), 'dvojklik na postavu otevře rychlý deník');
   ok(await pj.locator('#panel-spravovat.open').count() === 0, 'postranní panel se u postavy neotevře');
   ok((await postavaVRamci()) === '2', 'deník ukazuje postavu toho tokenu, na který se kliklo');
   ok(await pj.locator('#denikPjVrstva').isVisible(), 'PJ má v okně deníku svou vrstvu nástrojů');
@@ -244,7 +248,7 @@ const stav = (page) => page.evaluate(async (m) => (await fetch('api/mapa_stav.ph
 
   // ===== hráč: jen své postavy =====
   const hr = await login(browser, 'hrac@local', 'hrac1234');
-  const klikHr = async (page, id) => { const b = await page.$eval('.vtt-token[data-id="' + id + '"] .puck', e => { const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }); await page.mouse.click(b.x, b.y); await page.waitForTimeout(900); };
+  const klikHr = async (page, id) => { const b = await page.$eval('.vtt-token[data-id="' + id + '"] .puck', e => { const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }); await page.mouse.click(b.x, b.y); await page.waitForTimeout(120); await page.mouse.click(b.x, b.y); await page.waitForTimeout(900); };
   // Hráči klik na vlastní postavu rovnou otevře rychlý deník (dřív musel přes postranní panel a tlačítko).
   await klikHr(hr, tSindor);
   ok(await hr.locator('#denikDock').isVisible(), 'hráči klik na vlastní token otevře rychlý deník');
@@ -263,7 +267,7 @@ const stav = (page) => page.evaluate(async (m) => (await fetch('api/mapa_stav.ph
   const tel = await login(browser, 'hrac@local', 'hrac1234', 420, 800);
   await klikHr(tel, tSindor);
   await tel.waitForTimeout(1200);
-  ok(await tel.locator('#panel-spravovat.open').count() === 0, 'na telefonu klik na token otevře rovnou deník, detail tokenu ne');
+  ok(await tel.locator('#panel-spravovat.open').count() === 0, 'na telefonu dvojí klepnutí na token otevře deník, detail tokenu ne');
   const bb = await tel.locator('#denikDock').boundingBox();
   ok(Math.round(bb.width) === 420 && Math.round(bb.y + bb.height) === 800 && bb.height > 400, 'na telefonu je deník spodní list přes celou šířku: ' + JSON.stringify([bb.width, bb.height]));
   await tel.click('#denikCela'); await tel.waitForTimeout(400);

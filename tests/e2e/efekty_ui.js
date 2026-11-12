@@ -55,8 +55,10 @@ const stav = (page) => page.evaluate(async (m) => (await fetch('api/mapa_stav.ph
     await pj.mouse.click(b.x, b.y, { button: 'right' }); await pj.waitForTimeout(400);
     await pj.locator('#kontextMenu button', { hasText: 'Nastavení tokenu' }).click(); await pj.waitForTimeout(700);
   };
-  await klik(sindor);
-  ok(await pj.locator('#denikDock').isVisible(), 'klik na Sindora otevře rychlý deník');
+  // Od 2026-11-12 jeden klik otevírá jen malou kartu, plný deník až dvojklik (dva kliky do 400 ms).
+  { const b = await pj.$eval('.vtt-token[data-id="' + sindor + '"] .puck', e => { const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+    await pj.mouse.click(b.x, b.y); await pj.waitForTimeout(120); await pj.mouse.click(b.x, b.y); await pj.waitForTimeout(1200); }
+  ok(await pj.locator('#denikDock').isVisible(), 'dvojklik na Sindora otevře rychlý deník');
   await otevriPanel(sindor);
   ok(await pj.$eval('#panel-spravovat', e => e.classList.contains('open')), 'z kontextového menu se otevře panel');
   const jePanel = await pj.evaluate(() => !!document.getElementById('efektSelect'));

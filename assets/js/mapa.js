@@ -9,6 +9,7 @@ const {hodit3D, nactiKostky, kostky3DPripraveny} = await import('./kostky3d.js?v
 const hexy = await import('./hexy.js?v=' + VERZE_MODULU);
 const initSouboj = window.MAPA.funkce.souboj ? (await import('./souboj.js?v=' + VERZE_MODULU)).initSouboj : null;
 const initDenikDock = (window.MAPA.denikPostavy || []).length ? (await import('./denik_dock.js?v=' + VERZE_MODULU)).initDenikDock : null;
+const initPostavaMini = (window.MAPA.denikPostavy || []).length ? (await import('./postava_mini.js?v=' + VERZE_MODULU)).initPostavaMini : null;
 const svetloStiny = await import('./svetlo_stiny.js?v=' + VERZE_MODULU);   // světlo a stíny na mapě Noc / Tma (renderMlha)
 const initRaidPanel = document.getElementById('raidPanel') ? (await import('./raid_panel.js?v=' + VERZE_MODULU)).initRaidPanel : null;
 // Správa tokenů (jen PJ, až po ručním SQL migrace 0115): lišta dole uprostřed se zásobou NPC.
@@ -1885,6 +1886,7 @@ if (modalObrazky) {
 // Souboj s fázemi (assets/js/souboj.js) — jen když je na serveru zapnutý
 // (ruční SQL 0085); jinak zůstává dnešní jednoduchá iniciativa.
 let tokenBar = null;   // lišta správy tokenů (assets/js/token_bar.js) — jen PJ a jen po ručním SQL 0115
+let postavaMini = null;   // malá karta postavy u tokenu (assets/js/postava_mini.js) — jeden klik; plný deník až dvojklik / tlačítko
 let tvorOkno = null;   // plovoucí okno tvora (assets/js/tvor_okno.js) — jen PJ, jen u nestvůr
 let raid = null;   // raid panel (assets/js/raid_panel.js) — vznikne hned za soubojem, který do něj vkládá ovládání tvorů
 const souboj = initSouboj ? initSouboj({
@@ -1985,6 +1987,12 @@ const denikDock = initDenikDock ? initDenikDock({
 // Raid panel (assets/js/raid_panel.js): plovoucí okno s boxy tvorů a ovládáním souboje; myš nad boxem zvýrazní token a naopak.
 // PJ vidí všechny tvory a všechny údaje, hráč družinu / účastníky souboje a jen pruh životů.
 // Správa tokenů (assets/js/token_bar.js): zásoba NPC, výroba dávkou, pokládání tažením.
+postavaMini = initPostavaMini ? initPostavaMini({
+  mapaId: MAPA_ID,
+  getJson: (url) => fetch(url, {cache: 'no-store', credentials: 'same-origin'}).then((r) => r.json()).catch(() => null),
+  otevritDenik: (t) => otevritProToken(t, null, true),
+}) : null;
+
 tvorOkno = initTvorOkno ? initTvorOkno({
   mapaId: MAPA_ID,
   postJson,
@@ -2114,6 +2122,7 @@ function aplikujStav(s) {
   naplnitVolnePostavy();
   obnovPanelSpravovat();
   obnovTvorOkno();
+  obnovPostavaMini();
   if (raid) raid.prekresli();
   if (denikDock) {
     const naTahu = koloStav && koloStav.aktivni_token_id ? tokeny.find((x) => x.id === koloStav.aktivni_token_id) : null;
@@ -2194,14 +2203,37 @@ function otevritSpravovat(t, jenNaplnit) {
 //                  dostane vrstvu nástrojů k téhle postavě (přesunutý `#sekceEntita`);
 //   * postava, na kterou uživatel nemá deník (cizí hráčova), a obecný token → postranní panel jako dřív.
 // Postranní panel (vzhled značky, zámek, smazat) zůstává dostupný z kontextového menu nad tokenem.
-function otevritProToken(t, bod) {
-  if (tvorOkno && t.typ_entity === 'nestvura_instance') { tvorOkno.otevrit(t, bod || zvyraznenyBod(t)); return true; }
-  if (denikDock && t.typ_entity === 'postava' && denikDock.smi(t.entita_id)) {
-    if (spravovatPanel.classList.contains('open')) spravovatPanel.classList.remove('open');
-    denikDock.otevriZTokenu(t.entita_id, bod || zvyraznenyBod(t));
+// Od 2026-11-12 (uživatel: „na jednoklik jen tiny deník… full deník na dvouklik nebo tlačítko Deník“):
+//   * JEDEN klik na postavu → malá karta u tokenu (životy, magenergie, ÚČ, OČ; assets/js/postava_mini.js);
+//   * DVOJKLIK, tlačítko „Deník“ v kartě nebo „Rychlý deník“ v kontextovém menu (plny = true) → rychlý deník;
+//   * je-li okno deníku už otevřené, klik ho jen přepne na kliknutou postavu jako dřív (karta by byla dvojmo).
+function otevritProToken(t, bod, plny) {
+  if (tvorOkno && t.typ_entity === 'nestvura_instance') {
+    if (postavaMini) postavaMini.zavrit();
+    tvorOkno.otevrit(t, bod || zvyraznenyBod(t));
     return true;
   }
+  if (denikDock && t.typ_entity === 'postava' && denikDock.smi(t.entita_id)) {
+    if (spravovatPanel.classList.contains('open')) spravovatPanel.classList.remove('open');
+    if (plny || !postavaMini || denikDock.jeOtevreno()) {
+      if (postavaMini) postavaMini.zavrit();
+      denikDock.otevriZTokenu(t.entita_id, bod || zvyraznenyBod(t));
+    } else {
+      postavaMini.otevrit(t, bod || zvyraznenyBod(t));
+    }
+    return true;
+  }
+  if (postavaMini) postavaMini.zavrit();   // klik na token, který kartu nemá (cizí postava, značka), ji nenechá viset
   return false;
+}
+// Dvojklik na token se pozná tady (ukazatelové události mapy `dblclick` spolehlivě nedají): dva kliky bez tažení
+// na tentýž token do 400 ms.
+let posledniKlikTokenu = {id: 0, cas: 0};
+function jeDvojklikTokenu(id) {
+  const ted = Date.now();
+  const dvoj = posledniKlikTokenu.id === id && ted - posledniKlikTokenu.cas < 400;
+  posledniKlikTokenu = dvoj ? {id: 0, cas: 0} : {id, cas: ted};
+  return dvoj;
 }
 
 // Kde na obrazovce token je — okno tvora se u něj otevře i při kliknutí v panelu tvorů.
@@ -2217,6 +2249,10 @@ function obnovTvorOkno() {
   if (!tvorOkno || !tvorOkno.jeOtevrene()) return;
   const t = tokenData(tvorOkno.tokenId());
   if (t) tvorOkno.obnov(t); else tvorOkno.zavrit();
+}
+function obnovPostavaMini() {
+  if (!postavaMini || !postavaMini.jeOtevrene()) return;
+  postavaMini.obnov(tokenData(postavaMini.tokenId()) || null);
 }
 
 // Po obnově stavu sedí panel k aktuálním datům (životy, magenergie…);
@@ -2914,7 +2950,7 @@ function dokoncitAkci(a, e) {
           aktualizujVyber();
         } else {
           nastavVyber([t.id]);
-          if (!otevritProToken(t, {x: e.clientX, y: e.clientY}) && t.owned && t.na_tahu) otevritSpravovat(t);
+          if (!otevritProToken(t, {x: e.clientX, y: e.clientY}, jeDvojklikTokenu(t.id)) && t.owned && t.na_tahu) otevritSpravovat(t);
         }
       }
       break;
@@ -3341,6 +3377,7 @@ document.querySelectorAll('#panel-spravovat [data-delta]').forEach(btn => {
         }
         obnovPanelSpravovat();
         obnovTvorOkno();
+        obnovPostavaMini();
         posledniUdalostId = Math.max(posledniUdalostId, d.udalost_id);
       });
   });
@@ -3823,10 +3860,12 @@ function applyEvent(u) {
       nakreslitToken(t);
       if (raid) raid.prekresli();
       if (spravovanyToken && spravovanyToken.tokenId === t.id) obnovPanelSpravovat();
+      obnovPostavaMini();
     }
   } else if (u.typ === 'magenergie_zmena') {
     const t = tokeny.find((x) => x.typ_entity === 'postava' && x.entita_id === u.payload.entita_id);
     if (t) t.magenergie = u.payload.nova_magenergie;
+    obnovPostavaMini();
     if (raid) raid.prekresli();
     if (spravovanyToken && spravovanyToken.typEntity === 'postava' && spravovanyToken.entitaId === u.payload.entita_id) {
       spravovanyToken.magenergie = u.payload.nova_magenergie;
@@ -3986,7 +4025,7 @@ function polozkyKontextu(t, cile) {
     // Panel drží vzhled značky, zámek a smazání — od 2026-11-10 ho klik na token neotevírá, takže musí být
     // dostupný odtud, a to kdykoli (ne jen vlastní token na tahu, jak to bylo dřív).
     if (n === 1 && (pj || t.owned)) polozky.push(['Nastavení tokenu…', () => otevritSpravovat(t)]);
-    if (n === 1 && denikDock && t.typ_entity === 'postava' && denikDock.smi(t.entita_id)) polozky.push(['Rychlý deník', () => otevritProToken(t)]);
+    if (n === 1 && denikDock && t.typ_entity === 'postava' && denikDock.smi(t.entita_id)) polozky.push(['Rychlý deník', () => otevritProToken(t, null, true)]);
     if (cile.every(smiMenitSmer)) {
       polozky.push(['Otočit doleva' + pocet + '  (Q)', () => cile.forEach((c) => otocitTokenO(c, -krokOtoceni()))]);
       polozky.push(['Otočit doprava' + pocet + '  (E)', () => cile.forEach((c) => otocitTokenO(c, krokOtoceni()))]);

@@ -1066,7 +1066,7 @@ window.MAPA = <?= json_encode([
     'funkce' => dracak_vtt_tokeny_funkce(),
     'cas' => $casSveta,
     'pravidla' => dracak_vtt_souboj_pravidla(),
-    'verzeModulu' => max((int)@filemtime(__DIR__ . '/../assets/js/souboj.js'), (int)@filemtime(__DIR__ . '/../assets/js/kostky3d.js'), (int)@filemtime(__DIR__ . '/../assets/js/hexy.js'), (int)@filemtime(__DIR__ . '/../assets/js/denik_dock.js'), (int)@filemtime(__DIR__ . '/../assets/js/raid_panel.js'), (int)@filemtime(__DIR__ . '/../assets/js/svetlo_stiny.js'), (int)@filemtime(__DIR__ . '/../assets/js/token_bar.js'), (int)@filemtime(__DIR__ . '/../assets/js/tvor_okno.js'), (int)@filemtime(__DIR__ . '/../assets/js/kostky.js'), (int)@filemtime(__DIR__ . '/../assets/js/tvor_vyber.js'), (int)@filemtime(__DIR__ . '/../assets/js/souboj_animace.js')),
+    'verzeModulu' => max((int)@filemtime(__DIR__ . '/../assets/js/souboj.js'), (int)@filemtime(__DIR__ . '/../assets/js/kostky3d.js'), (int)@filemtime(__DIR__ . '/../assets/js/hexy.js'), (int)@filemtime(__DIR__ . '/../assets/js/denik_dock.js'), (int)@filemtime(__DIR__ . '/../assets/js/raid_panel.js'), (int)@filemtime(__DIR__ . '/../assets/js/svetlo_stiny.js'), (int)@filemtime(__DIR__ . '/../assets/js/token_bar.js'), (int)@filemtime(__DIR__ . '/../assets/js/tvor_okno.js'), (int)@filemtime(__DIR__ . '/../assets/js/kostky.js'), (int)@filemtime(__DIR__ . '/../assets/js/tvor_vyber.js'), (int)@filemtime(__DIR__ . '/../assets/js/souboj_animace.js'), (int)@filemtime(__DIR__ . '/../assets/js/postava_mini.js')),
     'grid' => [
         'px' => (int)($mapa['grid_velikost_px'] ?? 0),
         'typ' => $mapa['grid_typ'] ?? 'ctverec',
