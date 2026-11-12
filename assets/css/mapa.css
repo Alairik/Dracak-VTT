@@ -125,6 +125,29 @@ body.pin-v-mape .mapa-bod-marker svg { width:var(--pin-d, 28px); height:var(--pi
 .souboj-radek input[type=checkbox] { width:auto; margin:0; flex:none; }
 .souboj-jmeno { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .souboj-radek select { width:auto; padding:3px 6px; font-size:12px; }
+/* Okno Zahájit souboj (krok 0 nového průběhu): souhrn stran, dvě otázky s volbami, seznam schovaný v rozbalovátku. */
+.sz-strany { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:4px 0 8px; }
+.sz-strana { padding:10px 12px; border:1px solid rgba(255,255,255,.12); border-radius:12px; min-width:0; }
+.sz-strana-h { font-size:12px; font-weight:600; margin-bottom:4px; }
+.sz-strana-h.druzina { color:#6bbf7a; }
+.sz-strana-h.nepratele { color:#ff9a8a; }
+.sz-jmena { font-size:13.5px; color:#eee; overflow-wrap:anywhere; }
+.sz-uprava > summary { cursor:pointer; color:#e8c9a8; font-size:13px; text-decoration:underline; padding:6px 0; list-style:none; }
+.sz-uprava > summary::-webkit-details-marker { display:none; }
+.sz-otazka { margin-top:12px; }
+.sz-otazka-h { display:flex; align-items:center; gap:6px; font-size:13px; color:#ddd; margin-bottom:6px; }
+.sz-otazka-h .note { margin:0; }
+.sz-volby { display:flex; gap:8px; flex-wrap:wrap; }
+.sz-volba { flex:1 1 0; min-height:44px; padding:0 10px; border-radius:999px; border:1px solid rgba(255,255,255,.22);
+            background:transparent; color:#eee; font:inherit; font-size:14px; cursor:pointer; white-space:nowrap; }
+.sz-volba:hover { background:rgba(255,255,255,.08); }
+.sz-volba[aria-pressed="true"] { background:#f0e2cf; border-color:#f0e2cf; color:#2a1d12; font-weight:600; }
+/* Zbraň v ruce je přepínač, ne akce: nezabírá celou šířku a zapnutý nese fajfku (stav není jen barvou). */
+.sz-volba[data-zbrane] { flex:0 1 180px; }
+.sz-volba[data-zbrane][aria-pressed="true"]::after { content:" ✓"; }
+.souboj-kdo { display:flex; align-items:center; gap:8px; flex:1; min-width:0; margin:0; font-weight:400; color:inherit; cursor:pointer; }
+.souboj-zbran { display:inline-flex; align-items:center; gap:4px; margin:0 0 0 auto; font-size:12px; font-weight:400; color:#bbb; white-space:nowrap; }
+.souboj-zbran + select { margin-left:0; }
 .modal-obrazky-okno label.vz-radek { color:#ddd; }
 .modal-obrazky-okno .btn-ghost { color:#eee; border-color:rgba(255,255,255,.22); }
 .modal-obrazky-okno .note { font-size:12px; color:#bbb; }

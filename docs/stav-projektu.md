@@ -253,6 +253,28 @@ Tři věci ze zadání uživatele k pinům:
 Testy: rozšířený `tests/e2e/pin_vstoupit_api.js` (automatický zpáteční pin, zrušení, posunutí i s družinou,
 hláška v prohlížeči) a nový `tests/e2e/pin_mapa_ui.js` (mapa z pinu, práva, velikost značek).
 
+### Souboj, krok 0 — nové okno „Zahájit souboj“ (2026-11-12, hotovo)
+
+První postavený krok schváleného návrhu (plátno níž). Uživatel: *„schváleno, začni stavět krok 0“*.
+
+* **Okno** (`hra/mapa.php` `#modalSouboj`, `assets/js/souboj.js` `otevritZahajeni` / `prekresliSouhrn`, styly `.sz-*`):
+  nahoře souhrn stran („Družina · 2: Hrun, Sindor“, „Nepřátelé · 3: Goblin ×3“), seznam tvorů se zaškrtávátky je
+  sbalený pod **„Upravit, kdo bojuje…“** (při úpravě účastníků za boje je rozbalený rovnou). Souhrn i stav voleb se
+  odvozují ze seznamu, nic se nedrží dvakrát.
+* **Překvapení** = čtyři tlačítka (Nikdo / Družina / Nepřátelé / Obě strany) místo rozbalovacího pole.
+* **„Kdo má zbraň v ruce?“** je samostatná otázka, nezávislá na překvapení. Výchozí: všichni. Tlačítko strany
+  přepne všechny její postavy, jednotlivce jde doladit v seznamu. Volba se ukazuje jen u strany, kde je aspoň
+  jedna postava — **nestvůry zbraň netasí** (útočí tím, co mají v bestiáři), takže by tlačítko nic nedělalo.
+* **Server** (`hra/api/souboj_start.php`, nový volitelný údaj `zbran` u účastníka): kdo má prázdné ruce a má zbraň
+  mít, vytasí **bez akce** zbraň, kterou má **u sebe** (nejvyšší ÚČ tváří v tvář; z batohu nic); kdo už drží, drží
+  dál; odškrtnutý zbraň zasune k tělu. Bez údaje se nemění nic (starší volání). Co se stalo, dostane **jen PJ**
+  v odpovědi a vypíše se mu do logu — do události se to nepíše, hráči by viděli výzbroj cizích postav.
+* **Pravidla:** domácí pravidlo zapsané do knihy jako homebrew — `content/pravidla-hrac.html` **b93093–b93094**
+  (sekce h1606, hned za b10619, které říká, že vytasení stojí akci).
+* Bez změny databáze. Testy: nový `tests/e2e/souboj_start_ui.js` (30 kontrol), upravený `souboj_ui.js`.
+
+**Další krok:** krok 1 — ohlášení akce jedním klepnutím (karta dole místo záložky „Úmysly“ v panelu).
+
 ### Malá karta postavy: jeden klik = karta, dvojklik = deník (2026-11-12)
 
 Zadání uživatele: *„když kliknu na token, rovnou se mi ukazuje full deník. to bych chtěl, aby se vyvolalo buď na
@@ -273,7 +295,7 @@ mana, uč oč… zrušit dialog buď křížkem nebo klikem mimo.“* Mění roz
 Testy: nový `tests/e2e/postava_mini_ui.js` (30 kontrol), upravené `denik_dock.js` a `efekty_ui.js` (deník se v nich
 otevírá dvojklikem). Bez změny databáze.
 
-### Souboj — nový průběh, NÁVRH k připomínkám (2026-11-12, v kódu zatím nic)
+### Souboj — nový průběh, návrh (schválen 2026-11-12; postaven krok 0)
 
 Zadání uživatele: *„potřebuju zrevidovat souboj. přijde mi to strašně složitý… musí to fungovat úplně samo,
 respektive aby to udělalo jen výzvy k hodům, o zbytek se postarají animace… jen nahlásím jakou akci budu dělat,
@@ -312,7 +334,7 @@ Zdroj nákresů je v plátně, ne v repu; uživatel do něj píše připomínky 
 číslo vidět rovnou; výměna zbraně v tahu = přezbrojení za akci (nabídka to říká předem); **překvapení a „zbraň
 v ruce“ jsou dvě oddělené otázky** — výchozí je, že tasili všichni včetně překvapených (družina to tak hraje:
 „v jakési bonusové neviditelné akci všichni vytasili“), PJ jen odklepne stranu / jednotlivce zastižené beze zbraně.
-**Čeká na uživatele:** schválení upraveného plátna. **Další krok po schválení:** stavět po krocích odshora
+**Plátno schváleno 2026-11-12**, staví se po krocích odshora. **Další krok po schválení:** stavět po krocích odshora
 (0 → 1 → 2 …), server se z velké části nemění — jde hlavně o `assets/js/souboj.js` a markup v `hra/mapa.php`.
 
 ### Animace souboje (2026-11-11)

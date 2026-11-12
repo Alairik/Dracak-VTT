@@ -44,8 +44,12 @@ const txt = (page, sel) => page.$eval(sel, e => e.innerText).catch(() => '(nenal
 
   // Rychlý výběr, kdo vstoupí do iniciativy (na mapě s hodně tvory se po jednom klikat nedá; kdo zaškrtnutý není,
   // do pořadí tahů nevstoupí a PJ ho řídí ručně). Rozhodnutí uživatele 2026-11-09.
-  const zaskrtnuto = () => pj.locator('#soubojUcastnici input[type=checkbox]:checked').count();
-  const vsech = await pj.locator('#soubojUcastnici input[type=checkbox]').count();
+  // Od 2026-11-12 (krok 0 nového průběhu) je seznam schovaný pod „Upravit, kdo bojuje…“ a nahoře je jen souhrn stran.
+  ok(!(await pj.locator('#soubojUcastnici').isVisible()), 'seznam tvorů je při zahájení sbalený');
+  await pj.click('#soubojUprava > summary'); await pj.waitForTimeout(150);
+  const UCAST = '#soubojUcastnici input[type=checkbox]:not([data-zbran])';
+  const zaskrtnuto = () => pj.locator(UCAST + ':checked').count();
+  const vsech = await pj.locator(UCAST).count();
   ok((await txt(pj, '#soubojPocet')).includes('z ' + vsech), 'okno píše, kolik tvorů půjde do iniciativy: ' + (await txt(pj, '#soubojPocet')));
   await pj.click('[data-souboj-vyber="nic"]'); await pj.waitForTimeout(150);
   ok(await zaskrtnuto() === 0, '„Nikoho“ odškrtne všechny');

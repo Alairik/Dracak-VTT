@@ -1381,9 +1381,13 @@ export function initSouboj(ctx) {
     if (!jePj || !mSouboj) return;
     const uprava = !!kolo;
     document.getElementById('soubojNadpis').textContent = uprava ? 'Účastníci souboje' : 'Zahájit souboj';
-    mUlozit.textContent = uprava ? 'Uložit' : 'Zahájit souboj';
+    mUlozit.textContent = uprava ? 'Uložit' : 'Začít';
     mPrekvapeni.value = uprava ? kolo.prekvapeni : 'zadne';
     mPrekvapeni.disabled = uprava && (kolo.faze === 'kolo' || kolo.cislo_kola !== 1);
+    // Zbraně v ruce se řeší jen při zahájení; při úpravě účastníků za boje je seznam rovnou rozbalený.
+    document.getElementById('soubojZbraneBlok').style.display = uprava ? 'none' : '';
+    document.getElementById('soubojPrekvapeniBlok').style.display = mPrekvapeni.disabled ? 'none' : '';
+    document.getElementById('soubojUprava').open = uprava;
     mChyba.style.display = 'none';
     mSeznam.innerHTML = '';
     const tokeny = getTokeny().filter((t) => t.typ_entity === 'postava' || t.typ_entity === 'nestvura_instance');
@@ -1392,7 +1396,9 @@ export function initSouboj(ctx) {
     tokeny.forEach((t) => {
       const jeUcastnik = soucasni.has(t.id);
       const predvolena = uprava ? jeUcastnik : (vybrane.length >= 2 ? vybrane.includes(t.id) : true);
-      const radek = el('label', 'souboj-radek');
+      // Řádek není <label> — má dvě zaškrtávátka (účast a zbraň v ruce), každé s vlastním popiskem.
+      const radek = el('div', 'souboj-radek');
+      const kdo = el('label', 'souboj-kdo');
       const cb = el('input');
       cb.type = 'checkbox';
       cb.checked = predvolena;
@@ -1402,7 +1408,19 @@ export function initSouboj(ctx) {
       st.append(new Option('Družina', 'druzina'), new Option('Nepřátelé', 'nepratele'));
       st.value = jeUcastnik ? soucasni.get(t.id).strana : (t.typ_entity === 'postava' ? 'druzina' : 'nepratele');
       st.dataset.tokenId = String(t.id);
-      radek.append(cb, jm, st);
+      kdo.append(cb, jm);
+      radek.append(kdo);
+      // Zbraň v ruce jde doladit u jednotlivce (jen postavy, jen při zahájení) — výchozí je, že tasili všichni.
+      if (!uprava && t.typ_entity === 'postava') {
+        const zb = el('label', 'souboj-zbran');
+        const zcb = el('input');
+        zcb.type = 'checkbox';
+        zcb.checked = true;
+        zcb.dataset.zbran = '1';
+        zb.append(zcb, document.createTextNode(' zbraň v ruce'));
+        radek.append(zb);
+      }
+      radek.append(st);
       mSeznam.append(radek);
     });
     if (!tokeny.length) mSeznam.append(el('p', 'note', 'Na mapě nejsou žádné postavy ani nestvůry.'));
@@ -1410,11 +1428,52 @@ export function initSouboj(ctx) {
     mSouboj.style.display = '';
   }
   // Kolik je zaškrtnuto z kolika — u dlouhého seznamu je jinak nevidět, co vlastně do iniciativy půjde.
+  const radkyOkna = () => Array.from(mSeznam.querySelectorAll('.souboj-radek')).map((r) => ({
+    r, cb: r.querySelector('input[type=checkbox]:not([data-zbran])'), zbran: r.querySelector('input[data-zbran]'),
+    strana: r.querySelector('select').value, jmeno: r.querySelector('.souboj-jmeno').textContent,
+  }));
+  // Souhrn stran nahoře, stav voleb překvapení a zbraní — vše se odvozuje ze seznamu, ať se nic nedrží dvakrát.
+  function prekresliSouhrn() {
+    const radky = radkyOkna().filter((x) => x.cb.checked);
+    ['druzina', 'nepratele'].forEach((strana) => {
+      const moji = radky.filter((x) => x.strana === strana);
+      const velke = strana === 'druzina' ? 'Druzina' : 'Nepratele';
+      document.getElementById('soubojPocet' + velke).textContent = String(moji.length);
+      // Stejná jména se sloučí („Goblin ×3“).
+      const pocty = new Map();
+      moji.forEach((x) => { const j = x.jmeno.replace(/ \d+$/, ''); pocty.set(j, (pocty.get(j) || 0) + 1); });
+      document.getElementById('soubojJmena' + velke).textContent = moji.length
+        ? Array.from(pocty, ([j, n]) => (n > 1 ? j + ' ×' + n : j)).join(', ') : 'nikdo';
+      const tl = mSouboj.querySelector('[data-zbrane="' + strana + '"]');
+      const sPostavou = moji.filter((x) => x.zbran);
+      tl.style.display = sPostavou.length ? '' : 'none';
+      tl.setAttribute('aria-pressed', sPostavou.length && sPostavou.every((x) => x.zbran.checked) ? 'true' : 'false');
+    });
+    const nejakaPostava = radky.some((x) => x.zbran);
+    if (!kolo) document.getElementById('soubojZbraneBlok').style.display = nejakaPostava ? '' : 'none';
+    mSouboj.querySelectorAll('[data-prekvapeni]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.prekvapeni === mPrekvapeni.value ? 'true' : 'false'));
+  }
+  if (mSouboj) {
+    mSouboj.querySelectorAll('[data-prekvapeni]').forEach((b) => b.addEventListener('click', () => {
+      if (mPrekvapeni.disabled) return;
+      mPrekvapeni.value = b.dataset.prekvapeni;
+      prekresliSouhrn();
+    }));
+    // Tlačítko strany přepne zbraň v ruce všem jejím postavám najednou.
+    mSouboj.querySelectorAll('[data-zbrane]').forEach((b) => b.addEventListener('click', () => {
+      const zapnout = b.getAttribute('aria-pressed') !== 'true';
+      radkyOkna().filter((x) => x.zbran && x.strana === b.dataset.zbrane).forEach((x) => { x.zbran.checked = zapnout; });
+      prekresliSouhrn();
+    }));
+    const hlp = mSouboj.querySelector('.tvor-hlp');
+    if (hlp) hlp.addEventListener('click', () => hlp.classList.toggle('otevreno'));
+  }
   function prepocitatVybrane() {
     const el2 = document.getElementById('soubojPocet');
     if (!el2 || !mSeznam) return;
-    const vsechny = mSeznam.querySelectorAll('.souboj-radek input[type=checkbox]');
-    const zaskrtnuto = mSeznam.querySelectorAll('.souboj-radek input[type=checkbox]:checked').length;
+    prekresliSouhrn();
+    const vsechny = mSeznam.querySelectorAll('.souboj-radek input[type=checkbox]:not([data-zbran])');
+    const zaskrtnuto = mSeznam.querySelectorAll('.souboj-radek input[type=checkbox]:not([data-zbran]):checked').length;
     el2.textContent = vsechny.length ? 'do iniciativy půjde ' + zaskrtnuto + ' z ' + vsechny.length : '';
   }
   if (mSeznam) mSeznam.addEventListener('change', prepocitatVybrane);
@@ -1423,7 +1482,7 @@ export function initSouboj(ctx) {
   document.querySelectorAll('[data-souboj-vyber]').forEach((b) => b.addEventListener('click', () => {
     const co = b.dataset.soubojVyber;
     mSeznam.querySelectorAll('.souboj-radek').forEach((r) => {
-      const cb = r.querySelector('input[type=checkbox]');
+      const cb = r.querySelector('input[type=checkbox]:not([data-zbran])');
       const jeDruzina = r.querySelector('select').value === 'druzina';
       cb.checked = co === 'vse' ? true : (co === 'nic' ? false : jeDruzina);
     });
@@ -1437,6 +1496,7 @@ export function initSouboj(ctx) {
         tokenId: parseInt(r.querySelector('input').dataset.tokenId, 10),
         zaskrtnuto: r.querySelector('input').checked,
         strana: r.querySelector('select').value,
+        zbran: r.querySelector('input[data-zbran]') ? r.querySelector('input[data-zbran]').checked : null,
       }));
       const vybrani = radky.filter((r) => r.zaskrtnuto);
       if (!vybrani.length) { mChyba.textContent = 'Vyber aspoň jednoho účastníka.'; mChyba.style.display = ''; return; }
@@ -1444,8 +1504,14 @@ export function initSouboj(ctx) {
       if (!kolo) {
         d = await postJson('api/souboj_start.php', {
           mapa_id: mapaId, prekvapeni: mPrekvapeni.value,
-          ucastnici: vybrani.map((r) => ({token_id: r.tokenId, strana: r.strana})),
+          ucastnici: vybrani.map((r) => Object.assign({token_id: r.tokenId, strana: r.strana}, r.zbran === null ? {} : {zbran: r.zbran})),
         });
+        // Co se stalo se zbraněmi, vidí jen PJ (do události pro hráče to nejde — prozradilo by to výzbroj cizích postav).
+        if (d && d.zbrane && logLine) {
+          d.zbrane.tasili.forEach((z) => logLine(z.kdo + ' tasí: ' + z.zbran));
+          d.zbrane.schovali.forEach((z) => logLine(z.kdo + ' začíná beze zbraně v ruce (' + z.zbran + ' zůstává u těla)'));
+          if (d.zbrane.bez.length) logLine('Bez zbraně u sebe: ' + d.zbrane.bez.join(', '));
+        }
       } else {
         const soucasni = new Map(ucastnici.map((u) => [u.token_id, u]));
         const telo = {mapa_id: mapaId, pridat: [], odebrat: [], strany: {}};

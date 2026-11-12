@@ -881,27 +881,46 @@ $hodBonusy = array_values(array_filter($iniciativaBonusy, fn($b) => !in_array($b
     <div class="modal-obrazky-okno">
       <button class="close-x" type="button" id="modalSoubojZavrit" title="Zavřít"><?php dracak_icon('x', 16); ?></button>
       <h3 id="soubojNadpis">Zahájit souboj</h3>
-      <p class="note" style="margin-top:0;">Zaškrtni, kdo se souboje účastní, a na které straně stojí. Překvapená strana má v 1. kole −6 k iniciativě.</p>
-      <label class="vz-radek" for="soubojPrekvapeni" style="display:flex;"><span class="vz-popisek" style="min-width:90px;">Překvapení</span>
-        <select id="soubojPrekvapeni" class="input" style="flex:1;">
-          <option value="zadne">Nikdo (běžný začátek)</option>
-          <option value="druzina">Družina je překvapena</option>
-          <option value="nepratele">Nepřátelé jsou překvapeni</option>
-          <option value="obe">Obě strany jsou překvapeny</option>
-        </select>
-      </label>
-      <!-- Rychlý výběr: na mapě s desítkami tvorů je zaškrtávání po jednom nepoužitelné. „Jen družina“ je nejčastější případ —
-           PJ si pak nestvůry, které mají vstoupit do iniciativy, doklikne. Zbytek NPC řídí ručně mimo pořadí tahů. -->
-      <div class="vz-radek" style="gap:6px;margin:8px 0 4px;flex-wrap:wrap;align-items:center;">
-        <span class="note" style="margin:0;">Rychle:</span>
-        <button class="btn btn-ghost" type="button" data-souboj-vyber="druzina" style="font-size:12px;padding:3px 8px;">Jen družina</button>
-        <button class="btn btn-ghost" type="button" data-souboj-vyber="vse" style="font-size:12px;padding:3px 8px;">Vše</button>
-        <button class="btn btn-ghost" type="button" data-souboj-vyber="nic" style="font-size:12px;padding:3px 8px;">Nikoho</button>
-        <span class="note" id="soubojPocet" style="margin:0 0 0 auto;"></span>
+      <!-- Krok 0 nového průběhu souboje (návrh 2026-11-12): strany hra pozná sama, PJ řeší jen překvapení a kdo má
+           zbraň v ruce; seznam tvorů je schovaný pod „Upravit, kdo bojuje“. -->
+      <div class="sz-strany">
+        <div class="sz-strana"><div class="sz-strana-h druzina">Družina · <span id="soubojPocetDruzina">0</span></div><div id="soubojJmenaDruzina" class="sz-jmena"></div></div>
+        <div class="sz-strana"><div class="sz-strana-h nepratele">Nepřátelé · <span id="soubojPocetNepratele">0</span></div><div id="soubojJmenaNepratele" class="sz-jmena"></div></div>
       </div>
-      <div id="soubojUcastnici" class="souboj-seznam"></div>
-      <div class="vz-radek" style="margin-top:10px;">
-        <button class="btn btn-secondary" type="button" id="soubojUlozit" style="flex:1;">Zahájit souboj</button>
+      <details id="soubojUprava" class="sz-uprava">
+        <summary>Upravit, kdo bojuje…</summary>
+        <!-- Rychlý výběr: na mapě s desítkami tvorů je zaškrtávání po jednom nepoužitelné. Kdo zaškrtnutý není,
+             do pořadí tahů nevstoupí a PJ ho řídí ručně. -->
+        <div class="vz-radek" style="gap:6px;margin:8px 0 4px;flex-wrap:wrap;align-items:center;">
+          <span class="note" style="margin:0;">Rychle:</span>
+          <button class="btn btn-ghost" type="button" data-souboj-vyber="druzina" style="font-size:12px;padding:3px 8px;">Jen družina</button>
+          <button class="btn btn-ghost" type="button" data-souboj-vyber="vse" style="font-size:12px;padding:3px 8px;">Vše</button>
+          <button class="btn btn-ghost" type="button" data-souboj-vyber="nic" style="font-size:12px;padding:3px 8px;">Nikoho</button>
+          <span class="note" id="soubojPocet" style="margin:0 0 0 auto;"></span>
+        </div>
+        <div id="soubojUcastnici" class="souboj-seznam"></div>
+      </details>
+      <div class="sz-otazka" id="soubojPrekvapeniBlok">
+        <div class="sz-otazka-h">Kdo je překvapený? <span class="note">(−6 k iniciativě v 1. kole)</span></div>
+        <input type="hidden" id="soubojPrekvapeni" value="zadne">
+        <div class="sz-volby" role="group" aria-label="Kdo je překvapený">
+          <button type="button" class="sz-volba" data-prekvapeni="zadne" aria-pressed="true">Nikdo</button>
+          <button type="button" class="sz-volba" data-prekvapeni="druzina" aria-pressed="false">Družina</button>
+          <button type="button" class="sz-volba" data-prekvapeni="nepratele" aria-pressed="false">Nepřátelé</button>
+          <button type="button" class="sz-volba" data-prekvapeni="obe" aria-pressed="false">Obě strany</button>
+        </div>
+      </div>
+      <div class="sz-otazka" id="soubojZbraneBlok">
+        <div class="sz-otazka-h">Kdo má zbraň v ruce?
+          <button type="button" class="tvor-hlp" aria-label="Nápověda ke zbraním v ruce">?<span class="tvor-tip">Výchozí je, že tasili všichni — i překvapení. Kdo má prázdné ruce, vezme si zbraň, kterou nosí u sebe (ne z batohu). Odklepni stranu, kterou boj zastihl beze zbraně: ta ji zasune a tasí až svou akcí. Jednotlivce doladíš v „Upravit, kdo bojuje“. Týká se postav; nestvůry útočí vždy tím, co mají v bestiáři.</span></button>
+        </div>
+        <div class="sz-volby" role="group" aria-label="Kdo má zbraň v ruce">
+          <button type="button" class="sz-volba" data-zbrane="druzina" aria-pressed="true">Družina</button>
+          <button type="button" class="sz-volba" data-zbrane="nepratele" aria-pressed="true">Nepřátelé</button>
+        </div>
+      </div>
+      <div class="vz-radek" style="margin-top:12px;">
+        <button class="btn btn-secondary" type="button" id="soubojUlozit" style="flex:1;">Začít</button>
       </div>
       <p class="note" id="soubojChyba" style="color:#ff9a8a;display:none;"></p>
     </div>
