@@ -111,6 +111,8 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   ok(await hrac.evaluate(() => document.querySelectorAll('.vtt-token').length) === 1, 'hráč má na mapě jen svůj token');
 
   // PJ změní světlo v panelu tokenu (klik na token → sekce Vzhled → Světlo)
+  // Jeden klik otevírá jen malou kartu postavy (2026-11-12); nástroje PJ jsou v deníku, který otevře dvojklik.
+  await pj.locator('.vtt-token[data-id="' + h + '"] .puck').click(); await pj.waitForTimeout(120);
   await pj.locator('.vtt-token[data-id="' + h + '"] .puck').click();
   await pj.waitForTimeout(600);
   await pj.selectOption('#vzhledSvetlo', 'lucerna:8');

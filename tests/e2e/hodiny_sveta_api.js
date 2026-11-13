@@ -105,6 +105,8 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   ok(/9:00/.test(await pj.textContent('#svetCasText')), 'PJ klikne +1 hodina a čas se přepíše na 9:00');
   await hrac.waitForTimeout(3500);
   ok(/9:00/.test(await hrac.textContent('#svetCasText')), 'hráči se čas přepíše přes polling: ' + await hrac.textContent('#svetCasText'));
+  // Jeden klik otevírá jen malou kartu postavy (2026-11-12); nástroje PJ jsou v deníku, který otevře dvojklik.
+  await pj.locator('.vtt-token[data-id="' + h + '"] .puck').click(); await pj.waitForTimeout(120);
   await pj.locator('.vtt-token[data-id="' + h + '"] .puck').click();
   await pj.waitForTimeout(600);
   await pj.selectOption('#vzhledSvetlo', 'pochoden:6');
