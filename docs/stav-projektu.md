@@ -14,6 +14,87 @@ mění) se sem zapíše update ve stejném kroku, ne až "až bude čas".
 
 ## Pro novou session, co začíná tady
 
+### Kde jsme skončili — předání k 2026-11-13 (souboj)
+
+**Čti tohle jako první.** Poslední tři dny se přestavěl celý souboj. Všechno je nasazené na `main`
+**plná regrese 80 sad prošla** a z téhle práce **žádné nové ruční SQL nepřibylo** (databáze se neměnila).
+**Pozor:** `docs/sql-k-rucnimu-spusteni.sql` není prázdný — drží starší bloky **K** (infravidění z bestiáře a z rasy,
+migrace 0116–0117), **L** (skupina útoku u zbraně) a **M** (`svet.animace`, 0120). U žádného z nich tu není
+zapsané potvrzení ✓ ze stránky Změny databáze → „Co aplikace v databázi vidí“, takže podle `CLAUDE.md` se blok
+**posílá uživateli dál celý**, dokud ho nepotvrdí. Hra bez nich funguje (kód na chybějící sloupce nespoléhá).
+Uživatel bude hru zkoušet a posílat další úpravy; nic není „rozdělané napůl“.
+
+**Jak se teď souboj ovládá (jedna věta na krok, podrobnosti v sekcích pod tím):**
+
+| Krok | Co vidí hráč / PJ | Kde v kódu |
+|---|---|---|
+| 0 Zahájení | okno se souhrnem stran, překvapení čtyřmi tlačítky, zvlášť „kdo má zbraň v ruce“ | `hra/mapa.php` `#modalSouboj`, `souboj.js` `otevritZahajeni`, `hra/api/souboj_start.php` |
+| 1+2 Ohlášení a iniciativa | jedna karta dole: dlaždice akce → složení hodu → „Hodit kostkou“; tahy začnou samy | `souboj.js` `kartaPriprava` / `hoditIni`, `souboj_hod.php` (`auto`), `umysl_nastavit.php` |
+| 3 Tah | klepnutí na nepřítele / místo na mapě, karta potvrzuje; „v ruce ▾“, Kouzlo, Jiné, Konec tahu | `souboj.js` `kartaTah`, plánování beze změny (`docs/navrh-tahu-v2.md`) |
+| 3b Kouzlo | dlaždice kouzel s cenou → cíl klepnutím / „Na sebe“ → Seslat | `souboj.js` `kartaKouzlo`, `includes/vtt_kouzleni.php` |
+| 4+5 Hody | karta „Hoď na útok“ / „X na tebe útočí“, číslo vidět rovnou; obrana = volba + hod | `souboj.js` `kartaVyzvy`, `includes/vtt_souboj_utok.php`, `hra/api/vyzva_*.php` |
+| 6 Výsledek | hláška pod štítkem kola, zmizí sama | `souboj.js` `kartaVysledku` / `ukazVysledek` |
+| Pořadí | **svislé okno tvorů** se životy a magenergií (otevře se samo); nahoře jen štítek „Kolo N“ + **PJ ▾** | `raid_panel.js`, `souboj.js` `kreslitStavyVOkne` / `pjNabidka` |
+| Telefon | okno tvorů se neotvírá, pořadí je vodorovný pruh nahoře, karta nad lištou nástrojů | `souboj.js` `uzkaObrazovka`, `mapa.css` `@media (max-width:760px)` |
+
+Mimo souboj přibyla **malá karta postavy** (jeden klik na token = karta se životy, magenergií, ÚČ a OČ; plný deník
+až dvojklik nebo tlačítko „Deník“) — `assets/js/postava_mini.js`, `hra/api/postava_mini.php`.
+
+**Sekce s podrobnostmi, v pořadí od nejnovější:** „Souboj — úpravy po první zkoušce uživatele“ → „Souboj — nový
+průběh, kroky 1–7 a telefon“ → „Souboj, krok 0“ → „Malá karta postavy“ → „Souboj — nový průběh, návrh“ (odkaz na
+plátno s nákresy: https://claude.ai/artifact/3ojke53iFM7Utts6MgXiX6; je to schválený návrh, **realita se od něj
+v pár bodech liší** — viz „Co z nákresu není přesně tak“ a úpravy z 13. 11.).
+
+**Rozhodnutí uživatele z těchhle dnů (neotvírat znovu):**
+
+* Nestvůry hraje PJ (ohlásí, hází, brání); plná automatika „až bude VTT hotové“.
+* Obrana: vždy volí hráč „bráním se / nebráním se“ a hází v obou případech. Bez akce se zbraní bránit nejde — ani PJ.
+* Při obraně akcí se smí otočit čelem k útočníkovi (ruší −4 za bok) — **homebrew**, v knize b93095–b93096.
+* Na začátku boje mají zbraň v ruce všichni, i překvapení; PJ odklepne, koho boj zastihl beze zbraně — **homebrew**,
+  v knize b93093–b93094. Překvapení a zbraň v ruce jsou dvě různé otázky.
+* Kdo nic nedrží, útočí pěstí (Tabulka rvačky), ne první zbraní z inventáře.
+* Souboj na mapě bez hexů nebude (karta tam jen řekne, že to nejde, a umí odečíst akci).
+* Pořadí tahů chce uživatel ve svislém okně tvorů (se životy a magenergií), ne ve vodorovném pruhu; nabídku PJ nahoře
+  si pochválil a má zůstat.
+* Jeden klik na token = malá karta, plný deník až dvojklik / tlačítko.
+* Vysvětlivky patří do bubliny za otazníčkem, ne do plochy karty (pravidlo z `CLAUDE.md`, platí i tady).
+
+**Co víme, že není hotové (kandidáti na další práci, nic z toho neblokuje hraní):**
+
+1. **Stínové zranění** — rána pěstí má podle knihy působit jen stínové zranění (b10988); stínové životy hra nevede,
+   odečítá běžné a PJ to vidí jako upozornění. Zavést stínové životy je samostatná mechanika (a nejspíš sloupec =
+   ruční SQL) — **nejdřív se zeptat uživatele**, jak to u stolu hrají.
+2. **Kop** (Tabulka rvačky, druhý sloupec; jednou za kolo, postih −4 v další akci, b10987) se nenabízí.
+3. **Kouzla „ihned“ k obraně** mají v kartě obrany starší blok s rozbalovacími poli (`ihnedBlok` v `souboj.js`) —
+   jediné místo, které se nepřekreslilo do dlaždic.
+4. **Dosah kouzla na mapě** se kreslí jen u kouzel s číselným dosahem (`dosah_sahy`); slovní dosahy se nehádají.
+5. **Hráč nevidí nepřátele v pořadí** (okno tvorů mu ukazuje jen družinu) — je to záměr kvůli tajné iniciativě
+   nestvůr; kdyby je chtěl vidět aspoň jako „na tahu je Goblin“ v okně, dnes to říká jen tlačítko vpravo dole
+   a krátká hláška nahoře.
+6. **Na skutečném telefonu ani s živými hráči se to nezkoušelo** — jen v prohlížeči (Playwright, emulace 390 px).
+7. Starší otevřené věci beze změny: automatická ztráta iniciativy ve tmě, kouzla nestvůr, lupičův boj beze zbraně
+   (h624, chybí tabulky ze str. 68–70), 288 položek v `docs/kontrolni-seznam-neuplnych-mist.md`.
+
+**Pasti prostředí, na které se tu narazilo (ušetří hodinu):**
+
+* **MariaDB v cloud session není** — `apt-get update && apt-get install -y mariadb-server`, pak
+  `nohup mysqld_safe --user=mysql &` a `tests/build-fixture.sh --config`. **Po restartu session databáze i PHP
+  server neběží** (data v `/var/lib/mysql` zůstávají): stačí znovu `mysqld_safe` a
+  `PHP_CLI_SERVER_WORKERS=4 nohup php -S 127.0.0.1:8099 -t . &`.
+* **`tests/run.sh … | tail` se nikdy nevrátí**, když si runner sám startuje PHP server — ten drží rouru otevřenou
+  a vypadá to jako zaseknutý test. Výstup vždy **do souboru** (`tests/run.sh sada > log 2>&1; tail log`) a server
+  si nastartuj předem. Plná regrese trvá ~25 min — pustit na pozadí.
+* **Sady, které `run.sh` nepustí samy od sebe správně z příkazové řádky:** přímé `node sada.js` potřebuje
+  `CHROMIUM=$(ls /opt/pw-browsers/chromium-*/chrome-linux64/chrome | head -1)`; přes `run.sh` se najde sám.
+* **Po změně toho, co dělá klik na token, pusť i `videni_api` a `hodiny_sveta_api`** — otevírají nástroje PJ
+  klikem na postavu a 12. 11. zůstaly den rozbité, protože se před nasazením nepustila celá regrese.
+* **Dlouhé úpravy souborů přes `python3 - <<'E'` v jednom příkazu s dalšími kroky** občas odmítne bezpečnostní
+  kontrola shellu (neumí příkaz rozebrat). Skript napsat do souboru ve scratchpadu a pustit zvlášť.
+* **Rozpracovanou práci průběžně commitovat na pracovní větev** — session se během téhle práce dvakrát restartovala.
+* SQL v testech: uvozovky v řetězcích dotazu jednoduché a celý dotaz v JS do zpětných apostrofů (`sqlVal(\`…'x'…\`)`),
+  jinak je shell sežere.
+
+
 **Nejdřív si přečti `docs/zadani-pro-novy-chat.md` (předávací dokument z 2026-11-06: pravidla komunikace s uživatelem, pasti lokálního prostředí, co se udělalo, co čeká).** Přečti celý tenhle soubor, pak `CLAUDE.md` (hlavně pravidla o tom, že
 zdroj pravdy o hře jsou pravidla v `content/`, ne repo/DB, a o
 neodhadování mechaniky). **Fáze 1 a 2 ze sekce "Rozpracováno:

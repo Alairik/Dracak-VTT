@@ -1,5 +1,11 @@
 # Zadání pro nový chat — Dračák VTT (stav k 2026-11-06)
 
+> **Novější stav (2026-11-13):** od 6. 11. se přestavěl celý souboj (pruh / okno pořadí, jedna karta dole, karty hodů,
+> útok pěstí, otočení při obraně) a přibyla malá karta postavy. Aktuální předání je v `docs/stav-projektu.md`,
+> sekce **„Kde jsme skončili — předání k 2026-11-13 (souboj)“** — čti ji dřív než zbytek tohoto souboru. Pravidla
+> komunikace s uživatelem (sekce 1) a zásady práce (sekce 2) níž platí beze změny; seznam „co čeká“ (sekce 7) je
+> u souboje překonaný.
+
 Tenhle soubor je **předávací dokument**: předchozí chat vyčerpal kontextové okno, takže vše, co potřebuje navazující práce, je tady nebo odsud odkazované.
 Čti ho spolu s `CLAUDE.md` (pravidla práce v repu, platí vždy) a `docs/stav-projektu.md` (živý přehled hotového a rozpracovaného).
 Nic z toho nepřeskakuj: rozhodnutí uživatele, která tu jsou zapsaná, se **nikdy znovu neotevírají** a neptá se na ně.
