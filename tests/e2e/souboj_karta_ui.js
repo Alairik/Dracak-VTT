@@ -129,9 +129,13 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   ok(/^\d+$/.test(await txt(hr, '.vyzva-obrana .bk-stitek.cislo strong')), 'obranné číslo je vidět rovnou: ' + await txt(hr, '.vyzva-obrana .bk-stitek.cislo'));
   ok(await hr.locator('.vyzva-obrana [data-hod="vyzva"]').count() === 1, 'a hází si sám');
   await hr.screenshot({ path: (process.env.OUT || '/tmp/dracak-tests') + '/souboj_karta_obrana.png' });
+  // Šestka se u 1k6+ přehazuje, součet 6 tedy padnout nemůže: server ho odmítne a hráč to musí vidět na kartě.
   await hr.click('.vyzva-obrana button:has-text("Hodil jsem u stolu")'); await hr.fill('.vyzva-obrana .vyzva-akce input', '6');
+  await hr.click('.vyzva-obrana button:has-text("Zapsat vlastní hod")'); await hr.waitForTimeout(1500);
+  ok(await hr.locator('.vyzva-panel .bk-chyba').count() === 1, 'odmítnutý hod se hráči vypíše na kartě: ' + await txt(hr, '.vyzva-panel .bk-chyba'));
+  await hr.fill('.vyzva-obrana .vyzva-akce input', '5');
   await hr.click('.vyzva-obrana button:has-text("Zapsat vlastní hod")'); await hr.waitForTimeout(2000);
-  ok((await stav()).vyzvy.length === 0, 'po hodu na obranu je útok vyhodnocený');
+  { const zb = (await stav()).vyzvy; ok(zb.length === 0, 'po hodu na obranu je útok vyhodnocený' + (zb.length ? ': zbývá ' + JSON.stringify(zb.map((v) => [v.druh, v.stav, v.label, v.volba, v.smi_hodit])) + ' | karta: ' + await txt(hr, '.vyzva-panel') : '')); }
   ok(pj.chybyJs.length === 0 && hr.chybyJs.length === 0, 'žádná chyba JavaScriptu ' + pj.chybyJs.concat(hr.chybyJs).join(' | '));
 
   // ===== telefon: karta nad lištou nástrojů, pruh pořadí nahoře, nic nepřetéká =====
@@ -149,6 +153,15 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   ok(kb.y + kb.height <= lb.y + 1, 'telefon: karta sedí nad lištou nástrojů, nepřekrývá ji');
   ok(pb.y + pb.height <= kb.y, 'telefon: pruh pořadí kartu nepřekrývá');
   ok(await tel.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'telefon: stránka nepřetéká vodorovně');
+  // Nic plovoucího nesmí ležet přes tlačítka karty (dřív je kryla lupa, kostky a „kdo je na tahu“).
+  const zakryta = await tel.$$eval('#bojKarta .bk-tlacitka button', (bs) => bs.filter((b) => {
+    const r = b.getBoundingClientRect();
+    const e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return !(e && (e === b || b.contains(e)));
+  }).map((b) => b.innerText.trim().replace(/\s+/g, ' ')));
+  ok(zakryta.length === 0, 'telefon: všechna tlačítka karty jdou zmáčknout, nic je nepřekrývá' + (zakryta.length ? ' — zakrytá: ' + zakryta.join(', ') : ''));
+  const kostkyB = await tel.locator('#kostkyOtevrit').boundingBox();
+  ok(!!kostkyB && (kostkyB.x >= pb.x + pb.width || kostkyB.y >= pb.y + pb.height), 'telefon: házecí místo zůstává dostupné a neleží přes pruh pořadí');
   const vysky = await tel.$$eval('#bojKarta .bk-tlacitka button', (bs) => bs.map((b) => Math.round(b.getBoundingClientRect().height)));
   ok(vysky.length >= 3 && vysky.every((h) => h >= 44), 'telefon: tlačítka karty jdou trefit prstem (' + vysky.join(', ') + ' px)');
   await tel.screenshot({ path: (process.env.OUT || '/tmp/dracak-tests') + '/souboj_karta_telefon.png' });

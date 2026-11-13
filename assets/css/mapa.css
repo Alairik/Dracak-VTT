@@ -560,7 +560,7 @@ span.boj-cip { cursor:default; }
 .vyzva-pj { margin-top:6px; }
 .vyzva-pj summary { cursor:pointer; color:#e8c9a8; font-size:12.5px; }
 /* Výsledek útoku: krátká hláška pod pruhem pořadí, zmizí sama */
-.boj-vysledek { position:fixed; left:50%; top:132px; transform:translateX(-50%); z-index:185; width:min(440px, calc(100vw - 24px)); }
+.boj-vysledek { position:fixed; left:50%; top:172px; transform:translateX(-50%); z-index:185; width:min(440px, calc(100vw - 24px)); }
 .boj-vysledek .vyzva-karta { position:relative; padding-right:40px; box-shadow:0 8px 24px rgba(0,0,0,.5); }
 .boj-vysledek .btn.vyzva-zavrit { position:absolute; right:6px; top:6px; min-width:30px; min-height:30px; padding:0; border:none;
                                   background:none; color:#bbb; font-size:14px; }
@@ -571,9 +571,14 @@ span.boj-cip { cursor:default; }
   /* Telefon: nástroje mapy jsou vodorovná lišta dole, karta sedí nad ní; pruh pořadí je užší a roluje do strany. */
   .boj-karta, .vyzva-panel { bottom:76px; }
   .boj-karta { padding:12px; border-radius:16px; max-height:calc(100vh - 230px); }
-  .boj-poradi { top:98px; gap:8px; padding:6px 10px; border-radius:14px; }
+  .boj-poradi { top:98px; left:8px; transform:none; max-width:calc(100vw - 66px); gap:8px; padding:6px 10px; border-radius:14px; }
+  /* Plovoucí ovládání vpravo dole by na telefonu leželo přes kartu tahu („Konec tahu“ by nešel zmáčknout):
+     za souboje se lupa schová (mapa se přibližuje dvěma prsty), tlačítko „kdo je na tahu“ zastoupí pruh pořadí
+     a házecí místo se přestěhuje nahoru vedle něj. */
+  body.je-souboj #zoomCtl, body.je-souboj .boj-centr.je-boj { display:none; }
+  body.je-souboj .kostky-btn { bottom:auto; top:104px; right:8px; }
   .boj-poradi-hl span { display:none; }
-  .boj-vysledek { top:166px; }
+  .boj-vysledek { top:186px; }
   .bk-nadpis { font-size:17px; }
   .bk-dlazdice { grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; }
   .bk-dlazdice-b { min-height:60px; }
@@ -1003,7 +1008,7 @@ body.denik-dock-cela { overflow:hidden; }
 
 /* --- Animace souboje (assets/js/souboj_animace.js) --- */
 /* Hlášení, kdo je na tahu: krátký pruh nahoře, ne dialog. */
-.boj-oznam { position:fixed; left:50%; top:138px; transform:translateX(-50%); z-index:300; pointer-events:none;
+.boj-oznam { position:fixed; left:50%; top:176px; transform:translateX(-50%); z-index:300; pointer-events:none;
              background:rgba(24,22,20,.92); color:#f3ece2; border:1px solid rgba(255,255,255,.18);
              border-radius:999px; padding:7px 20px; font-size:15px; font-weight:600; letter-spacing:.3px;
              box-shadow:0 8px 24px rgba(0,0,0,.5); opacity:0; }
@@ -1065,7 +1070,7 @@ body.denik-dock-cela { overflow:hidden; }
 }
 @media (max-width: 760px) {
   .boj-centr { right:8px; bottom:170px; }
-  .boj-oznam { top:150px; font-size:14px; padding:6px 16px; }
+  .boj-oznam { top:190px; font-size:14px; padding:6px 16px; }
 }
 
 /* Hláška o zpátečním pinu — nízký pruh nahoře pod lištou světa, ne dialog přes půl obrazovky. */

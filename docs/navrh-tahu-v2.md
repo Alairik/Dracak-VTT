@@ -1,5 +1,9 @@
 # Tah v souboji — jedno gesto místo hlášení akcí (návrh v2, 2026-10-16)
 
+> **Stav 2026-11-13:** logika klikání na mapu z tohohle návrhu platí dál, ale ovládání kolem ní je nové —
+> pruh pořadí nahoře a jedna karta dole místo postranního panelu. Aktuální popis: `docs/stav-projektu.md`,
+> „Souboj — nový průběh, kroky 1–7 a telefon“.
+
 Nahrazuje lištu akcí z kroku 2a/2b/2c (`docs/navrh-souboje-v1.md`). Pravidla se nemění,
 mění se způsob ovládání: hráč na tahu **jen klikne na mapu**, systém z toho pozná akci
 (krok, běh, sprint, otočka, útok i jejich spojení), spočítá cenu v akcích a po potvrzení

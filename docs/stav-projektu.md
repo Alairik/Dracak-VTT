@@ -253,6 +253,68 @@ Tři věci ze zadání uživatele k pinům:
 Testy: rozšířený `tests/e2e/pin_vstoupit_api.js` (automatický zpáteční pin, zrušení, posunutí i s družinou,
 hláška v prohlížeči) a nový `tests/e2e/pin_mapa_ui.js` (mapa z pinu, práva, velikost značek).
 
+### Souboj — nový průběh, kroky 1–7 a telefon (2026-11-13, hotovo)
+
+Uživatel po kroku 0: *„dodělej to celé“*. Postavený je celý schválený návrh (plátno níž). **Bez změny databáze.**
+
+**Jak se teď souboj ovládá** (`assets/js/souboj.js`, styly `.boj-*`, `.bk-*` v `assets/css/mapa.css`):
+
+* **Pruh pořadí nahoře** (`#bojPoradi`): kolo a půlka, tvorové v pořadí s tečkami akcí, zvýrazněný ten, kdo je na tahu;
+  klepnutí na tvora na něj posune mapu. **Hráč vidí pořadí jen u družiny** — u nepřátel jen „nepřátelé ×N“
+  (kolik jich na mapě vidí) a konkrétního nepřítele až ve chvíli, kdy hraje. Iniciativa a úmysly nestvůr zůstávají
+  tajné, jak to bylo. PJ má v pruhu nabídku **„PJ ▾“**: Přeskočit tah, Upravit akce (−1 / +1 / ×2 / ½ / zrušit slib),
+  Začít bez čekání, Kdo bojuje…, Ukončit souboj.
+* **Jedna karta dole** (`#bojKarta`) říká, co se po mně právě chce. Výzvy k hodu (`.vyzva-panel`) jsou na stejném
+  místě a karta se pod nimi schová — dole je vždy jen jedna věc.
+* **Postranní panel souboj neřídí** a při zahájení se už sám neotvírá (`raid_panel.js`); zůstal jako přehled tvorů.
+
+**Krok 1 + 2 — ohlášení akce a iniciativa jsou jeden krok.** Hráč: čtyři dlaždice (Útok / Střelba / Kouzlo / Pohyb)
+a tři malé (Čekám / Utíkám / Něco jiného), pod nimi složení hodu štítky („k6 · Kouzlení · celkem +1“) a „Hodit kostkou“
+(nebo „Hodil jsem u stolu…“). **Cíl se neohlašuje**, pole „útoků za 2 kola“ hráč nemá (bonus povolání se počítá sám).
+Střelba je zamčená, když postava nemá střelnou ani vrhací zbraň, Kouzlo, když nezná žádné kouzlo. PJ: řádek na skupinu
+(stejné nestvůry = jeden hod), nestvůra bez ohlášené akce útočí, „Hodit za všechny“; postava hráče je u PJ jen
+„čeká se na hráče“ s „Hodit za něj…“. **Fáze PJ neodklikává:** `souboj_hod.php` s příznakem `auto` jde hodit už ve fázi
+úmyslů a po hodu posledního účastníka začnou tahy samy; `umysl_nastavit.php` dovolí hráči měnit akci, dokud nehodil.
+**Od 2. kola je akce z minula předvybraná** (`dracak_vtt_souboj_nove_kolo` už úmysl nemaže) — stačí hodit.
+Náhled složení hodu posílá server (`ini_nahled` u účastníka, `dracak_vtt_souboj_ini_nahled`).
+*Rozdíl proti knize, o kterém uživatel ví:* kniha říká „vyjádřit se postupně“ a pak házet; tady může hráč akci změnit
+i poté, co hodil někdo jiný. Úmysly a hody nestvůr hráč nevidí, takže z toho výhodu nemá.
+
+**Krok 3 — tah.** Klepnutí na nepřítele = cesta k němu + útok zbraní v ruce, na volné místo = přesun, do vlastního
+těla = otočení (logika z `docs/navrh-tahu-v2.md` beze změny). Karta ukáže jen plán („Krok a útok → Goblin · 1 akce ·
+Cep · 1 hex“) a jedno tlačítko pojmenované podle toho, co udělá (Útok / Jít / Otočit); jemné úpravy (↩ bod, ↶ ↷,
+bez útoku, z místa) jsou malé ikony pod tím. Dál **„v ruce: X ▾“** (nabídka zbraní u sebe; výměna stojí akci a je to
+u každé položky napsané předem), **Kouzlo**, **Jiné ▾** (čekání, obrana, obrana a krok, jiná činnost, držet čelo)
+a **Konec tahu**. Když PJ sleduje tah postavy hráče, má jen malou kartu s „Hrát za něj“.
+*Mapa bez hexů:* karta řekne, že tu pohyb a útok vyhodnotit nejde, a v „Jiné“ zůstává prosté odečtení akce
+(rozhodnutí uživatele: souboj na mapě bez hexů nebude; starý seznam 14 tlačítek je pryč).
+
+**Krok 3b — kouzlo.** „Kouzlo“ → dlaždice kouzel postavy s cenou v mazích a počtem akcí (nedostupná zašedlá
+„nemáš dost“), → cíl klepnutím na mapě nebo „Na sebe“ → „Seslat“. Na mapě se kreslí **dosah kouzla, jen když ho kniha
+udává číslem** (`dosah_sahy`); u kouzel se slovním dosahem kruh není — nehádám ho. Dosah i výhled dál hlídá server
+a chybu vypíše na kartě. Kouzlo „ihned“ se místo seslání **přidá k další akci** (štítek na kartě tahu). Trvání a cena,
+kterou hra z knihy nepozná, jsou pod „Upřesnit trvání a cenu“; PJ má navíc „Kouzlit bez seznamu“ pro nestvůry.
+Rozdělané kouzlo na víc akcí: „Kouzlit dál“ / „Přerušit“.
+
+**Kroky 4 a 5 — hody.** Karta výzvy má nadpis, co se po mně chce („Hoď na útok“, „Goblin na tebe útočí“), **číslo je
+vidět rovnou** („4 ÚČ Cep“, opravy jako štítky) a jedno tlačítko „Hodit kostkou“. Hráč nic nevyplňuje. Obrana: dvě
+velké volby **„Bráním se · zbraní · stojí akci“ / „Nebráním se · jen zbrojí · −3“** a hází se v obou případech
+(to už pravidla v kódu dělala, jen to teď karta říká nahlas). PJ má úpravy čísel pod „Upravit čísla…“ — rozbalí se
+samy, když nějaké číslo chybí. Nestvůry brání PJ. Odmítnutý hod se vypíše na kartě (dřív jen v logu).
+
+**Krok 6 — výsledek** je krátká hláška pod pruhem pořadí, zmizí sama (hráč 4,5 s, PJ 9 s), nic se nezavírá;
+animace z 2026-11-11 zůstává.
+
+**Telefon:** karta sedí nad lištou nástrojů, dlaždice ve dvou sloupcích; lupa a tlačítko „kdo je na tahu“ se za
+souboje schovají (jinak ležely přes „Konec tahu“), házecí místo se stěhuje nahoru vedle pruhu.
+
+**Co z nákresu není přesně tak:** (1) hráč nevidí v pruhu nepřátele jednotlivě s otazníkem v pořadí — viděl by
+tím jejich iniciativu, kterou má mít tajnou; (2) dosah kouzla jen u kouzel s číselným dosahem; (3) kouzla „ihned“
+k obraně mají v kartě obrany pořád starší blok s rozbalovacími poli (ukazuje se jen tomu, kdo takové kouzlo zná).
+
+**Testy:** nový `souboj_karta_ui.js` (48 kontrol), přepsané `souboj_ui.js` (celý průchod PJ + hráč, dvě kola),
+`hex_tah_ui.js`, `kouzleni_ui.js`, `kouzleni_plan_ui.js`, `zbrane_mapa.js`.
+
 ### Souboj, krok 0 — nové okno „Zahájit souboj“ (2026-11-12, hotovo)
 
 První postavený krok schváleného návrhu (plátno níž). Uživatel: *„schváleno, začni stavět krok 0“*.
@@ -273,7 +335,7 @@ První postavený krok schváleného návrhu (plátno níž). Uživatel: *„sch
   (sekce h1606, hned za b10619, které říká, že vytasení stojí akci).
 * Bez změny databáze. Testy: nový `tests/e2e/souboj_start_ui.js` (30 kontrol), upravený `souboj_ui.js`.
 
-**Další krok:** krok 1 — ohlášení akce jedním klepnutím (karta dole místo záložky „Úmysly“ v panelu).
+**Další kroky:** hotové, viz „Souboj — nový průběh, kroky 1–7 a telefon“ výš.
 
 ### Malá karta postavy: jeden klik = karta, dvojklik = deník (2026-11-12)
 
@@ -295,7 +357,7 @@ mana, uč oč… zrušit dialog buď křížkem nebo klikem mimo.“* Mění roz
 Testy: nový `tests/e2e/postava_mini_ui.js` (30 kontrol), upravené `denik_dock.js` a `efekty_ui.js` (deník se v nich
 otevírá dvojklikem). Bez změny databáze.
 
-### Souboj — nový průběh, návrh (schválen 2026-11-12; postaven krok 0)
+### Souboj — nový průběh, návrh (schválen 2026-11-12; postaven celý)
 
 Zadání uživatele: *„potřebuju zrevidovat souboj. přijde mi to strašně složitý… musí to fungovat úplně samo,
 respektive aby to udělalo jen výzvy k hodům, o zbytek se postarají animace… jen nahlásím jakou akci budu dělat,

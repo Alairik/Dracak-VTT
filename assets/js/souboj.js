@@ -188,8 +188,9 @@ export function initSouboj(ctx) {
   function ukazChybu(text) {
     kartaChyba = text;
     clearTimeout(kartaChybaTimer);
-    kartaChybaTimer = setTimeout(() => { kartaChyba = ''; kreslit(); }, 7000);
+    kartaChybaTimer = setTimeout(() => { kartaChyba = ''; kreslit(); kreslitVyzvy(true); }, 7000);
     kreslit();
+    kreslitVyzvy(true);   // chyba u hodu (karta tahu je v tu chvíli schovaná) se ukáže na kartě výzvy
   }
   // Otazníček s bublinou (vzor .tvor-hlp z okna tvora): vysvětlení patří sem, ne do plochy karty.
   function napoveda(text) {
@@ -2321,7 +2322,7 @@ export function initSouboj(ctx) {
   }
 
   function kreslitVyzvy(vynutit) {
-    const podpis = JSON.stringify([vyzvy, vysledekKarta, hodiSe]);
+    const podpis = JSON.stringify([vyzvy, vysledekKarta, hodiSe, kartaChyba]);
     if (!vynutit && podpis === vyzvaPodpis) return;
     // Rozepsaný vlastní hod se nepřekresluje pod rukama (čísla v polích PJ se ukládají hned při změně).
     const a = document.activeElement;
@@ -2333,6 +2334,7 @@ export function initSouboj(ctx) {
     if (vysledekKarta) vysledekEl.appendChild(kartaVysledku(vysledekKarta));
     if (!vyzvy.length) { vyzvaPanel.style.display = 'none'; return; }
     vyzvy.forEach((v) => vyzvaPanel.appendChild(kartaVyzvy(v)));
+    if (kartaChyba) vyzvaPanel.appendChild(el('p', 'bk-chyba', kartaChyba));
     if (jePj) {
       vyzvaPanel.appendChild(tlacitko('PJ: zrušit hod a jít dál', 'btn btn-ghost vyzva-zrusit', () => {
         if (window.confirm('Zrušit rozehraný hod? Nikdo neutrpí zranění, akce útočníka zůstává utracená.')) volat('api/vyzva_zrus.php', {});
