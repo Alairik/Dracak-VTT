@@ -18,10 +18,10 @@ mění) se sem zapíše update ve stejném kroku, ne až "až bude čas".
 
 **Čti tohle jako první.** Poslední tři dny se přestavěl celý souboj. Všechno je nasazené na `main`
 **plná regrese 80 sad prošla** a z téhle práce **žádné nové ruční SQL nepřibylo** (databáze se neměnila).
-**Pozor:** `docs/sql-k-rucnimu-spusteni.sql` není prázdný — drží starší bloky **K** (infravidění z bestiáře a z rasy,
-migrace 0116–0117), **L** (skupina útoku u zbraně) a **M** (`svet.animace`, 0120). U žádného z nich tu není
-zapsané potvrzení ✓ ze stránky Změny databáze → „Co aplikace v databázi vidí“, takže podle `CLAUDE.md` se blok
-**posílá uživateli dál celý**, dokud ho nepotvrdí. Hra bez nich funguje (kód na chybějící sloupce nespoléhá).
+**Ruční SQL nečeká žádné:** starší bloky K (infravidění, 0116–0117), L (skupina útoku u zbraně) a M (`svet.animace`,
+0120) uživatel potvrdil 2026-11-13 (na dotaz, jestli u všech čtyř řádků na stránce Změny databáze svítí ✓, odpověděl
+„je to tam“) a `docs/sql-k-rucnimu-spusteni.sql` je prázdný. Kdyby infravidění nestvůr nebo přepínač animací
+nefungovaly, první krok je podívat se na tu stránku — bloky jsou v historii souboru.
 Uživatel bude hru zkoušet a posílat další úpravy; nic není „rozdělané napůl“.
 
 **Jak se teď souboj ovládá (jedna věta na krok, podrobnosti v sekcích pod tím):**
