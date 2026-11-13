@@ -1912,6 +1912,7 @@ const souboj = initSouboj ? initSouboj({
   getZdi: () => zdiList,
   soubojSvg: document.getElementById('soubojSvg'),
   raidPrekresli: () => { if (raid) raid.prekresli(); },
+  obrazekUrl: (id) => (FUNKCE.obrazek && id ? 'obrazek.php?id=' + id : null),
 }) : null;
 // Deník postavy v plovoucím okně přes mapu (assets/js/denik_dock.js) — upravuje se přímo při hře.
 // ---- Vrstva PJ uvnitř rychlého deníku (návrh docs/panel-tokenu-navrh.md, část C) ----

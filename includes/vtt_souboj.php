@@ -255,7 +255,9 @@ function dracak_vtt_souboj_nove_kolo(PDO $pdo, int $svetId, int $mapaId, int $uc
     )->execute([$nove, $mapaId]);
     dracak_vtt_iniciativa_prenos_uloz($pdo, $mapaId);
     $pdo->prepare('DELETE FROM kolo_iniciativa WHERE mapa_id = ?')->execute([$mapaId]);
-    $pdo->prepare('UPDATE kolo_ucastnik SET umysl = NULL, umysl_cil_token_id = NULL WHERE mapa_id = ?')->execute([$mapaId]);
+    // Ohlášená akce zůstává do dalšího kola předvybraná („stejně jako minule“, návrh souboje 2026-11-12) — kdo nic
+    // nezmění, jen hodí. Cíl se nepřenáší (při ohlášení se už ani nezadává).
+    $pdo->prepare('UPDATE kolo_ucastnik SET umysl_cil_token_id = NULL WHERE mapa_id = ?')->execute([$mapaId]);
     $efekty = dracak_vtt_efekty_odpocet($pdo, $svetId, $mapaId, $ucetId, $stav['cislo_kola']);
     // Krvácení, regenerace… : na začátku kola se každému takovému tvoru založí hod kostkou (výzva „tik“).
     dracak_vtt_efekty_tiky_zaloz($pdo, $svetId, $mapaId, $ucetId);
@@ -863,7 +865,7 @@ function dracak_vtt_souboj_klient(PDO $pdo, array $user, array $mapa, bool $jePj
     $viditelny = function (int $tokenId) use ($info, $jePj): bool {
         return isset($info[$tokenId]) && ($jePj || dracak_vtt_souboj_vidi_hrac($info[$tokenId]));
     };
-    $sestav = function (int $tokenId) use ($pdo, $info, $ucastniciDb, $kiPoTokenu, $user, $jePj, $polovina): array {
+    $sestav = function (int $tokenId) use ($pdo, $info, $ucastniciDb, $kiPoTokenu, $user, $jePj, $polovina, $stav): array {
         $i = $info[$tokenId];
         $u = $ucastniciDb[$tokenId] ?? null;
         $ki = $kiPoTokenu[$tokenId] ?? null;
@@ -894,6 +896,10 @@ function dracak_vtt_souboj_klient(PDO $pdo, array $user, array $mapa, bool $jePj
             'zavazek_akci' => $ki && !empty($ki['zavazek']) ? (int)$ki['zavazek_akci'] : null,
             'zavazek_hotovo' => $ki && !empty($ki['zavazek']) ? (int)$ki['zavazek_hotovo'] : null,
             'akce_hotovo' => $ki && isset($ki['akce_hotovo']) ? (int)$ki['akce_hotovo'] : null,
+            // Karta „co uděláš / hoď“ (assets/js/souboj.js): z čeho se hod na iniciativu skládá a které akce tvor vůbec může
+            // ohlásit. Jen pro toho, kdo tvora ovládá, a jen dokud nehodil.
+            'ini_nahled' => $u && $ki === null && $stav['faze'] !== 'kolo' && dracak_vtt_souboj_ovlada($user, $jePj, $i)
+                ? dracak_vtt_souboj_ini_nahled($pdo, $i, $stav, $u) : null,
         ];
     };
 
@@ -942,6 +948,8 @@ function dracak_vtt_souboj_klient(PDO $pdo, array $user, array $mapa, bool $jePj
         'novy' => true,
         'iniciativa_v2' => dracak_vtt_iniciativa_v2(),
         'ini_utoky' => dracak_vtt_iniciativa_v2() ? dracak_vtt_iniciativa_utoky_tabulka($pdo) : new stdClass(),
+        // Kolik k iniciativě přidá ohlášené kouzlení (řádek „Kouzlení“ tabulky bonusů) — číslo na dlaždici „Kouzlo“.
+        'ini_kouzleni' => (int)($pdo->query("SELECT bonus FROM iniciativa_bonusy WHERE popis = 'Kouzlení' LIMIT 1")->fetchColumn() ?: 0),
         // Hráč se v souboji na hexové mapě hýbe akcemi (Krok, Otočka), ne tažením.
         'pohyb_akcemi' => dracak_vtt_hex_rozmery($mapa) !== null,
         // Pohybové akce, které únava aktivní postavě zakazuje (běh, sprint) — tlačítka se zamknou.
@@ -951,6 +959,33 @@ function dracak_vtt_souboj_klient(PDO $pdo, array $user, array $mapa, bool $jePj
     return [
         'kolo' => $kolo, 'iniciativa' => $iniciativa, 'ucastnici' => $ucastnici,
         'vyzvy' => dracak_vtt_vyzva_funkce() ? dracak_vtt_vyzvy_klient($pdo, $user, $jePj, $info, $mapaId) : [],
+    ];
+}
+
+// Náhled hodu na iniciativu před hodem: součet oprav, jejich popisy (štítky na kartě) a co tvor může ohlásit.
+// `strelba` / `kouzlo` = má postava čím střílet / zná nějaké kouzlo; nestvůry se neomezují (PJ ví, co umí).
+function dracak_vtt_souboj_ini_nahled(PDO $pdo, array $token, array $stav, array $ucastnik): array
+{
+    $m = dracak_vtt_iniciativa_modifikator($pdo, $token, [], 0, dracak_vtt_souboj_auto_popisy($stav, $ucastnik), $ucastnik);
+    $strelba = true;
+    $kouzlo = true;
+    if ($token['typ_entity'] === 'postava') {
+        $q = $pdo->prepare(
+            'SELECT COUNT(*) FROM postava_predmety pp JOIN predmety p ON p.id = pp.predmet_id
+             WHERE pp.postava_id = ? AND p.typ = "zbran" AND (p.dostrel_maly IS NOT NULL OR p.kategorie_zbrane LIKE "%vrhac%" OR p.kategorie_zbrane LIKE "%strel%")'
+        );
+        $q->execute([(int)$token['entita_id']]);
+        $strelba = (int)$q->fetchColumn() > 0;
+        $q = $pdo->prepare('SELECT COUNT(*) FROM postava_zna_kouzlo WHERE postava_id = ?');
+        $q->execute([(int)$token['entita_id']]);
+        $kouzlo = (int)$q->fetchColumn() > 0;
+    }
+    return [
+        'modifikator' => $m['modifikator'],
+        'popisy' => array_map(fn($t) => preg_replace('/ \(automaticky\)$/u', '', (string)$t), $m['popisy']),
+        'bez_akci' => $m['bez_akci'],
+        'strelba' => $strelba,
+        'kouzlo' => $kouzlo,
     ];
 }
 

@@ -21,7 +21,7 @@ try {
     }
     if ($kam === 'iniciativa' && $stav['faze'] === 'umysly') {
         $pdo->prepare('UPDATE kolo_stav SET faze = "iniciativa" WHERE mapa_id = ?')->execute([$mapaId]);
-    } elseif ($kam === 'kolo' && $stav['faze'] === 'iniciativa') {
+    } elseif ($kam === 'kolo' && ($stav['faze'] === 'iniciativa' || ($stav['faze'] === 'umysly' && !empty($data['bez_cekani'])))) {
         $pdo->prepare('UPDATE kolo_stav SET faze = "kolo", polovina = 1, aktivni_token_id = NULL WHERE mapa_id = ?')->execute([$mapaId]);
         dracak_vtt_souboj_posun($pdo, $svetId, $mapaId, (int)$user['id']);
     } else {

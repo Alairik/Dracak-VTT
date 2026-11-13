@@ -279,7 +279,8 @@ export function initRaidPanel(ctx) {
   function prekresli() {
     // Souboj se rozjel: okno se samo otevře (hráči i PJ v něm mají úmysly, hody a tahy), i když ho někdo dřív zavřel.
     const kolo0 = ctx.getKolo();
-    if (kolo0 && !predchoziKolo && !stav.otevreno) { stav.otevreno = true; uloz(stav); aplikuj(); }
+    // Od 2026-11-12 se panel při zahájení souboje sám neotvírá: souboj se ovládá pruhem pořadí a kartou dole
+    // (assets/js/souboj.js), panel je jen přehled tvorů, který si PJ otevře, když chce.
     predchoziKolo = !!kolo0;
     if (!stav.otevreno || tazeneId !== null) return;
     const info = seradit();

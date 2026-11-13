@@ -61,6 +61,14 @@ foreach ($b['zbrane'] as $z) {
         break;
     }
 }
+// Zbraně, které má postava u sebe (v boji je jde vytasit) — nabídka „v ruce“ na kartě tahu.
+$uSebe = [];
+foreach (dracak_vtt_denik_data($pdo, $p, false)['zbrane'] as $z) {
+    if ($z['u_sebe'] || $z['drzena']) {
+        $uSebe[] = ['id' => (int)$z['id'], 'nazev' => (string)$z['nazev'], 'drzena' => (bool)$z['drzena'],
+            'uc' => $z['uc_tvar_v_tvar'] !== null ? (int)$z['uc_tvar_v_tvar'] : null];
+    }
+}
 $podtitul = trim((string)($p['povolani_nazev'] ?? ''));
 if ($podtitul !== '' && ($p['uroven'] ?? null) !== null) {
     $podtitul .= ' · ' . (int)$p['uroven'] . '. úroveň';
@@ -74,6 +82,7 @@ postava_mini_konec(200, [
     'mag' => $p['max_magenergie'] !== null ? (int)$p['aktualni_magenergie'] : null,
     'max_mag' => $p['max_magenergie'] !== null ? (int)$p['max_magenergie'] : null,
     'zbran' => $vRuce,
+    'zbrane' => $uSebe,
     'oc' => $b['oc'] !== null ? (int)$b['oc'] : null,
     'stav' => $b['bojeschopnost'],
 ]);

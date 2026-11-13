@@ -54,28 +54,29 @@ const stav = (page) => page.evaluate(async (m) => (await fetch('/hra/api/mapa_st
   const sc = (b.x - a.x) / (B.x - A.x);
   const sx = (c, r) => { const m = stred(c, r); return { x: a.x + (m.x - A.x) * sc, y: a.y + (m.y - A.y) * sc }; };
 
-  // fronta kouzel ihned z menu
-  await hr.locator('details.ihned-menu summary').click();
+  // fronta kouzel ihned z karty dole (od 2026-11-12: „Kouzlo“ → dlaždice → cíl klepnutím na mapě / „Na sebe“)
+  await hr.click('#bojKarta [data-tah="kouzlo"]');
   await hr.waitForTimeout(800);
-  const vyber = hr.locator('details.ihned-menu select.kouzleni-vyber');
-  await vyber.selectOption({ label: 'Dusivý stín' });
-  await hr.locator('details.ihned-menu select.kouzleni-cil').selectOption({ label: await hr.locator('details.ihned-menu select.kouzleni-cil option').nth(1).innerText() });
-  await hr.locator('details.ihned-menu button', { hasText: 'Přidat' }).click();
+  await hr.locator('#bojKarta .bk-dlazdice-b', { hasText: 'Dusivý stín' }).click();
+  { const c = sx(10, 10); await hr.mouse.click(c.x, c.y); await hr.waitForTimeout(400); }
+  await hr.click('#bojKarta [data-kouzlo="seslat"]');
   await hr.waitForTimeout(400);
-  await hr.locator('details.ihned-menu select.kouzleni-vyber').selectOption({ label: 'Obrana' });
-  await hr.locator('details.ihned-menu button', { hasText: 'Přidat' }).click();
+  await hr.click('#bojKarta [data-tah="kouzlo"]'); await hr.waitForTimeout(400);
+  await hr.locator('#bojKarta .bk-dlazdice-b', { hasText: 'Obrana' }).click();
+  await hr.click('#bojKarta [data-kouzlo="na-sebe"]');
+  await hr.click('#bojKarta [data-kouzlo="seslat"]');
   await hr.waitForTimeout(400);
-  ok(await hr.locator('details.ihned-menu .ihned-chip').count() === 2, 've frontě jsou dvě kouzla');
+  ok(await hr.locator('#bojKarta .ihned-chip').count() === 2, 've frontě jsou dvě kouzla');
 
   // plánovaný tah: klik na goblina (2 hexy) → Krok a útok
   const akcePred = akce();
   const p = sx(10, 10);
   await hr.mouse.click(p.x, p.y);
   await hr.waitForTimeout(600);
-  const hlavicka = await hr.$eval('.tah-plan', (x) => x.querySelector('b').innerText).catch(() => '');
+  const hlavicka = await hr.$eval('#bojKarta .bk-plan-text strong', (x) => x.innerText).catch(() => '');
   ok(/Krok a útok/.test(hlavicka), 'klik na goblina naplánuje Krok a útok: ' + hlavicka);
-  ok(await hr.locator('details.ihned-menu .ihned-chip').count() === 2, 'fronta kouzel přežila plánování tahu');
-  await hr.click('.tah-plan button:has-text("Potvrdit")');
+  ok(await hr.locator('#bojKarta .ihned-chip').count() === 2, 'fronta kouzel přežila plánování tahu');
+  await hr.click('#bojKarta [data-plan="potvrdit"]');
   await hr.waitForTimeout(2200);
 
   const tS = (await stav(pj)).tokeny.find((t) => t.id === sindor);
@@ -85,7 +86,7 @@ const stav = (page) => page.evaluate(async (m) => (await fetch('/hra/api/mapa_st
   ok(hpGob() < 20, 'Dusivý stín zranil goblina: 20 → ' + hpGob());
   ok(Number(sqlVal(`select count(*) from svet_udalosti where mapa_id=${MAPA} and typ='kouzleni_stav' and payload like '%ihned%'`)) === 2, 'v logu jsou dvě události „ihned“');
   ok(Number(sqlVal(`select count(*) from souboj_vyzva where mapa_id=${MAPA}`)) >= 1, 'útok založil výzvu k hodu (kouzla ho nezrušila)');
-  ok(await hr.locator('details.ihned-menu .ihned-chip').count() === 0, 'fronta se po odeslání vyprázdnila');
+  ok(await hr.locator('.ihned-chip').count() === 0, 'fronta se po odeslání vyprázdnila');
   ok(hr.chyby.length === 0 && pj.chyby.length === 0, 'žádné chyby v JS: ' + hr.chyby.concat(pj.chyby).join(' | '));
 
   sql("delete from postava_zna_kouzlo where postava_id=2 and kouzlo_id in (674, 242); delete from souboj_vyzva");

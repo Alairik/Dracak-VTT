@@ -47,9 +47,21 @@ try {
         $pdo->rollBack();
         dracak_vtt_souboj_chyba(422, 'Na téhle mapě žádný souboj neběží.');
     }
-    if ($stav['faze'] === 'kolo' || ($stav['faze'] === 'iniciativa' && !$jePj)) {
+    if ($stav['faze'] === 'kolo') {
         $pdo->rollBack();
         dracak_vtt_souboj_chyba(422, 'Úmysly se zadávají před hodem na iniciativu.');
+    }
+    // Ohlášení a hod jsou pro hráče jeden krok (nový průběh 2026-11-12): dokud tvor nehodil, smí úmysl změnit i poté,
+    // co už hodil někdo jiný. Po vlastním hodu ho opraví jen PJ (bonus už je v hodu započítaný).
+    if ($stav['faze'] === 'iniciativa' && !$jePj) {
+        $hozeno = $pdo->prepare('SELECT 1 FROM kolo_iniciativa WHERE mapa_id = ? AND token_id = ?');
+        foreach ($tokenIds as $tokenId) {
+            $hozeno->execute([$mapaId, $tokenId]);
+            if ($hozeno->fetchColumn()) {
+                $pdo->rollBack();
+                dracak_vtt_souboj_chyba(422, 'Úmysly se zadávají před hodem na iniciativu.');
+            }
+        }
     }
     $upd = $pdo->prepare('UPDATE kolo_ucastnik SET umysl = ?, umysl_cil_token_id = ?' . ($utokuZadano ? ', utoku_za_2_kola = ?' : '') . ' WHERE mapa_id = ? AND token_id = ?');
     $existuje = $pdo->prepare('SELECT 1 FROM kolo_ucastnik WHERE mapa_id = ? AND token_id = ?');

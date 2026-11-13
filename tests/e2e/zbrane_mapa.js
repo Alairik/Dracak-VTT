@@ -40,26 +40,22 @@ const stav = (page) => page.evaluate(async (m) => (await fetch('/hra/api/mapa_st
 
   const hr = await login(browser, 'hrac@local', 'hrac1234', '/hra/mapa.php?id=' + MAPA);
   await hr.waitForTimeout(1500);
-  const sum = hr.locator('details.dalsi-akce summary');
-  ok(await sum.count() === 1, 'hráč na tahu vidí menu „Další akce…“');
-  await sum.click();
-  const tl = hr.locator('button', { hasText: 'Vytasit zbraň…' });
-  ok(await tl.count() === 1, 'v menu je „Vytasit zbraň…“');
-  await tl.click(); await hr.waitForTimeout(1500);
-  const viditelne = await hr.locator('#denikDock').isVisible();
-  ok(viditelne, 'otevřelo se okno deníku');
-  const src = await hr.locator('#denikFrame').getAttribute('src');
-  ok(/id=2/.test(src || ''), 'deník postavy 2: ' + src);
-  const fr = hr.frameLocator('#denikFrame');
-  ok(await fr.locator('#boj').isVisible(), 'v deníku je vidět sekce Boj');
+  // Od 2026-11-12 se zbraň v boji mění přímo na kartě tahu: „v ruce: X ▾“ → nabídka zbraní u sebe (výměna stojí akci).
+  const zb = hr.locator('#bojKarta [data-tah="zbran"]');
+  ok(await zb.count() === 1 && /Dýka/.test(await zb.innerText()), 'karta tahu ukazuje, co má postava v ruce: ' + (await zb.innerText()).replace(/\s+/g, ' '));
+  await zb.click(); await hr.waitForTimeout(900);
+  const polozky = (await hr.locator('#bojKarta [data-nabidka="zbran"] .bk-nabidka-b').allInnerTexts()).map((t) => t.replace(/\s+/g, ' '));
+  ok(polozky.some((t) => /^Dýka v ruce/.test(t)), 'držená zbraň je v nabídce označená „v ruce“: ' + polozky.join(' | '));
+  ok(polozky.some((t) => /^Cep přezbrojit · 1 akce/.test(t)), 'u jiné zbraně je předem vidět, že výměna stojí akci');
+  ok(await hr.locator('#bojKarta [data-zbran="2"]').isDisabled(), 'zbraň, kterou už drží, znovu vytasit nejde');
   await hr.screenshot({ path: OUT + '/zbrane_mapa.png' });
-  // vytasit z okna deníku → mapa ukáže log a ubyde akce
   const pred = parseInt(sqlVal(`select akce_zbyvajici from kolo_iniciativa where token_id=${sindor}`), 10);
-  hr.dialogy.length = 0;
-  await fr.locator('button[data-vytasit="39"]').click(); await hr.waitForTimeout(1500);
-  ok(parseInt(sqlVal(`select akce_zbyvajici from kolo_iniciativa where token_id=${sindor}`), 10) === pred - 1, 'z okna deníku: akce ubyla');
+  await hr.click('#bojKarta [data-zbran="39"]'); await hr.waitForTimeout(1800);
+  ok(parseInt(sqlVal(`select akce_zbyvajici from kolo_iniciativa where token_id=${sindor}`), 10) === pred - 1, 'přezbrojení stálo jednu akci');
+  ok(sqlVal('select drzena_zbran_id from postavy where id=2') === '39', 'postava teď drží Cep');
   const log = await hr.locator('body').innerText();
   ok(/Cep/.test(log) && /vytasení zbraně/.test(log), 'v logu souboje na mapě: vytasení zbraně (Cep)');
+  if (await hr.locator('#bojKarta [data-tah="zbran"]').count()) ok(/Cep/.test(await hr.locator('#bojKarta [data-tah="zbran"]').innerText()), 'karta ukazuje novou zbraň v ruce');
   await api(pj, 'souboj_konec', { mapa_id: MAPA });
   for (const t of (await stav(pj)).tokeny) await api(pj, 'token_smazat', { token_id: t.id, mapa_id: MAPA });
   sql("update postavy set drzena_zbran_id=NULL where id=2");

@@ -49,17 +49,20 @@ const stav = (page) => page.evaluate(async (m) => (await fetch('api/mapa_stav.ph
     const sx = (c, r) => { const m = stred(c, r); return { x: a.x + (m.x - A.x) * sc, y: a.y + (m.y - A.y) * sc }; };
     return { G, S, sx };
   }
-  const plan = async () => (await pj.$$eval('.tah-plan .ini-napoveda', e => e.map(x => x.innerText))).join(' / ');
-  const hlavicka = async () => pj.$eval('.tah-plan', x => x.querySelector('b').innerText + (x.querySelector('.tah-cena') ? x.querySelector('.tah-cena').innerText : '')).catch(() => '');
+  // Od 2026-11-12 je plán v kartě dole (#bojKarta .bk-plan): tučně co se stane a na koho, pod tím cena a zbraň.
+  const plan = async () => pj.$eval('#bojKarta .bk-plan-text span', x => x.innerText).catch(() => '');
+  const hlavicka = async () => pj.$eval('#bojKarta .bk-plan-text', x => x.querySelector('strong').innerText + ' · ' + x.querySelector('span').innerText).catch(() => '');
   const logTail = async () => (await pj.$eval('#logList', x => x.innerText)).split('\n').slice(-2).join(' | ');
   const posun = async (id) => (await stav(pj)).tokeny.find(t => t.id === id);
 
   // ===== 1) nepřítel 4 hexy daleko: Sprint a útok (2 akce) =====
   let k = await priprava(14, 10, 3, 3);
   let akceDo = +sqlVal(`select akce_zbyvajici from kolo_iniciativa where token_id=${k.G}`);
-  ok(await pj.$$('.tah-plan').then(x => x.length) === 1, 'plán začal sám, jakmile je tvor na tahu');
-  ok(await pj.$$('.akce-lista .akce-btn:has-text("Sprint")').then(x => x.length) === 0, 'lišta akcí s Krok / Běh / Sprint zmizela');
-  ok(await pj.$$('details.dalsi-akce').then(x => x.length) === 1, 'zbylo menu „Další akce…“');
+  ok(await pj.locator('#bojKarta .bk-tah').isVisible() && /Klepni na nepřítele/.test(await pj.innerText('#bojKarta')), 'karta tahu je dole a plánování začalo samo, jakmile je tvor na tahu');
+  ok(await pj.locator('#raidPanel').isHidden(), 'postranní panel se kvůli souboji neotevřel');
+  ok(await pj.locator('#bojKarta select').count() === 0, 'v kartě tahu není žádné rozbalovací pole ani lišta Krok / Běh / Sprint');
+  ok(await pj.locator('#bojKarta [data-tah="jine"]').count() === 1 && await pj.locator('#bojKarta [data-tah="konec"]').count() === 1, 'karta má „Jiné“ a „Konec tahu“');
+  ok(/na tahu/.test(await pj.innerText('#bojPoradi .boj-cip.na-tahu')), 'pruh pořadí nahoře zvýrazňuje, kdo je na tahu');
   ok(await pj.$$('#soubojSvg .sb-nepritel').then(x => x.length) === 1, 'nepřítel je na mapě označený kroužkem');
   let p = k.sx(14, 10);
   await pj.mouse.click(p.x, p.y); await pj.waitForTimeout(500);
@@ -67,10 +70,11 @@ const stav = (page) => page.evaluate(async (m) => (await fetch('api/mapa_stav.ph
   console.log('   plán:', h1, '|', await plan());
   ok(/Sprint a útok/.test(h1) && /1 akce/.test(h1), 'klik na nepřítele 4 hexy daleko: Sprint a útok za 1 akci (' + h1.replace(/\n/g, ' ') + ')');
   ok(await pj.$$('#soubojSvg .sb-bod').then(x => x.length) === 3, 'cesta A, B, C k nepříteli (3 hexy)');
-  ok(/Útok na: /.test(await plan()), 'v plánu je cíl útoku');
+  ok(/→ Sindor/.test(h1), 'v plánu je cíl útoku');
   ok(await pj.$$('#soubojSvg .sb-bublina').then(x => x.length) === 1, 'u konce cesty je plovoucí potvrzení');
   await pj.screenshot({ path: SHOTS + '/90_sprint_utok.png' });
-  await pj.click('.tah-plan button:has-text("Potvrdit")'); await pj.waitForTimeout(1800);
+  ok((await pj.innerText('#bojKarta [data-plan="potvrdit"]')).trim() === 'Útok', 'hlavní tlačítko se jmenuje podle toho, co udělá („Útok“)');
+  await pj.click('#bojKarta [data-plan="potvrdit"]'); await pj.waitForTimeout(1800);
   let tG = await posun(k.G);
   ok(Math.abs(tG.x - stred(13, 10).x) <= 1 && Math.abs(tG.y - stred(13, 10).y) <= 1, 'G stojí na (13,10) vedle nepřítele: ' + tG.x + ',' + tG.y);
   console.log('   log:', await logTail());
@@ -113,22 +117,24 @@ const stav = (page) => page.evaluate(async (m) => (await fetch('api/mapa_stav.ph
   k = await priprava(14, 10, 3, 0);   // 2 akce celkem, v 1. půlce jen 1
   p = k.sx(14, 10);
   await pj.mouse.click(p.x, p.y); await pj.waitForTimeout(500);
-  ok(/Sprint a útok/.test(await hlavicka()) && !(await pj.$eval('.tah-plan button:has-text("Potvrdit")', x => x.disabled)), 'při kvótě jedna akce jde sprint a útok potvrdit (stojí 1 akci)');
-  await pj.click('.tah-plan button:has-text("Bez útoku")'); await pj.waitForTimeout(300);
+  ok(/Sprint a útok/.test(await hlavicka()) && !(await pj.$eval('#bojKarta [data-plan="potvrdit"]', x => x.disabled)), 'při kvótě jedna akce jde sprint a útok potvrdit (stojí 1 akci)');
+  await pj.click('#bojKarta [data-plan="bez-utoku"]'); await pj.waitForTimeout(300);
+  ok((await pj.innerText('#bojKarta [data-plan="potvrdit"]')).trim() === 'Jít', 'bez útoku se hlavní tlačítko jmenuje „Jít“');
   ok(/Sprint/.test(await hlavicka()) && !/útok/.test(await hlavicka()), 'po „Bez útoku“ zbyde jen Sprint');
 
   // ===== 6) Esc vypne plánování, „Plánovat tah“ ho zapne =====
   await pj.keyboard.press('Escape'); await pj.waitForTimeout(400);
-  ok(await pj.$$('.tah-plan').then(x => x.length) === 0 && await pj.$$('button:has-text("Plánovat tah")').then(x => x.length) === 1, 'Esc vypne plán, nabídne „Plánovat tah“');
-  await pj.click('button:has-text("Plánovat tah")'); await pj.waitForTimeout(400);
-  ok(await pj.$$('.tah-plan').then(x => x.length) === 1, '„Plánovat tah“ plán zase zapne');
+  ok(await pj.locator('#bojKarta .bk-plan').count() === 0 && await pj.locator('#bojKarta [data-akce="planovat"]').count() === 1 && await pj.locator('#soubojSvg .sb-nepritel').count() === 0, 'Esc vypne plán a nabídne „Plánovat tah“');
+  await pj.click('#bojKarta [data-akce="planovat"]'); await pj.waitForTimeout(400);
+  ok(await pj.locator('#soubojSvg .sb-nepritel').count() === 1 && /Klepni na nepřítele/.test(await pj.innerText('#bojKarta')), '„Plánovat tah“ plán zase zapne');
 
   // ===== 7) Další akce… → Čekání =====
-  await pj.click('details.dalsi-akce summary'); await pj.waitForTimeout(200);
-  await pj.click('details.dalsi-akce button:has-text("Čekání")'); await pj.waitForTimeout(1500);
-  ok(/čekání/.test(await pj.$eval('#logList', x => x.innerText)), 'Další akce → Čekání se odečte a zapíše do logu');
+  await pj.click('#bojKarta [data-tah="jine"]'); await pj.waitForTimeout(200);
+  ok(await pj.locator('#bojKarta [data-nabidka="jine"] [data-akce]').count() >= 4, 'nabídka „Jiné“ se otevře (čekání, obrana, obrana a krok, jiná činnost…)');
+  await pj.click('#bojKarta [data-akce="cekani"]'); await pj.waitForTimeout(1500);
+  ok(/čekání/.test(await pj.$eval('#logList', x => x.innerText)), 'Jiné → Čekání se odečte a zapíše do logu');
 
-  console.log(errs.length ? 'JS CHYBY:\n' + errs.join('\n') : 'bez JS chyb');
+  ok(errs.length === 0, 'žádná chyba JavaScriptu' + (errs.length ? ': ' + errs.join(' | ') : ''));
   await api(pj, 'souboj_konec', { mapa_id: MAPA });
   await browser.close();
 })();

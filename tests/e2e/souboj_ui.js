@@ -21,10 +21,10 @@ const api = (page, name, body) => page.evaluate(async ([n, b]) => {
   const r = await fetch('api/' + n + '.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
   return r.json();
 }, [name, body]);
-const ok = (c, m) => console.log((c ? 'OK   ' : 'CHYBA') + ' ' + m);
+const ok = (c, m) => { if (!c) process.exitCode = 1; console.log((c ? 'OK   ' : 'CHYBA') + ' ' + m); };
 const txt = (page, sel) => page.$eval(sel, e => e.innerText).catch(() => '(nenalezeno)');
 (async () => {
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox', '--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
   const pj = await login(browser, 'test@local', 'test1234', 'PJ');
   const hr = await login(browser, 'hrac@local', 'hrac1234', 'HRAC');
   await api(pj, 'souboj_konec', { mapa_id: 1 });
@@ -36,6 +36,7 @@ const txt = (page, sel) => page.$eval(sel, e => e.innerText).catch(() => '(nenal
   ok(await hr.$('#tb-souboj') === null, 'hráč tlačítko nemá');
 
   // --- zahájení ---
+  errs.length = 0;   // příprava (úklid souboje, který neběží = 422; ikona stránky = 404) do kontroly chyb nepatří
   await pj.click('#tb-souboj');
   await pj.waitForSelector('#modalSouboj', { state: 'visible' });
   await pj.screenshot({ path: SHOTS + '/01_zahajeni.png' });
@@ -63,97 +64,111 @@ const txt = (page, sel) => page.$eval(sel, e => e.innerText).catch(() => '(nenal
   await pj.click('[data-souboj-vyber="vse"]'); await pj.waitForTimeout(150);
 
   await pj.click('#soubojUlozit');
-  await pj.waitForSelector('#raidPanel', { state: 'visible' });
+  // ===== Nový průběh (2026-11-12): pruh pořadí nahoře, jedna karta dole, postranní panel souboj neřídí =====
+  const sqlVal = (q) => require('child_process').execSync(`mysql --default-character-set=utf8mb4 ${process.env.DB || 'dracak'} -N -e "${q}"`).toString().trim();
+  await pj.waitForSelector('#bojPoradi', { state: 'visible' });
   await pj.waitForTimeout(600);
-  await pj.screenshot({ path: SHOTS + '/02_umysly_pj.png' });
-  ok((await txt(pj, '#raidTitul')).includes('kolo 1'), 'panel: ' + (await txt(pj, '#raidTitul')));
+  await pj.screenshot({ path: SHOTS + '/02_priprava_pj.png' });
+  ok(await pj.locator('#raidPanel').isHidden(), 'postranní panel se při zahájení souboje sám neotevře');
+  ok(/Kolo 1/.test(await txt(pj, '#bojPoradi')), 'pruh pořadí: ' + (await txt(pj, '#bojPoradi')).replace(/\s+/g, ' '));
 
-  // hráč vidí jen Sindora
+  // --- krok 1: hráč ohlásí akci jedním klepnutím ---
   await hr.waitForTimeout(2500);
-  await hr.screenshot({ path: SHOTS + '/03_umysly_hrac.png' });
-  const hrRad = await hr.$$eval('#raidSeznam .raid-box .raid-jmeno', r => r.map(x => x.innerText.trim().replace(/\s+/g, ' ')));
-  ok(hrRad.length === 1 && hrRad[0].startsWith('Sindor'), 'hráč v panelu: ' + hrRad.join(' | '));
-  ok(await hr.locator('#raidSeznam .raid-podtitul, #raidSeznam .raid-hp-text, #raidSeznam .raid-mag').count() === 0 && await hr.locator('#raidSeznam .raid-hp').count() === 1, 'hráč v panelu vidí jen pruh životů, bez čísel a dalších údajů');
-
-  // úmysly: hráč kouzlení; PJ: gobliny útok (skupina)
-  await hr.selectOption('#raidSeznam .ini-umysl select >> nth=0', 'kouzleni');
-  await pj.waitForTimeout(300);
-  const pjSel = await pj.$$('#raidSeznam .raid-box');
-  console.log('PJ řádků v úmyslech:', pjSel.length);
-  const gobRadek = pj.locator('#raidSeznam .raid-box').filter({ has: pj.locator('.raid-jmeno', { hasText: 'Goblin' }) }).filter({ has: pj.locator('select') });
-  ok(await gobRadek.count() === 1, 'gobliny sloučeni do skupiny (ovládání má jen první): ' + (await gobRadek.first().innerText()).replace(/\s+/g, ' '));
-  await gobRadek.locator('select').first().selectOption('utok');
-  await pj.waitForTimeout(1800);
-  await pj.screenshot({ path: SHOTS + '/04_umysly_pj_po.png' });
-
-  // --- iniciativa ---
-  await pj.click('text=Otevřít hody na iniciativu');
-  await pj.waitForTimeout(2200);
-  await hr.waitForTimeout(500);
-  await hr.screenshot({ path: SHOTS + '/05_ini_hrac.png' });
-  await hr.click('#raidSeznam button:has-text("Hodit")');
-  await hr.waitForSelector('#modalHod', { state: 'visible' });
-  await hr.screenshot({ path: SHOTS + '/06_hod_okno.png' });
-  console.log('tlačítko hodu:', (await txt(hr, '#hodKostkaBtn')).trim());
-  await hr.click('#hodKostkaBtn');
+  await hr.screenshot({ path: SHOTS + '/03_co_udelam_hrac.png' });
+  ok(await hr.locator('#bojKarta .bk-dlazdice-b').count() === 4, 'hráč má kartu se čtyřmi dlaždicemi (Útok, Střelba, Kouzlo, Pohyb)');
+  ok(/Sindor, co uděláš/.test(await txt(hr, '#bojKarta')), 'karta se ptá jménem: ' + (await txt(hr, '#bojKarta .bk-nadpis')));
+  ok(await hr.locator('#bojKarta select').count() === 0 && await hr.locator('#bojKarta input').count() === 0, 'hráč při ohlášení nic nevyplňuje (žádné pole, žádný výběr cíle)');
+  ok(await hr.locator('#bojKarta [data-hod="ini"]').count() === 0, 'dokud akci neohlásí, tlačítko hodu tam není');
+  ok(await hr.locator('#bojKarta [data-umysl="strelba"]').isDisabled(), 'Střelba je zamčená, když postava nemá čím střílet');
+  ok(/\+1/.test(await txt(hr, '#bojKarta [data-umysl="kouzleni"]')), 'u Kouzla je vidět bonus k iniciativě: ' + (await txt(hr, '#bojKarta [data-umysl="kouzleni"]')).replace(/\s+/g, ' '));
+  const pruhHrace = (await txt(hr, '#bojPoradi')).replace(/\s+/g, ' ');
+  ok(/nepřátelé/.test(pruhHrace) && /×3/.test(pruhHrace) && !/Go/.test(pruhHrace), 'hráč vidí v pruhu jen počet viditelných nepřátel, ne jejich pořadí: ' + pruhHrace);
+  await hr.click('#bojKarta [data-umysl="kouzleni"]');
   await hr.waitForTimeout(1500);
-  await hr.screenshot({ path: SHOTS + '/07_hod_leti.png' });
-  await hr.waitForFunction(() => document.getElementById('modalHod').style.display === 'none', null, { timeout: 15000 }).catch(() => console.log('modál hodu se nezavřel'));
-  console.log('výsledek hodu:', (await txt(hr, '#hodVysledek')).trim(), '| chyba:', (await txt(hr, '#hodChyba')).trim());
-  await hr.waitForTimeout(500);
-  await hr.screenshot({ path: SHOTS + '/08_po_hodu_hrac.png' });
+  ok(await hr.getAttribute('#bojKarta [data-umysl="kouzleni"]', 'aria-pressed') === 'true', 'ohlášená akce je zvýrazněná');
+  ok(/Kouzlení/.test(await txt(hr, '#bojKarta .bk-slozeni')) && /\+1/.test(await txt(hr, '#bojKarta .bk-slozeni')), 'složení hodu je vidět rovnou: ' + (await txt(hr, '#bojKarta .bk-slozeni')).replace(/\s+/g, ' '));
 
-  // PJ: gobliny 3D hod (skupinový), Hrun ručně
-  await pj.waitForTimeout(2000);
-  await pj.screenshot({ path: SHOTS + '/09_ini_pj.png' });
-  await pj.locator('#raidSeznam .raid-box').filter({ has: pj.locator('.raid-jmeno', { hasText: 'Goblin' }) }).locator('button:has-text("Hodit")').first().click();
-  await pj.waitForSelector('#modalHod', { state: 'visible' });
-  console.log('nadpis hodu PJ:', (await txt(pj, '#hodNadpis')));
-  await pj.click('#hodKostkaBtn');
-  await pj.waitForFunction(() => document.getElementById('modalHod').style.display === 'none', null, { timeout: 15000 }).catch(() => console.log('modál PJ se nezavřel'));
-  await pj.waitForTimeout(600);
-  await pj.locator('#raidSeznam .raid-box').filter({ has: pj.locator('.raid-jmeno', { hasText: 'Hrun' }) }).locator('button:has-text("Hodit")').first().click();
-  await pj.waitForSelector('#modalHod', { state: 'visible' });
-  await pj.fill('#hodRucne', '4');
-  await pj.click('#hodRucneBtn');
-  await pj.waitForFunction(() => document.getElementById('modalHod').style.display === 'none', null, { timeout: 10000 }).catch(() => console.log('modál ručně se nezavřel'));
-  await pj.waitForTimeout(700);
-  await pj.screenshot({ path: SHOTS + '/10_ini_pj_po.png' });
-  console.log('PJ řádky iniciativy:', (await pj.$$eval('#raidSeznam .raid-box', r => r.map(x => x.innerText.trim().replace(/\s+/g, ' ')))).join(' | '));
-
-  // --- tahy ---
-  await pj.click('text=Začít kolo');
-  await pj.waitForTimeout(1800);
+  // --- krok 2: hod na iniciativu (tady z vlastní kostky, ať je výsledek daný) ---
+  await hr.click('#bojKarta button:has-text("Hodil jsem u stolu")');
+  await hr.fill('#bojKarta .bk-hod input', '4');
+  await hr.click('#bojKarta .bk-hod button:has-text("Zapsat")');
   await hr.waitForTimeout(1800);
+  ok(sqlVal(`select concat(hod, '/', vysledek) from kolo_iniciativa ki join tokeny t on t.id=ki.token_id where t.entita_id=2 and t.typ_entity='postava' and t.mapa_id=1`) === '4/5', 'hod 4 + 1 za kouzlení = 5');
+  ok(/Iniciativa 5/.test(await txt(hr, '#bojKarta')), 'po hodu karta ukáže výsledek a čeká: ' + (await txt(hr, '#bojKarta')).replace(/\s+/g, ' '));
+  ok(sqlVal('select faze from kolo_stav where mapa_id=1') === 'iniciativa', 'kolo ještě nezačalo — nehodili všichni');
+  await hr.screenshot({ path: SHOTS + '/05_po_hodu_hrac.png' });
+
+  // --- PJ: řádek na skupinu, nestvůry útočí samy, postava hráče se jen čeká ---
+  await pj.waitForTimeout(1500);
+  await pj.screenshot({ path: SHOTS + '/06_priprava_pj.png' });
+  const radkyPj = await pj.$$eval('#bojKarta .bk-radek', (r) => r.map((x) => x.innerText.trim().replace(/\s+/g, ' ')));
+  console.log('PJ řádky:', radkyPj.join(' | '));
+  ok(radkyPj.filter((r) => /^Goblin ×3/.test(r)).length === 1, 'tři goblini jsou jedna skupina s jedním hodem');
+  ok(await pj.locator('#bojKarta .bk-radek', { hasText: 'Goblin' }).locator('select').inputValue() === 'utok', 'nestvůra má předvolený útok');
+  const radekHrun = pj.locator('#bojKarta .bk-radek', { hasText: 'Hrun' });
+  ok(await radekHrun.locator('[data-hod="ini"]').isDisabled(), 'postava vedená PJ bez ohlášené akce hodit nejde');
+  await radekHrun.locator('select').selectOption('utok');
+  await pj.waitForTimeout(1500);
+  ok(await pj.locator('#bojKarta .bk-radek', { hasText: 'Hrun' }).locator('[data-hod="ini"]').isEnabled(), 'po ohlášení akce už ano');
+  ok(/iniciativa 5/.test(radkyPj.find((r) => /^Sindor/.test(r)) || ''), 'PJ vidí, co hodil hráč: ' + (radkyPj.find((r) => /^Sindor/.test(r)) || ''));
+  await pj.click('#bojKarta [data-hod="vse"]');
+  await pj.waitForFunction(() => /půlka/.test(document.getElementById('bojPoradi').innerText), null, { timeout: 30000 }).catch(() => console.log('kolo nezačalo'));
+  await pj.waitForTimeout(1200);
+  ok(sqlVal('select faze from kolo_stav where mapa_id=1') === 'kolo', 'jakmile hodil poslední, tahy začaly samy (PJ nic neodklikával)');
+  ok(sqlVal('select count(*) from kolo_iniciativa where mapa_id=1') === '5', 'hozeno mají všichni: 3 goblini, Hrun, Sindor');
+  ok(await pj.locator('#bojPoradi .boj-cip').count() === 5 && await pj.locator('#bojPoradi .boj-cip.na-tahu').count() === 1, 'pruh pořadí ukazuje pět tvorů a jednoho na tahu');
   await pj.screenshot({ path: SHOTS + '/11_tahy_pj.png' });
+  await hr.waitForTimeout(1500);
   await hr.screenshot({ path: SHOTS + '/12_tahy_hrac.png' });
-  console.log('PJ tahy:', (await pj.$$eval('#raidInfo > *', r => r.map(x => x.innerText.trim().replace(/\s+/g, ' ')))).join(' | '));
-  console.log('Hráč tahy:', (await hr.$$eval('#raidInfo > *', r => r.map(x => x.innerText.trim().replace(/\s+/g, ' ')))).join(' | '));
 
-  // proklikat celé kolo: vždy ten, kdo má na tahu ovládání
-  for (let i = 0; i < 20; i++) {
-    const fz = await txt(pj, '#raidFaze');
-    if (!fz.includes('Tahy') || (await txt(pj, '#raidFaze')).includes('Tahy') === false) break;
-    const t = await txt(pj, '#raidTitul');
-    if (!t.includes('kolo 1')) break;
-    const jenHrac = (await txt(hr, '#raidInfo .tah-info')).includes('Sindor');
-    const strana = jenHrac ? hr : pj;
-    if (!(await strana.$('.akce-lista'))) { console.log('žádné ovládání, konec smyčky', t); break; }
-    await strana.click('.akce-btn:has-text("' + (jenHrac ? 'Kouzlení' : 'Čekání') + '")');   // Sindor slíbil kouzlení (h1622)
-    await pj.waitForTimeout(1500);
+  // --- tahy: mapa 1 nemá hexy, akce jdou jen odečíst v „Jiné“; proklikat celé kolo ---
+  let videlZaHrace = false, videlMujTah = false;
+  for (let i = 0; i < 30; i++) {
+    if (sqlVal('select cislo_kola from kolo_stav where mapa_id=1') !== '1') break;
+    const naTahu = sqlVal(`select ifnull(t.entita_id * (t.typ_entity='postava'), 0) from kolo_stav k join tokeny t on t.id=k.aktivni_token_id where k.mapa_id=1`);
+    const jeSindor = naTahu === '2';
+    const strana = jeSindor ? hr : pj;
+    await strana.waitForTimeout(1300);
+    if (jeSindor) {
+      if (!videlMujTah) {
+        videlMujTah = true;
+        ok(/Jsi na tahu/.test(await txt(hr, '#bojKarta')), 'hráč na tahu: ' + (await txt(hr, '#bojKarta .bk-hlava')).replace(/\s+/g, ' '));
+        ok(/nemá hexy/.test(await txt(hr, '#bojKarta')), 'na mapě bez hexů karta řekne, že pohyb a útok tu vyhodnotit nejde');
+        ok(await hr.locator('#bojKarta [data-tah="zbran"]').count() === 1, 'karta ukazuje, co má postava v ruce');
+      }
+      if (!videlZaHrace && await pj.locator('#bojKarta [data-tah="za-hrace"]').count() === 1) {
+        videlZaHrace = true;
+        ok(await pj.locator('#bojKarta [data-tah="jine"]').count() === 0, 'PJ na tahu hráče tah nehraje — má jen „Hrát za něj“');
+      }
+    }
+    if (!(await strana.$('#bojKarta [data-tah="jine"]'))) { console.log('žádné ovládání, konec smyčky'); break; }
+    await strana.click('#bojKarta [data-tah="jine"]');
+    await strana.click('#bojKarta [data-akce="cekani"]');
+    await pj.waitForTimeout(1300);
   }
+  ok(videlMujTah && videlZaHrace, 'v kole přišel na řadu hráč i PJ (a PJ viděl kartu „Hrát za něj“)');
   await pj.waitForTimeout(1500);
+  await hr.waitForTimeout(1500);
   await pj.screenshot({ path: SHOTS + '/13_kolo2_pj.png' });
-  ok((await txt(pj, '#raidTitul')).includes('kolo 2'), 'po kole: ' + (await txt(pj, '#raidTitul')) + ' / ' + (await txt(pj, '#raidFaze')).replace(/\s+/g, ' '));
+  ok(/Kolo 2/.test(await txt(pj, '#bojPoradi')), 'po odehrání všech akcí začalo samo kolo 2: ' + (await txt(pj, '#bojPoradi .boj-poradi-hl')).replace(/\s+/g, ' '));
 
-  // konec
-  await pj.click('#souborjKonecBtn');
+  // --- kolo 2: akce z minula je předvybraná, stačí hodit ---
+  ok(await hr.getAttribute('#bojKarta [data-umysl="kouzleni"]', 'aria-pressed') === 'true', 'ohlášená akce z minulého kola zůstala předvybraná');
+  ok(await hr.locator('#bojKarta [data-hod="ini"]').count() === 1, 'hráč může rovnou hodit');
+  ok(await pj.locator('#bojKarta .bk-radek', { hasText: 'Hrun' }).locator('select').inputValue() === 'utok', 'i tvorům PJ zůstala akce z minula');
+
+  // --- nabídka PJ a konec ---
+  await pj.click('#bojPoradi .boj-pj-btn');
+  ok(await pj.locator('#bojPoradi [data-pj="ucastnici"]').count() === 1 && await pj.locator('#bojPoradi [data-pj="konec"]').count() === 1, 'nabídka PJ má „Kdo bojuje…“ a „Ukončit souboj“');
+  await pj.click('#bojPoradi [data-pj="konec"]');
   await pj.waitForTimeout(1500);
-  ok((await txt(pj, '#raidFaze')).trim() === '' && (await txt(pj, '#raidTitul')) === 'Na mapě', 'po konci souboje zmizí fáze a nadpis se vrátí na „Na mapě“');
-  ok(await pj.locator('#souborPj').isHidden(), 'tlačítka souboje (Účastníci, Ukončit) po konci souboje zmizí');
+  await hr.waitForTimeout(1800);
+  ok(await pj.locator('#bojPoradi').isHidden() && await pj.locator('#bojKarta').isHidden(), 'po konci souboje zmizí pruh pořadí i karta');
+  ok(await hr.locator('#bojPoradi').isHidden() && await hr.locator('#bojKarta').isHidden(), 'i u hráče');
   const log = await pj.$$eval('#logList div', d => d.map(x => x.textContent));
-  console.log('LOG:\n' + log.slice(-25).join('\n'));
-  console.log(errs.length ? 'JS CHYBY:\n' + errs.join('\n') : 'bez JS chyb');
+  console.log('LOG:\n' + log.slice(-12).join('\n'));
+  ok(errs.length === 0, 'žádná chyba JavaScriptu ani serveru' + (errs.length ? ':\n' + errs.join('\n') : ''));
   for (const g of gob) await api(pj, 'token_smazat', { token_id: g, mapa_id: 1 });
   await browser.close();
+  process.exit(process.exitCode || 0);
 })().catch(e => { console.error('SELHÁNÍ', e); process.exit(1); });

@@ -58,7 +58,7 @@ function dracak_vtt_kouzlo_info(PDO $pdo, int $id): ?array
 function dracak_vtt_kouzla_postavy_pro_vyber(PDO $pdo, int $postavaId): array
 {
     $q = $pdo->prepare(
-        'SELECT k.id, k.nazev, k.doba_seslani FROM postava_zna_kouzlo pk JOIN kouzla k ON k.id = pk.kouzlo_id WHERE pk.postava_id = ? ORDER BY k.nazev'
+        'SELECT k.id, k.nazev, k.doba_seslani, k.cena_magenergie, k.dosah FROM postava_zna_kouzlo pk JOIN kouzla k ON k.id = pk.kouzlo_id WHERE pk.postava_id = ? ORDER BY k.nazev'
     );
     $q->execute([$postavaId]);
     $vysledek = [];
@@ -66,6 +66,11 @@ function dracak_vtt_kouzla_postavy_pro_vyber(PDO $pdo, int $postavaId): array
         $vysledek[] = [
             'id' => (int)$r['id'], 'nazev' => (string)$r['nazev'], 'doba' => $r['doba_seslani'],
             'akci' => dracak_vtt_kouzlo_akce($r['doba_seslani'] !== null ? (string)$r['doba_seslani'] : null),
+            // Pro kartu kouzel v souboji: cena tak, jak ji píše kniha, číslo z ní (null = vzorec, hra ho nepozná)
+            // a dosah v sázích (null = kniha ho číslem neudává).
+            'cena' => $r['cena_magenergie'] !== null ? (string)$r['cena_magenergie'] : null,
+            'magy' => dracak_vtt_kouzlo_cena_magenergie($r['cena_magenergie'] !== null ? (string)$r['cena_magenergie'] : null),
+            'dosah_sahy' => dracak_vtt_polozka_dosah_sahy('kouzlo', ['dosah' => $r['dosah']]),
         ];
     }
     return $vysledek;

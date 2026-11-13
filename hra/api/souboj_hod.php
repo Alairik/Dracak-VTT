@@ -12,6 +12,11 @@ require_once __DIR__ . '/../../includes/vtt_souboj.php';
 // druhu házejí jednou) — token_ids pak musí být ze stejného druhu.
 // Hází se jen ve fázi iniciativy; uprostřed kola už ne (nový účastník nastoupí
 // v příštím kole).
+//
+// `auto: true` (nový průběh souboje, 2026-11-12 — „jedna otázka, jeden hod“): ohlášení akce a hod jsou pro hráče
+// jeden krok, PJ fáze neodklikává. S tímhle příznakem jde hodit už ve fázi úmyslů (první hod ji přepne na
+// iniciativu) a jakmile mají hozeno VŠICHNI účastníci, tahy začnou samy (`zacalo_kolo` v odpovědi).
+// Bez příznaku platí starý postup po fázích (API volání, testy).
 $data = dracak_vtt_souboj_vstup();
 $mapaId = (int)($data['mapa_id'] ?? 0);
 [$mapa, $svetId, $jePj, $user] = dracak_vtt_souboj_zacatek($mapaId);
@@ -25,6 +30,8 @@ if ($hod < 1 || $hod > 6) {
 $rucne = !empty($data['rucne']);
 $bonusIds = array_map('intval', is_array($data['bonus_ids'] ?? null) ? $data['bonus_ids'] : []);
 $jinyBonus = (int)($data['jiny_bonus'] ?? 0);
+$auto = !empty($data['auto']);
+$zacaloKolo = false;
 
 $info = dracak_vtt_souboj_tokeny_info($pdo, $svetId, $mapaId);
 if (!$tokenIds) {
@@ -50,8 +57,12 @@ try {
         dracak_vtt_souboj_chyba(422, 'Na téhle mapě žádný souboj neběží.');
     }
     if ($stav['faze'] === 'umysly') {
-        $pdo->rollBack();
-        dracak_vtt_souboj_chyba(422, 'Nejdřív se zadávají úmysly; PJ pak otevře hody na iniciativu.');
+        if (!$auto) {
+            $pdo->rollBack();
+            dracak_vtt_souboj_chyba(422, 'Nejdřív se zadávají úmysly; PJ pak otevře hody na iniciativu.');
+        }
+        $pdo->prepare('UPDATE kolo_stav SET faze = "iniciativa" WHERE mapa_id = ?')->execute([$mapaId]);
+        $stav['faze'] = 'iniciativa';
     }
     if ($stav['faze'] === 'kolo') {
         // Akce se dostávají z iniciativy, a ta se hází na začátku kola: kdo se
@@ -140,6 +151,19 @@ try {
         'zavazek_akci' => $vysledky[0]['zavazek_akci'],
         'skryta' => $skryta,
     ], (int)$user['id']);
+    if ($auto) {
+        $q = $pdo->prepare(
+            'SELECT COUNT(*) FROM kolo_ucastnik u LEFT JOIN kolo_iniciativa ki ON ki.mapa_id = u.mapa_id AND ki.token_id = u.token_id
+             WHERE u.mapa_id = ? AND ki.token_id IS NULL'
+        );
+        $q->execute([$mapaId]);
+        if ((int)$q->fetchColumn() === 0) {
+            $pdo->prepare('UPDATE kolo_stav SET faze = "kolo", polovina = 1, aktivni_token_id = NULL WHERE mapa_id = ?')->execute([$mapaId]);
+            dracak_vtt_souboj_posun($pdo, $svetId, $mapaId, (int)$user['id']);
+            dracak_vtt_log_event($svetId, $mapaId, 'souboj_faze', ['faze' => 'kolo', 'cislo_kola' => $stav['cislo_kola']], (int)$user['id']);
+            $zacaloKolo = true;
+        }
+    }
     $pdo->commit();
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) {
@@ -157,4 +181,5 @@ echo json_encode([
     'automaticky' => $automaticke,
     'ignorovano_rucne' => $ignorovano,
     'upozorneni' => $upozorneni,
+    'zacalo_kolo' => $zacaloKolo,
 ], JSON_UNESCAPED_UNICODE);
