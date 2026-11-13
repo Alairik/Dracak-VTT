@@ -398,6 +398,11 @@ body.pin-v-mape .mapa-bod-marker svg { width:var(--pin-d, 28px); height:var(--pi
               border:1px solid rgba(255,255,255,.12); border-radius:18px; box-shadow:0 6px 18px rgba(0,0,0,.4);
               font-variant-numeric:lining-nums tabular-nums; }
 .boj-poradi[hidden], .boj-karta[hidden], .boj-vysledek[hidden] { display:none; }
+/* Na širší obrazovce je pořadí ve svislém okně tvorů; nahoře zbývá jen štítek kola a nabídka PJ. */
+.boj-poradi.jen-stitek { gap:10px; padding:6px 8px 6px 14px; border-radius:999px; }
+.boj-poradi.jen-stitek .boj-poradi-hl { flex-direction:row; align-items:baseline; gap:8px; }
+.ini-stav { font-size:11.5px; color:#bbb; }
+.ini-stav.hozeno { color:#e8c9a8; }
 .boj-poradi-hl { display:flex; flex-direction:column; flex:none; line-height:1.25; }
 .boj-poradi-hl strong { font-size:15px; color:#e8c9a8; }
 .boj-poradi-hl span { font-size:12px; color:#bbb; }
@@ -556,11 +561,16 @@ span.boj-cip { cursor:default; }
 .vyzva-volba-b span { font-size:11.5px; color:#bbb; }
 .vyzva-volba-b.vybrana { border:2px solid #ffd166; background:rgba(255,209,102,.12); }
 .vyzva-volba-b:disabled { opacity:.45; cursor:not-allowed; }
+.vyzva-otocit { width:100%; min-height:44px; margin:0 0 8px; padding:6px 12px; border-radius:12px; border:1px dashed rgba(255,255,255,.3);
+                background:transparent; color:#eee; font:inherit; cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:10px; text-align:left; }
+.vyzva-otocit strong { font-size:13.5px; }
+.vyzva-otocit span { font-size:11.5px; color:#bbb; }
+.vyzva-otocit.vybrana { border:2px solid #6bbf7a; background:rgba(107,191,122,.12); }
 .vyzva-panel .btn.vyzva-hodit { min-height:46px; padding:0 22px; border-radius:999px; font-size:15px; flex:1 1 160px; }
 .vyzva-pj { margin-top:6px; }
 .vyzva-pj summary { cursor:pointer; color:#e8c9a8; font-size:12.5px; }
 /* Výsledek útoku: krátká hláška pod pruhem pořadí, zmizí sama */
-.boj-vysledek { position:fixed; left:50%; top:172px; transform:translateX(-50%); z-index:185; width:min(440px, calc(100vw - 24px)); }
+.boj-vysledek { position:fixed; left:50%; top:168px; transform:translateX(-50%); z-index:185; width:min(440px, calc(100vw - 24px)); }
 .boj-vysledek .vyzva-karta { position:relative; padding-right:40px; box-shadow:0 8px 24px rgba(0,0,0,.5); }
 .boj-vysledek .btn.vyzva-zavrit { position:absolute; right:6px; top:6px; min-width:30px; min-height:30px; padding:0; border:none;
                                   background:none; color:#bbb; font-size:14px; }
@@ -1008,7 +1018,7 @@ body.denik-dock-cela { overflow:hidden; }
 
 /* --- Animace souboje (assets/js/souboj_animace.js) --- */
 /* Hlášení, kdo je na tahu: krátký pruh nahoře, ne dialog. */
-.boj-oznam { position:fixed; left:50%; top:176px; transform:translateX(-50%); z-index:300; pointer-events:none;
+.boj-oznam { position:fixed; left:50%; top:122px; transform:translateX(-50%); z-index:300; pointer-events:none;
              background:rgba(24,22,20,.92); color:#f3ece2; border:1px solid rgba(255,255,255,.18);
              border-radius:999px; padding:7px 20px; font-size:15px; font-weight:600; letter-spacing:.3px;
              box-shadow:0 8px 24px rgba(0,0,0,.5); opacity:0; }

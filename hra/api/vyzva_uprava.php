@@ -11,6 +11,7 @@ require_once __DIR__ . '/../../includes/vtt_kouzleni.php';
 //  - zbran_id      (kdo ovládá útočníka) jiná zbraň / jiný útok nestvůry
 //  - nasobek       (PJ)  násobek zranění u obrany spícího / vyřazeného tvora (1–99)
 //  - volba         (kdo ovládá obránce) 'branit' (zbraní, stojí akci) / 'nebranit' (jen brněním, −3)
+//  - otocit        (kdo ovládá obránce) true = v rámci obrany akcí se otočí čelem k útočníkovi (ruší −4 za útok z boku)
 //  - ihned         (kdo ovládá obránce) seznam kouzel „ihned“ k obraně (vyvolání ihned = 0 akcí): vyhodnotí se hned a opravy obrany se přepočtou
 // Po hodu už se výzva nemění.
 // Tělo: {mapa_id, vyzva_id, ...pole výše}
@@ -150,12 +151,49 @@ try {
             $pdo->rollBack();
             dracak_vtt_souboj_chyba(422, 'Tvor se nemůže bránit zbraní (' . ($d['duvod_nebrani'] === 'vyřazený' ? 'je vyřazený' : 'efekt ' . $d['duvod_nebrani']) . ') — jen nebránit se.' . ($d['duvod_nebrani'] === 'vyřazený' ? '' : ' PJ může efekt sundat.'));
         }
-        if ($volba === 'branit' && empty($d['muze_branit']) && !$jePj) {
+        // Bez akce se zbraní bránit nejde nikomu — ani když volí PJ (dřív měl výjimku a šlo zvolit obranu tvorovi
+        // s nula akcemi; nahlásil uživatel 2026-11-13). Když PJ obranu opravdu chce povolit, přidá akci v nabídce PJ.
+        if ($volba === 'branit' && empty($d['muze_branit'])) {
             $pdo->rollBack();
             dracak_vtt_souboj_chyba(422, 'Bránit se akcí nejde — tvor už nemá žádnou akci. Zbývá jen nebránit se (−3).');
         }
         $d['volba'] = $volba;
+        if ($volba !== 'branit') {
+            unset($d['otocit']);   // otočit se jde jen v rámci akce obrana
+        }
         $zmeneno[] = 'volba';
+    }
+
+    // Otočení při obraně (domácí pravidlo, hrac b93095–b93096): kdo se brání akcí, smí se v ní otočit čelem
+    // k útočníkovi — postih −4 za útok z boku nebo zezadu pak neplatí. Token se otočí při vyhodnocení útoku.
+    if (array_key_exists('otocit', $data)) {
+        if ($v['druh'] !== 'obrana') {
+            $pdo->rollBack();
+            dracak_vtt_souboj_chyba(422, 'Otočit se jde jen při obraně.');
+        }
+        if (!$ovlada) {
+            $pdo->rollBack();
+            dracak_vtt_souboj_chyba(403, 'Za tohohle tvora se rozhodovat nesmíš.');
+        }
+        if (empty($data['otocit'])) {
+            unset($d['otocit']);
+        } else {
+            if (($d['volba'] ?? null) !== 'branit') {
+                $pdo->rollBack();
+                dracak_vtt_souboj_chyba(422, 'Otočit se jde jen v rámci obrany akcí — nejdřív zvol „Bráním se“.');
+            }
+            if (($d['strana'] ?? 'predni') !== 'bok') {
+                $pdo->rollBack();
+                dracak_vtt_souboj_chyba(422, 'Útočník už stojí před tebou, otáčet se není kam.');
+            }
+            $smer = dracak_vtt_obrana_smer_celem($pdo, $mapa, (int)$v['token_id'], (int)$v['cil_token_id']);
+            if ($smer === null) {
+                $pdo->rollBack();
+                dracak_vtt_souboj_chyba(422, 'Čelem k útočníkovi se tu otočit nedá.');
+            }
+            $d['otocit'] = $smer;
+        }
+        $zmeneno[] = 'otocit';
     }
 
     // Kouzla „ihned“ k obraně: obránce je sešle ve chvíli obrany; efekty se projeví v opravách obranného čísla dřív, než se hází.

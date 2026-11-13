@@ -55,10 +55,13 @@ $b = dracak_vtt_souboj_bojovnik($pdo, [
 ]);
 // Zbraň v ruce; když žádnou nedrží, karta to řekne (souboj pak bere boj beze zbraně).
 $vRuce = null;
+$pest = null;
 foreach ($b['zbrane'] as $z) {
-    if ($z['drzena']) {
+    if ($z['drzena'] && $vRuce === null) {
         $vRuce = ['nazev' => $z['nazev'], 'uc' => $z['uc']];
-        break;
+    }
+    if (!empty($z['pest'])) {
+        $pest = (int)$z['uc'];
     }
 }
 // Zbraně, které má postava u sebe (v boji je jde vytasit) — nabídka „v ruce“ na kartě tahu.
@@ -82,6 +85,8 @@ postava_mini_konec(200, [
     'mag' => $p['max_magenergie'] !== null ? (int)$p['aktualni_magenergie'] : null,
     'max_mag' => $p['max_magenergie'] !== null ? (int)$p['max_magenergie'] : null,
     'zbran' => $vRuce,
+    // Útočné číslo beze zbraně (síla pěsti podle velikosti + bonus za sílu, Tabulka rvačky); null = nejde spočítat.
+    'pest' => $pest,
     'zbrane' => $uSebe,
     'oc' => $b['oc'] !== null ? (int)$b['oc'] : null,
     'stav' => $b['bojeschopnost'],

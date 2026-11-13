@@ -97,7 +97,7 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   ok(await hr.locator('.boj-vysledek button:has-text("Zavřít")').count() === 0, 'výsledek nemá tlačítko, které by se muselo odklikávat');
   // Sindor měl v 1. půlce jednu akci, takže tah přešel na goblina: hra jde dál sama, nikdo nic neodklikává.
   ok(sqlVal(`select aktivni_token_id from kolo_stav where mapa_id=${MAPA}`) === String(gob), 'po vyhodnocení jde tah sám dál (na řadě je goblin)');
-  ok(/na tahu/.test(await txt(hr, '#bojPoradi .boj-cip.na-tahu')) && /Goblin/.test(await hr.getAttribute('#bojPoradi .boj-cip.na-tahu', 'title')), 'pruh pořadí hráči ukáže nepřítele, který je právě na tahu');
+  ok(/Goblin/.test(await txt(hr, '#bojCentr')), 'hráč vidí, že je na tahu nepřítel (tlačítko „kdo je na tahu“): ' + await txt(hr, '#bojCentr'));
   ok(await pj.locator('#bojKarta [data-tah="jine"]').count() === 1 && /Na tahu: Goblin/.test(await txt(pj, '#bojKarta .bk-nadpis')), 'PJ má pro nestvůru stejnou kartu tahu jako hráč');
   const kartaBox = await pj.locator('#bojKarta').boundingBox(), vyslBox = await pj.locator('.boj-vysledek').boundingBox(), pruhBox = await pj.locator('#bojPoradi').boundingBox();
   ok(vyslBox.y >= pruhBox.y + pruhBox.height - 1 && vyslBox.y + vyslBox.height <= kartaBox.y, 'výsledek leží mezi pruhem pořadí a kartou tahu, nic nepřekrývá');
@@ -148,6 +148,7 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   const tel = await prihlas('hrac@local', 'hrac1234', 390, 844);
   await tel.goto(BASE + '/hra/mapa.php?id=' + MAPA); await tel.waitForTimeout(2200);
   ok(await tel.locator('#bojKarta').isVisible() && await tel.locator('#bojPoradi').isVisible(), 'telefon: karta tahu i pruh pořadí jsou vidět');
+  ok(await tel.locator('#bojPoradi .boj-cip.na-tahu').count() === 1 && await tel.locator('#raidPanel').isHidden(), 'telefon: pořadí je ve vodorovném pruhu, okno tvorů se samo neotvírá (zabralo by půl obrazovky)');
   const kb = await tel.locator('#bojKarta').boundingBox(), pb = await tel.locator('#bojPoradi').boundingBox(), lb = await tel.locator('.toolbar').boundingBox();
   ok(kb.x >= 0 && kb.x + kb.width <= 390 && pb.x >= 0 && pb.x + pb.width <= 390, 'telefon: karta ani pruh nevyčnívají do stran');
   ok(kb.y + kb.height <= lb.y + 1, 'telefon: karta sedí nad lištou nástrojů, nepřekrývá ji');

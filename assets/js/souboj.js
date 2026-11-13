@@ -246,12 +246,43 @@ export function initSouboj(ctx) {
       return;
     }
     titul.textContent = 'Souboj · kolo ' + kolo.cislo_kola + (kolo.faze === 'kolo' ? ' · ' + kolo.polovina + '. půlka' : '');
+    kreslitStavyVOkne();
     kreslitPoradi();
     kreslitKartu(!!vynutit);
     prekresliRaid();
   }
 
-  // ---------- Pruh pořadí ----------
+  // ---------- Pořadí ve svislém okně tvorů ----------
+  // Pořadí tahů ukazuje okno tvorů (raid panel): boxy se životy a magenergií seřazené podle iniciativy. Sem se do
+  // každého boxu doplní jen stav souboje — při přípravě co tvor ohlásil a jestli hodil, v tazích tečky akcí a slib.
+  // Na telefonu (do 760 px) okno překáží, tam pořadí ukazuje vodorovný pruh nahoře.
+  const uzkaObrazovka = () => window.innerWidth <= 760;
+  function kreslitStavyVOkne() {
+    if (kolo.faze !== 'kolo') {
+      seskupit(ucastnici, (u) => (u.hozeno ? 'h' + u.vysledek : 'n') + '|' + (u.umysl || '')).forEach((s) => {
+        const u = s.radky[0];
+        const casti = [];
+        if (u.umysl) casti.push(UMYSLY[u.umysl].toLowerCase());
+        casti.push(u.hozeno ? 'iniciativa ' + u.vysledek + ' · ' + u.akce_celkem + ' ' + akci(u.akce_celkem) : 'ještě nehodil(a)');
+        nastavExtra(s, el('span', 'ini-stav' + (u.hozeno ? ' hozeno' : ''), casti.join(' · ')));
+      });
+      return;
+    }
+    iniciativa.forEach((r) => {
+      const obal = el('div', 'raid-extra-obsah');
+      const pr = el('span', 'ini-pravy');
+      pr.append(pips(r.akce_celkem, r.akce_zbyvajici));
+      if (r.zavazek) {
+        const z = el('span', 'ini-slib', textZavazku(r, false));
+        z.title = textZavazku(r, true);
+        pr.append(z);
+      }
+      obal.append(pr);
+      extra.set(r.token_id, obal);
+    });
+  }
+
+  // ---------- Štítek kola a nabídka PJ nahoře (na telefonu i s pořadím) ----------
   function cip(t, label, stav, trida, title) {
     const b = el('button', 'boj-cip' + (trida ? ' ' + trida : ''));
     b.type = 'button';
@@ -273,6 +304,12 @@ export function initSouboj(ctx) {
       hl.append(p);
     }
     pruh.append(hl);
+    pruh.classList.toggle('jen-stitek', !uzkaObrazovka());
+    if (!uzkaObrazovka()) {
+      // Širší obrazovka: pořadí je ve svislém okně tvorů; nahoře zůstává jen kolo a nabídka PJ.
+      if (jePj) pruh.append(pjNabidka());
+      return;
+    }
     const rada = el('div', 'boj-poradi-rada');
     const ukazane = new Set();
     if (kolo.faze !== 'kolo') {
@@ -665,7 +702,7 @@ export function initSouboj(ctx) {
       const tx = el('div', 'bk-plan-text');
       tx.append(el('strong', '', AKCE_DRUHY[druh] + (cil ? ' → ' + cil.label : '')));
       const pod = ['1 akce'];
-      if (cil && t && t.typ_entity === 'postava' && zbrane) pod.push(zbrane.zbran ? zbrane.zbran.nazev : 'beze zbraně');
+      if (cil && t && t.typ_entity === 'postava' && zbrane) pod.push(zbrane.zbran ? zbrane.zbran.nazev : 'pěstí');
       if (plan.cesta.length) pod.push(popisHexu(plan.cesta.length));
       if (potrebujePast()) pod.push('napřed hod na dovednost');
       tx.append(el('span', '', pod.join(' · ')));
@@ -2140,13 +2177,25 @@ export function initSouboj(ctx) {
         return b;
       };
       const b1 = tlVolby('branit', 'Bráním se', 'zbraní · stojí akci',
-        v.muze_branit || v.je_pj ? 'Brání se zbraní — stojí jednu akci ze zbytku' : 'Tvor už nemá žádnou akci');
+        v.muze_branit ? 'Brání se zbraní — stojí jednu akci ze zbytku' : 'Tvor už nemá žádnou akci');
       const b2 = tlVolby('nebranit', 'Nebráním se', 'jen zbrojí · −3', 'Jen brněním, bez zbraně — postih −3 (z boku nebo zezadu dohromady −6)');
-      b1.disabled = !v.smi_volit || (!v.muze_branit && !v.je_pj) || !!v.duvod_nebrani;
+      // Bez akce se zbraní bránit nejde — ani PJ to za tvora nezvolí (akci mu případně přidá v nabídce PJ).
+      b1.disabled = !v.smi_volit || !v.muze_branit || !!v.duvod_nebrani;
+      if (!v.muze_branit && !v.duvod_nebrani) { b1.lastChild.textContent = 'nemá žádnou akci'; b1.title = 'Tvor už nemá žádnou akci — zbývá jen nebránit se'; }
       if (v.duvod_nebrani) b1.title = 'Nemůže se bránit zbraní — ' + v.duvod_nebrani;
       b2.disabled = !v.smi_volit;
       volba.append(b1, b2);
       k.appendChild(volba);
+      // Útok z boku nebo zezadu: kdo se brání akcí, smí se v ní otočit čelem k útočníkovi (domácí pravidlo) — bez −4.
+      if (v.strana === 'bok' && v.volba === 'branit' && v.smi_volit) {
+        const ot = el('button', 'vyzva-otocit' + (v.otocit ? ' vybrana' : ''));
+        ot.type = 'button';
+        ot.dataset.otocit = v.otocit ? '1' : '0';
+        ot.setAttribute('aria-pressed', v.otocit ? 'true' : 'false');
+        ot.append(el('strong', '', v.otocit ? 'Otočím se čelem ✓' : 'Otočit se čelem k útočníkovi'), el('span', '', v.otocit ? 'postih −4 za bok neplatí' : 'v rámci obrany · zruší −4 za útok z boku'));
+        ot.addEventListener('click', () => upravitVyzvu(v, {otocit: !v.otocit}));
+        k.appendChild(ot);
+      }
       if (!v.smi_volit && v.volba === null) k.appendChild(el('div', 'vyzva-poznamka', 'Čeká se, až se ' + v.label + ' rozhodne, jak se bude bránit.'));
       // Kouzla „ihned“ k obraně jen u toho, kdo nějaké zná (jinak by to byl řádek o ničem).
       const dataK = v.smi_volit ? nactiKouzla(v.token_id) : null;

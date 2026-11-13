@@ -192,6 +192,21 @@ function dracak_vtt_nestvura_oc(?string $text): ?int
 
 // Údaje o tvoru na tokenu, které boj potřebuje. Postava: z deníku (zbraně, OČ, bojeschopnost, naložení);
 // nestvůra: z textu bestiáře (varianty ÚČ, OČ, velikost, odolnost) + životy instance.
+
+// TABULKA RVAČKY (hrac b10982–b10985): síla pěsti podle velikosti postavy — A 2, B 3, C 4. (Druhý sloupec tabulky je
+// síla nohy s útočností, „3/+3“, „5/+3“, „7/+3“; kop má vlastní omezení — jednou za kolo a postih −4 v další akci,
+// b10987 — a zatím se nenabízí.) Útočnost pěsti kniha neuvádí, počítá se 0.
+const DRACAK_VTT_SILA_PESTI = ['A' => 2, 'B' => 3, 'C' => 4];
+// Varianta útoku „Pěst“ pro postavu dané velikosti a s daným bonusem za sílu; null, když velikost není A–C nebo
+// postava nemá vyplněnou sílu (pak se číslo nehádá).
+function dracak_vtt_souboj_pest(?string $velikost, ?int $bonusSily): ?array
+{
+    if ($velikost === null || !isset(DRACAK_VTT_SILA_PESTI[$velikost]) || $bonusSily === null) {
+        return null;
+    }
+    return ['id' => -1, 'nazev' => 'pěst', 'uc' => max(0, DRACAK_VTT_SILA_PESTI[$velikost] + $bonusSily),
+        'utocnost' => 0, 'drzena' => false, 'pest' => true];
+}
 function dracak_vtt_souboj_bojovnik(PDO $pdo, array $infoTokenu): array
 {
     $b = [
@@ -233,6 +248,13 @@ function dracak_vtt_souboj_bojovnik(PDO $pdo, array $infoTokenu): array
             $b['oc'] = $d['obrana']['oc'];
             $b['stit'] = $d['obrana']['bonus_stit'] > 0;
             $b['bonus_obratnost'] = (int)$d['obrana']['bonus_obratnost'];
+        }
+        // Útok beze zbraně (Rvačka, hrac h1654): „Útočné číslo je rovno síle pěsti (viz Tabulka rvačky) a bonusu za
+        // sílu“ (b10981) a platí i proti ozbrojenci: „pro neozbrojeného útočníka se určuje útočné číslo podle SZ pěsti
+        // či nohy“ (b10988). Pěst je tedy vždy poslední varianta útoku postavy; bere se sama, když postava nic nedrží.
+        $pest = dracak_vtt_souboj_pest($b['velikost'], $d['bonusy']['sila'] ?? null);
+        if ($pest !== null) {
+            $b['zbrane'][] = $pest;
         }
         return $b;
     }
@@ -305,6 +327,36 @@ function dracak_vtt_utok_strana(array $mapa, array $cilToken, array $utocnikToke
     return 'bok';
 }
 
+// Kam se má obránce natočit, aby stál čelem k útočníkovi: ze šesti směrů (po 60°), ve kterých ho má před sebou,
+// ten nejblíž přímému směru na něj. null = žádný takový není (velký tvor, který se na místě neotočí) nebo mapa nemá hexy.
+function dracak_vtt_obrana_smer_celem(PDO $pdo, array $mapa, int $obranceTokenId, int $utocnikTokenId): ?int
+{
+    $q = $pdo->prepare('SELECT * FROM tokeny WHERE id = ? AND mapa_id = ?');
+    $q->execute([$obranceTokenId, (int)$mapa['id']]);
+    $obrance = $q->fetch();
+    $q->execute([$utocnikTokenId, (int)$mapa['id']]);
+    $utocnik = $q->fetch();
+    if (!$obrance || !$utocnik || dracak_vtt_hex_rozmery($mapa) === null) {
+        return null;
+    }
+    // Míří se přímo na útočníka (směr od středu obránce ke středu útočníka, 0° = východ, po směru hodinových ručiček).
+    $ted = (int)round(rad2deg(atan2((float)$utocnik['y'] - (float)$obrance['y'], (float)$utocnik['x'] - (float)$obrance['x'])));
+    $nej = null;
+    for ($k = 0; $k < 6; $k++) {
+        $smer = $k * 60;
+        $zkus = $obrance;
+        $zkus['smer'] = $smer;
+        if (dracak_vtt_utok_strana($mapa, $zkus, $utocnik) !== 'predni') {
+            continue;
+        }
+        $rozdil = abs((($smer - $ted + 540) % 360) - 180);
+        if ($nej === null || $rozdil < $nej[1]) {
+            $nej = [$smer, $rozdil];
+        }
+    }
+    return $nej === null ? null : $nej[0];
+}
+
 function dracak_vtt_oprava(string $nazev, int $hodnota): array
 {
     return ['nazev' => $nazev, 'hodnota' => $hodnota];
@@ -342,7 +394,8 @@ function dracak_vtt_obrana_opravy(array $d): array
         if (($d['oz_znamo'] ?? false) === true) {
             $o[] = $d['oz'] === null ? dracak_vtt_oprava('bez zbraně', -3) : dracak_vtt_oprava('obrana zbraně (OZ ' . ($d['oz_nazev'] ?? '') . ')', (int)$d['oz']);
         }
-        if ($bok) {
+        // Kdo se v rámci obrany akcí otočil čelem k útočníkovi (domácí pravidlo, hrac b93095), postih za bok nemá.
+        if ($bok && !isset($d['otocit'])) {
             $o[] = dracak_vtt_oprava('útok z boku nebo zezadu', -4);
         }
     } elseif ($volba === 'nebranit') {
@@ -475,12 +528,26 @@ function dracak_vtt_utok_priprav(PDO $pdo, array $utocnik, array $cil, bool $roz
             $vybrana = $z;
         }
     }
+    // Postava, která nic nedrží, útočí beze zbraně (rozhodnutí uživatele 2026-11-12: „mám v ruce nějakou zbraň, podle
+    // ní se to přepočítává. pokud nemám, útočím beze zbraně“) — ne první zbraní z inventáře jako dřív.
+    if ($vybrana === null && $utocnik['typ'] === 'postava') {
+        foreach ($utocnik['zbrane'] as $z) {
+            if (!empty($z['pest'])) {
+                $vybrana = $z;
+            }
+        }
+    }
     if ($vybrana === null && $utocnik['zbrane']) {
         $vybrana = $utocnik['zbrane'][0];
     }
+    if ($vybrana !== null && !empty($vybrana['pest'])) {
+        // b10988: „Útoky vedené beze zbraně nebo jen její hlavicí způsobují jen stínové zranění.“ Stínové životy hra
+        // zatím nevede — zranění se odečte jako běžné a PJ to tady vidí.
+        $upozorneni[] = 'Úder pěstí působí jen stínové zranění (Rvačka, PPP str. 95). Stínové životy hra zatím nevede — zranění se odečte jako běžné.';
+    }
     if ($vybrana === null) {
         $upozorneni[] = $utocnik['typ'] === 'postava'
-            ? 'Postava nemá zbraň se spočítaným ÚČ — doplň útočné číslo.'
+            ? 'Útočné číslo se nedá spočítat — postava nemá vyplněnou sílu nebo velikost (A–C) a nedrží zbraň se silou zbraně. Doplň to v deníku, nebo číslo zadej tady.'
             : 'Útočné číslo nestvůry se z textu bestiáře nedá spočítat (' . ($utocnik['uc_text'] ?? 'bez údaje') . ') — doplň ho'
                 . (dracak_vtt_tokeny_funkce()['denik_nestvur'] ? ' (nejlíp v deníku nestvůry v panelu tokenu, pak platí pro celý druh).' : '.');
     }
@@ -736,6 +803,17 @@ function dracak_vtt_utok_vyhodnot(PDO $pdo, array $mapa, array $info, array $uto
     }
     // Obrana akcí (h1623) stojí obránce jednu akci.
     $akceObrance = null;
+    if (($obranaVyzva['data']['volba'] ?? null) === 'branit' && isset($obranaVyzva['data']['otocit']) && dracak_vtt_tokeny_ma_sloupec('smer')) {
+        // Otočení čelem k útočníkovi v rámci obrany (hrac b93095): token se otočí teď, při vyhodnocení.
+        $novySmer = (int)$obranaVyzva['data']['otocit'];
+        $q = $pdo->prepare('SELECT smer FROM tokeny WHERE id = ?');
+        $q->execute([$obrId]);
+        $staryS = (int)($q->fetchColumn() ?: 0);
+        if ($staryS !== $novySmer) {
+            $pdo->prepare('UPDATE tokeny SET smer = ? WHERE id = ?')->execute([$novySmer, $obrId]);
+            dracak_vtt_log_event($svetId, $mapaId, 'token_zmena', ['token_id' => $obrId, 'zmeny' => ['smer' => $novySmer], 'pred' => ['smer' => $staryS]], $ucetId);
+        }
+    }
     if (($obranaVyzva['data']['volba'] ?? null) === 'branit') {
         // Obrana je bojová akce: splňuje slíbený útok (iniciativa v2), do „první akce kola“ se ale nepočítá.
         $pdo->prepare('UPDATE kolo_iniciativa SET akce_zbyvajici = IF(akce_zbyvajici > 0, akce_zbyvajici - 1, 0)'
@@ -848,6 +926,7 @@ function dracak_vtt_vyzvy_klient(PDO $pdo, array $user, bool $jePj, array $info,
         } elseif ($v['druh'] === 'obrana') {
             $radek['volba'] = $d['volba'] ?? null;
             $radek['muze_branit'] = !empty($d['muze_branit']);
+            $radek['otocit'] = isset($d['otocit']);
             $radek['duvod_nebrani'] = $d['duvod_nebrani'] ?? null;
             $radek['nasobek'] = $d['nasobek'] ?? null;
             $radek['nasobek_duvod'] = $d['nasobek_duvod'] ?? null;

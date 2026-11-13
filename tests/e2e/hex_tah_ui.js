@@ -59,10 +59,12 @@ const stav = (page) => page.evaluate(async (m) => (await fetch('api/mapa_stav.ph
   let k = await priprava(14, 10, 3, 3);
   let akceDo = +sqlVal(`select akce_zbyvajici from kolo_iniciativa where token_id=${k.G}`);
   ok(await pj.locator('#bojKarta .bk-tah').isVisible() && /Klepni na nepřítele/.test(await pj.innerText('#bojKarta')), 'karta tahu je dole a plánování začalo samo, jakmile je tvor na tahu');
-  ok(await pj.locator('#raidPanel').isHidden(), 'postranní panel se kvůli souboji neotevřel');
+  // Pořadí tahů je ve svislém okně tvorů (uživatel 2026-11-13: „původní přehled iniciativy byl lepší“), ovládání v něm není.
+  ok(await pj.locator('#raidPanel').isVisible() && await pj.locator('#raidPanel select, #raidAkce button, #raidInfo button').count() === 0, 'okno tvorů ukazuje pořadí, ale souboj se z něj neovládá');
   ok(await pj.locator('#bojKarta select').count() === 0, 'v kartě tahu není žádné rozbalovací pole ani lišta Krok / Běh / Sprint');
   ok(await pj.locator('#bojKarta [data-tah="jine"]').count() === 1 && await pj.locator('#bojKarta [data-tah="konec"]').count() === 1, 'karta má „Jiné“ a „Konec tahu“');
-  ok(/na tahu/.test(await pj.innerText('#bojPoradi .boj-cip.na-tahu')), 'pruh pořadí nahoře zvýrazňuje, kdo je na tahu');
+  ok(await pj.locator('#raidSeznam .raid-box.na-tahu').count() === 1 && await pj.locator('#raidSeznam .raid-box .ini-pips').count() === 2, 'okno tvorů zvýrazňuje, kdo je na tahu, a u každého ukazuje tečky akcí');
+  ok(/Kolo 1/.test(await pj.innerText('#bojPoradi')) && await pj.locator('#bojPoradi .boj-pj-btn').count() === 1 && await pj.locator('#bojPoradi .boj-cip').count() === 0, 'nahoře zůstal jen štítek kola a nabídka PJ');
   ok(await pj.$$('#soubojSvg .sb-nepritel').then(x => x.length) === 1, 'nepřítel je na mapě označený kroužkem');
   let p = k.sx(14, 10);
   await pj.mouse.click(p.x, p.y); await pj.waitForTimeout(500);

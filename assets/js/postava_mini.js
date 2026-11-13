@@ -80,7 +80,7 @@ export function initPostavaMini(opts) {
     telo.appendChild(pruh('Životy', d.hp, d.max_hp, tridaHp));
     if (d.max_mag !== null && d.max_mag > 0) telo.appendChild(pruh('Magenergie', d.mag || 0, d.max_mag, 'mag'));
     const staty = el('div', 'pmini-staty');
-    staty.appendChild(cislo('ÚČ', d.zbran ? d.zbran.uc : null, d.zbran ? d.zbran.nazev : 'beze zbraně'));
+    staty.appendChild(cislo('ÚČ', d.zbran ? d.zbran.uc : (d.pest !== null && d.pest !== undefined ? d.pest : null), d.zbran ? d.zbran.nazev : 'beze zbraně (pěst)'));
     staty.appendChild(cislo('OČ', d.oc, null));
     telo.appendChild(staty);
     box.appendChild(telo);

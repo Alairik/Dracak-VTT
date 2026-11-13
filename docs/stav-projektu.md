@@ -253,6 +253,42 @@ Tři věci ze zadání uživatele k pinům:
 Testy: rozšířený `tests/e2e/pin_vstoupit_api.js` (automatický zpáteční pin, zrušení, posunutí i s družinou,
 hláška v prohlížeči) a nový `tests/e2e/pin_mapa_ui.js` (mapa z pinu, práva, velikost značek).
 
+### Souboj — úpravy po první zkoušce uživatele (2026-11-13)
+
+Čtyři připomínky uživatele k novému průběhu, všechny zapracované. **Bez změny databáze.**
+
+* **Útok beze zbraně se počítá sám.** Uživatel: *„myslím, že by to číslo mělo existovat. v pravidlech jsou všechny
+  informace k tomu, abych nemusel řešit přepočet ručně.“* Měl pravdu — obecné pravidlo je v kapitole **Rvačka**
+  (hrac h1654): *„Útočné číslo je rovno síle pěsti (viz Tabulka rvačky) a bonusu za sílu“* (b10981) a platí i proti
+  ozbrojenci (b10988). **Tabulka rvačky** b10982–b10985: velikost A → síla pěsti 2, B → 3, C → 4. V kódu
+  `dracak_vtt_souboj_pest()` (`includes/vtt_souboj_utok.php`): pěst je vždy poslední varianta útoku postavy a **bere
+  se sama, když postava nic nedrží** (dřív se vzala první zbraň z inventáře; rozhodnutí uživatele 2026-11-12: „pokud
+  nemám, útočím beze zbraně“). Útočnost 0 (kniha ji u pěsti neuvádí). Malá karta postavy ukazuje ÚČ pěsti.
+  **Moje dřívější chyba:** v tomhle souboru stálo, že boj beze zbraně čeká na foto stran 68–70 — to se týká jen
+  lupičovy zvláštní dovednosti (h624), ne obyčejné rány pěstí. Hledalo se na špatném místě.
+  **Co zbývá:** (a) *stínové zranění* — b10988: „Útoky vedené beze zbraně… způsobují jen stínové zranění“; stínové
+  životy hra nevede, zranění se odečítá jako běžné a PJ to vidí jako upozornění na kartě; (b) **kop** (druhý sloupec
+  tabulky, „3/+3“ až „7/+3“, jednou za kolo a postih −4 v další akci, b10987) se nenabízí; (c) velikosti mimo A–C
+  tabulka nemá — číslo se pak nehádá a karta řekne, co v deníku chybí.
+* **Pořadí tahů je zpátky ve svislém okně tvorů.** Uživatel: *„původní přehled iniciativy byl lepší. takové to naše
+  raid okno, kde byly HP, mana a pořadí vertikálně“* a *„menu PJ je skvělé a chtěl bych ho tam nechat“*. Okno tvorů
+  se při zahájení zase samo otevře (boxy se životy a magenergií podle iniciativy, zvýrazněný tvor na tahu, tečky
+  akcí; při přípravě co kdo ohlásil a jestli hodil — `kreslitStavyVOkne`). Nahoře zůstal jen malý štítek „Kolo N ·
+  půlka“ s nabídkou **PJ ▾**. Ovládání souboje v okně dál není — to je karta dole. **Na telefonu** (do 760 px) by
+  okno zabralo půl obrazovky, tam zůstává vodorovný pruh pořadí a okno se samo neotvírá.
+* **Bez akce se zbraní bránit nejde — ani když volí PJ.** PJ měl výjimku a šlo zvolit „Bráním se“ tvorovi s nula
+  akcemi. Pryč na serveru (`vyzva_uprava.php`, 422) i na kartě (tlačítko zamčené s textem „nemá žádnou akci“).
+  Když to PJ výjimečně chce povolit, přidá akci v nabídce PJ → Upravit akce.
+* **Otočení při obraně.** Uživatel: *„při obraně se lze i otočit. pokud se bráním, spotřebuji akci, pak lze“*.
+  Při útoku z boku nebo zezadu a zvolené obraně akcí nabídne karta **„Otočit se čelem k útočníkovi“**: postih −4
+  zmizí, token se otočí při vyhodnocení (přímo na útočníka), stojí to pořád jednu akci. Kdo se nebrání, otočit se
+  nemůže (−6 zůstává). **Je to domácí pravidlo** — kniha zná jen „obrana“ a „obrana a krok“ (b10816, b10821) —
+  proto je zapsané do knihy jako homebrew: `content/pravidla-hrac.html` **b93095–b93096** (sekce h1623, za b10826).
+  Kód: `dracak_vtt_obrana_smer_celem()`, pole `otocit` ve výzvě obrany.
+
+Testy: nové `pest_api.js` (14 kontrol) a `obrana_otocit_api.js` (19), upravené `souboj_ui.js`, `hex_tah_ui.js`,
+`souboj_karta_ui.js`, `postava_mini_ui.js`.
+
 ### Souboj — nový průběh, kroky 1–7 a telefon (2026-11-13, hotovo)
 
 Uživatel po kroku 0: *„dodělej to celé“*. Postavený je celý schválený návrh (plátno níž). **Bez změny databáze.**
@@ -745,7 +781,7 @@ Zařazení vychází z kódu, testů a scénáře, ne z ověření na zařízen�
 | Fronta | (a) funguje, pokryto testem | (b) neověřeno v reálné hře | (c) chybí |
 |---|---|---|---|
 | **Mapa a tokeny** | kamera, tokeny (vzhled, otáčení, výběr, kontextové menu), mlha, zdi, dveře, světlo a tma, piny, ping, kresby, raid panel, nahrávání obrázků (`hex_*`, `dvere_api`, `videni_api`, `svetlo_*_ui`, `raid_panel_ui`, `upload_api`, `xss_ui`) | tažení prstem, pinch, spodní lišta na skutečném tabletu / telefonu (test jen emuluje okno), polling při 6 hráčích, stíny na velké mapě v ostré hře | nic, co by blokovalo. Mimo MVP: zamčené a tajné dveře, hráč otevírá dveře, ikony efektů na tokenu |
-| **Souboj** | iniciativa v2, akce a pohyb, útok a obrana, zbraně a vytasení, efekty, kouzlení (včetně „ihned“), boj ve tmě s postihy, souběhy (`souboj_api`, `ini_*`, `vyzva_api`, `zbrane_*`, `efekty_*`, `kouzleni_*`, `soubehy_api`) | celý souboj s živou družinou a hráčem na druhém zařízení; kouzlení je z 4.–6. 11., ještě nikdy ne v reálné hře | Boj beze zbraně: tabulky (str. 68–70) se v přepisu nedochovaly. **Neblokuje** — bez držené zbraně hra vezme první zbraň s ÚČ, jinak číslo doplní PJ; viz kontrolní seznam. Ztráta iniciativy ve tmě je jen postih (rozhodnutí čeká) |
+| **Souboj** | iniciativa v2, akce a pohyb, útok a obrana, zbraně a vytasení, efekty, kouzlení (včetně „ihned“), boj ve tmě s postihy, souběhy (`souboj_api`, `ini_*`, `vyzva_api`, `zbrane_*`, `efekty_*`, `kouzleni_*`, `soubehy_api`) | celý souboj s živou družinou a hráčem na druhém zařízení; kouzlení je z 4.–6. 11., ještě nikdy ne v reálné hře | Lupičův boj beze zbraně (h624): tabulky ze str. 68–70 se v přepisu nedochovaly. Obyčejná rána pěstí se od 2026-11-13 počítá sama podle Tabulky rvačky (viz „Souboj — úpravy po první zkoušce uživatele“). Ztráta iniciativy ve tmě je jen postih (rozhodnutí čeká) |
 | **Deník postavy** | založení postavy, inventář z katalogu, zbroj a štít, přepočet OČ / ÚČ / naložení, lektvary, kouzla, odpočinek a únava, dock na mapě (`denik_v2`, `denik_dock`, `inv_ui`) | deník na telefonu, doba načtení při velkém inventáři | figurína a sloty, Dovednosti, Společníci, připnutá kouzla (čekají na rozhodnutí uživatele). Deník nestvůry **před bojem** (čeká na jeho design); za boje funguje malý deník v panelu tokenu. Nic z toho první večer neblokuje |
 | **Svět a cesta** | světy, pozvání a oprávnění, poznámky, piny, přechod mezi lokacemi, hodiny světa, pochod po mapě světa, kalkulačka cesty, povozy, jezdecká zvířata (`e2e_hra`, `druzina_*`, `poznamky_ui`, `pin_vstoupit_api`, `hodiny_sveta_api`, `pochod_cesta_ui`, `cesta_*`) | cesta s kočárem v ostré hře, propojení cesty s časem světa | automatické přenesení družiny po trase (jde ručně); odpočinek a spánek neposouvají čas světa. Neblokuje |
 | **Administrace a provoz** | účty a role, Změny databáze, Kontrola nasazení, chybový log, záloha, kontrola zabezpečení, fuzzery (`admin_migrace_ui`, `log_ui`, `zaloha_ui`, `csp_api`, `fuzz_*`) | **obnova zálohy do prázdné DB na hostingu** (lokálně testovaná, na WEDOSu ne), Content-Security-Policy je zatím jen v režimu hlášení | nic. Subdoména `vtt` je kosmetika |

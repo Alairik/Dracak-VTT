@@ -57,7 +57,7 @@ const ok = (c, m) => { if (!c) chyb++; console.log((c ? 'OK    ' : 'CHYBA ') + m
   // ÚČ a OČ proti tomu, s čím počítá deník (stejný zdroj jako souboj)
   const api = await (await pj.request.get(BASE + `/hra/api/postava_mini.php?mapa_id=${MAPA}&token_id=${tSindor}`)).json();
   const staty = await pj.locator('.pmini .pmini-stat strong').allTextContents();
-  ok(staty[0] === (api.zbran ? String(api.zbran.uc) : '–'), 'ÚČ na kartě = ÚČ zbraně v ruce z deníku (' + staty[0] + ')');
+  ok(staty[0] === (api.zbran ? String(api.zbran.uc) : (api.pest === null ? '–' : String(api.pest))), 'ÚČ na kartě = ÚČ zbraně v ruce z deníku, bez zbraně ÚČ pěsti (' + staty[0] + ')');
   ok(staty[1] === (api.oc === null ? '–' : String(api.oc)), 'OČ na kartě = OČ z deníku (' + staty[1] + ')');
   ok(await pj.locator('.pmini input, .pmini select').count() === 0, 'karta je jen ke čtení');
 

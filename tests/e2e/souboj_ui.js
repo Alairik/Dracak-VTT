@@ -69,7 +69,8 @@ const txt = (page, sel) => page.$eval(sel, e => e.innerText).catch(() => '(nenal
   await pj.waitForSelector('#bojPoradi', { state: 'visible' });
   await pj.waitForTimeout(600);
   await pj.screenshot({ path: SHOTS + '/02_priprava_pj.png' });
-  ok(await pj.locator('#raidPanel').isHidden(), 'postranní panel se při zahájení souboje sám neotevře');
+  ok(await pj.locator('#raidPanel').isVisible(), 'okno tvorů se při zahájení souboje otevře jako svislý přehled pořadí');
+  ok(await pj.locator('#raidPanel select, #raidAkce button, #raidInfo button').count() === 0, 'ovládání souboje v okně tvorů není (je v kartě dole)');
   ok(/Kolo 1/.test(await txt(pj, '#bojPoradi')), 'pruh pořadí: ' + (await txt(pj, '#bojPoradi')).replace(/\s+/g, ' '));
 
   // --- krok 1: hráč ohlásí akci jedním klepnutím ---
@@ -81,8 +82,8 @@ const txt = (page, sel) => page.$eval(sel, e => e.innerText).catch(() => '(nenal
   ok(await hr.locator('#bojKarta [data-hod="ini"]').count() === 0, 'dokud akci neohlásí, tlačítko hodu tam není');
   ok(await hr.locator('#bojKarta [data-umysl="strelba"]').isDisabled(), 'Střelba je zamčená, když postava nemá čím střílet');
   ok(/\+1/.test(await txt(hr, '#bojKarta [data-umysl="kouzleni"]')), 'u Kouzla je vidět bonus k iniciativě: ' + (await txt(hr, '#bojKarta [data-umysl="kouzleni"]')).replace(/\s+/g, ' '));
-  const pruhHrace = (await txt(hr, '#bojPoradi')).replace(/\s+/g, ' ');
-  ok(/nepřátelé/.test(pruhHrace) && /×3/.test(pruhHrace) && !/Go/.test(pruhHrace), 'hráč vidí v pruhu jen počet viditelných nepřátel, ne jejich pořadí: ' + pruhHrace);
+  const boxyHrace = await hr.$$eval('#raidSeznam .raid-box .raid-jmeno', (r) => r.map((x) => x.innerText.trim()));
+  ok(boxyHrace.length === 1 && /^Sindor/.test(boxyHrace[0]), 'hráč vidí v okně tvorů jen družinu, nepřátele a jejich pořadí ne: ' + boxyHrace.join(', '));
   await hr.click('#bojKarta [data-umysl="kouzleni"]');
   await hr.waitForTimeout(1500);
   ok(await hr.getAttribute('#bojKarta [data-umysl="kouzleni"]', 'aria-pressed') === 'true', 'ohlášená akce je zvýrazněná');
@@ -116,7 +117,8 @@ const txt = (page, sel) => page.$eval(sel, e => e.innerText).catch(() => '(nenal
   await pj.waitForTimeout(1200);
   ok(sqlVal('select faze from kolo_stav where mapa_id=1') === 'kolo', 'jakmile hodil poslední, tahy začaly samy (PJ nic neodklikával)');
   ok(sqlVal('select count(*) from kolo_iniciativa where mapa_id=1') === '5', 'hozeno mají všichni: 3 goblini, Hrun, Sindor');
-  ok(await pj.locator('#bojPoradi .boj-cip').count() === 5 && await pj.locator('#bojPoradi .boj-cip.na-tahu').count() === 1, 'pruh pořadí ukazuje pět tvorů a jednoho na tahu');
+  ok(await pj.locator('#raidSeznam .raid-box').count() === 5 && await pj.locator('#raidSeznam .raid-box.na-tahu').count() === 1, 'okno tvorů ukazuje pět tvorů v pořadí a jednoho na tahu');
+  ok(await pj.locator('#raidSeznam .raid-box .ini-pips').count() === 5, 'u každého jsou tečky akcí');
   await pj.screenshot({ path: SHOTS + '/11_tahy_pj.png' });
   await hr.waitForTimeout(1500);
   await hr.screenshot({ path: SHOTS + '/12_tahy_hrac.png' });
