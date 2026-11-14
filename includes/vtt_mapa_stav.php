@@ -230,11 +230,16 @@ function dracak_vtt_mapa_stav(PDO $pdo, array $user, array $mapa, bool $jePj): a
     // událost ztratí (stejná úvaha jako v hra/api/stav.php).
     $posledniUdalostId = (int)($pdo->query('SELECT MAX(id) FROM svet_udalosti WHERE svet_id = ' . (int)$mapa['svet_id'])->fetchColumn() ?: 0);
 
+    // stin_hp (migrace 0121) jen když sloupec existuje — kód běží i před ručním SQL, pak se stínové životy nevedou.
+    $stinSel = dracak_vtt_ma_stin_hp()
+        ? 'p.stin_hp AS postava_stin_hp, ni.stin_hp AS nestvura_stin_hp'
+        : '0 AS postava_stin_hp, 0 AS nestvura_stin_hp';
     $stmt = $pdo->prepare(
         'SELECT t.*,
                 p.nazev AS postava_nazev, p.vlastnik_ucet_id, p.aktualni_hp AS postava_hp, p.max_hp AS postava_max_hp,
                 p.aktualni_magenergie AS postava_magenergie, p.max_magenergie AS postava_max_magenergie,
-                ni.nazev_instance, ni.aktualni_hp AS nestvura_hp, ni.max_hp AS nestvura_max_hp
+                ni.nazev_instance, ni.aktualni_hp AS nestvura_hp, ni.max_hp AS nestvura_max_hp,
+                ' . $stinSel . '
          FROM tokeny t
          LEFT JOIN postavy p ON p.id = t.entita_id AND t.typ_entity = "postava"
          LEFT JOIN nestvura_instance ni ON ni.id = t.entita_id AND t.typ_entity = "nestvura_instance"
@@ -295,6 +300,7 @@ function dracak_vtt_mapa_stav(PDO $pdo, array $user, array $mapa, bool $jePj): a
         }
         $hp = $jePostava ? $t['postava_hp'] : ($jeNestvura ? $t['nestvura_hp'] : null);
         $maxHp = $jePostava ? $t['postava_max_hp'] : ($jeNestvura ? $t['nestvura_max_hp'] : null);
+        $stinHp = $jePostava ? $t['postava_stin_hp'] : ($jeNestvura ? $t['nestvura_stin_hp'] : null);
         $maxMag = $jePostava ? $t['postava_max_magenergie'] : null;
         $tokeny[] = [
             'id' => (int)$t['id'],
@@ -307,6 +313,7 @@ function dracak_vtt_mapa_stav(PDO $pdo, array $user, array $mapa, bool $jePj): a
             'label' => $label,
             'hp' => $hp !== null ? (int)$hp : null,
             'max_hp' => $maxHp !== null ? (int)$maxHp : null,
+            'stin_hp' => $stinHp !== null ? (int)$stinHp : 0,
             'magenergie' => $jePostava && $t['postava_magenergie'] !== null ? (int)$t['postava_magenergie'] : null,
             'max_magenergie' => ($maxMag !== null && (int)$maxMag > 0) ? (int)$maxMag : null,
             'owned' => $owned,

@@ -311,6 +311,23 @@ function dracak_vtt_cital_zmen(PDO $pdo, string $tabulka, string $sloupec, strin
     return $r ? ['hodnota' => (int)$r['hodnota'], 'dalsi' => (int)$r['dalsi']] : null;
 }
 
+// Je v DB sloupec stin_hp (migrace 0121, ruční SQL pod admin účtem)? Dokud neexistuje, stínové životy se nevedou
+// a boj se chová jako dřív (rána pěstí se odečte jako běžné zranění). Guard, aby nasazení kódu PŘED spuštěním
+// ručního SQL nerozbilo souboj (SELECT na neexistující sloupec by spadl). Výsledek se cachuje na request.
+function dracak_vtt_ma_stin_hp(): bool
+{
+    static $je = null;
+    if ($je === null) {
+        try {
+            $st = dracak_db()->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'postavy' AND COLUMN_NAME = 'stin_hp'");
+            $je = (int)$st->fetchColumn() > 0;
+        } catch (Throwable $e) {
+            $je = false;
+        }
+    }
+    return $je;
+}
+
 // Životy o $delta: nejníž 0, nejvýš max_hp (max_hp = 0 znamená „neznámé“, nahoru se neořezává, jen na rozsah sloupce). Vrací [nove_hp, max_hp] nebo null.
 function dracak_vtt_hp_zmen(PDO $pdo, string $typEntity, int $entitaId, int $delta): ?array
 {

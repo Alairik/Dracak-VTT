@@ -82,6 +82,7 @@ postava_mini_konec(200, [
     'podtitul' => $podtitul,
     'hp' => (int)$p['aktualni_hp'],
     'max_hp' => (int)$p['max_hp'],
+    'stin_hp' => (int)($b['stin_hp'] ?? 0),
     'mag' => $p['max_magenergie'] !== null ? (int)$p['aktualni_magenergie'] : null,
     'max_mag' => $p['max_magenergie'] !== null ? (int)$p['max_magenergie'] : null,
     'zbran' => $vRuce,

@@ -46,7 +46,8 @@ if (!dracak_vtt_je_pj_sveta($user, $svetId)) {
     nestvura_denik_chyba(403, 'Deník nestvůry vidí jen PJ.');
 }
 $q = $pdo->prepare(
-    'SELECT t.id, t.nazev AS token_nazev, ni.id AS instance_id, ni.nazev_instance, ni.aktualni_hp, ni.max_hp, ni.nestvura_id
+    'SELECT t.id, t.nazev AS token_nazev, ni.id AS instance_id, ni.nazev_instance, ni.aktualni_hp, ni.max_hp, '
+    . (dracak_vtt_ma_stin_hp() ? 'ni.stin_hp' : '0 AS stin_hp') . ', ni.nestvura_id
      FROM tokeny t JOIN nestvura_instance ni ON ni.id = t.entita_id AND t.typ_entity = "nestvura_instance"
      WHERE t.id = ? AND t.mapa_id = ?'
 );
@@ -97,7 +98,7 @@ $mez = null;
 $bojeschopnost = null;
 if ($s['staty']['odolnost'] !== null && (int)$t['max_hp'] > 0) {
     // Celý stav, ne jen mez: okno tvora z toho píše „vyřazená“ / „pod třetinou životů, postih −2“.
-    $bojeschopnost = dracak_vtt_bojeschopnost((int)$s['staty']['odolnost'], (int)$t['max_hp'], (int)$t['aktualni_hp']);
+    $bojeschopnost = dracak_vtt_bojeschopnost((int)$s['staty']['odolnost'], (int)$t['max_hp'], (int)$t['aktualni_hp'], (int)($t['stin_hp'] ?? 0));
     $mez = $bojeschopnost['mez_vyrazeni'];
 }
 // Schopnosti i s hodnotou, když ji kniha uvádí (migrace 0116): „Infravidění 30 sáhů“ místo holého názvu.

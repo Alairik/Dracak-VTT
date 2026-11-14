@@ -48,6 +48,8 @@ try {
         $pdo->prepare('DELETE FROM kolo_ucastnik WHERE mapa_id = ?')->execute([$mapaId]);
     }
     dracak_vtt_kouzli_konec_souboje($pdo, $svetId, $mapaId, (int)$user['id']);
+    // Stínové zranění (h1654 b10988) se po boji samo zahojí — stin_hp zpět na 0 u všech tvorů na mapě.
+    dracak_vtt_stin_zahoj_mapa($pdo, $svetId, $mapaId, (int)$user['id']);
     $pdo->prepare('DELETE FROM kolo_stav WHERE mapa_id = ?')->execute([$mapaId]);
     $eventId = dracak_vtt_log_event($svetId, $mapaId, 'kolo_nove', [
         'souboj_konec' => true,

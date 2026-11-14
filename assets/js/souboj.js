@@ -2356,9 +2356,14 @@ export function initSouboj(ctx) {
       return k;
     }
     k.appendChild(el('div', 'vyzva-poznamka', 'Útok ' + p.utok + ' proti obraně ' + p.obrana
-      + (p.zasah ? ' → zranění ' + p.zraneni + (p.nasobek > 1 ? ' (' + p.zraneni_zaklad + ' × ' + p.nasobek + ', ' + p.nasobek_duvod + ')' : (p.nasobek_duvod ? ' (' + p.nasobek_duvod + ': násobí se úrovní)' : '')) : '')
+      + (p.zasah ? ' → ' + (p.stinove ? 'stínové zranění ' : 'zranění ') + p.zraneni + (p.nasobek > 1 ? ' (' + p.zraneni_zaklad + ' × ' + p.nasobek + ', ' + p.nasobek_duvod + ')' : (p.nasobek_duvod ? ' (' + p.nasobek_duvod + ': násobí se úrovní)' : '')) : '')
       + (p.zasah && p.tma_bonus ? ' (zranění bez postihu za tmu +' + p.tma_bonus + ')' : '')));
-    if (p.zasah && p.hp_nove !== null && p.hp_nove !== undefined) {
+    if (p.zasah && p.stinove && p.stin_nove !== null && p.stin_nove !== undefined) {
+      k.appendChild(el('div', '', (p.cil_label || 'Obránce') + ': stínové zranění — fyzické životy beze změny'
+        + (p.hp_nove !== null && p.hp_nove !== undefined ? ' (' + p.hp_nove + (p.max_hp ? '/' + p.max_hp : '') + ')' : '')
+        + ', stínové celkem ' + p.stin_nove + (p.max_hp ? '/' + p.max_hp : '') + ' (do vyřazení se počítá, po boji se zahojí)'
+        + (p.vyrazen ? ' — VYŘAZEN(A) z boje' : '')));
+    } else if (p.zasah && p.hp_nove !== null && p.hp_nove !== undefined) {
       k.appendChild(el('div', '', (p.cil_label || 'Obránce') + ': ' + p.hp_nove + (p.max_hp ? '/' + p.max_hp : '') + ' životů'
         + (p.vyrazen ? ' — VYŘAZEN(A) z boje' : '')));
     }
@@ -2449,7 +2454,7 @@ export function initSouboj(ctx) {
           break;
         }
         logLine((p.zasah ? 'Zásah: ' : 'Minul(a): ') + (p.label || 'někdo') + ' → ' + (p.cil_label || 'někdo') + ' — útok ' + p.utok + ' proti obraně ' + p.obrana
-          + (p.zasah ? ', zranění ' + p.zraneni + (p.nasobek > 1 ? ' (' + p.zraneni_zaklad + ' × ' + p.nasobek + ')' : (p.nasobek_duvod ? ' (násobí se úrovní: ' + p.nasobek_duvod + ')' : '')) + (p.tma_bonus ? ' (bez postihu za tmu +' + p.tma_bonus + ')' : '') + (p.hp_nove !== null && p.hp_nove !== undefined ? ' (zbývá ' + p.hp_nove + (p.max_hp ? '/' + p.max_hp : '') + ' životů)' : '') : '')
+          + (p.zasah ? ', ' + (p.stinove ? 'stínové zranění ' : 'zranění ') + p.zraneni + (p.nasobek > 1 ? ' (' + p.zraneni_zaklad + ' × ' + p.nasobek + ')' : (p.nasobek_duvod ? ' (násobí se úrovní: ' + p.nasobek_duvod + ')' : '')) + (p.tma_bonus ? ' (bez postihu za tmu +' + p.tma_bonus + ')' : '') + (p.stinove && p.stin_nove !== null && p.stin_nove !== undefined ? ' (fyzické beze změny, stínové celkem ' + p.stin_nove + (p.max_hp ? '/' + p.max_hp : '') + ')' : (p.hp_nove !== null && p.hp_nove !== undefined ? ' (zbývá ' + p.hp_nove + (p.max_hp ? '/' + p.max_hp : '') + ' životů)' : '')) : '')
           + (p.vyrazen ? ' — VYŘAZEN(A)' : '') + (p.kouzlo_zasazeno ? (p.kouzlo_stav === 'selhalo'
             ? ' — ZASAŽEN KOUZLÍCÍ: kouzlo' + (p.kouzlo_nazev ? ' ' + p.kouzlo_nazev : '') + ' se nezdařilo, magenergie propadla' + (p.kouzlo_cena ? ' (' + p.kouzlo_cena + ')' : '')
             : (p.kouzlo_stav === 'zdarilo'

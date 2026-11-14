@@ -40,7 +40,7 @@ Uživatel bude hru zkoušet a posílat další úpravy; nic není „rozdělané
 Mimo souboj přibyla **malá karta postavy** (jeden klik na token = karta se životy, magenergií, ÚČ a OČ; plný deník
 až dvojklik nebo tlačítko „Deník“) — `assets/js/postava_mini.js`, `hra/api/postava_mini.php`.
 
-**Sekce s podrobnostmi, v pořadí od nejnovější:** „Souboj — úpravy po první zkoušce uživatele“ → „Souboj — nový
+**Sekce s podrobnostmi, v pořadí od nejnovější:** „Stínové životy (2026-11-14)“ → „Souboj — úpravy po první zkoušce uživatele“ → „Souboj — nový
 průběh, kroky 1–7 a telefon“ → „Souboj, krok 0“ → „Malá karta postavy“ → „Souboj — nový průběh, návrh“ (odkaz na
 plátno s nákresy: https://claude.ai/artifact/3ojke53iFM7Utts6MgXiX6; je to schválený návrh, **realita se od něj
 v pár bodech liší** — viz „Co z nákresu není přesně tak“ a úpravy z 13. 11.).
@@ -61,10 +61,12 @@ v pár bodech liší** — viz „Co z nákresu není přesně tak“ a úpravy 
 
 **Co víme, že není hotové (kandidáti na další práci, nic z toho neblokuje hraní):**
 
-1. **Stínové zranění** — rána pěstí má podle knihy působit jen stínové zranění (b10988); stínové životy hra nevede,
-   odečítá běžné a PJ to vidí jako upozornění. Zavést stínové životy je samostatná mechanika (a nejspíš sloupec =
-   ruční SQL) — **nejdřív se zeptat uživatele**, jak to u stolu hrají.
+1. **Stínové zranění — HOTOVO 2026-11-14** (migrace 0121, čeká na ruční SQL blok N). Rána pěstí teď působí
+   skutečné stínové zranění: nesnižuje fyzické životy (tvora nezabije), ale do vyřazení se počítá a po boji se
+   zahojí. Viz sekce „Stínové životy“ níž. Rozhodnutí uživatele (kvíz 2026-11-14): „zaveď pořádně“.
 2. **Kop** (Tabulka rvačky, druhý sloupec; jednou za kolo, postih −4 v další akci, b10987) se nenabízí.
+   Uživatel 2026-11-14 schválil přidat. **Potřebuje malou změnu DB** (engine si musí zapamatovat kop kvůli
+   „jednou za kolo“ a postihu do další akce) — další na řadě po stínových životech.
 3. **Kouzla „ihned“ k obraně** mají v kartě obrany starší blok s rozbalovacími poli (`ihnedBlok` v `souboj.js`) —
    jediné místo, které se nepřekreslilo do dlaždic.
 4. **Dosah kouzla na mapě** se kreslí jen u kouzel s číselným dosahem (`dosah_sahy`); slovní dosahy se nehádají.
@@ -107,6 +109,44 @@ konverzace je zapsaný přesně proto, aby ses nemusel/a ptát na věci, co
 už byly rozhodnuté (viz "Architektonická rozhodnutí" a celá sekce
 "Rozpracováno" níže — všechno v ní je buď přímo citovaný text pravidel,
 nebo odsouhlasené uživatelem, ne můj odhad).
+
+### Stínové životy (2026-11-14, hotovo v kódu, čeká ruční SQL blok N)
+
+Uživatel u kvízu 2026-11-14 zvolil „zaveď stínové životy pořádně“. Rána beze zbraně (pěst) a úder naplocho
+působí podle pravidel jen **stínové zranění** (hrac Rvačka h1654 **b10988**): tvora nezabíjí (fyzické životy
+nesnižuje) a po boji se samo zahojí, ale do **vyřazení** (omráčení) se počítá spolu s fyzickým zraněním.
+
+**Model:** nový sloupec `stin_hp` na `postavy` i `nestvura_instance` (migrace **0121**) = kolik stínového
+zranění má tvor právě teď natrpěno (0 = žádné). Fyzické `aktualni_hp` stínové zranění nesnižuje. Vyřazení se
+počítá z **účinných životů = aktualni_hp − stin_hp** (`dracak_vtt_bojeschopnost` dostal 4. parametr `$stinHp`;
+vrací i `stin_hp` a `hp_ucinne`). Zastropováno na max_hp.
+
+**Kudy zranění teče:** útok beze zbraně nese z výběru zbraně příznak `stinove` (`dracak_vtt_utok_priprav`),
+ten doteče do dat výzvy útoku i do klientského payloadu (`stinove` v řádku výzvy) a při vyhodnocení
+(`dracak_vtt_utok_vyhodnot`) → `dracak_vtt_souboj_zranit($stinove)` přičte do `stin_hp` místo ubrání
+`aktualni_hp`. Výsledek nese `stinove`, `stin_pred`, `stin_nove`. Po skončení souboje
+`dracak_vtt_stin_zahoj_mapa` (volá `souboj_konec.php`) srovná `stin_hp` na 0 u všech tvorů na mapě.
+
+**Pojistka (důležité):** kód čte `stin_hp` jen když sloupec existuje (`dracak_vtt_ma_stin_hp()` v `vtt.php`,
+cache na request). Dokud se nespustí ruční SQL, boj běží jako dřív (rána pěstí se odečte jako běžné zranění
++ varování PJ). Takže nasazení kódu PŘED ručním SQL nic nerozbije. SELECTy na `stin_hp`
+(`vtt_mapa_stav.php`, `vtt_souboj_utok.php`, `nestvura_denik.php`) jsou podmíněné.
+
+**UI:** karta výsledku útoku říká „stínové zranění — fyzické životy beze změny, stínové celkem N/max“; raid
+panel, okno tvora i malá karta postavy kreslí stínové jako **šrafovaný fialový díl** na pravém konci pruhu
+životů a text „+N stín“. Stav (bojeschopná / pod třetinou / vyřazená) počítá server z účinných životů.
+
+**Testy:** nový `tests/e2e/stin_api.js` (12 kontrol: pěst = stínové, fyzické beze změny, stin_hp roste,
+vyřazení z účinných životů bez poklesu fyzických, hojení po boji, payload). Regrese souboje prošla
+(pest_api, obrana_otocit_api, souboj_ui, souboj_karta_ui, hex_tah_ui, postava_mini_ui, tvor_okno_ui, kouzleni_ui).
+
+**Ruční SQL (blok N v `docs/sql-k-rucnimu-spusteni.sql`):** přidá `stin_hp` na obě tabulky, ověřeno lokálně ve
+4 stavech (čistá DB → 2, podruhé → 2, částečně → 2, špatná DB → 0 bez pádu). `includes/migrace.php` pozná 0121
+jako hotovou po ručním spuštění. **Po nasazení uživatel klikne v administraci na Změny databáze → Spustit
+čekající změny.**
+
+**Zbývá v okolí:** naplocho jako volba útoku (dnes stínové jede jen z pěsti), stínové u útoků nestvůr beze
+zbraně, přesný „zbytek po naplocho“ (kniha jinde zmiňuje „čtvrtina zůstává“ — na korekturu, neblokuje).
 
 ### Panel tokenu: co se odvozuje z pravidel místo ručního zadávání (2026-11-09)
 

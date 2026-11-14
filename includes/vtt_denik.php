@@ -109,7 +109,7 @@ function dracak_vtt_zakladni_rasa(PDO $pdo, ?int $rasaId): ?string
 // život; vždy aspoň 1, zaokrouhluje se aritmeticky (12:8 = 1,5 -> 2).
 // Postih k útoku i obraně, má-li postava MÉNĚ než třetinu životů: −3 / −2
 // / −1 / 0 podle stejného pásma odolnosti.
-function dracak_vtt_bojeschopnost(int $odolnost, int $maxHp, int $aktualniHp): array
+function dracak_vtt_bojeschopnost(int $odolnost, int $maxHp, int $aktualniHp, int $stinHp = 0): array
 {
     if ($odolnost <= 5) {
         $delitel = 4; $postih = -3;
@@ -121,13 +121,19 @@ function dracak_vtt_bojeschopnost(int $odolnost, int $maxHp, int $aktualniHp): a
         $delitel = null; $postih = 0;
     }
     $mez = $delitel === null ? 1 : max(1, (int)floor($maxHp / $delitel + 0.5));
-    $podTretinou = $maxHp > 0 && $aktualniHp * 3 < $maxHp;
+    // Stínové zranění (rána pěstí/kopem/naplocho, hrac h1654 b10988) se do vyřazení počítá SPOLU s fyzickým,
+    // ale tvora nezabíjí a po boji se samo zahojí. Účinné životy pro vyřazení i pro postih „pod třetinou“ =
+    // aktuální − stínové. Fyzické životy (aktualni_hp, smrt) stínové zranění nesnižuje.
+    $ucinne = $aktualniHp - max(0, $stinHp);
+    $podTretinou = $maxHp > 0 && $ucinne * 3 < $maxHp;
     return [
         'mez_vyrazeni' => $mez,
-        'vyrazena' => $maxHp > 0 && $aktualniHp <= $mez,
+        'vyrazena' => $maxHp > 0 && $ucinne <= $mez,
         'pod_tretinou' => $podTretinou,
         'postih_pod_tretinou' => $postih,
         'postih_aktualni' => $podTretinou ? $postih : 0,
+        'stin_hp' => max(0, $stinHp),
+        'hp_ucinne' => $ucinne,
     ];
 }
 

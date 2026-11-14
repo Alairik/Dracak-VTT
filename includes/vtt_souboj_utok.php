@@ -211,7 +211,7 @@ function dracak_vtt_souboj_bojovnik(PDO $pdo, array $infoTokenu): array
 {
     $b = [
         'typ' => $infoTokenu['typ_entity'], 'entita_id' => $infoTokenu['entita_id'], 'label' => $infoTokenu['label'],
-        'velikost' => null, 'odolnost' => null, 'hp' => 0, 'max_hp' => 0, 'bojeschopnost' => null,
+        'velikost' => null, 'odolnost' => null, 'hp' => 0, 'max_hp' => 0, 'stin_hp' => 0, 'bojeschopnost' => null,
         'nalozeni_velke' => false, 'zbrane' => [], 'oc' => null, 'stit' => false, 'oz' => null, 'oz_nazev' => null,
         'uc_text' => null, 'oc_text' => null, 'bonus_obratnost' => null, 'uroven_nasobek' => null,
         'efekty' => dracak_vtt_efekty_souhrn(
@@ -230,9 +230,13 @@ function dracak_vtt_souboj_bojovnik(PDO $pdo, array $infoTokenu): array
         $b['odolnost'] = $d['stupne']['odolnost'];
         $b['hp'] = (int)$p['aktualni_hp'];
         $b['max_hp'] = (int)$p['max_hp'];
+        $b['stin_hp'] = (int)($p['stin_hp'] ?? 0);
         // Násobek zranění útoku na vyřazeného / spícího (h1613 b10736): úroveň postavy, nejvýš 9.
         $b['uroven_nasobek'] = max(1, min(9, (int)($p['uroven'] ?? 1)));
-        $b['bojeschopnost'] = $d['bojeschopnost'];
+        // Bojeschopnost z deníku počítá bez stínových životů; pro souboj ji přepočítáme se stínovým zraněním.
+        $b['bojeschopnost'] = $b['odolnost'] !== null
+            ? dracak_vtt_bojeschopnost((int)$b['odolnost'], (int)$p['max_hp'], (int)$p['aktualni_hp'], $b['stin_hp'])
+            : $d['bojeschopnost'];
         $b['nalozeni_velke'] = in_array($d['pohyblivost']['nalozeni']['kod'] ?? null, ['velke', 'prilis_velke'], true);
         foreach ($d['zbrane'] as $z) {
             if ($z['uc_tvar_v_tvar'] !== null) {
@@ -258,9 +262,10 @@ function dracak_vtt_souboj_bojovnik(PDO $pdo, array $infoTokenu): array
         }
         return $b;
     }
+    $stinCol = dracak_vtt_ma_stin_hp() ? 'ni.stin_hp' : '0 AS stin_hp';
     $q = $pdo->prepare(
-        'SELECT ni.nestvura_id, ni.aktualni_hp, ni.max_hp, n.velikost, n.uc, n.oc, n.odolnost, n.zivotaschopnost
-         FROM nestvura_instance ni JOIN nestvury n ON n.id = ni.nestvura_id WHERE ni.id = ?'
+        "SELECT ni.nestvura_id, ni.aktualni_hp, ni.max_hp, $stinCol, n.velikost, n.uc, n.oc, n.odolnost, n.zivotaschopnost
+         FROM nestvura_instance ni JOIN nestvury n ON n.id = ni.nestvura_id WHERE ni.id = ?"
     );
     $q->execute([$infoTokenu['entita_id']]);
     $n = $q->fetch();
@@ -280,8 +285,9 @@ function dracak_vtt_souboj_bojovnik(PDO $pdo, array $infoTokenu): array
     $b['odolnost'] = $st['odolnost'];
     $b['hp'] = (int)$n['aktualni_hp'];
     $b['max_hp'] = (int)$n['max_hp'];
+    $b['stin_hp'] = (int)($n['stin_hp'] ?? 0);
     if ($b['odolnost'] !== null && $b['max_hp'] > 0) {
-        $b['bojeschopnost'] = dracak_vtt_bojeschopnost($b['odolnost'], $b['max_hp'], $b['hp']);
+        $b['bojeschopnost'] = dracak_vtt_bojeschopnost($b['odolnost'], $b['max_hp'], $b['hp'], $b['stin_hp']);
     }
     $b['uc_text'] = $n['uc'] !== null ? (string)$n['uc'] : null;
     $b['oc_text'] = $n['oc'] !== null ? (string)$n['oc'] : null;
@@ -540,10 +546,11 @@ function dracak_vtt_utok_priprav(PDO $pdo, array $utocnik, array $cil, bool $roz
     if ($vybrana === null && $utocnik['zbrane']) {
         $vybrana = $utocnik['zbrane'][0];
     }
-    if ($vybrana !== null && !empty($vybrana['pest'])) {
-        // b10988: „Útoky vedené beze zbraně nebo jen její hlavicí způsobují jen stínové zranění.“ Stínové životy hra
-        // zatím nevede — zranění se odečte jako běžné a PJ to tady vidí.
-        $upozorneni[] = 'Úder pěstí působí jen stínové zranění (Rvačka, PPP str. 95). Stínové životy hra zatím nevede — zranění se odečte jako běžné.';
+    $stinove = $vybrana !== null && !empty($vybrana['pest']);
+    if ($stinove) {
+        // b10988: „Útoky vedené beze zbraně nebo jen její hlavicí způsobují jen stínové zranění.“ Stínové zranění
+        // nesnižuje fyzické životy (tvora nezabije), ale do vyřazení se počítá a po boji zmizí.
+        $upozorneni[] = 'Úder pěstí působí jen stínové zranění (Rvačka, h1654): nesnižuje fyzické životy, ale do omráčení se počítá a po boji se zahojí.';
     }
     if ($vybrana === null) {
         $upozorneni[] = $utocnik['typ'] === 'postava'
@@ -558,6 +565,7 @@ function dracak_vtt_utok_priprav(PDO $pdo, array $utocnik, array $cil, bool $roz
         'zaklad_nazev' => $vybrana ? 'ÚČ ' . $vybrana['nazev'] : 'ÚČ',
         'utocnost' => $vybrana ? $vybrana['utocnost'] : 0,
         'zbran_id' => $vybrana ? $vybrana['id'] : null,
+        'stinove' => $stinove,
         'varianty' => $utocnik['zbrane'],
         'opravy' => $opravy,
         'modifikator' => 0,
@@ -711,27 +719,84 @@ function dracak_vtt_obrana_obnov_efekty(PDO $pdo, array $info, array $obranaVyzv
 }
 
 // Odečte životy (nejníž na 0, jako hp_uprava.php) a zapíše hp_zmena. Vrací
-// ['hp_pred', 'hp_nove', 'max_hp', 'vyrazen'].
-function dracak_vtt_souboj_zranit(PDO $pdo, int $svetId, int $mapaId, array $infoTokenu, int $zraneni, int $ucetId): array
+// ['hp_pred', 'hp_nove', 'max_hp', 'stin_pred', 'stin_nove', 'stinove', 'vyrazen'].
+// $stinove = rána beze zbraně / naplocho (h1654 b10988): nesnižuje fyzické životy (aktualni_hp), ale přičítá se
+// do stínového zranění (stin_hp). Stínové tvora nezabíjí, ale do vyřazení se počítá spolu s fyzickým a po boji
+// se srovná na 0. Zastropováno na max_hp — víc stínového zranění než životů nemá smysl držet.
+function dracak_vtt_souboj_zranit(PDO $pdo, int $svetId, int $mapaId, array $infoTokenu, int $zraneni, int $ucetId, bool $stinove = false): array
 {
+    // Dokud sloupec stin_hp neexistuje (před ručním SQL), stínové zranění se odečte jako běžné (chování jako dřív).
+    $maStin = dracak_vtt_ma_stin_hp();
+    if (!$maStin) {
+        $stinove = false;
+    }
     $tabulka = $infoTokenu['typ_entity'] === 'nestvura_instance' ? 'nestvura_instance' : 'postavy';
-    $q = $pdo->prepare("SELECT aktualni_hp, max_hp FROM $tabulka WHERE id = ? FOR UPDATE");
+    $stinCol = $maStin ? 'stin_hp' : '0 AS stin_hp';
+    $q = $pdo->prepare("SELECT aktualni_hp, max_hp, $stinCol FROM $tabulka WHERE id = ? FOR UPDATE");
     $q->execute([$infoTokenu['entita_id']]);
     $r = $q->fetch();
     if (!$r) {
-        return ['hp_pred' => 0, 'hp_nove' => 0, 'max_hp' => 0, 'vyrazen' => false];
+        return ['hp_pred' => 0, 'hp_nove' => 0, 'max_hp' => 0, 'stin_pred' => 0, 'stin_nove' => 0, 'stinove' => $stinove, 'vyrazen' => false];
     }
     $pred = (int)$r['aktualni_hp'];
-    $nove = max(0, $pred - $zraneni);
-    $pdo->prepare("UPDATE $tabulka SET aktualni_hp = ? WHERE id = ?")->execute([$nove, $infoTokenu['entita_id']]);
+    $maxHp = (int)$r['max_hp'];
+    $stinPred = (int)$r['stin_hp'];
+    if ($stinove) {
+        $strop = $maxHp > 0 ? $maxHp : 32767;
+        $stinNove = max(0, min($strop, $stinPred + $zraneni));
+        $nove = $pred;
+        $pdo->prepare("UPDATE $tabulka SET stin_hp = ? WHERE id = ?")->execute([$stinNove, $infoTokenu['entita_id']]);
+    } else {
+        $stinNove = $stinPred;
+        $nove = max(0, $pred - $zraneni);
+        $pdo->prepare("UPDATE $tabulka SET aktualni_hp = ? WHERE id = ?")->execute([$nove, $infoTokenu['entita_id']]);
+    }
     dracak_vtt_log_event($svetId, $mapaId, 'hp_zmena', [
         'typ_entity' => $infoTokenu['typ_entity'],
         'entita_id' => $infoTokenu['entita_id'],
         'nove_hp' => $nove,
-        'max_hp' => (int)$r['max_hp'],
+        'max_hp' => $maxHp,
+        'stin_hp' => $stinNove,
+        'stinove' => $stinove,
         'zdroj' => 'souboj',
     ], $ucetId);
-    return ['hp_pred' => $pred, 'hp_nove' => $nove, 'max_hp' => (int)$r['max_hp'], 'vyrazen' => dracak_vtt_souboj_vyrazen($pdo, $infoTokenu)];
+    return ['hp_pred' => $pred, 'hp_nove' => $nove, 'max_hp' => $maxHp, 'stin_pred' => $stinPred, 'stin_nove' => $stinNove,
+        'stinove' => $stinove, 'vyrazen' => dracak_vtt_souboj_vyrazen($pdo, $infoTokenu)];
+}
+
+// Po skončení souboje se stínové zranění (h1654 b10988) samo zahojí — stin_hp se srovná na 0 u všech tvorů
+// (postav i nestvůr) s tokenem na téhle mapě. Loguje hp_zmena, aby se klientům obnovila karta a okno tvora.
+// Volat uvnitř transakce v souboj_konec.php.
+function dracak_vtt_stin_zahoj_mapa(PDO $pdo, int $svetId, int $mapaId, int $ucetId): void
+{
+    if (!dracak_vtt_ma_stin_hp()) {
+        return;
+    }
+    foreach (['postava' => 'postavy', 'nestvura_instance' => 'nestvura_instance'] as $typ => $tab) {
+        $q = $pdo->prepare(
+            "SELECT e.id, e.aktualni_hp, e.max_hp FROM $tab e
+             JOIN tokeny t ON t.entita_id = e.id AND t.typ_entity = ? AND t.mapa_id = ?
+             WHERE e.stin_hp > 0 GROUP BY e.id, e.aktualni_hp, e.max_hp"
+        );
+        $q->execute([$typ, $mapaId]);
+        $radky = $q->fetchAll();
+        if (!$radky) {
+            continue;
+        }
+        $ids = array_map(static fn($r) => (int)$r['id'], $radky);
+        $in = implode(',', array_fill(0, count($ids), '?'));
+        $pdo->prepare("UPDATE $tab SET stin_hp = 0 WHERE id IN ($in)")->execute($ids);
+        foreach ($radky as $r) {
+            dracak_vtt_log_event($svetId, $mapaId, 'hp_zmena', [
+                'typ_entity' => $typ,
+                'entita_id' => (int)$r['id'],
+                'nove_hp' => (int)$r['aktualni_hp'],
+                'max_hp' => (int)$r['max_hp'],
+                'stin_hp' => 0,
+                'zdroj' => 'souboj_konec',
+            ], $ucetId);
+        }
+    }
 }
 
 // Vyhodnotí hozenou obranu: zásah, zranění, životy, akce obránce, událost; obě výzvy skončí.
@@ -790,9 +855,11 @@ function dracak_vtt_utok_vyhodnot(PDO $pdo, array $mapa, array $info, array $uto
         }
     }
 
-    $hp = ['hp_pred' => null, 'hp_nove' => null, 'max_hp' => null, 'vyrazen' => false];
+    // Stínové zranění (rána beze zbraně / naplocho, h1654 b10988): útok ho nese z výběru zbraně (pěst/kop).
+    $stinove = !empty($utokVyzva['data']['stinove']);
+    $hp = ['hp_pred' => null, 'hp_nove' => null, 'max_hp' => null, 'stin_pred' => null, 'stin_nove' => null, 'stinove' => $stinove, 'vyrazen' => false];
     if ($zraneni > 0) {
-        $hp = dracak_vtt_souboj_zranit($pdo, $svetId, $mapaId, $info[$obrId], $zraneni, $ucetId);
+        $hp = dracak_vtt_souboj_zranit($pdo, $svetId, $mapaId, $info[$obrId], $zraneni, $ucetId, $stinove);
     }
     // Zasažený kouzlící tvor (b10846–b10847): před předposlední akcí kouzlení se kouzlo nezdaří (magenergie propadne), po ní uspěje a tvor se jen nemohl
     // bránit; štítek bez počítaných akcí hra nevyhodnotí. Stav: selhalo | zdarilo | rucne (null = tvor nekouzlil).
@@ -838,6 +905,9 @@ function dracak_vtt_utok_vyhodnot(PDO $pdo, array $mapa, array $info, array $uto
         'hp_pred' => $hp['hp_pred'],
         'hp_nove' => $hp['hp_nove'],
         'max_hp' => $hp['max_hp'],
+        'stinove' => $stinove,
+        'stin_pred' => $hp['stin_pred'] ?? null,
+        'stin_nove' => $hp['stin_nove'] ?? null,
         'vyrazen' => $hp['vyrazen'],
         'branil_se' => ($obranaVyzva['data']['volba'] ?? null) === 'branit',
         'obrance_akce_zbyvajici' => $akceObrance,
@@ -862,6 +932,7 @@ function dracak_vtt_utok_vyhodnot(PDO $pdo, array $mapa, array $info, array $uto
     }
     if (!$info[$obrId]['viditelny']) {
         $verejne['hp_pred'] = $verejne['hp_nove'] = $verejne['max_hp'] = null;
+        $verejne['stin_pred'] = $verejne['stin_nove'] = null;
         $verejne['vyrazen'] = false;
     }
     dracak_vtt_log_event($svetId, $mapaId, 'souboj_vysledek',
@@ -923,6 +994,7 @@ function dracak_vtt_vyzvy_klient(PDO $pdo, array $user, bool $jePj, array $info,
             $radek['zbran_id'] = $d['zbran_id'] ?? null;
             $radek['utocnost'] = (int)($d['utocnost'] ?? 0);
             $radek['rozbeh'] = !empty($d['rozbeh']);
+            $radek['stinove'] = !empty($d['stinove']);
         } elseif ($v['druh'] === 'obrana') {
             $radek['volba'] = $d['volba'] ?? null;
             $radek['muze_branit'] = !empty($d['muze_branit']);

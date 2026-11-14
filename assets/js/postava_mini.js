@@ -30,17 +30,30 @@ export function initPostavaMini(opts) {
     box.style.top = Math.round(y) + 'px';
   }
 
-  function pruh(nazev, aktualni, max, trida) {
+  function pruh(nazev, aktualni, max, trida, stinHp) {
     const r = el('div', 'pmini-radek');
     r.appendChild(el('span', 'pmini-popis', nazev));
     const p = el('div', 'pmini-pruh' + (trida ? ' ' + trida : ''));
+    p.style.position = 'relative';
     const i = document.createElement('i');
-    i.style.width = (max > 0 ? Math.max(0, Math.min(100, Math.round(aktualni / max * 100))) : 0) + '%';
+    const hpP = max > 0 ? Math.max(0, Math.min(100, Math.round(aktualni / max * 100))) : 0;
+    i.style.width = hpP + '%';
     p.appendChild(i);
+    // Stínové zranění (h1654 b10988): šrafovaný díl na konci pruhu — do vyřazení se počítá, po boji zmizí.
+    const stin = Math.max(0, Math.min(Number(stinHp) || 0, Number(aktualni) || 0));
+    if (stin > 0 && max > 0) {
+      const ucinneP = Math.max(0, Math.min(100, (aktualni - stin) / max * 100));
+      const s = document.createElement('i');
+      s.className = 'pmini-pruh-stin';
+      s.style.cssText = 'position:absolute;top:0;bottom:0;left:' + ucinneP + '%;width:' + Math.max(0, hpP - ucinneP) + '%;'
+        + 'background:repeating-linear-gradient(45deg,rgba(38,20,56,.8),rgba(38,20,56,.8) 3px,rgba(126,96,168,.8) 3px,rgba(126,96,168,.8) 6px);';
+      s.title = 'Stínové zranění ' + stin + ' — do vyřazení se počítá, po boji se zahojí';
+      p.appendChild(s);
+    }
     p.setAttribute('role', 'img');
-    p.setAttribute('aria-label', nazev + ' ' + aktualni + ' z ' + max);
+    p.setAttribute('aria-label', nazev + ' ' + aktualni + ' z ' + max + (stin > 0 ? ', stínové ' + stin : ''));
     r.appendChild(p);
-    r.appendChild(el('span', 'pmini-cislo', aktualni + ' / ' + max));
+    r.appendChild(el('span', 'pmini-cislo', aktualni + ' / ' + max + (stin > 0 ? ' (+' + stin + ' stín)' : '')));
     return r;
   }
 
@@ -77,7 +90,7 @@ export function initPostavaMini(opts) {
     let tridaHp = '';
     if (d.stav && d.stav.vyrazena) tridaHp = 'vyrazena';
     else if (d.stav && d.stav.pod_tretinou) tridaHp = 'zranena';
-    telo.appendChild(pruh('Životy', d.hp, d.max_hp, tridaHp));
+    telo.appendChild(pruh('Životy', d.hp, d.max_hp, tridaHp, d.stin_hp));
     if (d.max_mag !== null && d.max_mag > 0) telo.appendChild(pruh('Magenergie', d.mag || 0, d.max_mag, 'mag'));
     const staty = el('div', 'pmini-staty');
     staty.appendChild(cislo('ÚČ', d.zbran ? d.zbran.uc : (d.pest !== null && d.pest !== undefined ? d.pest : null), d.zbran ? d.zbran.nazev : 'beze zbraně (pěst)'));

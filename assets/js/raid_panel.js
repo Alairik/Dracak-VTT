@@ -231,13 +231,29 @@ export function initRaidPanel(ctx) {
     }
     const p = procento(t);
     const hp = el('div', 'raid-hp');
+    hp.style.position = 'relative';
     const vypln = el('div', 'raid-hp-vypln');
     vypln.style.width = p + '%';
     vypln.style.background = barvaHp(p);
+    hp.append(vypln);
+    // Stínové zranění (h1654 b10988): šrafovaný díl na pravém konci fyzického pruhu — do vyřazení se počítá, po boji zmizí.
+    const stin = Math.max(0, Math.min(Number(t.stin_hp) || 0, Number(t.hp) || 0));
+    if (stin > 0 && t.max_hp) {
+      const ucinneP = Math.max(0, Math.min(100, Math.round((Number(t.hp) - stin) / Number(t.max_hp) * 100)));
+      const stinEl = el('div', 'raid-hp-stin');
+      stinEl.style.cssText = 'position:absolute;top:0;bottom:0;left:' + ucinneP + '%;width:' + Math.max(0, p - ucinneP) + '%;'
+        + 'background:repeating-linear-gradient(45deg,rgba(38,20,56,.8),rgba(38,20,56,.8) 3px,rgba(126,96,168,.8) 3px,rgba(126,96,168,.8) 6px);';
+      stinEl.title = 'Stínové zranění ' + stin + ' — do vyřazení se počítá, po boji se zahojí';
+      hp.append(stinEl);
+    }
     // Hráč vidí jen pruh, bez čísel.
-    if (ctx.jePj) hp.append(vypln, el('div', 'raid-hp-text', t.hp === null || t.hp === undefined ? '—' : (t.hp + (t.max_hp ? ' / ' + t.max_hp : ''))));
-    else hp.append(vypln);
-    if (!ctx.jePj) hp.title = 'Životy';
+    if (ctx.jePj) {
+      const txt = el('div', 'raid-hp-text', t.hp === null || t.hp === undefined ? '—' : (t.hp + (t.max_hp ? ' / ' + t.max_hp : '') + (stin > 0 ? ' (+' + stin + ' stín)' : '')));
+      txt.style.position = 'relative';
+      hp.append(txt);
+    } else {
+      hp.title = 'Životy';
+    }
     const ex = ctx.radekExtra ? ctx.radekExtra(t.id) : null;
     if (kompakt) {
       b.append(telo, hp);

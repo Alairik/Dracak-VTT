@@ -188,6 +188,12 @@ export function initTvorOkno(opts) {
     });
     cislo.appendChild(vstup);
     cislo.appendChild(el('span', 'tvor-hp-max', '/ ' + (t.max_hp == null ? '?' : t.max_hp) + ' životů'));
+    if ((Number(t.stin_hp) || 0) > 0) {
+      const sv = el('span', 'tvor-hp-stin', '+' + (Number(t.stin_hp) || 0) + ' stín');
+      sv.style.cssText = 'margin-left:.4em;font-size:.82em;color:#9a7bc0;font-weight:600;';
+      sv.title = 'Stínové zranění (rána pěstí/kopem): fyzické životy nesnižuje, ale do vyřazení se počítá a po boji se zahojí.';
+      cislo.appendChild(sv);
+    }
     hp.appendChild(cislo);
 
     const tl = el('div', 'tvor-hp-tl');
@@ -203,9 +209,21 @@ export function initTvorOkno(opts) {
     if (max > 0 && t.hp != null) {
       const trida = bs && bs.vyrazena ? ' vyrazena' : (bs && bs.pod_tretinou ? ' zranena' : '');
       const pruh = el('div', 'tvor-pruh' + trida);
+      pruh.style.position = 'relative';
       const vypln = el('i');
       vypln.style.width = Math.max(0, Math.min(100, (Number(t.hp) / max) * 100)) + '%';
       pruh.appendChild(vypln);
+      // Stínové zranění (h1654 b10988): šrafovaný díl na pravém konci fyzického pruhu — do vyřazení se počítá, po boji zmizí.
+      const stin = Math.max(0, Math.min(Number(t.stin_hp) || 0, Number(t.hp) || 0));
+      if (stin > 0) {
+        const ucinneP = Math.max(0, Math.min(100, ((Number(t.hp) - stin) / max) * 100));
+        const hpP = Math.max(0, Math.min(100, (Number(t.hp) / max) * 100));
+        const stinEl = el('i', 'tvor-pruh-stin');
+        stinEl.style.cssText = 'position:absolute;top:0;bottom:0;left:' + ucinneP + '%;width:' + Math.max(0, hpP - ucinneP) + '%;'
+          + 'background:repeating-linear-gradient(45deg,rgba(38,20,56,.8),rgba(38,20,56,.8) 3px,rgba(126,96,168,.8) 3px,rgba(126,96,168,.8) 6px);';
+        stinEl.title = 'Stínové zranění ' + stin + ' — do vyřazení se počítá, po boji se zahojí';
+        pruh.appendChild(stinEl);
+      }
       if (mez != null && mez > 0) {
         const znacka = el('b');
         znacka.style.left = Math.max(0, Math.min(100, (mez / max) * 100)) + '%';
