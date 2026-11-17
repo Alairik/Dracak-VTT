@@ -40,7 +40,7 @@ Uživatel bude hru zkoušet a posílat další úpravy; nic není „rozdělané
 Mimo souboj přibyla **malá karta postavy** (jeden klik na token = karta se životy, magenergií, ÚČ a OČ; plný deník
 až dvojklik nebo tlačítko „Deník“) — `assets/js/postava_mini.js`, `hra/api/postava_mini.php`.
 
-**Sekce s podrobnostmi, v pořadí od nejnovější:** „Stínové životy (2026-11-14)“ → „Souboj — úpravy po první zkoušce uživatele“ → „Souboj — nový
+**Sekce s podrobnostmi, v pořadí od nejnovější:** „Kop (2026-11-17)“ → „Stínové životy (2026-11-14)“ → „Souboj — úpravy po první zkoušce uživatele“ → „Souboj — nový
 průběh, kroky 1–7 a telefon“ → „Souboj, krok 0“ → „Malá karta postavy“ → „Souboj — nový průběh, návrh“ (odkaz na
 plátno s nákresy: https://claude.ai/artifact/3ojke53iFM7Utts6MgXiX6; je to schválený návrh, **realita se od něj
 v pár bodech liší** — viz „Co z nákresu není přesně tak“ a úpravy z 13. 11.).
@@ -64,9 +64,9 @@ v pár bodech liší** — viz „Co z nákresu není přesně tak“ a úpravy 
 1. **Stínové zranění — HOTOVO 2026-11-14** (migrace 0121, čeká na ruční SQL blok N). Rána pěstí teď působí
    skutečné stínové zranění: nesnižuje fyzické životy (tvora nezabije), ale do vyřazení se počítá a po boji se
    zahojí. Viz sekce „Stínové životy“ níž. Rozhodnutí uživatele (kvíz 2026-11-14): „zaveď pořádně“.
-2. **Kop** (Tabulka rvačky, druhý sloupec; jednou za kolo, postih −4 v další akci, b10987) se nenabízí.
-   Uživatel 2026-11-14 schválil přidat. **Potřebuje malou změnu DB** (engine si musí zapamatovat kop kvůli
-   „jednou za kolo“ a postihu do další akce) — další na řadě po stínových životech.
+2. **Kop — HOTOVO 2026-11-17** (migrace 0122, čeká na ruční SQL blok O). Volitelná varianta útoku nohou:
+   síla nohy (A 3, B 5, C 7) + bonus za sílu, útočnost +3, stínové zranění; jednou za kolo; postih −4
+   (−2 bojovník/šermíř/lupič/chodec) na nejbližší útok/obranu. Viz sekce „Kop“ níž.
 3. **Kouzla „ihned“ k obraně** mají v kartě obrany starší blok s rozbalovacími poli (`ihnedBlok` v `souboj.js`) —
    jediné místo, které se nepřekreslilo do dlaždic.
 4. **Dosah kouzla na mapě** se kreslí jen u kouzel s číselným dosahem (`dosah_sahy`); slovní dosahy se nehádají.
@@ -109,6 +109,39 @@ konverzace je zapsaný přesně proto, aby ses nemusel/a ptát na věci, co
 už byly rozhodnuté (viz "Architektonická rozhodnutí" a celá sekce
 "Rozpracováno" níže — všechno v ní je buď přímo citovaný text pravidel,
 nebo odsouhlasené uživatelem, ne můj odhad).
+
+### Kop (2026-11-17, hotovo v kódu, čeká ruční SQL blok O)
+
+Uživatel 2026-11-14 schválil přidat kop, 2026-11-17 „kop klidně dodělej“. Kop z Tabulky rvačky (hrac h1654
+**b10987**): ÚČ = síla nohy (A 3, B 5, C 7) + bonus za sílu, útočnost +3; útok beze zbraně → **stínové zranění**
+(navazuje na stínové životy); jen **jednou za kolo**; v nejbližší další akci (útok nebo obrana) postih **−4**
+(**−2** bojovník/šermíř/lupič/chodec, `DRACAK_VTT_KOP_POVOLANI_POLOVICNI`).
+
+**Model:** kop je varianta útoku (`dracak_vtt_souboj_kop`, id −2, `kop`=>true, `pest`=>true) nabízená postavě
+v seznamu variant útoku (vedle pěsti; nestvůrám ne). Stav kopu je na `kolo_iniciativa` (migrace **0122**, maže se
+koncem souboje sám): `kop_kolo` (kolo posledního kopu — „jednou za kolo“) a `kop_postih` (0/2/4 — čekající postih
+do další akce). Postih se ukazuje jako oprava „postih za kop v minulé akci“ v `dracak_vtt_vyzva_opravy` (platí pro
+útok i obranu, takže ho `dracak_vtt_vyzva_cislo` započítá do součtu). Výběr kopu (`vyzva_uprava` zbran_id=−2)
+hlídá „jednou za kolo“ (422). `dracak_vtt_kop_po_vyhodnoceni` po vyhodnocení spotřebuje čekající postih útočníka
+i obránce a po kopu nastaví nový + `kop_kolo`.
+
+**Pojistka:** kop se nabízí jen když existuje sloupec (`dracak_vtt_ma_kop()` v `vtt.php`). Před ručním SQL se kop
+prostě neukáže a souboj jede jako dřív.
+
+**Chyták, který se tím opravil:** pěst i kop mají `pest`=>true (obě jsou beze zbraně → stínové). Fallback „beze
+zbraně se útočí pěstí“ (`dracak_vtt_utok_priprav`) i `$pest` v `postava_mini.php` braly POSLEDNÍ `pest`-flaglou
+variantu = kop. Opraveno na `pest && !kop`. (Odhalil to pest_api.)
+
+**UI:** varianta „kop (ÚČ N)“ je v selectu zbraně/útoku na kartě útoku; po výběru kopu karta ukáže nápovědu
+(jednou za kolo, postih −4/−2, stínové). Postih na další akci se ukáže jako oprava hodu.
+
+**Testy:** nový `tests/e2e/kop_api.js` (10 kontrol: varianta a síla nohy, útočnost 3, přepnutí = stínové,
+kop = stínové zranění, nastavení postihu, oprava −4/−2 na další akci, „jednou za kolo“ 422, spotřebování postihu).
+Regrese: pest_api, stin_api, obrana_otocit_api, souboj_ui, souboj_karta_ui, postava_mini_ui, hex_tah_ui.
+
+**Ruční SQL (blok O v `docs/sql-k-rucnimu-spusteni.sql`):** `kop_kolo`, `kop_postih` na `kolo_iniciativa`,
+ověřeno lokálně ve 4 stavech (2/2/2/0). Migrace 0122 je rozpoznatelná jako hotová. **Po nasazení uživatel klikne
+na Změny databáze → Spustit čekající změny.**
 
 ### Stínové životy (2026-11-14, hotovo v kódu, čeká ruční SQL blok N)
 

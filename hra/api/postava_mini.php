@@ -60,7 +60,8 @@ foreach ($b['zbrane'] as $z) {
     if ($z['drzena'] && $vRuce === null) {
         $vRuce = ['nazev' => $z['nazev'], 'uc' => $z['uc']];
     }
-    if (!empty($z['pest'])) {
+    // Pěst, ne kop (kop má taky příznak pest, ale nabízí se jen ručně v boji).
+    if (!empty($z['pest']) && empty($z['kop'])) {
         $pest = (int)$z['uc'];
     }
 }

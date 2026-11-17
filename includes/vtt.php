@@ -328,6 +328,23 @@ function dracak_vtt_ma_stin_hp(): bool
     return $je;
 }
 
+// Je v DB sloupec kolo_iniciativa.kop_kolo (migrace 0122, ruční SQL)? Dokud neexistuje, kop se vůbec nenabízí
+// (nejde hlídat „jednou za kolo“ ani postih do další akce). Guard, aby nasazení kódu PŘED ručním SQL nerozbilo
+// souboj. Cachuje se na request.
+function dracak_vtt_ma_kop(): bool
+{
+    static $je = null;
+    if ($je === null) {
+        try {
+            $st = dracak_db()->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'kolo_iniciativa' AND COLUMN_NAME = 'kop_kolo'");
+            $je = (int)$st->fetchColumn() > 0;
+        } catch (Throwable $e) {
+            $je = false;
+        }
+    }
+    return $je;
+}
+
 // Životy o $delta: nejníž 0, nejvýš max_hp (max_hp = 0 znamená „neznámé“, nahoru se neořezává, jen na rozsah sloupce). Vrací [nove_hp, max_hp] nebo null.
 function dracak_vtt_hp_zmen(PDO $pdo, string $typEntity, int $entitaId, int $delta): ?array
 {

@@ -126,10 +126,24 @@ try {
             $pdo->rollBack();
             dracak_vtt_souboj_chyba(422, 'Tuhle zbraň tvor nemá.');
         }
+        // Kop (b10987) jde použít jen jednou za kolo — hlídá kolo_iniciativa.kop_kolo proti aktuálnímu kolu.
+        if (!empty($vybrana['kop']) && dracak_vtt_ma_kop()) {
+            $stav = dracak_vtt_souboj_nacti($pdo, (int)$v['mapa_id']);
+            $qk = $pdo->prepare('SELECT kop_kolo FROM kolo_iniciativa WHERE mapa_id = ? AND token_id = ?');
+            $qk->execute([(int)$v['mapa_id'], (int)$v['token_id']]);
+            $kopKolo = (int)($qk->fetchColumn() ?: 0);
+            if ($stav !== null && $kopKolo === (int)$stav['cislo_kola']) {
+                $pdo->rollBack();
+                dracak_vtt_souboj_chyba(422, 'Kop jde použít jen jednou za kolo — tenhle tvor už v tomhle kole kopl.');
+            }
+        }
         $d['zbran_id'] = $vybrana['id'];
         $d['zaklad'] = $vybrana['uc'];
         $d['zaklad_nazev'] = 'ÚČ ' . $vybrana['nazev'];
         $d['utocnost'] = $vybrana['utocnost'];
+        // Rána beze zbraně (pěst/kop) = stínové zranění (b10988); kop má navíc postih do další akce (řeší vyhodnocení).
+        $d['stinove'] = !empty($vybrana['pest']) || !empty($vybrana['kop']);
+        $d['kop'] = !empty($vybrana['kop']);
         $zmeneno[] = 'zbran_id';
     }
 

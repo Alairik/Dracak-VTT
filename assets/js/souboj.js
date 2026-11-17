@@ -2236,6 +2236,10 @@ export function initSouboj(ctx) {
       sel.addEventListener('change', () => upravitVyzvu(v, {zbran_id: parseInt(sel.value, 10)}));
       r.appendChild(sel);
       k.appendChild(r);
+      const vybranaVar = v.varianty.find((z) => z.id === v.zbran_id) || {};
+      if (vybranaVar.kop) {
+        k.appendChild(el('div', 'vyzva-poznamka', 'Kop: jen jednou za kolo a v nejbližší další akci (útok/obrana) máš postih −4 (bojovník, šermíř, lupič a chodec −2). Působí jen stínové zranění.'));
+      }
     }
     // PJ: úpravy čísel před hodem (základ, oprava, tma, útočnost, obtížnost) — schované, dokud je nepotřebuje.
     if (v.je_pj) {

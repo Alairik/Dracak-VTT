@@ -193,10 +193,12 @@ function dracak_vtt_nestvura_oc(?string $text): ?int
 // Údaje o tvoru na tokenu, které boj potřebuje. Postava: z deníku (zbraně, OČ, bojeschopnost, naložení);
 // nestvůra: z textu bestiáře (varianty ÚČ, OČ, velikost, odolnost) + životy instance.
 
-// TABULKA RVAČKY (hrac b10982–b10985): síla pěsti podle velikosti postavy — A 2, B 3, C 4. (Druhý sloupec tabulky je
-// síla nohy s útočností, „3/+3“, „5/+3“, „7/+3“; kop má vlastní omezení — jednou za kolo a postih −4 v další akci,
-// b10987 — a zatím se nenabízí.) Útočnost pěsti kniha neuvádí, počítá se 0.
+// TABULKA RVAČKY (hrac b10982–b10985): síla pěsti podle velikosti postavy — A 2, B 3, C 4. Druhý sloupec je síla
+// nohy s útočností „3/+3“, „5/+3“, „7/+3“ — kop (b10987). Útočnost pěsti kniha neuvádí, počítá se 0.
 const DRACAK_VTT_SILA_PESTI = ['A' => 2, 'B' => 3, 'C' => 4];
+const DRACAK_VTT_SILA_NOHY = ['A' => 3, 'B' => 5, 'C' => 7];
+// Povolání, která mají za kop postih do další akce poloviční (−2 místo −4): bojovník, šermíř, lupič, chodec (b10987).
+const DRACAK_VTT_KOP_POVOLANI_POLOVICNI = ['Bojovník', 'Šermíř', 'Lupič', 'Chodec'];
 // Varianta útoku „Pěst“ pro postavu dané velikosti a s daným bonusem za sílu; null, když velikost není A–C nebo
 // postava nemá vyplněnou sílu (pak se číslo nehádá).
 function dracak_vtt_souboj_pest(?string $velikost, ?int $bonusSily): ?array
@@ -206,6 +208,68 @@ function dracak_vtt_souboj_pest(?string $velikost, ?int $bonusSily): ?array
     }
     return ['id' => -1, 'nazev' => 'pěst', 'uc' => max(0, DRACAK_VTT_SILA_PESTI[$velikost] + $bonusSily),
         'utocnost' => 0, 'drzena' => false, 'pest' => true];
+}
+
+// Varianta útoku „Kop“ (b10987): ÚČ = síla nohy (A 3, B 5, C 7) + bonus za sílu, útočnost +3. Útok beze zbraně,
+// takže působí stínové zranění (pest=>true). Omezení „jednou za kolo“ a postih −4/−2 řeší souboj zvlášť přes
+// kolo_iniciativa (kop=>true).
+function dracak_vtt_souboj_kop(?string $velikost, ?int $bonusSily): ?array
+{
+    if ($velikost === null || !isset(DRACAK_VTT_SILA_NOHY[$velikost]) || $bonusSily === null) {
+        return null;
+    }
+    return ['id' => -2, 'nazev' => 'kop', 'uc' => max(0, DRACAK_VTT_SILA_NOHY[$velikost] + $bonusSily),
+        'utocnost' => 3, 'drzena' => false, 'pest' => true, 'kop' => true];
+}
+
+// Čekající postih za minulý kop (kolo_iniciativa.kop_postih) pro daný token; 0, když sloupec není nebo řádek chybí.
+// Ukládá se do dat výzvy útoku/obrany, aby ho dracak_vtt_vyzva_opravy ukázalo a započítalo.
+function dracak_vtt_kop_pending(PDO $pdo, int $mapaId, int $tokenId): int
+{
+    if (!dracak_vtt_ma_kop()) {
+        return 0;
+    }
+    $q = $pdo->prepare('SELECT kop_postih FROM kolo_iniciativa WHERE mapa_id = ? AND token_id = ?');
+    $q->execute([$mapaId, $tokenId]);
+    return (int)($q->fetchColumn() ?: 0);
+}
+
+// Velikost postihu za kop do další akce (b10987): −2 pro bojovníka/šermíře/lupiče/chodce, jinak −4.
+function dracak_vtt_kop_hodnota(PDO $pdo, array $infoTokenu): int
+{
+    if (($infoTokenu['typ_entity'] ?? null) === 'postava') {
+        $q = $pdo->prepare('SELECT pv.nazev FROM postavy po JOIN povolani pv ON pv.id = po.povolani_id WHERE po.id = ?');
+        $q->execute([(int)$infoTokenu['entita_id']]);
+        if (in_array((string)($q->fetchColumn() ?: ''), DRACAK_VTT_KOP_POVOLANI_POLOVICNI, true)) {
+            return 2;
+        }
+    }
+    return 4;
+}
+
+// Po vyhodnocení útoku dořeší stav kopu na kolo_iniciativa: spotřebuje čekající postih útočníka i obránce (už se
+// promítl do hodu) a po kopu nastaví nový postih −4/−2 do další akce + značku „kopl v tomhle kole“ (b10987).
+function dracak_vtt_kop_po_vyhodnoceni(PDO $pdo, int $mapaId, array $utokVyzva, array $obranaVyzva, array $info): void
+{
+    if (!dracak_vtt_ma_kop()) {
+        return;
+    }
+    $utId = (int)$utokVyzva['token_id'];
+    $obrId = (int)$obranaVyzva['token_id'];
+    $vynuluj = $pdo->prepare('UPDATE kolo_iniciativa SET kop_postih = 0 WHERE mapa_id = ? AND token_id = ?');
+    // Obránce: čekající postih se spotřeboval na tuhle obranu.
+    if ((int)($obranaVyzva['data']['kop_postih'] ?? 0) > 0) {
+        $vynuluj->execute([$mapaId, $obrId]);
+    }
+    if (!empty($utokVyzva['data']['kop'])) {
+        // Kop: spotřebuje případný starý postih a nastaví nový (−4/−2) + značku „kopl v tomhle kole“.
+        $stav = dracak_vtt_souboj_nacti($pdo, $mapaId);
+        $pdo->prepare('UPDATE kolo_iniciativa SET kop_postih = ?, kop_kolo = ? WHERE mapa_id = ? AND token_id = ?')
+            ->execute([dracak_vtt_kop_hodnota($pdo, $info[$utId] ?? []), $stav !== null ? (int)$stav['cislo_kola'] : 0, $mapaId, $utId]);
+    } elseif ((int)($utokVyzva['data']['kop_postih'] ?? 0) > 0) {
+        // Útok beze kopu: čekající postih se spotřeboval na tenhle útok.
+        $vynuluj->execute([$mapaId, $utId]);
+    }
 }
 function dracak_vtt_souboj_bojovnik(PDO $pdo, array $infoTokenu): array
 {
@@ -259,6 +323,11 @@ function dracak_vtt_souboj_bojovnik(PDO $pdo, array $infoTokenu): array
         $pest = dracak_vtt_souboj_pest($b['velikost'], $d['bonusy']['sila'] ?? null);
         if ($pest !== null) {
             $b['zbrane'][] = $pest;
+        }
+        // Kop (b10987) je volitelná varianta útoku — nabídne se, jen když je v DB stav kopu (migrace 0122).
+        $kop = dracak_vtt_ma_kop() ? dracak_vtt_souboj_kop($b['velikost'], $d['bonusy']['sila'] ?? null) : null;
+        if ($kop !== null) {
+            $b['zbrane'][] = $kop;
         }
         return $b;
     }
@@ -418,6 +487,11 @@ function dracak_vtt_vyzva_opravy(string $druh, array $d): array
     if (($druh === 'utok' || $druh === 'obrana') && is_string($tma) && isset(DRACAK_VTT_TMA_POSTIHY[$tma])) {
         $o[] = dracak_vtt_oprava(DRACAK_VTT_TMA_POSTIHY[$tma][0], DRACAK_VTT_TMA_POSTIHY[$tma][1]);
     }
+    // Postih za kop v minulé akci (b10987): −4 (−2 bojovník/šermíř/lupič/chodec) na nejbližší útok nebo obranu.
+    $kp = (int)($d['kop_postih'] ?? 0);
+    if (($druh === 'utok' || $druh === 'obrana') && $kp > 0) {
+        $o[] = dracak_vtt_oprava('postih za kop v minulé akci', -$kp);
+    }
     return $o;
 }
 
@@ -537,8 +611,9 @@ function dracak_vtt_utok_priprav(PDO $pdo, array $utocnik, array $cil, bool $roz
     // Postava, která nic nedrží, útočí beze zbraně (rozhodnutí uživatele 2026-11-12: „mám v ruce nějakou zbraň, podle
     // ní se to přepočítává. pokud nemám, útočím beze zbraně“) — ne první zbraní z inventáře jako dřív.
     if ($vybrana === null && $utocnik['typ'] === 'postava') {
+        // Beze zbraně v ruce se útočí PĚSTÍ, ne kopem (kop má taky příznak pest, ale vybírá se jen ručně).
         foreach ($utocnik['zbrane'] as $z) {
-            if (!empty($z['pest'])) {
+            if (!empty($z['pest']) && empty($z['kop'])) {
                 $vybrana = $z;
             }
         }
@@ -566,6 +641,7 @@ function dracak_vtt_utok_priprav(PDO $pdo, array $utocnik, array $cil, bool $roz
         'utocnost' => $vybrana ? $vybrana['utocnost'] : 0,
         'zbran_id' => $vybrana ? $vybrana['id'] : null,
         'stinove' => $stinove,
+        'kop' => $vybrana !== null && !empty($vybrana['kop']),
         'varianty' => $utocnik['zbrane'],
         'opravy' => $opravy,
         'modifikator' => 0,
@@ -590,6 +666,8 @@ function dracak_vtt_utok_zahaj(PDO $pdo, array $mapa, array $info, array $utocni
     $cil = dracak_vtt_souboj_bojovnik($pdo, $info[$cilTokenId]);
     $d = dracak_vtt_utok_priprav($pdo, $utocnik, $cil, $rozbeh, dracak_vtt_souboj_utoku_v_kole($pdo, $mapaId, $utId));
     $d['strana'] = $cilToken ? dracak_vtt_utok_strana($mapa, $cilToken, $utocnikToken) : 'predni';
+    // Čekající postih za kop z minulé akce útočníka (b10987) — ukáže se jako oprava a započítá do útoku.
+    $d['kop_postih'] = dracak_vtt_kop_pending($pdo, $mapaId, $utId);
     $tma = dracak_vtt_videni_tma_volba($pdo, $mapa, $utId, $cilTokenId);
     if ($tma !== null) {
         $d['tma'] = $tma;
@@ -685,6 +763,7 @@ function dracak_vtt_obrana_zaloz(PDO $pdo, array $mapa, array $info, array $utok
         'oz_nazev' => $obr['oz_nazev'],
         'oz_znamo' => $ozZnamo,
         'postih_zivoty' => $obr['bojeschopnost']['postih_aktualni'] ?? 0,
+        'kop_postih' => dracak_vtt_kop_pending($pdo, $mapaId, $obrId),
         'nalozeni_velke' => $obr['nalozeni_velke'],
         'strana' => $nehybny !== null ? 'predni' : (string)($utokVyzva['data']['strana'] ?? 'predni'),
         'volba' => $muzeBranit ? null : 'nebranit',
@@ -892,6 +971,8 @@ function dracak_vtt_utok_vyhodnot(PDO $pdo, array $mapa, array $info, array $uto
         $akceObrance = $q->fetchColumn();
         $akceObrance = $akceObrance !== false ? (int)$akceObrance : null;
     }
+    // Stav kopu (b10987): spotřebovat čekající postih a po kopu nastavit nový do další akce.
+    dracak_vtt_kop_po_vyhodnoceni($pdo, $mapaId, $utokVyzva, $obranaVyzva, $info);
     $vysledek = [
         'zasah' => $zasah,
         'zraneni' => $zraneni,
