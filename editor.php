@@ -298,9 +298,11 @@ if ($nastroj === null) {
           } elseif ($f['type'] === 'checkbox') {
               echo '<input type="checkbox" id="f_' . htmlspecialchars($f['name']) . '" name="' . htmlspecialchars($f['name']) . '" ' . ($val ? 'checked' : '') . '>';
           } elseif ($f['type'] === 'select' && $f['options']) {
+              // option_labels (volitelné): popisek k hodnotě, aby select mohl ukázat slovo místo kódu (např. „Kouzelná“ místo „C“).
+              $popisky = $f['option_labels'] ?? [];
               echo '<select id="f_' . htmlspecialchars($f['name']) . '" name="' . htmlspecialchars($f['name']) . '"><option value="">—</option>';
               foreach ($f['options'] as $opt) {
-                  echo '<option value="' . htmlspecialchars($opt) . '" ' . ((string)$val === $opt ? 'selected' : '') . '>' . htmlspecialchars($opt) . '</option>';
+                  echo '<option value="' . htmlspecialchars($opt) . '" ' . ((string)$val === $opt ? 'selected' : '') . '>' . htmlspecialchars($popisky[$opt] ?? $opt) . '</option>';
               }
               echo '</select>';
           } elseif ($f['type'] === 'select_fk') {

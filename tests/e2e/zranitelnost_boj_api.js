@@ -47,6 +47,7 @@ const stav = (page) => page.evaluate(async (m) => (await fetch('api/mapa_stav.ph
   const druh = parseInt(sqlVal("select id from nestvury where nazev='Goblin'"), 10) || 41;
   const kodB = parseInt(sqlVal("select id from kody_zranitelnosti where kod='B'"), 10);
   const kodC = parseInt(sqlVal("select id from kody_zranitelnosti where kod='C'"), 10);
+  const CEP = parseInt(sqlVal("select id from predmety where nazev='Cep' limit 1"), 10) || 39;
   ok(kodB > 0 && kodC > 0, 'kódy zranitelnosti B a C jsou v číselníku: B=' + kodB + ' C=' + kodC);
   const puvodni = require('child_process').execSync(
     `mysql --default-character-set=utf8mb4 ${DB} -N -e "select concat(kod_zranitelnosti_id,':',coalesce(modifikator,'')) from nestvura_zranitelnosti where nestvura_id=${druh}"`
@@ -55,7 +56,9 @@ const stav = (page) => page.evaluate(async (m) => (await fetch('api/mapa_stav.ph
   const pripravBoj = async () => {
     await api(pj, 'souboj_konec', { mapa_id: MAPA });
     for (const t of (await stav(pj)).tokeny) await api(pj, 'token_smazat', { token_id: t.id, mapa_id: MAPA });
-    sql('delete from souboj_vyzva; update postavy set aktualni_hp=5, max_hp=5 where id=2');
+    // Sindor drží Cep (skutečná zbraň) — útoky jsou fyzické. Bez zbraně by útočil pěstí, a to je stínové zranění
+    // (jde do stin_hp, ne do životů), takže by hp assertce zranitelnosti neseděly.
+    sql(`delete from souboj_vyzva; update postavy set aktualni_hp=5, max_hp=5, drzena_zbran_id=${CEP} where id=2; update postava_predmety set u_sebe=1 where postava_id=2`);
     const pridej = async (typ, col, row) => (await api(pj, 'token_pridat', Object.assign(
       { mapa_id: MAPA, typ_entity: typ, x: stred(col, row).x, y: stred(col, row).y },
       typ === 'nestvura' ? { nestvura_id: druh } : { postava_id: 2 }))).token_id;
@@ -102,8 +105,8 @@ const stav = (page) => page.evaluate(async (m) => (await fetch('api/mapa_stav.ph
     ok(d.vysledek.zraneni === cekane, 'násobek ½ se použil a zaokrouhlil nahoru: ' + zakladniZraneni + ' → ' + d.vysledek.zraneni + ' (čekáno ' + cekane + ')');
     ok(!!d.vysledek.zranitelnost && d.vysledek.zranitelnost.kod === 'B' && /násobek/.test(d.vysledek.zranitelnost.text),
       'PJ dostane vysvětlení: ' + ((d.vysledek.zranitelnost || {}).text || '—'));
-    ok(parseInt(sqlVal(`select aktualni_hp from nestvura_instance where id=${t.inst}`), 10) === 40 - cekane,
-      'v databázi ubyly opravdu jen zmenšené životy');
+    const hpPo2 = parseInt(sqlVal(`select aktualni_hp from nestvura_instance where id=${t.inst}`), 10);
+    ok(hpPo2 === 40 - cekane, 'v databázi ubyly opravdu jen zmenšené životy: hp=' + hpPo2 + ', čekáno ' + (40 - cekane) + ', zraneni=' + d.vysledek.zraneni);
 
     // --- 3) B s násobkem 2: zranění se zdvojnásobí ---
     sql(`update nestvura_zranitelnosti set modifikator='2' where nestvura_id=${druh} and kod_zranitelnosti_id=${kodB}`);
@@ -119,6 +122,25 @@ const stav = (page) => page.evaluate(async (m) => (await fetch('api/mapa_stav.ph
     ok(d.vysledek.zraneni === zakladniZraneni, 'bez skupiny B se zranění samo nenuluje (hra nepozná kouzelnou zbraň): ' + d.vysledek.zraneni);
     ok(!!d.vysledek.zranitelnost && d.vysledek.zranitelnost.nasobek === null && /NENÍ/.test(d.vysledek.zranitelnost.text),
       'PJ dostane varování: ' + ((d.vysledek.zranitelnost || {}).text || '—').slice(0, 80));
+
+    // --- 4b) materiál zbraně VYBRANÝ a skupina v seznamu NENÍ → hra vynutí zranění 0 ---
+    // Sindor drží Cep označený jako obyčejná (B); nestvůra má v seznamu jen C (z kroku 4). Obyčejná jí neublíží.
+    sql(`update postavy set drzena_zbran_id=${CEP} where id=2; update postava_predmety set u_sebe=1 where postava_id=2`);
+    sql(`update predmety set zranitelnost_skupina='B' where id=${CEP}`);
+    t = await pripravBoj();
+    d = await utok(t);
+    ok(d.vysledek.zraneni === 0, 'obyčejná zbraň (materiál B) na nestvůru bez B → zranění 0 (vynuceno): ' + d.vysledek.zraneni);
+    ok(!!d.vysledek.zranitelnost && d.vysledek.zranitelnost.nasobek === '0' && /NENÍ/.test(d.vysledek.zranitelnost.text || ''),
+      'PJ to vidí vysvětlené: ' + ((d.vysledek.zranitelnost || {}).text || '—').slice(0, 70));
+    ok(parseInt(sqlVal(`select aktualni_hp from nestvura_instance where id=${t.inst}`), 10) === 40, 'nestvůře opravdu neubyl život');
+
+    // --- 4c) materiál = kouzelná (C) a nestvůra má C → zranění projde ---
+    sql(`update predmety set zranitelnost_skupina='C' where id=${CEP}`);
+    t = await pripravBoj();
+    d = await utok(t);
+    ok(d.vysledek.zraneni > 0, 'kouzelná zbraň (C) na nestvůru zranitelnou C → zranění projde: ' + d.vysledek.zraneni);
+    ok(!d.vysledek.zranitelnost || d.vysledek.zranitelnost.nasobek !== '0', 'kouzelná zbraň se nenuluje');
+    sql(`update predmety set zranitelnost_skupina=NULL where id=${CEP}; update postavy set drzena_zbran_id=NULL where id=2`);
 
     // --- 5) hráč se z veřejné události nedozví nic (b17728) ---
     const udalosti = await hr.evaluate(async (m) => {
@@ -148,7 +170,9 @@ const stav = (page) => page.evaluate(async (m) => (await fetch('api/mapa_stav.ph
       ok(hrPosl.zasah !== undefined && hrPosl.cil_label !== undefined, 'ale pozná, kdo na koho a jestli trefil');
     }
   } finally {
-    // vrátit zranitelnosti goblina do původního stavu, ať na sobě sady nezávisí
+    // vrátit katalog i postavu do výchozího stavu, ať na sobě sady nezávisí
+    sql(`update predmety set zranitelnost_skupina=NULL where id=${CEP}; update postavy set drzena_zbran_id=NULL where id=2`);
+    // vrátit zranitelnosti goblina do původního stavu
     sql(`delete from nestvura_zranitelnosti where nestvura_id=${druh}`);
     for (const r of puvodni) {
       const [kod, mod] = r.split(':');

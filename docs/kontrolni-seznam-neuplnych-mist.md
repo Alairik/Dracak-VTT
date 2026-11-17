@@ -346,15 +346,21 @@ Hodnoty 6 sáhů / 3 směny a 8 sáhů / 24 směn jsou tedy prozatímní; při k
 a kapitole o vybavení a sjednotit. Mechanika se kvůli tomu neodkládala (pravidlo uživatele: „nesmysl
 neimplementovat mechaniku jen na neshodě čísel“), PJ může hodnotu na tokenu přepsat.
 
-## F0. Chybí v datech: předmět neumí říct, že je kouzelný nebo stříbrný (2026-11-10)
+## F0. Materiál zbraně (kouzelná/stříbrná/…) — VYŘEŠENO 2026-11-17
 
-Tabulka `predmety` nemá pole, podle kterého by se poznala **kouzelná (skupina C)** nebo **stříbrná (D)** zbraň.
-Kvůli tomu nejde u útoku určit skupinu podle bestiáře jinak než jako **B „obyčejná zbraň“** — a boj tak nemůže
-sám vyhodnotit, že nestvůra zranitelná jen C se obyčejným mečem zabít nedá. Dnes to řeší varování PJ (viz
-`docs/stav-projektu.md`, „Zranitelnost nestvůry konečně počítá i boj“), ale správné řešení je přidat předmětu
-příznak a podle něj skupinu určovat. Je to `ALTER TABLE`, takže to vyžaduje ruční SQL — **čeká na rozhodnutí
-uživatele**, protože se k tomu musí doplnit, které předměty v katalogu kouzelné nebo stříbrné vlastně jsou
-(v knize to u konkrétních kusů bývá v popisu, ne jako parametr).
+~~Tabulka `predmety` nemá pole, podle kterého by se poznala kouzelná (C) nebo stříbrná (D) zbraň.~~ Sloupec
+`predmety.zranitelnost_skupina` přidal blok L (2026-11-11), migrace 0123 ho doplnila do číslovaných migrací.
+V editoru vybavení se u zbraně vybírá **materiál** (Obyčejná / Stříbrná / Kouzelná / Posvěcená / Ohnivá-mrazivá /
+Jedovatá-leptavá) a boj podle něj určí skupinu. Když je materiál vybraný a jeho skupina v zranitelnostech nestvůry
+není, **zranění je 0** (obyčejný meč nestvůře zranitelné jen magií neublíží); bez vybraného materiálu se jen varuje.
+Podrobně viz `docs/stav-projektu.md`, sekce „Materiály zbraní a vynucení zranitelnosti“.
+
+**Zbývá** (zapsáno tamtéž): lykantrop + kouzelná zbraň = jen stínové zranění (b19272; data mají plné) — na
+rozhodnutí per nestvůra; víc materiálů naráz (kouzelný stříbrný); pěst/kop jako vynucené B.
+
+Souvisí s tím zbytek skupin: E (svěcená voda), G (oheň a mráz), H (jed a kyselina), I–N (skupiny kouzel),
+O, P — u kouzel by skupina šla odvodit ze `seznam_kouzel` / `skupiny_kouzel`, ale ta tabulka má čtyři řádky
+proti šesti číslovaným skupinám bestiáře (viz migrace 0118), takže ani to se zatím nehádá.
 
 Souvisí s tím i zbytek skupin: E (svěcená voda), G (oheň a mráz), H (jed a kyselina), I–N (skupiny kouzel),
 O, P — u kouzel by skupina šla odvodit ze `seznam_kouzel` / `skupiny_kouzel`, ale ta tabulka má čtyři řádky

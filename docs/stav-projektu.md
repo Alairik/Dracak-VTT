@@ -40,7 +40,7 @@ Uživatel bude hru zkoušet a posílat další úpravy; nic není „rozdělané
 Mimo souboj přibyla **malá karta postavy** (jeden klik na token = karta se životy, magenergií, ÚČ a OČ; plný deník
 až dvojklik nebo tlačítko „Deník“) — `assets/js/postava_mini.js`, `hra/api/postava_mini.php`.
 
-**Sekce s podrobnostmi, v pořadí od nejnovější:** „Kop (2026-11-17)“ → „Stínové životy (2026-11-14)“ → „Souboj — úpravy po první zkoušce uživatele“ → „Souboj — nový
+**Sekce s podrobnostmi, v pořadí od nejnovější:** „Materiály zbraní a vynucení zranitelnosti (2026-11-17)“ → „Kop (2026-11-17)“ → „Stínové životy (2026-11-14)“ → „Souboj — úpravy po první zkoušce uživatele“ → „Souboj — nový
 průběh, kroky 1–7 a telefon“ → „Souboj, krok 0“ → „Malá karta postavy“ → „Souboj — nový průběh, návrh“ (odkaz na
 plátno s nákresy: https://claude.ai/artifact/3ojke53iFM7Utts6MgXiX6; je to schválený návrh, **realita se od něj
 v pár bodech liší** — viz „Co z nákresu není přesně tak“ a úpravy z 13. 11.).
@@ -109,6 +109,36 @@ konverzace je zapsaný přesně proto, aby ses nemusel/a ptát na věci, co
 už byly rozhodnuté (viz "Architektonická rozhodnutí" a celá sekce
 "Rozpracováno" níže — všechno v ní je buď přímo citovaný text pravidel,
 nebo odsouhlasené uživatelem, ne můj odhad).
+
+### Materiály zbraní a vynucení zranitelnosti (2026-11-17, hotovo, bez nového ručního SQL)
+
+Uživatel u kvízu 2026-11-14: *„Ať hlídá hra. Existuje zranitelnost. Mohou se zavést stavy zbraně a materiály —
+kouzelná, posvěcená…“* Navazuje na blok L (2026-11-11), který už přidal `predmety.zranitelnost_skupina` (ruční SQL)
+a boj z něj bral skupinu útoku — ale jen **varoval**, nenuloval.
+
+**Co přibylo:**
+- **Migrace 0123** doplňuje `predmety.zranitelnost_skupina CHAR(1) NULL` do číslovaných migrací (dosud jen ruční
+  SQL z bloku L). Na produkci sloupec existuje, takže stránka Změny databáze migraci pozná jako hotovou (ADD COLUMN
+  se ověřuje podle existence sloupce) — **žádný nový ruční SQL není potřeba**, jen po nasazení „Spustit čekající změny“.
+- **Přívětivý editor materiálu** (`editor.php` dostal `option_labels`, `entities.php` mapuje písmena na slova):
+  místo holého „C/D/E“ se v editoru vybavení u zbraně vybírá **Obyčejná zbraň / Stříbrná / Kouzelná / Posvěcená /
+  Ohnivá-mrazivá / Jedovatá-leptavá**. Ukládá se dál písmeno (B/D/C/E/G/H).
+- **Vynucení v boji** (`dracak_vtt_utok_skupina` vrací písmeno, nebo `null` = neurčeno): když je materiál zbraně
+  VYBRANÝ a jeho skupina v zranitelnostech nestvůry **není**, boj dá zranění **0** („obyčejný meč jí neublíží“).
+  Když materiál vybraný **není** (neurčeno), chová se jako dřív — nenuluje, jen varuje PJ (hra nehádá, čím zbraň je).
+  Násobek u skupiny, která v seznamu je, se používá dál beze změny.
+
+**Rozšíření testu** `zranitelnost_boj_api.js`: materiál B na nestvůru bez B → zranění 0; materiál C na nestvůru
+zranitelnou C → projde. (Zároveň opraveno, že Sindor v tom testu drží Cep — bez zbraně by útočil pěstí a to je od
+úkolu „stínové životy“ stínové zranění, které nejde do běžných životů; starý test to nečekal.)
+
+**Vědomě NEhotové (čeká na tvoje rozhodnutí / foto knihy, neblokuje):**
+- **Lykantrop: kouzelná zbraň → jen stínové zranění** (b19272). V datech má Krysodlak C (kouzelná) s prázdným
+  násobkem = plné běžné zranění, ne stínové. Převod „kouzelná na lykantropa = stínové“ je navíc oproti datům a
+  rozchází se s obecným pravidlem — **nehádám to**, chce to ověřit proti knize a rozhodnout per nestvůra.
+- **Zbraň může být víc materiálů naráz** (kouzelný stříbrný meč = C i D). Sloupec drží jedno písmeno; zatím stačí.
+- **Pěst/kop a „rána beze zbraně = B“** (b17731): beze zbraně je materiál „neurčeno“ (null), takže se nevynucuje
+  (jen varuje). Vynutit B i u pěsti by šlo, ale musel by to vědět výběr varianty — necháno na později.
 
 ### Kop (2026-11-17, hotovo v kódu, čeká ruční SQL blok O)
 

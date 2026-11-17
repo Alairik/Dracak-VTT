@@ -157,8 +157,13 @@ return [
             // Skupina útoku podle bestiáře (b17729–b17745): podle ní se pozná, jestli zbraň na nestvůru vůbec
             // platí. Prázdné = obyčejná zbraň (B), do které kniha řadí i rány beze zbraně a pařáty (b17731).
             ...(dracak_entities_ma_sloupec('predmety', 'zranitelnost_skupina') ? [
-                ['name' => 'zranitelnost_skupina', 'label' => 'Skupina útoku proti nestvůrám (prázdné = B obyčejná zbraň)', 'type' => 'select',
-                 'options' => ['C', 'D', 'E', 'G', 'H'], 'filter' => 'select'],
+                ['name' => 'zranitelnost_skupina', 'label' => 'Materiál zbraně (kvůli zranitelnosti nestvůr; prázdné = neurčeno)', 'type' => 'select',
+                 'options' => ['B', 'D', 'C', 'E', 'G', 'H'],
+                 'option_labels' => [
+                     'B' => 'Obyčejná zbraň', 'D' => 'Stříbrná', 'C' => 'Kouzelná', 'E' => 'Posvěcená',
+                     'G' => 'Ohnivá / mrazivá', 'H' => 'Jedovatá / leptavá',
+                 ],
+                 'filter' => 'select'],
             ] : []),
         ],
         'relations' => [

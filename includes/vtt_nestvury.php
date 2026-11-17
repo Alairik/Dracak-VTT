@@ -342,24 +342,24 @@ function dracak_vtt_zranitelnost_tokenu(PDO $pdo, array $infoTokenu, string $kod
     return $nestvuraId > 0 ? dracak_vtt_nestvura_zranitelnost($pdo, $nestvuraId, $kod) : $prazdne;
 }
 
-// Do jaké skupiny bestiáře patří útok tohohle tvora (A–P). Výchozí je B „obyčejná zbraň“ — kniha tam řadí
-// i rány beze zbraně, pád a pařáty nestvůr (b17731, b17748). Jinou skupinu může mít jen držená zbraň postavy,
-// a to až když je v katalogu vyplněná (sloupec predmety.zranitelnost_skupina z ručního SQL). Bez toho sloupce
-// se nic nemění: hra kouzelnou (C) ani stříbrnou (D) zbraň nepozná a všechno je B.
-function dracak_vtt_utok_skupina(PDO $pdo, array $infoTokenu): string
+// Do jaké skupiny bestiáře patří útok tohohle tvora podle MATERIÁLU držené zbraně (predmety.zranitelnost_skupina).
+// Vrací písmeno A–P, když je materiál u zbraně vyplněný (PJ ho zná → boj ho smí vynutit, včetně nuly), nebo NULL,
+// když vyplněný není (neurčeno — pro výpočet se bere B „obyčejná zbraň“, b17731, ale nula se nevynucuje, jen varuje).
+// Rána beze zbraně (pěst/kop) a nestvůra nemají držený předmět, takže vracejí NULL (bere se B, nevynucuje).
+function dracak_vtt_utok_skupina(PDO $pdo, array $infoTokenu): ?string
 {
     if (($infoTokenu['typ_entity'] ?? '') !== 'postava' || empty($infoTokenu['entita_id'])) {
-        return DRACAK_VTT_ZRANITELNOST_ZBRAN;
+        return null;
     }
     if (empty(dracak_vtt_tokeny_funkce()['zbran_skupina'])) {
-        return DRACAK_VTT_ZRANITELNOST_ZBRAN;
+        return null;
     }
     $q = $pdo->prepare('SELECT p.zranitelnost_skupina FROM postavy po
                           JOIN predmety p ON p.id = po.drzena_zbran_id
                          WHERE po.id = ?');
     $q->execute([(int)$infoTokenu['entita_id']]);
     $skupina = strtoupper(trim((string)($q->fetchColumn() ?: '')));
-    return preg_match('/^[A-P]$/', $skupina) ? $skupina : DRACAK_VTT_ZRANITELNOST_ZBRAN;
+    return preg_match('/^[A-P]$/', $skupina) ? $skupina : null;
 }
 
 // Použije násobek zranitelnosti na spočítané zranění. Zaokrouhluje NAHORU (b17753) a nikdy nespadne pod 1,

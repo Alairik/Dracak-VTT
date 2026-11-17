@@ -897,13 +897,17 @@ function dracak_vtt_utok_vyhodnot(PDO $pdo, array $mapa, array $info, array $uto
     $obrId = (int)$obranaVyzva['token_id'];
     $utId = (int)$utokVyzva['token_id'];
 
-    // Zranitelnost nestvůry (bestiář, b17729–b17753). Fyzický útok je vždy skupina B „obyčejná zbraň“ — i rána
-    // beze zbraně a pařáty (b17731). Násobek u písmene („A ½“, „D 2“) se použije rovnou, zaokrouhluje se nahoru.
-    // Když nestvůra B v seznamu nemá, zranění se NEnuluje samo: hra nepozná kouzelnou (C) ani stříbrnou (D)
-    // zbraň, tabulka předmětů pro to nemá pole. Dostane to jen PJ jako upozornění (b17728: hráčům se to neříká).
+    // Zranitelnost nestvůry (bestiář, b17729–b17753). Skupina útoku se bere z materiálu držené zbraně
+    // (dracak_vtt_utok_skupina → písmeno, nebo null = neurčeno). Pro výpočet je výchozí B „obyčejná zbraň“ (kniha
+    // tam řadí i rány beze zbraně a pařáty, b17731). Násobek u písmene („A ½“, „D 2“) se použije rovnou (nahoru).
+    // Když skupina v seznamu NENÍ: materiál ZNÁMÝ (PJ ho u zbraně vybral) → nestvůře neublíží, zranění 0 (b17745);
+    // materiál NEZNÁMÝ → nenuluje se, jen varování pro PJ (b17728: hráčům se to neříká).
     $zranitelnost = null;
     require_once __DIR__ . '/vtt_nestvury.php';
-    $skupinaUtoku = dracak_vtt_utok_skupina($pdo, $info[$utId]);
+    $skupinaExplicit = dracak_vtt_utok_skupina($pdo, $info[$utId]);
+    $skupinaUtoku = $skupinaExplicit ?? DRACAK_VTT_ZRANITELNOST_ZBRAN;
+    $materialNazvy = ['B' => 'obyčejná zbraň', 'C' => 'kouzelná zbraň', 'D' => 'stříbrná zbraň', 'E' => 'posvěcená zbraň', 'G' => 'ohnivá/mrazivá zbraň', 'H' => 'jedovatá/leptavá zbraň'];
+    $materialNazev = $materialNazvy[$skupinaUtoku] ?? ('skupina ' . $skupinaUtoku);
     $zr = dracak_vtt_zranitelnost_tokenu($pdo, $info[$obrId], $skupinaUtoku);
     if ($zasah && $zraneni > 0 && $zr['ma_data']) {
         if ($zr['v_seznamu'] && $zr['nasobek'] !== null) {
@@ -918,18 +922,29 @@ function dracak_vtt_utok_vyhodnot(PDO $pdo, array $mapa, array $info, array $uto
                     . $zr['nasobek'][0] . ($zr['nasobek'][1] > 1 ? '/' . $zr['nasobek'][1] : '')
                     . ' — zranění ' . $pred . ' → ' . $zraneni . ' (zaokrouhluje se nahoru).',
             ];
+        } elseif (!$zr['v_seznamu'] && $skupinaExplicit !== null) {
+            // Materiál zbraně je známý a tahle skupina v zranitelnostech nestvůry není → neublíží jí.
+            $pred = $zraneni;
+            $zraneni = 0;
+            $zranitelnost = [
+                'kod' => $skupinaUtoku,
+                'nazev' => $materialNazev,
+                'nasobek' => '0',
+                'zraneni_pred' => $pred,
+                'zraneni_nove' => 0,
+                'text' => 'Tahle zbraň (' . $materialNazev . ', skupina ' . $skupinaUtoku . ') v zranitelnostech téhle nestvůry NENÍ'
+                    . ' — podle bestiáře jí neublíží, zranění jsem dal na 0. (Změnit jde v materiálu zbraně nebo tady v opravě.)',
+            ];
         } elseif (!$zr['v_seznamu']) {
+            // Materiál neznámý — nenuluju, jen varuju (hra nepozná, čím je zbraň; PJ rozhodne).
             $zranitelnost = [
                 'kod' => $zr['kod'],
                 'nazev' => $zr['nazev'],
                 'nasobek' => null,
                 'zraneni_pred' => $zraneni,
-                'text' => $skupinaUtoku === DRACAK_VTT_ZRANITELNOST_ZBRAN
-                    ? 'Pozor: obyčejná zbraň (skupina B) v zranitelnostech téhle nestvůry NENÍ — podle bestiáře jí'
-                        . ' neublíží. Zranění jsem nechal, protože nepoznám kouzelnou ani stříbrnou zbraň; když útočí'
-                        . ' obyčejnou, dej zranění 0.'
-                    : 'Pozor: skupina ' . $skupinaUtoku . ' (podle držené zbraně) v zranitelnostech téhle nestvůry NENÍ'
-                        . ' — podle bestiáře jí tenhle útok neublíží. Zranění jsem nechal, rozhodni sám.',
+                'text' => 'Pozor: obyčejná zbraň (skupina B) v zranitelnostech téhle nestvůry NENÍ — podle bestiáře by jí'
+                    . ' neublížila. Zranění jsem nechal, protože u téhle zbraně není vybraný materiál; vyber ho u zbraně'
+                    . ' (kouzelná/stříbrná/…), nebo když je obyčejná, dej zranění 0.',
             ];
         }
     }
